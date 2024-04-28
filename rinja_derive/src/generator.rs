@@ -1364,12 +1364,14 @@ impl<'a> Generator<'a> {
             ));
         }
 
-        if args.len() != 1 {
-            return Err(ctx.generate_error("unexpected argument(s) in `json` filter", node));
-        }
         buf.write(CRATE);
         buf.write("::filters::json(");
         self._visit_args(ctx, buf, args)?;
+        match args.len() {
+            1 => buf.write(", ()"),
+            2 => {}
+            _ => return Err(ctx.generate_error("unexpected argument(s) in `json` filter", node)),
+        }
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
     }
