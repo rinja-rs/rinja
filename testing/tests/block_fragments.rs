@@ -103,3 +103,45 @@ fn test_specific_block() {
     let t = RenderInPlace { s1 };
     assert_eq!(t.render().unwrap(), "\nSection: [abc]\n");
 }
+
+#[derive(Template)]
+#[template(
+    source = r#"{% block empty %}
+{% endblock %}
+
+{% if let Some(var) = var %}
+{{ var }}
+{% endif %}"#,
+    block = "empty",
+    ext = "txt"
+)]
+struct Empty {}
+
+#[test]
+fn test_render_only_block() {
+    assert_eq!(Empty {}.render().unwrap(), "\n");
+}
+
+#[derive(Template)]
+#[template(
+    source = r#"{% extends "fragment-base.html" %}
+
+{% block body %}
+{% include "included.html" %}
+{% endblock %}
+
+{% block other_body %}
+<p>Don't render me.</p>
+{% endblock %}"#,
+    block = "body",
+    ext = "html"
+)]
+struct FragmentInclude<'a> {
+    s: &'a str,
+}
+
+#[test]
+fn test_fragment_include() {
+    let fragment_include = FragmentInclude { s: "world" };
+    assert_eq!(fragment_include.render().unwrap(), "\nINCLUDED: world\n");
+}
