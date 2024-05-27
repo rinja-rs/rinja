@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::env::current_dir;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::rc::Rc;
 use std::{fmt, str};
@@ -127,6 +128,59 @@ impl<'a> Ast<'a> {
     }
 }
 
+/// Struct used to wrap types with their associated "span" which is used when generating errors
+/// in the code generation.
+pub struct WithSpan<'a, T> {
+    inner: T,
+    span: &'a str,
+}
+
+impl<'a, T> WithSpan<'a, T> {
+    pub fn new(inner: T, span: &'a str) -> Self {
+        Self { inner, span }
+    }
+
+    pub fn span(&self) -> &str {
+        self.span
+    }
+}
+
+impl<'a, T> Deref for WithSpan<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a, T> DerefMut for WithSpan<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for WithSpan<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
+impl<'a, T: Clone> Clone for WithSpan<'a, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            span: self.span,
+        }
+    }
+}
+
+impl<'a, T: PartialEq> PartialEq for WithSpan<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        // We never want to compare the span information.
+        self.inner == other.inner
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     Incomplete,
@@ -209,38 +263,6 @@ pub fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorIn
     };
     let error_info = generate_row_and_column(src, input);
     (error_info, file_path)
-}
-
-fn generate_error_message(
-    message: &str,
-    src: &str,
-    input: &str,
-    file_path: &Option<Rc<Path>>,
-) -> String {
-    if let Some(file_path) = file_path {
-        let (
-            ErrorInfo {
-                row,
-                column,
-                source_after,
-            },
-            file_path,
-        ) = generate_error_info(src, input, file_path);
-        format!(
-            "{message}failed to parse template source\n  --> {file_path}:{row}:{column}\n{source_after}",
-            row = row + 1,
-        )
-    } else {
-        let ErrorInfo {
-            row,
-            column,
-            source_after,
-        } = generate_row_and_column(src, input);
-        format!(
-            "{message}failed to parse template source at row {}, column {column} near:\n{source_after}",
-            row + 1,
-        )
-    }
 }
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
