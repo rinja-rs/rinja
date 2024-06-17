@@ -44,7 +44,14 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let mut contexts = HashMap::new();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
-    Generator::new(&input, &contexts, None, MapChain::default()).build(&contexts[&input.path])
+    Generator::new(
+        &input,
+        &contexts,
+        None,
+        MapChain::default(),
+        input.block.is_some(),
+    )
+    .build(&contexts[&input.path])
 }
 
 /// Takes a `syn::DeriveInput` and generates source code for it
@@ -91,8 +98,14 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
         eprintln!("{:?}", templates[&input.path].nodes());
     }
 
-    let code = Generator::new(&input, &contexts, heritage.as_ref(), MapChain::default())
-        .build(&contexts[&input.path])?;
+    let code = Generator::new(
+        &input,
+        &contexts,
+        heritage.as_ref(),
+        MapChain::default(),
+        input.block.is_some(),
+    )
+    .build(&contexts[&input.path])?;
     if input.print == Print::Code || input.print == Print::All {
         eprintln!("{code}");
     }

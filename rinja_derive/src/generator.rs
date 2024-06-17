@@ -47,6 +47,7 @@ impl<'a> Generator<'a> {
         contexts: &'n HashMap<&'n Rc<Path>, Context<'n>>,
         heritage: Option<&'n Heritage<'_>>,
         locals: MapChain<'n, Cow<'n, str>, LocalMeta>,
+        buf_writable_discard: bool,
     ) -> Generator<'n> {
         Generator {
             input,
@@ -57,7 +58,7 @@ impl<'a> Generator<'a> {
             skip_ws: WhitespaceHandling::Preserve,
             super_block: None,
             buf_writable: WritableBuffer {
-                discard: input.block.is_some(),
+                discard: buf_writable_discard,
                 ..Default::default()
             },
             named: 0,
@@ -90,6 +91,7 @@ impl<'a> Generator<'a> {
         buf.write(CRATE);
         buf.writeln("::Result<()> {")?;
 
+        buf.discard = self.buf_writable.discard;
         // Make sure the compiler understands that the generated code depends on the template files.
         for path in self.contexts.keys() {
             // Skip the fake path of templates defined in rust source.
@@ -113,6 +115,7 @@ impl<'a> Generator<'a> {
         } else {
             self.handle(ctx, ctx.nodes, buf, AstLevel::Top)
         }?;
+        buf.discard = false;
 
         self.flush_ws(Ws(None, None));
         buf.write(CRATE);
@@ -829,7 +832,13 @@ impl<'a> Generator<'a> {
             None => child_ctx,
         };
         let locals = MapChain::with_parent(&self.locals);
-        let mut child = Self::new(self.input, self.contexts, heritage.as_ref(), locals);
+        let mut child = Self::new(
+            self.input,
+            self.contexts,
+            heritage.as_ref(),
+            locals,
+            self.buf_writable.discard,
+        );
         let mut size_hint = child.handle(handle_ctx, handle_ctx.nodes, buf, AstLevel::Top)?;
         size_hint += child.write_buf_writable(handle_ctx, buf)?;
         self.prepare_ws(i.ws);
@@ -992,6 +1001,7 @@ impl<'a> Generator<'a> {
             Some(heritage),
             // Variables are NOT inherited from the parent scope.
             MapChain::default(),
+            self.buf_writable.discard,
         );
         child.buf_writable = mem::take(&mut self.buf_writable);
 
@@ -1013,6 +1023,13 @@ impl<'a> Generator<'a> {
         // succeeding whitespace according to the outer WS spec
         self.prepare_ws(outer);
 
+        // If we are rendering a specific block and the discard changed, it means that we're done
+        // with the block we want to render and that from this point, everything will be discarded.
+        //
+        // To get this block content rendered as well, we need to write to the buffer before then.
+        if buf.discard != prev_buf_discard {
+            self.write_buf_writable(ctx, buf)?;
+        }
         // Restore the original buffer discarding state
         if block_fragment_write {
             self.buf_writable.discard = true;
@@ -1910,6 +1927,7 @@ impl<'a> Generator<'a> {
     }
 }
 
+#[derive(Debug)]
 struct Buffer {
     // The buffer to generate the code into
     buf: String,
@@ -2269,6 +2287,7 @@ struct WriteParts {
 /// ```ignore
 /// let var = format!(format, expr);
 /// ```
+#[derive(Debug)]
 struct WritePartsBuffers {
     format: Buffer,
     expr: Option<Buffer>,
