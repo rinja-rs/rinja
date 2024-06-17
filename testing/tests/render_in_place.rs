@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 #[derive(Template)]
 #[template(path = "render_in_place.html")]
 struct RenderInPlace<'a> {

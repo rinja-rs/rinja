@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{% block foo %}{% endblock not_foo %}", ext = "html")]

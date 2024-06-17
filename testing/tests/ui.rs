@@ -14,7 +14,7 @@ fn ui() {
         Ok(manifest_dir) => manifest_dir,
         Err(_) => panic!("you need to run tests with `cargo`"),
     };
-    let target = Path::new(&manifest_dir).join("../target/tests/trybuild/askama_testing");
+    let target = Path::new(&manifest_dir).join("../target/tests/trybuild/rinja_testing");
     if !target.exists() {
         if let Err(err) = std::fs::create_dir_all(&target) {
             panic!("failed to create folder `{}`: {err:?}", target.display());

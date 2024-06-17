@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = r#"{% extends "extend_and_import.html" %}

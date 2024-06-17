@@ -1,6 +1,6 @@
 #![allow(clippy::useless_let_if_seq)]
 
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{% let v = s %}{{ v }}", ext = "txt")]

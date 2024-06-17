@@ -32,8 +32,8 @@ jobs:
     strategy:
       matrix:
         package: [
-          askama, askama_actix, askama_axum, askama_derive, askama_escape,
-          askama_parser, askama_rocket, askama_warp, testing,
+          rinja, rinja_actix, rinja_axum, rinja_derive, rinja_escape,
+          rinja_parser, rinja_rocket, rinja_warp, testing,
         ]
     runs-on: ubuntu-latest
     steps:
@@ -60,7 +60,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.65.0"
-      - run: cargo check --lib -p askama --all-features
+      - run: cargo check --lib -p rinja --all-features
 
   Audit:
     runs-on: ubuntu-22.04

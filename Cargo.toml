@@ -1,21 +1,21 @@
 [workspace]
 members = [
-    "askama",
-    "askama_actix",
-    "askama_axum",
-    "askama_derive",
-    "askama_escape",
-    "askama_parser",
-    "askama_rocket",
-    "askama_warp",
+    "rinja",
+    "rinja_actix",
+    "rinja_axum",
+    "rinja_derive",
+    "rinja_escape",
+    "rinja_parser",
+    "rinja_rocket",
+    "rinja_warp",
     "testing",
 ]
 resolver = "2"
 
 default-members = [
-    "askama",
-    "askama_derive",
-    "askama_escape",
-    "askama_parser",
+    "rinja",
+    "rinja_derive",
+    "rinja_escape",
+    "rinja_parser",
     "testing",
 ]

@@ -28,12 +28,12 @@ Lit("", "!", "\n")]
 The generated code looks like this:
 
 ```rust
-impl < 'a > ::askama::Template for HelloTemplate< 'a > {
-    fn render_into(&self, writer: &mut ::std::fmt::Write) -> ::askama::Result<()> {
+impl < 'a > ::rinja::Template for HelloTemplate< 'a > {
+    fn render_into(&self, writer: &mut ::std::fmt::Write) -> ::rinja::Result<()> {
         write!(
             writer,
             "Hello, {expr0}!",
-            expr0 = &::askama::MarkupDisplay::from(&self.name),
+            expr0 = &::rinja::MarkupDisplay::from(&self.name),
         )?;
         Ok(())
     }
@@ -43,7 +43,7 @@ impl < 'a > ::askama::Template for HelloTemplate< 'a > {
 }
 impl < 'a > ::std::fmt::Display for HelloTemplate< 'a > {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        ::askama::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})
+        ::rinja::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})
     }
 }
 ```

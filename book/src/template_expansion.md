@@ -10,10 +10,10 @@ following examples might not be up-to-date.
 
 When you add `#[derive(Template)]` and `#[template(...)]` on your type, the
 `Template` derive proc-macro will then generate an implementation of the
-`askama::Template` trait which will be a Rust version of the template.
+`rinja::Template` trait which will be a Rust version of the template.
 
 It will also implement the `std::fmt::Display` trait on your type which will
-internally call the `askama::Template` trait.
+internally call the `rinja::Template` trait.
 
 Let's take a small example:
 
@@ -26,13 +26,13 @@ struct Mine;
 will generate:
 
 ```rust
-impl ::askama::Template for YourType {
+impl ::rinja::Template for YourType {
     fn render_into(
         &self,
         writer: &mut (impl ::std::fmt::Write + ?Sized),
-    ) -> ::askama::Result<()> {
+    ) -> ::rinja::Result<()> {
         let x = 12;
-        ::askama::Result::Ok(())
+        ::rinja::Result::Ok(())
     }
     const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = Some(
         "html",
@@ -44,12 +44,12 @@ impl ::askama::Template for YourType {
 impl ::std::fmt::Display for YourType {
     #[inline]
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        ::askama::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})
+        ::rinja::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})
     }
 }
 ```
 
-For simplicity, we will only keep the content of the `askama::Template::render_into`
+For simplicity, we will only keep the content of the `rinja::Template::render_into`
 function from now on.
 
 ## Text content
@@ -67,10 +67,10 @@ writer
     .write_fmt(
         format_args!(
             "<h1>{0}</h1>",
-            &::askama::MarkupDisplay::new_unsafe(&(self.title), ::askama::Html),
+            &::rinja::MarkupDisplay::new_unsafe(&(self.title), ::rinja::Html),
         ),
     )?;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 About `MarkupDisplay`: we need to use this type in order to prevent generating
@@ -98,12 +98,12 @@ will generate:
 ```rust
 let x = 12;
 let y = x + 1;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 ### Variables usage
 
-By default, variables will reference a field from the type on which the `askama::Template`
+By default, variables will reference a field from the type on which the `rinja::Template`
 trait is implemented:
 
 ```jinja
@@ -117,13 +117,13 @@ writer
     .write_fmt(
         format_args!(
             "{0}",
-            &::askama::MarkupDisplay::new_unsafe(&(self.y), ::askama::Html),
+            &::rinja::MarkupDisplay::new_unsafe(&(self.y), ::rinja::Html),
         ),
     )?;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
-This is why if the variable is undefined, it won't work with Askama and why
+This is why if the variable is undefined, it won't work with Rinja and why
 we can't check if a variable is defined or not.
 
 You can still access constants and statics by using paths. Let's say you have in
@@ -146,12 +146,12 @@ writer
     .write_fmt(
         format_args!(
             "{0}{1}{2}",
-            &::askama::MarkupDisplay::new_unsafe(&(crate::FOO), ::askama::Html),
-            &::askama::MarkupDisplay::new_unsafe(&(super::FOO), ::askama::Html),
-            &::askama::MarkupDisplay::new_unsafe(&(self::FOO), ::askama::Html),
+            &::rinja::MarkupDisplay::new_unsafe(&(crate::FOO), ::rinja::Html),
+            &::rinja::MarkupDisplay::new_unsafe(&(super::FOO), ::rinja::Html),
+            &::rinja::MarkupDisplay::new_unsafe(&(self::FOO), ::rinja::Html),
         ),
     )?;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 (Note: `crate::` is to get an item at the root level of the crate, `super::` is
@@ -184,7 +184,7 @@ if *(&(self.x == "a") as &bool) {
 } else {
     writer.write_str("tarte")?;
 }
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 Very much as expected except for the `&(self.x == "a") as &bool`. Now about why
@@ -227,7 +227,7 @@ if let Some(x) = &(self.x) {
         .write_fmt(
             format_args!(
                 "{0}",
-                &::askama::MarkupDisplay::new_unsafe(&(x), ::askama::Html),
+                &::rinja::MarkupDisplay::new_unsafe(&(x), ::rinja::Html),
             ),
         )?;
 }
@@ -246,17 +246,17 @@ will generate:
 ```rust
 {
     let _iter = (&self.users).into_iter();
-    for (user, _loop_item) in ::askama::helpers::TemplateLoop::new(_iter) {
+    for (user, _loop_item) in ::rinja::helpers::TemplateLoop::new(_iter) {
         writer
             .write_fmt(
                 format_args!(
                     "\n    {0}\n",
-                    &::askama::MarkupDisplay::new_unsafe(&(user), ::askama::Html),
+                    &::rinja::MarkupDisplay::new_unsafe(&(user), ::rinja::Html),
                 ),
             )?;
     }
 }
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 Now let's see what happens if you add an `else` condition:
@@ -275,13 +275,13 @@ Which generates:
 {
     let mut _did_loop = false;
     let _iter = (&self.users).into_iter();
-    for (user, _loop_item) in ::askama::helpers::TemplateLoop::new(_iter) {
+    for (user, _loop_item) in ::rinja::helpers::TemplateLoop::new(_iter) {
         _did_loop = true;
         writer
             .write_fmt(
                 format_args!(
                     "\n    {0}\n",
-                    &::askama::MarkupDisplay::new_unsafe(&(user), ::askama::Html),
+                    &::rinja::MarkupDisplay::new_unsafe(&(user), ::rinja::Html),
                 ),
             )?;
     }
@@ -290,15 +290,15 @@ Which generates:
             .write_fmt(
                 format_args!(
                     "\n    {0}\n",
-                    &::askama::MarkupDisplay::new_unsafe(
+                    &::rinja::MarkupDisplay::new_unsafe(
                         &(self.x),
-                        ::askama::Html,
+                        ::rinja::Html,
                     ),
                 ),
             )?;
     }
 }
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 It creates a `_did_loop` variable which will check if we entered the loop. If
@@ -322,13 +322,13 @@ which generates:
     let mut _did_loop = false;
     let _iter = (&self.users).into_iter();
     let _iter = _iter.filter(|user| -> bool { self.users.len() > 2 });
-    for (user, _loop_item) in ::askama::helpers::TemplateLoop::new(_iter) {
+    for (user, _loop_item) in ::rinja::helpers::TemplateLoop::new(_iter) {
         _did_loop = true;
         writer
             .write_fmt(
                 format_args!(
                     "\n    {0}\n",
-                    &::askama::MarkupDisplay::new_unsafe(&(user), ::askama::Html),
+                    &::rinja::MarkupDisplay::new_unsafe(&(user), ::rinja::Html),
                 ),
             )?;
     }
@@ -337,15 +337,15 @@ which generates:
             .write_fmt(
                 format_args!(
                     "\n    {0}\n",
-                    &::askama::MarkupDisplay::new_unsafe(
+                    &::rinja::MarkupDisplay::new_unsafe(
                         &(self.x),
-                        ::askama::Html,
+                        ::rinja::Html,
                     ),
                 ),
             )?;
     }
 }
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 It generates an iterator but filters it based on the `if` condition (`users.len() > 2`).
@@ -367,17 +367,17 @@ Which generates:
 {
     let _iter = (&self.users).into_iter();
     let _iter = _iter.filter(|user| -> bool { self.users.len() > 2 });
-    for (user, _loop_item) in ::askama::helpers::TemplateLoop::new(_iter) {
+    for (user, _loop_item) in ::rinja::helpers::TemplateLoop::new(_iter) {
         writer
             .write_fmt(
                 format_args!(
                     "\n    {0}\n",
-                    &::askama::MarkupDisplay::new_unsafe(&(user), ::askama::Html),
+                    &::rinja::MarkupDisplay::new_unsafe(&(user), ::rinja::Html),
                 ),
             )?;
     }
 }
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 ## Filters
@@ -395,13 +395,13 @@ writer
     .write_fmt(
         format_args!(
             "{0}",
-            &::askama::MarkupDisplay::new_unsafe(
-                &(::askama::filters::abs(-2)?),
-                ::askama::Html,
+            &::rinja::MarkupDisplay::new_unsafe(
+                &(::rinja::filters::abs(-2)?),
+                ::rinja::Html,
             ),
         ),
     )?;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 The filter is called with `-2` as first argument. You can add further arguments
@@ -418,13 +418,13 @@ writer
     .write_fmt(
         format_args!(
             "{0}",
-            &::askama::MarkupDisplay::new_unsafe(
-                &(::askama::filters::indent("a", 4)?),
-                ::askama::Html,
+            &::rinja::MarkupDisplay::new_unsafe(
+                &(::rinja::filters::indent("a", 4)?),
+                ::rinja::Html,
             ),
         ),
     )?;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 No surprise there, `4` is added after `"a"`. Now let's check when we chain the filters:
@@ -440,15 +440,15 @@ writer
     .write_fmt(
         format_args!(
             "{0}",
-            &::askama::MarkupDisplay::new_unsafe(
-                &(::askama::filters::capitalize(
-                    &(::askama::filters::indent("a", 4)?),
+            &::rinja::MarkupDisplay::new_unsafe(
+                &(::rinja::filters::capitalize(
+                    &(::rinja::filters::indent("a", 4)?),
                 )?),
-                ::askama::Html,
+                ::rinja::Html,
             ),
         ),
     )?;
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 As expected, `capitalize`'s first argument is the value returned by the `indent` call.
@@ -474,11 +474,11 @@ generates:
         .write_fmt(
             format_args!(
                 "\n<h1>{0}</h1>\n",
-                &::askama::MarkupDisplay::new_unsafe(&(arg), ::askama::Html),
+                &::rinja::MarkupDisplay::new_unsafe(&(arg), ::rinja::Html),
             ),
         )?;
 }
-::askama::Result::Ok(())
+::rinja::Result::Ok(())
 ```
 
 As you can see, the macro itself isn't present in the generated code, only its

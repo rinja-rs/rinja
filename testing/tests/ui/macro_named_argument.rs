@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{%- macro thrice(param1, param2) -%}

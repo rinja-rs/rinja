@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 struct Post {
     id: u32,

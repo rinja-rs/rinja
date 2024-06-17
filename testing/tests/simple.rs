@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_names)] // For the use of `foo` in test cases
 
-use askama::Template;
+use rinja::Template;
 
 use std::collections::HashMap;
 
@@ -448,18 +448,18 @@ fn test_raw_ws() {
 }
 
 mod without_import_on_derive {
-    #[derive(askama::Template)]
+    #[derive(rinja::Template)]
     #[template(source = "foo", ext = "txt")]
     struct WithoutImport;
 
     #[test]
     fn test_without_import() {
-        use askama::Template;
+        use rinja::Template;
         assert_eq!(WithoutImport.render().unwrap(), "foo");
     }
 }
 
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(source = "{% let s = String::new() %}{{ s }}", ext = "txt")]
 struct DefineStringVar;
 
@@ -469,7 +469,7 @@ fn test_define_string_var() {
     assert_eq!(template.render().unwrap(), "");
 }
 
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(source = "{% let x = 4.5 %}{{ x }}", ext = "html")]
 struct SimpleFloat;
 
@@ -479,7 +479,7 @@ fn test_simple_float() {
     assert_eq!(template.render().unwrap(), "4.5");
 }
 
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(path = "num-literals.html")]
 struct NumLiterals;
 
@@ -493,7 +493,7 @@ fn test_num_literals() {
 }
 
 #[allow(non_snake_case)]
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(source = "{{ xY }}", ext = "txt")]
 struct MixedCase {
     xY: &'static str,
@@ -505,7 +505,7 @@ struct MixedCase {
 /// variable names (`foo`). Previously, this test would fail because any
 /// name containing uppercase characters would be considered a path.
 ///
-/// https://github.com/djc/askama/issues/924
+/// https://github.com/rinja-rs/rinja/issues/924
 #[test]
 fn test_mixed_case() {
     let template = MixedCase { xY: "foo" };
@@ -513,7 +513,7 @@ fn test_mixed_case() {
 }
 
 #[allow(non_snake_case)]
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(source = "Hello, {{ user }}!", ext = "txt")]
 struct Referenced {
     user: &'static str,

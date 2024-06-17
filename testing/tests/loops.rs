@@ -3,7 +3,7 @@
 use std::fmt;
 use std::ops::Range;
 
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(path = "for.html")]

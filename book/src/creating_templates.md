@@ -1,8 +1,8 @@
 # Creating Templates
 
-An Askama template is a `struct` definition which provides the template
+An Rinja template is a `struct` definition which provides the template
 context combined with a UTF-8 encoded text file (or inline source, see
-below). Askama can be used to generate any kind of text-based format.
+below). Rinja can be used to generate any kind of text-based format.
 The template file's extension may be used to provide content type hints.
 
 A template consists of **text contents**, which are passed through as-is,
@@ -24,7 +24,7 @@ struct HelloTemplate<'a> { // the name of the struct can be anything
 
 ## The `template()` attribute
 
-Askama works by generating one or more trait implementations for any
+Rinja works by generating one or more trait implementations for any
 `struct` type decorated with the `#[derive(Template)]` attribute. The
 code generation process takes some options that can be specified through
 the `template()` attribute. The following sub-attributes are currently
@@ -95,7 +95,7 @@ recognized:
   ```
 * `syntax` (as `syntax = "foo"`): set the syntax name for a parser defined
   in the configuration file. The default syntax , "default", is the one
-  provided by Askama.
+  provided by Rinja.
   ```rust
   #[derive(Template)]
   #[template(path = "hello.html", syntax = "foo")]

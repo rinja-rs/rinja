@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{{ func(value) }}", ext = "txt")]
@@ -85,7 +85,7 @@ fn double_attr_arg_helper(x: u32) -> u32 {
     x * x + x
 }
 
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(
     source = "{{ self::double_attr_arg_helper(self.x.0 + 2) }}",
     ext = "txt"

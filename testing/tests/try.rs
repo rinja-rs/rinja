@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{% let v = self.parse()? %}{{s}}={{v}}", ext = "txt")]
@@ -15,7 +15,7 @@ impl IntParserTemplate<'_> {
 #[test]
 fn test_int_parser() {
     let template = IntParserTemplate { s: "💯" };
-    assert!(matches!(template.render(), Err(askama::Error::Custom(_))));
+    assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
         "invalid digit found in string"
@@ -36,7 +36,7 @@ fn fail_fmt() {
     let template = FailFmt {
         value: || Err(std::fmt::Error),
     };
-    assert!(matches!(template.render(), Err(askama::Error::Custom(_))));
+    assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
         format!("{}", std::fmt::Error)
@@ -59,7 +59,7 @@ fn fail_str() {
     let template = FailStr {
         value: || Err("FAIL"),
     };
-    assert!(matches!(template.render(), Err(askama::Error::Custom(_))));
+    assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
     assert_eq!(format!("{}", &template.render().unwrap_err()), "FAIL");
 
     let template = FailStr {

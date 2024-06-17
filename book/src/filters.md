@@ -13,7 +13,7 @@ is passed to the next.
 {{ "HELLO"|lower }}
 ```
 
-Askama has a collection of built-in filters, documented below, but can also include custom filters. 
+Rinja has a collection of built-in filters, documented below, but can also include custom filters. 
 Additionally, the `json` filter is included in the built-in filters, but is disabled by default.
 Enable it with Cargo features (see below for more information).
 
@@ -192,7 +192,7 @@ Formats arguments according to the specified format
 
 The *second* argument to this filter must be a string literal (as in normal
 Rust). The two arguments are passed through to [`format!()`] by
-the Askama code generator, but the order is swapped to support filter
+the Rinja code generator, but the order is swapped to support filter
 composition.
 
 ```text
@@ -213,7 +213,7 @@ Formats arguments according to the specified format.
 
 The first argument to this filter must be a string literal (as in normal Rust).
 
-All arguments are passed through to [`format!()`] by the Askama code generator.
+All arguments are passed through to [`format!()`] by the Rinja code generator.
 
 ```
 {{ "{:?}"|format(var) }}
@@ -265,13 +265,13 @@ Replaces line breaks in plain text with appropriate HTML.
 A single newline becomes an HTML line break `<br>` and a new line followed by a blank line becomes a paragraph break `<p>`.
 
 ```
-{{ "hello\nworld\n\nfrom\naskama"|linebreaks }}
+{{ "hello\nworld\n\nfrom\nrinja"|linebreaks }}
 ```
 
 Output:
 
 ```
-<p>hello<br />world</p><p>from<br />askama</p>
+<p>hello<br />world</p><p>from<br />rinja</p>
 ```
 
 ### linebreaksbr
@@ -280,13 +280,13 @@ Output:
 Converts all newlines in a piece of plain text to HTML line breaks.
 
 ```
-{{ "hello\nworld\n\nfrom\naskama"|linebreaks }}
+{{ "hello\nworld\n\nfrom\nrinja"|linebreaks }}
 ```
 
 Output:
 
 ```
-hello<br />world<br /><br />from<br />askama
+hello<br />world<br /><br />from<br />rinja
 ```
 
 ### paragraphbreaks
@@ -299,13 +299,13 @@ Consecutive double line breaks will be reduced down to a single paragraph break.
 This is useful in contexts where changing single line breaks to line break tags would interfere with other HTML elements, such as lists and nested `<div>` tags.
 
 ```
-{{ "hello\nworld\n\nfrom\n\n\n\naskama"|paragraphbreaks }}
+{{ "hello\nworld\n\nfrom\n\n\n\nrinja"|paragraphbreaks }}
 ```
 
 Output:
 
 ```
-<p>hello\nworld</p><p>from</p><p>askama</p>
+<p>hello\nworld</p><p>from</p><p>rinja</p>
 ```
 
 ### lower | lowercase
@@ -421,7 +421,7 @@ hello%3Fworld
 Count the words in that string.
 
 ```
-{{ "askama is sort of cool"|wordcount }}
+{{ "rinja is sort of cool"|wordcount }}
 ```
 
 Output:
@@ -438,7 +438,7 @@ The following filters can be enabled by requesting the respective feature in the
 
 ```
 [dependencies]
-askama = { version = "0.11.2", features = "serde-json" }
+rinja = { version = "0.11.2", features = "serde-json" }
 ```
 
 ### `json` | `tojson`
@@ -473,7 +473,7 @@ Ugly: <script>var data = '{{data|json|safe}}';</script>
 
 To define your own filters, simply have a module named `filters` in scope of the context deriving a `Template` impl 
 and define the filters as functions within this module. 
-The functions must have at least one argument and the return type must be `::askama::Result<T>`.
+The functions must have at least one argument and the return type must be `::rinja::Result<T>`.
 Although there are no restrictions on `T` for a single filter, 
 the final result of a chain of filters must implement `Display`. 
 
@@ -483,7 +483,7 @@ Subsequent arguments, if any, must be given directly when calling the filter.
 The first argument may or may not be a reference, depending on the context in which the filter is called. 
 To abstract over ownership, consider defining your argument as a trait bound.
 For example, the `trim` built-in filter accepts any value implementing `Display`. 
-Its signature is similar to `fn trim(s: impl std::fmt::Display) -> ::askama::Result<String>`.
+Its signature is similar to `fn trim(s: impl std::fmt::Display) -> ::rinja::Result<String>`.
 
 Note that built-in filters have preference over custom filters, so, in case of name collision, the built-in filter is applied.
 
@@ -491,7 +491,7 @@ Note that built-in filters have preference over custom filters, so, in case of n
 
 Implementing a filter that replaces all instances of `"oo"` for `"aa"`.
 ```rust
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{{ s|myfilter }}", ext = "txt")]
@@ -502,7 +502,7 @@ struct MyFilterTemplate<'a> {
 // Any filter defined in the module `filters` is accessible in your template.
 mod filters {
     // This filter does not have extra arguments
-    pub fn myfilter<T: std::fmt::Display>(s: T) -> ::askama::Result<String> {
+    pub fn myfilter<T: std::fmt::Display>(s: T) -> ::rinja::Result<String> {
         let s = s.to_string();
         Ok(s.replace("oo", "aa"))
     }
@@ -516,7 +516,7 @@ fn main() {
 
 Implementing a filter that replaces all instances of `"oo"` for `n` times `"a"`.
 ```rust
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{{ s|myfilter(4) }}", ext = "txt")]
@@ -527,7 +527,7 @@ struct MyFilterTemplate<'a> {
 // Any filter defined in the module `filters` is accessible in your template.
 mod filters {
     // This filter requires a `usize` input when called in templates
-    pub fn myfilter<T: std::fmt::Display>(s: T, n: usize) -> ::askama::Result<String> {
+    pub fn myfilter<T: std::fmt::Display>(s: T, n: usize) -> ::rinja::Result<String> {
         let s = s.to_string();
     	  let mut replace = String::with_capacity(n);
     	  replace.extend((0..n).map(|_| "a"));

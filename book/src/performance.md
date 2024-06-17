@@ -3,12 +3,12 @@
 ## Slow Debug Recompilations
 
 If you experience slow compile times when iterating with lots of templates,
-you can compile Askama's derive macros with a higher optimization level.
+you can compile Rinja's derive macros with a higher optimization level.
 This can speed up recompilation times dramatically.
 
 Add the following to `Cargo.toml` or `.cargo/config.toml`:
 ```rust
-[profile.dev.package.askama_derive]
+[profile.dev.package.rinja_derive]
 opt-level = 3
 ```
 

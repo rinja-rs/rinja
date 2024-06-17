@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{% macro foo(arg) %} {{arg}} {% endmacro not_foo %}", ext = "html")]

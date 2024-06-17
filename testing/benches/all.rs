@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate criterion;
 
-use askama::Template;
+use rinja::Template;
 use criterion::Criterion;
 
 criterion_main!(benches);

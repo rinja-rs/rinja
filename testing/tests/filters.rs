@@ -2,7 +2,7 @@
 #[macro_use]
 extern crate serde_json;
 
-use askama::Template;
+use rinja::Template;
 #[cfg(feature = "serde-json")]
 use serde_json::Value;
 
@@ -119,11 +119,11 @@ struct MyFilterTemplate<'a> {
 }
 
 mod filters {
-    pub fn myfilter(s: &str) -> ::askama::Result<String> {
+    pub fn myfilter(s: &str) -> ::rinja::Result<String> {
         Ok(s.replace("oo", "aa"))
     }
     // for test_nested_filter_ref
-    pub fn mytrim(s: &dyn (::std::fmt::Display)) -> ::askama::Result<String> {
+    pub fn mytrim(s: &dyn (::std::fmt::Display)) -> ::rinja::Result<String> {
         Ok(s.to_string().trim().to_owned())
     }
 }
@@ -310,7 +310,7 @@ fn test_json_script() {
     );
 }
 
-#[derive(askama::Template)]
+#[derive(rinja::Template)]
 #[template(
     source = r#"{% let word = s|as_ref %}{{ word }}
 {%- let hello = String::from("hello") %}

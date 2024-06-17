@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 macro_rules! hello {
     () => {

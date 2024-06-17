@@ -1,7 +1,7 @@
 # Configuration
 
-At compile time, Askama will read optional configuration values from
-`askama.toml` in the crate root (the directory where `Cargo.toml` can
+At compile time, Rinja will read optional configuration values from
+`rinja.toml` in the crate root (the directory where `Cargo.toml` can
 be found). Currently, this covers the directories to search for templates,
 custom syntax configuration and escaper configuration.
 

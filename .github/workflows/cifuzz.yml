@@ -2,7 +2,7 @@ name: CIFuzz
 on:
   pull_request:
     paths:
-      - 'askama_parser/**'
+      - 'rinja_parser/**'
 jobs:
  Fuzzing:
    runs-on: ubuntu-latest
@@ -11,12 +11,12 @@ jobs:
      id: build
      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
      with:
-       oss-fuzz-project-name: 'askama'
+       oss-fuzz-project-name: 'rinja'
        language: rust
    - name: Run Fuzzers
      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
      with:
-       oss-fuzz-project-name: 'askama'
+       oss-fuzz-project-name: 'rinja'
        language: rust
        fuzz-seconds: 180
    - name: Upload Crash

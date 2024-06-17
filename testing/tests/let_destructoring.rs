@@ -1,4 +1,4 @@
-use askama::Template;
+use rinja::Template;
 
 #[derive(Template)]
 #[template(source = "{% let (a, b, c) = v %}{{a}}{{b}}{{c}}", ext = "txt")]
