@@ -12,11 +12,10 @@ any other feedback to the [issue tracker][issues].
 
 * Construct templates using a familiar, easy-to-use syntax
 * Benefit from the safety provided by Rust's type system
-* Template code is compiled into your crate for [optimal performance][benchmarks]
-* Optional built-in support for Actix, Axum, Gotham, Mendes, Rocket, tide, and warp web frameworks
+* Template code is compiled into your crate for optimal performance
+* Optional built-in support for Actix, Axum, Rocket, and warp web frameworks
 * Debugging features to assist you in template development
 * Templates must be valid UTF-8 and produce UTF-8 when rendered
-* IDE support available in [JetBrains products](https://plugins.jetbrains.com/plugin/16591-rinja-template-support)
 * Works on stable Rust
 
 ### Supported in templates

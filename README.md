@@ -16,7 +16,6 @@ any other feedback to the [issue tracker][issues].
 * Optional built-in support for Actix, Axum, Rocket, and warp web frameworks
 * Debugging features to assist you in template development
 * Templates must be valid UTF-8 and produce UTF-8 when rendered
-* IDE support available in [JetBrains products](https://plugins.jetbrains.com/plugin/16591-rinja-template-support)
 * Works on stable Rust
 
 ### Supported in templates
