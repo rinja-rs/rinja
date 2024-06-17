@@ -14,7 +14,7 @@ rust-version = "1.65"
 proc-macro = true
 
 [features]
-config = ["serde", "basic-toml"]
+config = ["dep:serde", "dep:basic-toml"]
 humansize = []
 urlencode = []
 serde-json = []

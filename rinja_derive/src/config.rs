@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::{env, fs};
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "config")]
 use serde::Deserialize;
 
 use crate::{CompileError, FileInfo, CRATE};
@@ -194,10 +194,10 @@ impl<'a> TryInto<Syntax<'a>> for RawSyntax<'a> {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "config", derive(Deserialize))]
 #[derive(Default)]
 struct RawConfig<'a> {
-    #[cfg_attr(feature = "serde", serde(borrow))]
+    #[cfg_attr(feature = "config", serde(borrow))]
     general: Option<General<'a>>,
     syntax: Option<Vec<RawSyntax<'a>>>,
     escaper: Option<Vec<RawEscaper<'a>>>,
@@ -218,8 +218,8 @@ impl RawConfig<'_> {
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "lowercase"))]
+#[cfg_attr(feature = "config", derive(Deserialize))]
+#[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
 pub(crate) enum WhitespaceHandling {
     /// The default behaviour. It will leave the whitespace characters "as is".
     #[default]
@@ -242,16 +242,16 @@ impl From<WhitespaceHandling> for Whitespace {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "config", derive(Deserialize))]
 struct General<'a> {
-    #[cfg_attr(feature = "serde", serde(borrow))]
+    #[cfg_attr(feature = "config", serde(borrow))]
     dirs: Option<Vec<&'a str>>,
     default_syntax: Option<&'a str>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "config", serde(default))]
     whitespace: WhitespaceHandling,
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "config", derive(Deserialize))]
 struct RawSyntax<'a> {
     name: &'a str,
     block_start: Option<&'a str>,
@@ -262,7 +262,7 @@ struct RawSyntax<'a> {
     comment_end: Option<&'a str>,
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "config", derive(Deserialize))]
 struct RawEscaper<'a> {
     path: &'a str,
     extensions: Vec<&'a str>,
@@ -550,7 +550,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "toml")]
+    #[cfg(feature = "config")]
     #[should_panic]
     #[test]
     fn use_default_at_syntax_name() {
@@ -561,7 +561,7 @@ mod tests {
         let _config = Config::new(raw_config, None, None).unwrap();
     }
 
-    #[cfg(feature = "toml")]
+    #[cfg(feature = "config")]
     #[should_panic]
     #[test]
     fn duplicated_syntax_name_on_list() {
@@ -573,7 +573,7 @@ mod tests {
         let _config = Config::new(raw_config, None, None).unwrap();
     }
 
-    #[cfg(feature = "toml")]
+    #[cfg(feature = "config")]
     #[should_panic]
     #[test]
     fn is_not_exist_default_syntax() {
@@ -655,7 +655,7 @@ mod tests {
         assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
     }
 
-    #[cfg(feature = "toml")]
+    #[cfg(feature = "config")]
     #[test]
     fn test_whitespace_in_template() {
         // Checking that template arguments have precedence over general configuration.
@@ -666,13 +666,13 @@ mod tests {
             [general]
             whitespace = "suppress"
             "#,
-            Some(&"minimize".to_owned()),
             None,
+            Some("minimize"),
         )
         .unwrap();
         assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
 
-        let config = Config::new(r#""#, Some(&"minimize".to_owned()), None).unwrap();
+        let config = Config::new(r#""#, None, Some("minimize")).unwrap();
         assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
     }
 
