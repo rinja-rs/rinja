@@ -1,4 +1,3 @@
-use rinja_axum::Template;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -6,6 +5,7 @@ use axum::{
     Router,
 };
 use http_body_util::BodyExt;
+use rinja_axum::Template;
 use tower::util::ServiceExt;
 
 #[derive(Template)]

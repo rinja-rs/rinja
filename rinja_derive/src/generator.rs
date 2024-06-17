@@ -164,11 +164,7 @@ impl<'a> Generator<'a> {
     // Implement Axum's `IntoResponse`.
     #[cfg(feature = "with-axum")]
     fn impl_axum_into_response(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(
-            buf,
-            "::rinja_axum::axum_core::response::IntoResponse",
-            None,
-        )?;
+        self.write_header(buf, "::rinja_axum::axum_core::response::IntoResponse", None)?;
         buf.writeln("#[inline]")?;
         buf.writeln(
             "fn into_response(self)\

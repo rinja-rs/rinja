@@ -1,5 +1,5 @@
-use rinja_parser::{Ast, Syntax};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use rinja_parser::{Ast, Syntax};
 
 criterion_main!(benches);
 criterion_group!(benches, librustdoc);
