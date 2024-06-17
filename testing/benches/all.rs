@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate criterion;
 
-use rinja::Template;
 use criterion::Criterion;
+use rinja::Template;
 
 criterion_main!(benches);
 criterion_group!(benches, functions);

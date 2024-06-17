@@ -14,13 +14,13 @@ mod json;
 #[cfg(feature = "serde-json")]
 pub use self::json::json;
 
-use rinja_escape::{Escaper, MarkupDisplay};
 #[cfg(feature = "humansize")]
 use dep_humansize::{ISizeFormatter, ToF64, DECIMAL};
 #[cfg(feature = "num-traits")]
 use dep_num_traits::{cast::NumCast, Signed};
 #[cfg(feature = "percent-encoding")]
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+use rinja_escape::{Escaper, MarkupDisplay};
 
 use super::Result;
 #[allow(unused_imports)]

@@ -3,10 +3,10 @@
 #![deny(unreachable_pub)]
 
 #[doc(no_inline)]
-pub use rinja::*;
-#[doc(no_inline)]
 pub use axum_core;
 use axum_core::response::{IntoResponse, Response};
+#[doc(no_inline)]
+pub use rinja::*;
 
 /// Render a [`Template`] into a [`Response`], or render an error page.
 pub fn into_response<T: ?Sized + rinja::Template>(tmpl: &T) -> Response {

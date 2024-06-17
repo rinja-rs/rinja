@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::env::current_dir;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::rc::Rc;
 use std::{fmt, str};
@@ -59,6 +60,10 @@ mod _parsed {
         // The return value's lifetime must be limited to `self` to uphold the unsafe invariant.
         pub fn nodes(&self) -> &[Node<'_>] {
             &self.ast.nodes
+        }
+
+        pub fn source(&self) -> &str {
+            &self.source
         }
     }
 
@@ -127,6 +132,59 @@ impl<'a> Ast<'a> {
     }
 }
 
+/// Struct used to wrap types with their associated "span" which is used when generating errors
+/// in the code generation.
+pub struct WithSpan<'a, T> {
+    inner: T,
+    span: &'a str,
+}
+
+impl<'a, T> WithSpan<'a, T> {
+    pub fn new(inner: T, span: &'a str) -> Self {
+        Self { inner, span }
+    }
+
+    pub fn span(&self) -> &str {
+        self.span
+    }
+}
+
+impl<'a, T> Deref for WithSpan<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a, T> DerefMut for WithSpan<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for WithSpan<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
+impl<'a, T: Clone> Clone for WithSpan<'a, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            span: self.span,
+        }
+    }
+}
+
+impl<'a, T: PartialEq> PartialEq for WithSpan<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        // We never want to compare the span information.
+        self.inner == other.inner
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     Incomplete,
@@ -176,6 +234,40 @@ impl fmt::Display for ParseError {
 
 pub(crate) type ParseErr<'a> = nom::Err<ErrorContext<'a>>;
 pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
+
+pub struct ErrorInfo {
+    pub row: usize,
+    pub column: usize,
+    pub source_after: String,
+}
+
+pub fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
+    let offset = src.len() - input.len();
+    let (source_before, source_after) = src.split_at(offset);
+
+    let source_after = match source_after.char_indices().enumerate().take(41).last() {
+        Some((40, (i, _))) => format!("{:?}...", &source_after[..i]),
+        _ => format!("{source_after:?}"),
+    };
+
+    let (row, last_line) = source_before.lines().enumerate().last().unwrap_or_default();
+    let column = last_line.chars().count();
+    ErrorInfo {
+        row,
+        column,
+        source_after,
+    }
+}
+
+/// Return the error related information and its display file path.
+pub fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorInfo, String) {
+    let file_path = match std::env::current_dir() {
+        Ok(cwd) => strip_common(&cwd, file_path),
+        Err(_) => file_path.display().to_string(),
+    };
+    let error_info = generate_row_and_column(src, input);
+    (error_info, file_path)
+}
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
 /// It used to generate `ParserError`.
@@ -636,7 +728,7 @@ impl Level {
 }
 
 #[allow(clippy::type_complexity)]
-fn filter(i: &str, level: Level) -> ParseResult<'_, (&str, Option<Vec<Expr<'_>>>)> {
+fn filter(i: &str, level: Level) -> ParseResult<'_, (&str, Option<Vec<WithSpan<'_, Expr<'_>>>>)> {
     let (i, (_, fname, args)) = tuple((
         char('|'),
         ws(identifier),
@@ -656,7 +748,7 @@ fn filter(i: &str, level: Level) -> ParseResult<'_, (&str, Option<Vec<Expr<'_>>>
 /// ```
 ///
 /// `strip_common` will return `d/e.txt`.
-fn strip_common(base: &Path, path: &Path) -> String {
+pub fn strip_common(base: &Path, path: &Path) -> String {
     let path = match path.canonicalize() {
         Ok(path) => path,
         Err(_) => return path.display().to_string(),

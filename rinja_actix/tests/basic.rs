@@ -1,7 +1,7 @@
 use actix_web::http::header::CONTENT_TYPE;
 use actix_web::web;
-use rinja_actix::Template;
 use bytes::Bytes;
+use rinja_actix::Template;
 
 #[derive(Template)]
 #[template(path = "hello.html")]
