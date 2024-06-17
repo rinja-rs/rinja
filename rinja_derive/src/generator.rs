@@ -67,7 +67,7 @@ impl<'a> Generator<'a> {
 
     // Takes a Context and generates the relevant implementations.
     pub(crate) fn build(mut self, ctx: &Context<'a>) -> Result<String, CompileError> {
-        let mut buf = Buffer::new(0);
+        let mut buf = Buffer::new();
 
         self.impl_template(ctx, &mut buf)?;
         self.impl_display(&mut buf)?;
@@ -364,12 +364,11 @@ impl<'a> Generator<'a> {
                 if i == 0 {
                     buf.write("if ");
                 } else {
-                    buf.dedent()?;
                     buf.write("} else if ");
                 }
 
                 if let Some(target) = target {
-                    let mut expr_buf = Buffer::new(0);
+                    let mut expr_buf = Buffer::new();
                     buf.write("let ");
                     // If this is a chain condition, then we need to declare the variable after the
                     // left expression has been handled but before the right expression is handled
@@ -400,7 +399,6 @@ impl<'a> Generator<'a> {
                     buf.write(") as &bool)");
                 }
             } else {
-                buf.dedent()?;
                 buf.write("} else");
                 has_else = true;
             }
@@ -598,8 +596,8 @@ impl<'a> Generator<'a> {
         buf.writeln("{")?;
         self.prepare_ws(def.ws1);
 
-        let mut names = Buffer::new(0);
-        let mut values = Buffer::new(0);
+        let mut names = Buffer::new();
+        let mut values = Buffer::new();
         let mut is_first_variable = true;
         if args.len() != def.args.len() {
             return Err(ctx.generate_error(
@@ -670,7 +668,7 @@ impl<'a> Generator<'a> {
                         .insert(Cow::Borrowed(arg), LocalMeta::with_ref(var));
                 }
                 Expr::Attr(obj, attr) => {
-                    let mut attr_buf = Buffer::new(0);
+                    let mut attr_buf = Buffer::new();
                     self.visit_attr(ctx, &mut attr_buf, obj, attr)?;
 
                     let var = self.locals.resolve(&attr_buf.buf).unwrap_or(attr_buf.buf);
@@ -737,7 +735,7 @@ impl<'a> Generator<'a> {
         let WriteParts {
             size_hint: write_size_hint,
             buffers,
-        } = self.prepare_format(ctx, buf.indent + 1)?;
+        } = self.prepare_format(ctx)?;
         size_hint += match buffers {
             None => return Ok(0),
             Some(WritePartsBuffers { format, expr: None }) => {
@@ -759,7 +757,7 @@ impl<'a> Generator<'a> {
 
         self.buf_writable.buf = current_buf;
 
-        let mut filter_buf = Buffer::new(buf.indent);
+        let mut filter_buf = Buffer::new();
         let Filter {
             name: filter_name,
             arguments,
@@ -904,7 +902,7 @@ impl<'a> Generator<'a> {
             return buf.writeln(";");
         };
 
-        let mut expr_buf = Buffer::new(0);
+        let mut expr_buf = Buffer::new();
         self.visit_expr(ctx, &mut expr_buf, val)?;
 
         let shadowed = self.is_shadowing_variable(ctx, &l.var, l)?;
@@ -1050,7 +1048,7 @@ impl<'a> Generator<'a> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
     ) -> Result<usize, CompileError> {
-        let WriteParts { size_hint, buffers } = self.prepare_format(ctx, buf.indent)?;
+        let WriteParts { size_hint, buffers } = self.prepare_format(ctx)?;
         match buffers {
             None => Ok(size_hint),
             Some(WritePartsBuffers { format, expr: None }) => {
@@ -1062,11 +1060,9 @@ impl<'a> Generator<'a> {
                 expr: Some(expr),
             }) => {
                 buf.writeln("::std::write!(")?;
-                buf.indent();
                 buf.writeln("writer,")?;
                 buf.writeln(&format!("{:#?},", &format.buf))?;
                 buf.writeln(expr.buf.trim())?;
-                buf.dedent()?;
                 buf.writeln(")?;")?;
                 Ok(size_hint)
             }
@@ -1076,11 +1072,7 @@ impl<'a> Generator<'a> {
     /// This is the common code to generate an expression. It is used for filter blocks and for
     /// expressions more generally. It stores the size it represents and the buffers. Take a look
     /// at `WriteParts` for more details.
-    fn prepare_format(
-        &mut self,
-        ctx: &Context<'_>,
-        indent: u8,
-    ) -> Result<WriteParts, CompileError> {
+    fn prepare_format(&mut self, ctx: &Context<'_>) -> Result<WriteParts, CompileError> {
         if self.buf_writable.is_empty() {
             return Ok(WriteParts {
                 size_hint: 0,
@@ -1093,7 +1085,7 @@ impl<'a> Generator<'a> {
             .iter()
             .all(|w| matches!(w, Writable::Lit(_)))
         {
-            let mut buf_lit = Buffer::new(0);
+            let mut buf_lit = Buffer::new();
             for s in mem::take(&mut self.buf_writable.buf) {
                 if let Writable::Lit(s) = s {
                     buf_lit.write(s);
@@ -1111,8 +1103,8 @@ impl<'a> Generator<'a> {
         let mut expr_cache = HashMap::with_capacity(self.buf_writable.len());
 
         let mut size_hint = 0;
-        let mut buf_format = Buffer::new(0);
-        let mut buf_expr = Buffer::new(indent + 1);
+        let mut buf_format = Buffer::new();
+        let mut buf_expr = Buffer::new();
 
         for s in mem::take(&mut self.buf_writable.buf) {
             match s {
@@ -1121,7 +1113,7 @@ impl<'a> Generator<'a> {
                     size_hint += s.len();
                 }
                 Writable::Expr(s) => {
-                    let mut expr_buf = Buffer::new(0);
+                    let mut expr_buf = Buffer::new();
                     let wrapped = self.visit_expr(ctx, &mut expr_buf, s)?;
                     let cacheable = is_cacheable(s);
                     size_hint += self.named_expression(
@@ -1235,7 +1227,7 @@ impl<'a> Generator<'a> {
         ctx: &Context<'_>,
         expr: &WithSpan<'_, Expr<'_>>,
     ) -> Result<String, CompileError> {
-        let mut buf = Buffer::new(0);
+        let mut buf = Buffer::new();
         self.visit_expr(ctx, &mut buf, expr)?;
         Ok(buf.buf)
     }
@@ -1931,19 +1923,13 @@ impl<'a> Generator<'a> {
 struct Buffer {
     // The buffer to generate the code into
     buf: String,
-    // The current level of indentation (in spaces)
-    indent: u8,
-    // Whether the output buffer is currently at the start of a line
-    start: bool,
     discard: bool,
 }
 
 impl Buffer {
-    fn new(indent: u8) -> Self {
+    fn new() -> Self {
         Self {
             buf: String::new(),
-            indent,
-            start: true,
             discard: false,
         }
     }
@@ -1952,17 +1938,10 @@ impl Buffer {
         if self.discard {
             return Ok(());
         }
-        if s == "}" {
-            self.dedent()?;
-        }
         if !s.is_empty() {
             self.write(s);
         }
         self.buf.push('\n');
-        if s.ends_with('{') {
-            self.indent();
-        }
-        self.start = true;
         Ok(())
     }
 
@@ -1970,28 +1949,8 @@ impl Buffer {
         if self.discard {
             return;
         }
-        if self.start {
-            for _ in 0..(self.indent * 4) {
-                self.buf.push(' ');
-            }
-            self.start = false;
-        }
 
         self.buf.push_str(s);
-    }
-
-    fn indent(&mut self) {
-        self.indent += 1;
-    }
-
-    fn dedent(&mut self) -> Result<(), CompileError> {
-        if self.indent == 0 {
-            return Err(CompileError::no_file_info(
-                "dedent() called while indentation == 0",
-            ));
-        }
-        self.indent -= 1;
-        Ok(())
     }
 }
 
