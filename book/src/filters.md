@@ -56,13 +56,13 @@ Enable it with Cargo features (see below for more information).
 
 Returns the absolute value.
 
-```
+```jinja
 {{ -2|abs }}
 ```
 
 Output:
 
-```
+```text
 2
 ```
 
@@ -71,14 +71,14 @@ Output:
 
 Creates a reference to the given argument.
 
-```
+```jinja
 {{ "a"|as_ref }}
 {{ self.x|as_ref }}
 ```
 
 will become:
 
-```
+```rust
 &"a"
 &self.x
 ```
@@ -88,13 +88,13 @@ will become:
 
 Capitalize a value. The first character will be uppercase, all others lowercase:
 
-```
+```jinja
 {{ "hello"|capitalize }}
 ```
 
 Output:
 
-```
+```text
 Hello
 ```
 
@@ -103,12 +103,12 @@ Hello
 
 Centers the value in a field of a given width:
 
-```
+```jinja
 -{{ "a"|center(5) }}-
 ```
 
 Output:
-```
+```text
 -  a  -
 ```
 
@@ -117,7 +117,7 @@ Output:
 
 Dereferences the given argument.
 
-```
+```jinja
 {% let s = String::from("a")|as_ref %}
 {% if s|deref == String::from("b") %}
 {% endif %}
@@ -125,7 +125,7 @@ Dereferences the given argument.
 
 will become:
 
-```
+```rust
 let s = &String::from("a");
 if *s == String::from("b") {}
 ```
@@ -135,13 +135,13 @@ if *s == String::from("b") {}
 
 Escapes HTML characters in strings:
 
-```
+```jinja
 {{ "Escape <>&"|e }}
 ```
 
 Output:
 
-```
+```html
 Escape &lt;&gt;&amp;
 ```
 
@@ -175,12 +175,12 @@ Escape &lt;&gt;&amp;
 
 Returns adequate string representation (in KB, ..) of number of bytes:
 
-```
+```jinja
 {{ 1000|filesizeformat }}
 ```
 
 Output:
-```
+```text
 1 KB
 ```
 
@@ -195,14 +195,14 @@ Rust). The two arguments are passed through to [`format!()`] by
 the Rinja code generator, but the order is swapped to support filter
 composition.
 
-```text
+```jinja
 {{ value|fmt("{:?}") }}
 ```
 
 As an example, this allows filters to be composed like the following.
 Which is not possible using the `format` filter.
 
-```text
+```jinja
 {{ value|capitalize|fmt("{:?}") }}
 ```
 
@@ -215,7 +215,7 @@ The first argument to this filter must be a string literal (as in normal Rust).
 
 All arguments are passed through to [`format!()`] by the Rinja code generator.
 
-```
+```jinja
 {{ "{:?}"|format(var) }}
 ```
 
@@ -226,13 +226,13 @@ All arguments are passed through to [`format!()`] by the Rinja code generator.
 
 Indent newlines with width spaces.
 
-```
+```jinja
 {{ "hello\nfoo\nbar"|indent(4) }}
 ```
 
 Output:
 
-```
+```text
 hello
     foo
     bar
@@ -243,17 +243,17 @@ hello
 
 Joins iterable into a string separated by provided argument.
 
-```
+```rust
 array = &["foo", "bar", "bazz"]
 ```
 
-```
+```jinja
 {{ array|join(", ") }}
 ```
 
 Output:
 
-```
+```text
 foo, bar, bazz
 ```
 
@@ -264,13 +264,13 @@ Replaces line breaks in plain text with appropriate HTML.
 
 A single newline becomes an HTML line break `<br>` and a new line followed by a blank line becomes a paragraph break `<p>`.
 
-```
+```jinja
 {{ "hello\nworld\n\nfrom\nrinja"|linebreaks }}
 ```
 
 Output:
 
-```
+```html
 <p>hello<br />world</p><p>from<br />rinja</p>
 ```
 
@@ -279,13 +279,13 @@ Output:
 
 Converts all newlines in a piece of plain text to HTML line breaks.
 
-```
+```jinja
 {{ "hello\nworld\n\nfrom\nrinja"|linebreaks }}
 ```
 
 Output:
 
-```
+```html
 hello<br />world<br /><br />from<br />rinja
 ```
 
@@ -298,13 +298,13 @@ Consecutive double line breaks will be reduced down to a single paragraph break.
 
 This is useful in contexts where changing single line breaks to line break tags would interfere with other HTML elements, such as lists and nested `<div>` tags.
 
-```
+```jinja
 {{ "hello\nworld\n\nfrom\n\n\n\nrinja"|paragraphbreaks }}
 ```
 
 Output:
 
-```
+```html
 <p>hello\nworld</p><p>from</p><p>rinja</p>
 ```
 
@@ -313,13 +313,13 @@ Output:
 
 Converts to lowercase.
 
-```
+```jinja
 {{ "HELLO"|lower }}
 ```
 
 Output:
 
-```
+```text
 hello
 ```
 
@@ -344,13 +344,13 @@ Output:
 Return a title cased version of the value. Words will start with uppercase letters, all
 remaining characters are lowercase.
 
-```
+```jinja
 {{ "hello WORLD"|title }}
 ```
 
 Output:
 
-```
+```text
 Hello World
 ```
 
@@ -359,13 +359,13 @@ Hello World
 
 Strip leading and trailing whitespace.
 
-```
+```jinja
 {{ " hello "|trim }}
 ```
 
 Output:
 
-```
+```text
 hello
 ```
 
@@ -375,13 +375,13 @@ hello
 Limit string length, appends '...' if truncated.
 
 
-```
+```jinja
 {{ "hello"|truncate(2) }}
 ```
 
 Output:
 
-```
+```text
 he...
 ```
 
@@ -390,13 +390,13 @@ he...
 
 Converts to uppercase.
 
-```
+```jinja
 {{ "hello"|upper }}
 ```
 
 Output:
 
-```
+```text
 HELLO
 ```
 
@@ -405,13 +405,13 @@ HELLO
 
 Percent encodes the string. Replaces reserved characters with the % escape character followed by a byte value as two hexadecimal digits.
 
-```
+```text
 hello?world
 ```
 
 Output:
 
-```
+```text
 hello%3Fworld
 ```
 
@@ -420,13 +420,13 @@ hello%3Fworld
 
 Count the words in that string.
 
-```
+```jinja
 {{ "rinja is sort of cool"|wordcount }}
 ```
 
 Output:
 
-```
+```text
 5
 ```
 
@@ -436,7 +436,7 @@ Output:
 The following filters can be enabled by requesting the respective feature in the Cargo.toml
 [dependencies section](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html), e.g.
 
-```
+```toml
 [dependencies]
 rinja = { version = "0.11.2", features = "serde-json" }
 ```
@@ -454,7 +454,7 @@ In HTML attributes, you can either use it in quotation marks `"{{data|json}}"` a
 or in apostrophes with the (optional) safe filter `'{{data|json|safe}}'`.
 In HTML texts the output of e.g. `<pre>{{data|json|safe}}</pre>` is safe, too.
 
-```
+```jinja
 Good: <li data-extra="{{data|json}}">…</li>
 Good: <li data-extra='{{data|json|safe}}'>…</li>
 Good: <pre>{{data|json|safe}}</pre>

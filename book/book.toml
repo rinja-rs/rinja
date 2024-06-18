@@ -4,3 +4,10 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Rinja"
+
+[rust]
+edition = "2021"
+
+[output.html]
+git-repository-url = "https://github.com/rinja-rs/rinja/tree/master/book"
+edit-url-template = "https://github.com/rinja-rs/rinja/tree/master/book/{path}"
