@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::fmt::{self, Display};
 
-pub type Result<I, E = Error> = ::std::result::Result<I, E>;
+pub type Result<I, E = Error> = std::result::Result<I, E>;
 
 /// rinja error type
 ///
@@ -28,13 +28,11 @@ pub type Result<I, E = Error> = ::std::result::Result<I, E>;
 pub enum Error {
     /// formatting error
     Fmt(fmt::Error),
-
     /// an error raised by using `?` in a template
     Custom(Box<dyn std::error::Error + Send + Sync>),
-
     /// json conversion error
     #[cfg(feature = "serde_json")]
-    Json(::serde_json::Error),
+    Json(serde_json::Error),
 }
 
 impl std::error::Error for Error {
@@ -66,8 +64,8 @@ impl From<fmt::Error> for Error {
 }
 
 #[cfg(feature = "serde_json")]
-impl From<::serde_json::Error> for Error {
-    fn from(err: ::serde_json::Error) -> Self {
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
         Error::Json(err)
     }
 }
