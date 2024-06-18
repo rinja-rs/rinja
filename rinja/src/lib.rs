@@ -5,7 +5,10 @@
 //! in [`rinja_derive`](https://crates.io/crates/rinja_derive)).
 //!
 //! For feature highlights and a quick start, please review the
-//! [README](https://github.com/rinja-rs/rinja/blob/main/README.md).
+//! [README](https://github.com/rinja-rs/rinja/blob/master/README.md).
+//!
+//! You can find the documentation about our syntax, features, configuration in our book:
+//! [rinja.readthedocs.io](https://rinja.readthedocs.io/en/latest/).
 //!
 //! # Creating Rinja templates
 //!

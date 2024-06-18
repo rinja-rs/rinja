@@ -8,6 +8,9 @@ See below for an example.
 All feedback welcome. Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
 
+You can find the documentation about our syntax, features, configuration in our book:
+[rinja.readthedocs.io](https://rinja.readthedocs.io/en/latest/).
+
 ### Feature highlights
 
 * Construct templates using a familiar, easy-to-use syntax
@@ -44,7 +47,7 @@ cargo add rinja
 Now create a directory called `templates` in your crate root.
 In it, create a file called `hello.html`, containing the following:
 
-```
+```jinja
 Hello, {{ name }}!
 ```
 
