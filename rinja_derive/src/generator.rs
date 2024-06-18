@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
+use std::fmt::{Arguments, Display, Write};
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
@@ -86,7 +87,7 @@ impl<'a> Generator<'a> {
 
     // Implement `Template` for the given context struct.
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, &format!("{CRATE}::Template"), None);
+        self.write_header(buf, format_args!("{CRATE}::Template"), None);
         buf.write("fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> ");
         buf.write(CRATE);
         buf.writeln("::Result<()> {");
@@ -102,8 +103,8 @@ impl<'a> Generator<'a> {
             if path_is_valid {
                 let path = path.to_str().unwrap();
                 buf.writeln(
-                    &quote! {
-                        include_bytes!(#path);
+                    quote! {
+                        const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
                     }
                     .to_string(),
                 );
@@ -122,17 +123,17 @@ impl<'a> Generator<'a> {
         buf.writeln("::Result::Ok(())");
         buf.writeln("}");
 
-        buf.writeln("const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = ");
-        buf.writeln(&format!("{:?}", self.input.extension()));
-        buf.writeln(";");
-
-        buf.writeln("const SIZE_HINT: ::std::primitive::usize = ");
-        buf.writeln(&format!("{size_hint}"));
-        buf.writeln(";");
-
-        buf.writeln("const MIME_TYPE: &'static ::std::primitive::str = ");
-        buf.writeln(&format!("{:?}", &self.input.mime_type));
-        buf.writeln(";");
+        buf.writeln(format_args!(
+            "const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = {:?};",
+            self.input.extension(),
+        ));
+        buf.writeln(format_args!(
+            "const SIZE_HINT: ::std::primitive::usize = {size_hint};",
+        ));
+        buf.writeln(format_args!(
+            "const MIME_TYPE: &'static ::std::primitive::str = {:?};",
+            self.input.mime_type,
+        ));
 
         buf.writeln("}");
         Ok(())
@@ -214,7 +215,7 @@ impl<'a> Generator<'a> {
     fn write_header(
         &mut self,
         buf: &mut Buffer,
-        target: &str,
+        target: impl Display,
         params: Option<Vec<syn::GenericParam>>,
     ) {
         let mut generics;
@@ -231,7 +232,7 @@ impl<'a> Generator<'a> {
             self.input.ast.generics.split_for_impl()
         };
 
-        buf.writeln(&format!(
+        buf.writeln(format_args!(
             "{} {} for {}{} {{",
             quote!(impl #impl_generics),
             target,
@@ -376,7 +377,7 @@ impl<'a> Generator<'a> {
                         Expr::BinOp(op, ref left, ref right) if *op == "||" || *op == "&&" => {
                             self.visit_expr(ctx, &mut expr_buf, left)?;
                             self.visit_target(buf, true, true, target);
-                            expr_buf.write(&format!(" {op} "));
+                            expr_buf.write(format_args!(" {op} "));
                             self.visit_expr(ctx, &mut expr_buf, right)?;
                         }
                         _ => {
@@ -385,7 +386,7 @@ impl<'a> Generator<'a> {
                         }
                     }
                     buf.write(" = &");
-                    buf.write(&expr_buf.buf);
+                    buf.write(expr_buf.buf);
                 } else {
                     // The following syntax `*(&(...) as &bool)` is used to
                     // trigger Rust's automatic dereferencing, to coerce
@@ -393,8 +394,7 @@ impl<'a> Generator<'a> {
                     // coerces e.g. `&&&bool` to `&bool`. Then `*(&bool)`
                     // finally dereferences it to `bool`.
                     buf.write("*(&(");
-                    let expr_code = self.visit_expr_root(ctx, expr)?;
-                    buf.write(&expr_code);
+                    buf.write(self.visit_expr_root(ctx, expr)?);
                     buf.write(") as &bool)");
                 }
             } else {
@@ -438,7 +438,7 @@ impl<'a> Generator<'a> {
         let mut arm_sizes = Vec::new();
 
         let expr_code = self.visit_expr_root(ctx, expr)?;
-        buf.writeln(&format!("match &{expr_code} {{"));
+        buf.writeln(format_args!("match &{expr_code} {{"));
 
         let mut arm_size = 0;
         for (i, arm) in arms.iter().enumerate() {
@@ -488,24 +488,24 @@ impl<'a> Generator<'a> {
             buf.writeln("let mut _did_loop = false;");
         }
         match &*loop_block.iter {
-            Expr::Range(_, _, _) => buf.writeln(&format!("let _iter = {expr_code};")),
-            Expr::Array(..) => buf.writeln(&format!("let _iter = {expr_code}.iter();")),
+            Expr::Range(_, _, _) => buf.writeln(format_args!("let _iter = {expr_code};")),
+            Expr::Array(..) => buf.writeln(format_args!("let _iter = {expr_code}.iter();")),
             // If `iter` is a call then we assume it's something that returns
             // an iterator. If not then the user can explicitly add the needed
             // call without issues.
             Expr::Call(..) | Expr::Index(..) => {
-                buf.writeln(&format!("let _iter = ({expr_code}).into_iter();"))
+                buf.writeln(format_args!("let _iter = ({expr_code}).into_iter();"))
             }
             // If accessing `self` then it most likely needs to be
             // borrowed, to prevent an attempt of moving.
             _ if expr_code.starts_with("self.") => {
-                buf.writeln(&format!("let _iter = (&{expr_code}).into_iter();"))
+                buf.writeln(format_args!("let _iter = (&{expr_code}).into_iter();"))
             }
             // If accessing a field then it most likely needs to be
             // borrowed, to prevent an attempt of moving.
-            Expr::Attr(..) => buf.writeln(&format!("let _iter = (&{expr_code}).into_iter();")),
+            Expr::Attr(..) => buf.writeln(format_args!("let _iter = (&{expr_code}).into_iter();")),
             // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
-            _ => buf.writeln(&format!("let _iter = ({expr_code}).into_iter();")),
+            _ => buf.writeln(format_args!("let _iter = ({expr_code}).into_iter();")),
         }
         if let Some(cond) = &loop_block.cond {
             self.locals.push();
@@ -688,7 +688,7 @@ impl<'a> Generator<'a> {
                     names.write(arg);
 
                     values.write("(");
-                    values.write(&self.visit_expr_root(ctx, expr)?);
+                    values.write(self.visit_expr_root(ctx, expr)?);
                     values.write(")");
                     self.locals.insert_with_default(Cow::Borrowed(arg));
                 }
@@ -697,7 +697,7 @@ impl<'a> Generator<'a> {
 
         debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
         if !names.buf.is_empty() {
-            buf.writeln(&format!("let ({}) = ({});", names.buf, values.buf));
+            buf.writeln(format_args!("let ({}) = ({});", names.buf, values.buf));
         }
 
         let mut size_hint = self.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
@@ -720,7 +720,7 @@ impl<'a> Generator<'a> {
         let mut var_name = String::new();
         for id in 0.. {
             var_name = format!("__filter_block{id}");
-            if self.locals.get(&Cow::Borrowed(var_name.as_str())).is_none() {
+            if self.locals.get(&Cow::Borrowed(&var_name)).is_none() {
                 // No variable with this name exists, we're in the clear!
                 break;
             }
@@ -738,14 +738,14 @@ impl<'a> Generator<'a> {
         size_hint += match buffers {
             None => return Ok(0),
             Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(&format!("let {var_name} = {:#?};", &format.buf));
+                buf.writeln(format_args!("let {var_name} = {:#?};", &format.buf));
                 write_size_hint
             }
             Some(WritePartsBuffers {
                 format,
                 expr: Some(expr),
             }) => {
-                buf.writeln(&format!(
+                buf.writeln(format_args!(
                     "let {var_name} = format!({:#?}, {});",
                     &format.buf,
                     expr.buf.trim(),
@@ -795,8 +795,8 @@ impl<'a> Generator<'a> {
         {
             let path = path.to_str().unwrap();
             buf.writeln(
-                &quote! {
-                    include_bytes!(#path);
+                quote! {
+                    const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
                 }
                 .to_string(),
             );
@@ -919,7 +919,7 @@ impl<'a> Generator<'a> {
         }
 
         self.visit_target(buf, true, true, &l.var);
-        buf.writeln(&format!(" = {};", &expr_buf.buf));
+        buf.writeln(format_args!(" = {};", &expr_buf.buf));
         Ok(())
     }
 
@@ -1053,7 +1053,7 @@ impl<'a> Generator<'a> {
         match buffers {
             None => Ok(size_hint),
             Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(&format!("writer.write_str({:#?})?;", &format.buf));
+                buf.writeln(format_args!("writer.write_str({:#?})?;", &format.buf));
                 Ok(size_hint)
             }
             Some(WritePartsBuffers {
@@ -1062,7 +1062,7 @@ impl<'a> Generator<'a> {
             }) => {
                 buf.writeln("::std::write!(");
                 buf.writeln("writer,");
-                buf.writeln(&format!("{:#?},", &format.buf));
+                buf.writeln(format_args!("{:#?},", &format.buf));
                 buf.writeln(expr.buf.trim());
                 buf.writeln(")?;");
                 Ok(size_hint)
@@ -1110,7 +1110,7 @@ impl<'a> Generator<'a> {
         for s in mem::take(&mut self.buf_writable.buf) {
             match s {
                 Writable::Lit(s) => {
-                    buf_format.write(&s.replace('{', "{{").replace('}', "}}"));
+                    buf_format.write(s.replace('{', "{{").replace('}', "}}"));
                     size_hint += s.len();
                 }
                 Writable::Expr(s) => {
@@ -1169,10 +1169,7 @@ impl<'a> Generator<'a> {
                 let id = self.named;
                 self.named += 1;
 
-                buf_expr.write(&format!("expr{id} = "));
-                buf_expr.write("&");
-                buf_expr.write(entry.key());
-                buf_expr.writeln(",");
+                buf_expr.write(format_args!("expr{id} = &{},", entry.key()));
 
                 if let Entry::Vacant(e) = entry {
                     e.insert(id);
@@ -1182,7 +1179,7 @@ impl<'a> Generator<'a> {
             }
         };
 
-        buf_format.write(&format!("{{expr{id}}}"));
+        buf_format.write(format_args!("{{expr{id}}}"));
         3
     }
 
@@ -1312,9 +1309,9 @@ impl<'a> Generator<'a> {
         }
 
         if crate::BUILT_IN_FILTERS.contains(&name) {
-            buf.write(&format!("{CRATE}::filters::{name}("));
+            buf.write(format_args!("{CRATE}::filters::{name}("));
         } else {
-            buf.write(&format!("filters::{name}("));
+            buf.write(format_args!("filters::{name}("));
         }
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
@@ -1561,7 +1558,7 @@ impl<'a> Generator<'a> {
             }
         }
         self.visit_expr(ctx, buf, obj)?;
-        buf.write(&format!(".{}", normalize_identifier(attr)));
+        buf.write(format_args!(".{}", normalize_identifier(attr)));
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -1620,8 +1617,8 @@ impl<'a> Generator<'a> {
             sub_left => {
                 match sub_left {
                     Expr::Var(name) => match self.locals.resolve(name) {
-                        Some(resolved) => buf.write(&resolved),
-                        None => buf.write(&format!("(&self.{})", normalize_identifier(name))),
+                        Some(resolved) => buf.write(resolved),
+                        None => buf.write(format_args!("(&self.{})", normalize_identifier(name))),
                     },
                     _ => {
                         self.visit_expr(ctx, buf, left)?;
@@ -1674,7 +1671,7 @@ impl<'a> Generator<'a> {
         right: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
         self.visit_expr(ctx, buf, left)?;
-        buf.write(&format!(" {op} "));
+        buf.write(format_args!(" {op} "));
         self.visit_expr(ctx, buf, right)?;
         Ok(DisplayWrap::Unwrapped)
     }
@@ -1767,12 +1764,12 @@ impl<'a> Generator<'a> {
     }
 
     fn visit_str_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(&format!("\"{s}\""));
+        buf.write(format_args!("\"{s}\""));
         DisplayWrap::Unwrapped
     }
 
     fn visit_char_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(&format!("'{s}'"));
+        buf.write(format_args!("'{s}'"));
         DisplayWrap::Unwrapped
     }
 
@@ -1813,7 +1810,7 @@ impl<'a> Generator<'a> {
                 }
             },
             Target::Tuple(path, targets) => {
-                buf.write(&path.join("::"));
+                buf.write(SeparatedPath(path));
                 buf.write("(");
                 for target in targets {
                     self.visit_target(buf, initialized, false, target);
@@ -1822,7 +1819,7 @@ impl<'a> Generator<'a> {
                 buf.write(")");
             }
             Target::Struct(path, targets) => {
-                buf.write(&path.join("::"));
+                buf.write(SeparatedPath(path));
                 buf.write(" { ");
                 for (name, target) in targets {
                     buf.write(normalize_identifier(name));
@@ -1935,18 +1932,57 @@ impl Buffer {
         }
     }
 
-    fn writeln(&mut self, s: &str) {
+    fn writeln(&mut self, src: impl BufferFmt) {
         if !self.discard {
-            if !s.is_empty() {
-                self.write(s);
-            }
+            src.append_to(&mut self.buf);
             self.buf.push('\n');
         }
     }
 
-    fn write(&mut self, s: &str) {
+    fn write(&mut self, src: impl BufferFmt) {
         if !self.discard {
-            self.buf.push_str(s);
+            src.append_to(&mut self.buf);
+        }
+    }
+}
+
+trait BufferFmt {
+    fn append_to(&self, buf: &mut String);
+}
+
+impl<T: BufferFmt + ?Sized> BufferFmt for &T {
+    fn append_to(&self, buf: &mut String) {
+        T::append_to(self, buf)
+    }
+}
+
+impl BufferFmt for str {
+    fn append_to(&self, buf: &mut String) {
+        buf.push_str(self);
+    }
+}
+
+impl BufferFmt for String {
+    fn append_to(&self, buf: &mut String) {
+        buf.push_str(self);
+    }
+}
+
+impl BufferFmt for Arguments<'_> {
+    fn append_to(&self, buf: &mut String) {
+        buf.write_fmt(*self).unwrap();
+    }
+}
+
+struct SeparatedPath<I>(I);
+
+impl<I: IntoIterator<Item = E> + Copy, E: BufferFmt> BufferFmt for SeparatedPath<I> {
+    fn append_to(&self, buf: &mut String) {
+        for (idx, item) in self.0.into_iter().enumerate() {
+            if idx > 0 {
+                buf.push_str("::");
+            }
+            item.append_to(buf);
         }
     }
 }
