@@ -5,6 +5,8 @@ from contextlib import closing
 from http.client import HTTPSConnection
 from io import StringIO
 from json import load
+from os import PathLike
+from pathlib import Path
 
 
 INDEX_HBS_DOMAIN = "api.github.com"
@@ -49,7 +51,7 @@ SIDEBAR_END = r"""
 """
 
 
-def main():
+def update_theme(target: PathLike) -> None:
     with closing(HTTPSConnection(INDEX_HBS_DOMAIN, INDEX_HBS_PORT)) as conn:
         conn.request(INDEX_HBS_PROTO, INDEX_HBS_PATH, None, INDEX_HBS_HEADERS)
         res = conn.getresponse()
@@ -64,7 +66,7 @@ def main():
     output_f = StringIO()
 
     _, revision = data["git_url"].rsplit("/", 1)
-    print("{{!-- Source revision:", revision, "--}}", file=output_f)
+    print("Source revision:", revision)
 
     state = "before-sidebar"
     for line in input_f:
@@ -93,10 +95,13 @@ def main():
                 state = "after-sidebar"
         output_f.write(line)
 
+    if state != "after-sidebar":
+        raise Exception(f"state={state!r}")
+
     output_f.seek(0, 0)
-    with open("./theme/index.hbs", "wt") as f:
+    with open(target, "wt") as f:
         print(output_f.read(), end="", file=f)
 
 
 if __name__ == "__main__":
-    main()
+    update_theme(Path(__file__).absolute().parent / "theme" / "index.hbs")
