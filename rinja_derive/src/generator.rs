@@ -70,26 +70,26 @@ impl<'a> Generator<'a> {
         let mut buf = Buffer::new();
 
         self.impl_template(ctx, &mut buf)?;
-        self.impl_display(&mut buf)?;
+        self.impl_display(&mut buf);
 
         #[cfg(feature = "with-actix-web")]
-        self.impl_actix_web_responder(&mut buf)?;
+        self.impl_actix_web_responder(&mut buf);
         #[cfg(feature = "with-axum")]
-        self.impl_axum_into_response(&mut buf)?;
+        self.impl_axum_into_response(&mut buf);
         #[cfg(feature = "with-rocket")]
-        self.impl_rocket_responder(&mut buf)?;
+        self.impl_rocket_responder(&mut buf);
         #[cfg(feature = "with-warp")]
-        self.impl_warp_reply(&mut buf)?;
+        self.impl_warp_reply(&mut buf);
 
         Ok(buf.buf)
     }
 
     // Implement `Template` for the given context struct.
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, &format!("{CRATE}::Template"), None)?;
+        self.write_header(buf, &format!("{CRATE}::Template"), None);
         buf.write("fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> ");
         buf.write(CRATE);
-        buf.writeln("::Result<()> {")?;
+        buf.writeln("::Result<()> {");
 
         buf.discard = self.buf_writable.discard;
         // Make sure the compiler understands that the generated code depends on the template files.
@@ -106,7 +106,7 @@ impl<'a> Generator<'a> {
                         include_bytes!(#path);
                     }
                     .to_string(),
-                )?;
+                );
             }
         }
 
@@ -119,68 +119,68 @@ impl<'a> Generator<'a> {
 
         self.flush_ws(Ws(None, None));
         buf.write(CRATE);
-        buf.writeln("::Result::Ok(())")?;
-        buf.writeln("}")?;
+        buf.writeln("::Result::Ok(())");
+        buf.writeln("}");
 
-        buf.writeln("const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = ")?;
-        buf.writeln(&format!("{:?}", self.input.extension()))?;
-        buf.writeln(";")?;
+        buf.writeln("const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = ");
+        buf.writeln(&format!("{:?}", self.input.extension()));
+        buf.writeln(";");
 
-        buf.writeln("const SIZE_HINT: ::std::primitive::usize = ")?;
-        buf.writeln(&format!("{size_hint}"))?;
-        buf.writeln(";")?;
+        buf.writeln("const SIZE_HINT: ::std::primitive::usize = ");
+        buf.writeln(&format!("{size_hint}"));
+        buf.writeln(";");
 
-        buf.writeln("const MIME_TYPE: &'static ::std::primitive::str = ")?;
-        buf.writeln(&format!("{:?}", &self.input.mime_type))?;
-        buf.writeln(";")?;
+        buf.writeln("const MIME_TYPE: &'static ::std::primitive::str = ");
+        buf.writeln(&format!("{:?}", &self.input.mime_type));
+        buf.writeln(";");
 
-        buf.writeln("}")?;
+        buf.writeln("}");
         Ok(())
     }
 
     // Implement `Display` for the given context struct.
-    fn impl_display(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::std::fmt::Display", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln("fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {")?;
+    fn impl_display(&mut self, buf: &mut Buffer) {
+        self.write_header(buf, "::std::fmt::Display", None);
+        buf.writeln("#[inline]");
+        buf.writeln("fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {");
         buf.write(CRATE);
-        buf.writeln("::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})")?;
-        buf.writeln("}")?;
-        buf.writeln("}")
+        buf.writeln("::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})");
+        buf.writeln("}");
+        buf.writeln("}");
     }
 
     // Implement Actix-web's `Responder`.
     #[cfg(feature = "with-actix-web")]
-    fn impl_actix_web_responder(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::rinja_actix::actix_web::Responder", None)?;
-        buf.writeln("type Body = ::rinja_actix::actix_web::body::BoxBody;")?;
-        buf.writeln("#[inline]")?;
+    fn impl_actix_web_responder(&mut self, buf: &mut Buffer) {
+        self.write_header(buf, "::rinja_actix::actix_web::Responder", None);
+        buf.writeln("type Body = ::rinja_actix::actix_web::body::BoxBody;");
+        buf.writeln("#[inline]");
         buf.writeln(
             "fn respond_to(self, _req: &::rinja_actix::actix_web::HttpRequest) \
              -> ::rinja_actix::actix_web::HttpResponse<Self::Body> {",
-        )?;
-        buf.writeln("::rinja_actix::into_response(&self)")?;
-        buf.writeln("}")?;
-        buf.writeln("}")
+        );
+        buf.writeln("::rinja_actix::into_response(&self)");
+        buf.writeln("}");
+        buf.writeln("}");
     }
 
     // Implement Axum's `IntoResponse`.
     #[cfg(feature = "with-axum")]
-    fn impl_axum_into_response(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::rinja_axum::axum_core::response::IntoResponse", None)?;
-        buf.writeln("#[inline]")?;
+    fn impl_axum_into_response(&mut self, buf: &mut Buffer) {
+        self.write_header(buf, "::rinja_axum::axum_core::response::IntoResponse", None);
+        buf.writeln("#[inline]");
         buf.writeln(
             "fn into_response(self)\
              -> ::rinja_axum::axum_core::response::Response {",
-        )?;
-        buf.writeln("::rinja_axum::into_response(&self)")?;
-        buf.writeln("}")?;
-        buf.writeln("}")
+        );
+        buf.writeln("::rinja_axum::into_response(&self)");
+        buf.writeln("}");
+        buf.writeln("}");
     }
 
     // Implement Rocket's `Responder`.
     #[cfg(feature = "with-rocket")]
-    fn impl_rocket_responder(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
+    fn impl_rocket_responder(&mut self, buf: &mut Buffer) {
         let lifetime1 = syn::Lifetime::new("'rinja1", proc_macro2::Span::call_site());
         let param1 = syn::GenericParam::Lifetime(syn::LifetimeParam::new(lifetime1));
 
@@ -188,26 +188,25 @@ impl<'a> Generator<'a> {
             buf,
             "::rinja_rocket::rocket::response::Responder<'rinja1, 'static>",
             Some(vec![param1]),
-        )?;
-        buf.writeln("#[inline]")?;
+        );
+        buf.writeln("#[inline]");
         buf.writeln(
             "fn respond_to(self, _: &'rinja1 ::rinja_rocket::rocket::request::Request<'_>) \
              -> ::rinja_rocket::rocket::response::Result<'static> {",
-        )?;
-        buf.writeln("::rinja_rocket::respond(&self)")?;
-        buf.writeln("}")?;
-        buf.writeln("}")?;
-        Ok(())
+        );
+        buf.writeln("::rinja_rocket::respond(&self)");
+        buf.writeln("}");
+        buf.writeln("}");
     }
 
     #[cfg(feature = "with-warp")]
-    fn impl_warp_reply(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::rinja_warp::warp::reply::Reply", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln("fn into_response(self) -> ::rinja_warp::warp::reply::Response {")?;
-        buf.writeln("::rinja_warp::into_response(&self)")?;
-        buf.writeln("}")?;
-        buf.writeln("}")
+    fn impl_warp_reply(&mut self, buf: &mut Buffer) {
+        self.write_header(buf, "::rinja_warp::warp::reply::Reply", None);
+        buf.writeln("#[inline]");
+        buf.writeln("fn into_response(self) -> ::rinja_warp::warp::reply::Response {");
+        buf.writeln("::rinja_warp::into_response(&self)");
+        buf.writeln("}");
+        buf.writeln("}");
     }
 
     // Writes header for the `impl` for `TraitFromPathName` or `Template`
@@ -217,7 +216,7 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         target: &str,
         params: Option<Vec<syn::GenericParam>>,
-    ) -> Result<(), CompileError> {
+    ) {
         let mut generics;
         let (impl_generics, orig_ty_generics, where_clause) = if let Some(params) = params {
             generics = self.input.ast.generics.clone();
@@ -238,7 +237,7 @@ impl<'a> Generator<'a> {
             target,
             self.input.ast.ident,
             quote!(#orig_ty_generics #where_clause),
-        ))
+        ));
     }
 
     /* Helper methods for handling node types */
@@ -321,12 +320,12 @@ impl<'a> Generator<'a> {
                 Node::Break(ref ws) => {
                     self.handle_ws(**ws);
                     self.write_buf_writable(ctx, buf)?;
-                    buf.writeln("break;")?;
+                    buf.writeln("break;");
                 }
                 Node::Continue(ref ws) => {
                     self.handle_ws(**ws);
                     self.write_buf_writable(ctx, buf)?;
-                    buf.writeln("continue;")?;
+                    buf.writeln("continue;");
                 }
             }
         }
@@ -403,14 +402,14 @@ impl<'a> Generator<'a> {
                 has_else = true;
             }
 
-            buf.writeln(" {")?;
+            buf.writeln(" {");
 
             arm_size += self.handle(ctx, &cond.nodes, buf, AstLevel::Nested)?;
             arm_sizes.push(arm_size);
         }
         self.handle_ws(i.ws);
         flushed += self.write_buf_writable(ctx, buf)?;
-        buf.writeln("}")?;
+        buf.writeln("}");
 
         self.locals.pop();
 
@@ -439,7 +438,7 @@ impl<'a> Generator<'a> {
         let mut arm_sizes = Vec::new();
 
         let expr_code = self.visit_expr_root(ctx, expr)?;
-        buf.writeln(&format!("match &{expr_code} {{"))?;
+        buf.writeln(&format!("match &{expr_code} {{"));
 
         let mut arm_size = 0;
         for (i, arm) in arms.iter().enumerate() {
@@ -448,23 +447,23 @@ impl<'a> Generator<'a> {
             if i > 0 {
                 arm_sizes.push(arm_size + self.write_buf_writable(ctx, buf)?);
 
-                buf.writeln("}")?;
+                buf.writeln("}");
                 self.locals.pop();
             }
 
             self.locals.push();
             self.visit_target(buf, true, true, &arm.target);
-            buf.writeln(" => {")?;
+            buf.writeln(" => {");
 
             arm_size = self.handle(ctx, &arm.nodes, buf, AstLevel::Nested)?;
         }
 
         self.handle_ws(ws2);
         arm_sizes.push(arm_size + self.write_buf_writable(ctx, buf)?);
-        buf.writeln("}")?;
+        buf.writeln("}");
         self.locals.pop();
 
-        buf.writeln("}")?;
+        buf.writeln("}");
 
         Ok(flushed + median(&mut arm_sizes))
     }
@@ -484,9 +483,9 @@ impl<'a> Generator<'a> {
         let has_else_nodes = !loop_block.else_nodes.is_empty();
 
         let flushed = self.write_buf_writable(ctx, buf)?;
-        buf.writeln("{")?;
+        buf.writeln("{");
         if has_else_nodes {
-            buf.writeln("let mut _did_loop = false;")?;
+            buf.writeln("let mut _did_loop = false;");
         }
         match &*loop_block.iter {
             Expr::Range(_, _, _) => buf.writeln(&format!("let _iter = {expr_code};")),
@@ -507,14 +506,14 @@ impl<'a> Generator<'a> {
             Expr::Attr(..) => buf.writeln(&format!("let _iter = (&{expr_code}).into_iter();")),
             // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
             _ => buf.writeln(&format!("let _iter = ({expr_code}).into_iter();")),
-        }?;
+        }
         if let Some(cond) = &loop_block.cond {
             self.locals.push();
             buf.write("let _iter = _iter.filter(|");
             self.visit_target(buf, true, true, &loop_block.var);
             buf.write("| -> bool {");
             self.visit_expr(ctx, buf, cond)?;
-            buf.writeln("});")?;
+            buf.writeln("});");
             self.locals.pop();
         }
 
@@ -523,32 +522,32 @@ impl<'a> Generator<'a> {
         self.visit_target(buf, true, true, &loop_block.var);
         buf.write(", _loop_item) in ");
         buf.write(CRATE);
-        buf.writeln("::helpers::TemplateLoop::new(_iter) {")?;
+        buf.writeln("::helpers::TemplateLoop::new(_iter) {");
 
         if has_else_nodes {
-            buf.writeln("_did_loop = true;")?;
+            buf.writeln("_did_loop = true;");
         }
         let mut size_hint1 = self.handle(ctx, &loop_block.body, buf, AstLevel::Nested)?;
         self.handle_ws(loop_block.ws2);
         size_hint1 += self.write_buf_writable(ctx, buf)?;
         self.locals.pop();
-        buf.writeln("}")?;
+        buf.writeln("}");
 
         let mut size_hint2;
         if has_else_nodes {
-            buf.writeln("if !_did_loop {")?;
+            buf.writeln("if !_did_loop {");
             self.locals.push();
             size_hint2 = self.handle(ctx, &loop_block.else_nodes, buf, AstLevel::Nested)?;
             self.handle_ws(loop_block.ws3);
             size_hint2 += self.write_buf_writable(ctx, buf)?;
             self.locals.pop();
-            buf.writeln("}")?;
+            buf.writeln("}");
         } else {
             self.handle_ws(loop_block.ws3);
             size_hint2 = self.write_buf_writable(ctx, buf)?;
         }
 
-        buf.writeln("}")?;
+        buf.writeln("}");
 
         Ok(flushed + ((size_hint1 * 3) + size_hint2) / 2)
     }
@@ -593,7 +592,7 @@ impl<'a> Generator<'a> {
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
         self.locals.push();
         self.write_buf_writable(ctx, buf)?;
-        buf.writeln("{")?;
+        buf.writeln("{");
         self.prepare_ws(def.ws1);
 
         let mut names = Buffer::new();
@@ -698,14 +697,14 @@ impl<'a> Generator<'a> {
 
         debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
         if !names.buf.is_empty() {
-            buf.writeln(&format!("let ({}) = ({});", names.buf, values.buf))?;
+            buf.writeln(&format!("let ({}) = ({});", names.buf, values.buf));
         }
 
         let mut size_hint = self.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
 
         self.flush_ws(def.ws2);
         size_hint += self.write_buf_writable(ctx, buf)?;
-        buf.writeln("}")?;
+        buf.writeln("}");
         self.locals.pop();
         self.prepare_ws(ws);
         Ok(size_hint)
@@ -739,7 +738,7 @@ impl<'a> Generator<'a> {
         size_hint += match buffers {
             None => return Ok(0),
             Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(&format!("let {var_name} = {:#?};", &format.buf))?;
+                buf.writeln(&format!("let {var_name} = {:#?};", &format.buf));
                 write_size_hint
             }
             Some(WritePartsBuffers {
@@ -750,7 +749,7 @@ impl<'a> Generator<'a> {
                     "let {var_name} = format!({:#?}, {});",
                     &format.buf,
                     expr.buf.trim(),
-                ))?;
+                ));
                 write_size_hint
             }
         };
@@ -800,7 +799,7 @@ impl<'a> Generator<'a> {
                     include_bytes!(#path);
                 }
                 .to_string(),
-            )?;
+            );
         }
 
         // We clone the context of the child in order to preserve their macros and imports.
@@ -899,7 +898,8 @@ impl<'a> Generator<'a> {
             self.write_buf_writable(ctx, buf)?;
             buf.write("let ");
             self.visit_target(buf, false, true, &l.var);
-            return buf.writeln(";");
+            buf.writeln(";");
+            return Ok(());
         };
 
         let mut expr_buf = Buffer::new();
@@ -919,7 +919,8 @@ impl<'a> Generator<'a> {
         }
 
         self.visit_target(buf, true, true, &l.var);
-        buf.writeln(&format!(" = {};", &expr_buf.buf))
+        buf.writeln(&format!(" = {};", &expr_buf.buf));
+        Ok(())
     }
 
     // If `name` is `Some`, this is a call to a block definition, and we have to find
@@ -1052,18 +1053,18 @@ impl<'a> Generator<'a> {
         match buffers {
             None => Ok(size_hint),
             Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(&format!("writer.write_str({:#?})?;", &format.buf))?;
+                buf.writeln(&format!("writer.write_str({:#?})?;", &format.buf));
                 Ok(size_hint)
             }
             Some(WritePartsBuffers {
                 format,
                 expr: Some(expr),
             }) => {
-                buf.writeln("::std::write!(")?;
-                buf.writeln("writer,")?;
-                buf.writeln(&format!("{:#?},", &format.buf))?;
-                buf.writeln(expr.buf.trim())?;
-                buf.writeln(")?;")?;
+                buf.writeln("::std::write!(");
+                buf.writeln("writer,");
+                buf.writeln(&format!("{:#?},", &format.buf));
+                buf.writeln(expr.buf.trim());
+                buf.writeln(")?;");
                 Ok(size_hint)
             }
         }
@@ -1123,7 +1124,7 @@ impl<'a> Generator<'a> {
                         wrapped,
                         cacheable,
                         &mut expr_cache,
-                    )?;
+                    );
                 }
                 Writable::Generated(s, wrapped) => {
                     size_hint += self.named_expression(
@@ -1133,7 +1134,7 @@ impl<'a> Generator<'a> {
                         wrapped,
                         false,
                         &mut expr_cache,
-                    )?;
+                    );
                 }
             }
         }
@@ -1154,7 +1155,7 @@ impl<'a> Generator<'a> {
         wrapped: DisplayWrap,
         cacheable: bool,
         expr_cache: &mut HashMap<String, usize>,
-    ) -> Result<usize, CompileError> {
+    ) -> usize {
         let expression = match wrapped {
             DisplayWrap::Wrapped => expr,
             DisplayWrap::Unwrapped => format!(
@@ -1171,7 +1172,7 @@ impl<'a> Generator<'a> {
                 buf_expr.write(&format!("expr{id} = "));
                 buf_expr.write("&");
                 buf_expr.write(entry.key());
-                buf_expr.writeln(",")?;
+                buf_expr.writeln(",");
 
                 if let Entry::Vacant(e) = entry {
                     e.insert(id);
@@ -1182,7 +1183,7 @@ impl<'a> Generator<'a> {
         };
 
         buf_format.write(&format!("{{expr{id}}}"));
-        Ok(3)
+        3
     }
 
     fn visit_lit(&mut self, lit: &'a Lit<'_>) {
@@ -1517,9 +1518,9 @@ impl<'a> Generator<'a> {
 
             match **arg {
                 Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
-                    buf.writeln("{")?;
+                    buf.writeln("{");
                     self.visit_expr(ctx, buf, arg)?;
-                    buf.writeln("}")?;
+                    buf.writeln("}");
                 }
                 _ => {
                     self.visit_expr(ctx, buf, arg)?;
@@ -1598,15 +1599,15 @@ impl<'a> Generator<'a> {
                         buf.write("({");
                         buf.write("let _cycle = &(");
                         self.visit_expr(ctx, buf, arg)?;
-                        buf.writeln(");")?;
-                        buf.writeln("let _len = _cycle.len();")?;
-                        buf.writeln("if _len == 0 {")?;
+                        buf.writeln(");");
+                        buf.writeln("let _len = _cycle.len();");
+                        buf.writeln("if _len == 0 {");
                         buf.write("return ::core::result::Result::Err(");
                         buf.write(CRATE);
-                        buf.writeln("::Error::Fmt(::core::fmt::Error));")?;
-                        buf.writeln("}")?;
-                        buf.writeln("_cycle[_loop_item.index % _len]")?;
-                        buf.writeln("})")?;
+                        buf.writeln("::Error::Fmt(::core::fmt::Error));");
+                        buf.writeln("}");
+                        buf.writeln("_cycle[_loop_item.index % _len]");
+                        buf.writeln("})");
                     }
                     _ => {
                         return Err(
@@ -1934,23 +1935,19 @@ impl Buffer {
         }
     }
 
-    fn writeln(&mut self, s: &str) -> Result<(), CompileError> {
-        if self.discard {
-            return Ok(());
+    fn writeln(&mut self, s: &str) {
+        if !self.discard {
+            if !s.is_empty() {
+                self.write(s);
+            }
+            self.buf.push('\n');
         }
-        if !s.is_empty() {
-            self.write(s);
-        }
-        self.buf.push('\n');
-        Ok(())
     }
 
     fn write(&mut self, s: &str) {
-        if self.discard {
-            return;
+        if !self.discard {
+            self.buf.push_str(s);
         }
-
-        self.buf.push_str(s);
     }
 }
 
