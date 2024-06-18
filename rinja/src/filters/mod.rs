@@ -22,9 +22,7 @@ use dep_num_traits::{cast::NumCast, Signed};
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use rinja_escape::{Escaper, MarkupDisplay};
 
-use super::Result;
-#[allow(unused_imports)]
-use crate::error::Error::Fmt;
+use crate::{Error, Result};
 
 #[cfg(feature = "percent-encoding")]
 // Urlencode char encoding set. Only the characters in the unreserved set don't
@@ -401,7 +399,7 @@ pub fn into_f64<T>(number: T) -> Result<f64>
 where
     T: NumCast,
 {
-    number.to_f64().ok_or(Fmt(fmt::Error))
+    number.to_f64().ok_or(Error::Fmt)
 }
 
 #[cfg(feature = "num-traits")]
@@ -410,7 +408,7 @@ pub fn into_isize<T>(number: T) -> Result<isize>
 where
     T: NumCast,
 {
-    number.to_isize().ok_or(Fmt(fmt::Error))
+    number.to_isize().ok_or(Error::Fmt)
 }
 
 /// Joins iterable into a string separated by provided argument
@@ -728,8 +726,8 @@ mod tests {
         assert_eq!(into_isize(1.5_f64).unwrap(), 1_isize);
         assert_eq!(into_isize(-1.5_f64).unwrap(), -1_isize);
         match into_isize(f64::INFINITY) {
-            Err(Fmt(fmt::Error)) => {}
-            _ => panic!("Should return error of type Err(Fmt(fmt::Error))"),
+            Err(Error::Fmt) => {}
+            _ => panic!("Should return error of type Err(Error::Fmt)"),
         };
     }
 

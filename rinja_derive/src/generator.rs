@@ -1599,9 +1599,9 @@ impl<'a> Generator<'a> {
                         buf.writeln(");");
                         buf.writeln("let _len = _cycle.len();");
                         buf.writeln("if _len == 0 {");
-                        buf.write("return ::core::result::Result::Err(");
-                        buf.write(CRATE);
-                        buf.writeln("::Error::Fmt(::core::fmt::Error));");
+                        buf.writeln(format_args!(
+                            "return ::core::result::Result::Err({CRATE}::Error::Fmt);"
+                        ));
                         buf.writeln("}");
                         buf.writeln("_cycle[_loop_item.index % _len]");
                         buf.writeln("})");

@@ -27,7 +27,7 @@ pub type Result<I, E = Error> = std::result::Result<I, E>;
 #[derive(Debug)]
 pub enum Error {
     /// formatting error
-    Fmt(fmt::Error),
+    Fmt,
     /// an error raised by using `?` in a template
     Custom(Box<dyn std::error::Error + Send + Sync>),
     /// json conversion error
@@ -38,7 +38,7 @@ pub enum Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
-            Error::Fmt(ref err) => Some(err),
+            Error::Fmt => None,
             Error::Custom(ref err) => Some(err.as_ref()),
             #[cfg(feature = "serde_json")]
             Error::Json(ref err) => Some(err),
@@ -49,7 +49,7 @@ impl std::error::Error for Error {
 impl Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Fmt(err) => write!(formatter, "formatting error: {err}"),
+            Error::Fmt => write!(formatter, "formatting error"),
             Error::Custom(err) => write!(formatter, "{err}"),
             #[cfg(feature = "serde_json")]
             Error::Json(err) => write!(formatter, "json conversion error: {err}"),
@@ -58,13 +58,15 @@ impl Display for Error {
 }
 
 impl From<fmt::Error> for Error {
-    fn from(err: fmt::Error) -> Self {
-        Error::Fmt(err)
+    #[inline]
+    fn from(_: fmt::Error) -> Self {
+        Error::Fmt
     }
 }
 
 #[cfg(feature = "serde_json")]
 impl From<serde_json::Error> for Error {
+    #[inline]
     fn from(err: serde_json::Error) -> Self {
         Error::Json(err)
     }
