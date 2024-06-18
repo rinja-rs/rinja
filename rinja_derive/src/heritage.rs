@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 
-use crate::config::Config;
-use crate::{CompileError, FileInfo};
 use parser::node::{BlockDef, Macro};
 use parser::{Node, Parsed, WithSpan};
+
+use crate::config::Config;
+use crate::{CompileError, FileInfo};
 
 pub(crate) struct Heritage<'a> {
     pub(crate) root: &'a Context<'a>,

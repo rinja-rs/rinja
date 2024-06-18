@@ -1,38 +1,57 @@
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
 
+mod config;
+mod generator;
+mod heritage;
+mod input;
+#[cfg(test)]
+mod tests;
+
 use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
-use proc_macro::TokenStream;
-use proc_macro2::Span;
-
-use parser::{generate_error_info, strip_common, ErrorInfo, ParseError};
-
-mod config;
 use config::{read_config_file, Config};
-mod generator;
 use generator::{Generator, MapChain};
-mod heritage;
 use heritage::{Context, Heritage};
-mod input;
 use input::{Print, TemplateArgs, TemplateInput};
-#[cfg(test)]
-mod tests;
+use parser::{generate_error_info, strip_common, ErrorInfo, ParseError};
+use proc_macro2::{Span, TokenStream};
 
+#[cfg(not(feature = "__standalone"))]
+macro_rules! pub_if_standalone {
+    (pub $($tt:tt)*) => {
+        $($tt)*
+    }
+}
+
+#[cfg(feature = "__standalone")]
+macro_rules! pub_if_standalone {
+    ($($tt:tt)*) => {
+        $($tt)*
+    }
+}
+
+#[cfg(not(feature = "__standalone"))]
 #[proc_macro_derive(Template, attributes(template))]
-pub fn derive_template(input: TokenStream) -> TokenStream {
-    let ast = syn::parse::<syn::DeriveInput>(input).unwrap();
-    match build_template(&ast) {
-        Ok(source) => source.parse().unwrap(),
-        Err(e) => {
-            let mut e = e.into_compile_error();
-            if let Ok(source) = build_skeleton(&ast) {
-                let source: TokenStream = source.parse().unwrap();
-                e.extend(source);
+pub fn derive_template(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    derive_template2(input.into()).into()
+}
+
+pub_if_standalone! {
+    pub fn derive_template2(input: TokenStream) -> TokenStream {
+        let ast = syn::parse2(input).unwrap();
+        match build_template(&ast) {
+            Ok(source) => source.parse().unwrap(),
+            Err(e) => {
+                let mut e = e.into_compile_error();
+                if let Ok(source) = build_skeleton(&ast) {
+                    let source: TokenStream = source.parse().unwrap();
+                    e.extend(source);
+                }
+                e
             }
-            e
         }
     }
 }
@@ -138,9 +157,7 @@ impl CompileError {
     }
 
     fn into_compile_error(self) -> TokenStream {
-        syn::Error::new(self.span, self.msg)
-            .to_compile_error()
-            .into()
+        syn::Error::new(self.span, self.msg).to_compile_error()
     }
 }
 

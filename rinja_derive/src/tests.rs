@@ -1,7 +1,8 @@
-// Files containing tests for generated code.
+//! Files containing tests for generated code.
+
+use std::fmt::Write;
 
 use crate::build_template;
-use std::fmt::Write;
 
 #[test]
 fn check_if_let() {
