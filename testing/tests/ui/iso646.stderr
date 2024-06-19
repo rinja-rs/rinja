@@ -1,6 +1,6 @@
-error: the binary operator '&' is called 'bitand' in rinja
-       failed to parse template source at row 1, column 5 near:
-       "& b }}"
+error: the binary AND operator is called `bitand` in rinja
+       failed to parse template source at row 1, column 6 near:
+       " b }}"
  --> tests/ui/iso646.rs:3:10
   |
 3 | #[derive(Template)]
@@ -19,9 +19,9 @@ error: the filter operator `|` must not be preceeded by any whitespace character
    |
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: the binary operator '^' is called 'xor' in rinja
-       failed to parse template source at row 1, column 5 near:
-       "^ b }}"
+error: the binary XOR operator is called `xor` in rinja
+       failed to parse template source at row 1, column 6 near:
+       " b }}"
   --> tests/ui/iso646.rs:31:10
    |
 31 | #[derive(Template)]

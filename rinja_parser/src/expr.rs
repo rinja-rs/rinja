@@ -33,29 +33,6 @@ macro_rules! expr_prec_layer {
     };
 }
 
-fn alternative_binop<'a>(
-    rust: &'static str,
-    dont_match: Option<&'static str>,
-    rinja: &'static str,
-) -> impl Fn(&'a str) -> ParseResult<'a, &'static str> {
-    move |i: &'a str| -> ParseResult<'a, &'static str> {
-        let (_, fail) = opt(tag(rust))(i)?;
-        if fail.is_some() {
-            let succeed = match dont_match {
-                Some(dont_match) => opt(tag(dont_match))(i)?.1.is_some(),
-                None => false,
-            };
-            if !succeed {
-                return Err(nom::Err::Failure(ErrorContext::new(
-                    format!("the binary operator '{rust}' is called '{rinja}' in rinja"),
-                    i,
-                )));
-            }
-        }
-        value(rust, keyword(rinja))(i)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<'a> {
     BoolLit(&'a str),
@@ -207,8 +184,8 @@ impl<'a> Expr<'a> {
         ))
     );
     expr_prec_layer!(bor, bxor, value("|", tag("bitor")));
-    expr_prec_layer!(bxor, band, alternative_binop("^", None, "xor"));
-    expr_prec_layer!(band, shifts, alternative_binop("&", Some("&&"), "bitand"));
+    expr_prec_layer!(bxor, band, token_xor);
+    expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));
     expr_prec_layer!(addsub, muldivmod, alt((tag("+"), tag("-"))));
     expr_prec_layer!(muldivmod, filtered, alt((tag("*"), tag("/"), tag("%"))));
@@ -326,6 +303,33 @@ impl<'a> Expr<'a> {
     fn char(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         map(char_lit, |i| WithSpan::new(Self::CharLit(i), start))(i)
+    }
+}
+
+fn token_xor(i: &str) -> ParseResult<'_> {
+    let (i, good) = alt((value(true, keyword("xor")), value(false, char('^'))))(i)?;
+    if good {
+        Ok((i, "^"))
+    } else {
+        Err(nom::Err::Failure(ErrorContext::new(
+            "the binary XOR operator is called `xor` in rinja",
+            i,
+        )))
+    }
+}
+
+fn token_bitand(i: &str) -> ParseResult<'_> {
+    let (i, good) = alt((
+        value(true, keyword("bitand")),
+        value(false, pair(char('&'), not(char('&')))),
+    ))(i)?;
+    if good {
+        Ok((i, "&"))
+    } else {
+        Err(nom::Err::Failure(ErrorContext::new(
+            "the binary AND operator is called `bitand` in rinja",
+            i,
+        )))
     }
 }
 
