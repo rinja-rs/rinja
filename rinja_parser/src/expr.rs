@@ -199,27 +199,17 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(addsub, muldivmod, "+", "-");
     expr_prec_layer!(muldivmod, filtered, "*", "/", "%");
 
-    fn filtered(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let (_, level) = level.nest(i)?;
+    fn filtered(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, (obj, filters)) =
-            tuple((|i| Self::prefix(i, level), many0(|i| filter(i, level))))(i)?;
+        let (mut i, mut res) = Self::prefix(i, level)?;
+        while let (j, Some((name, args))) = opt(|i| filter(i, &mut level))(i)? {
+            i = j;
 
-        let mut res = obj;
-        for (fname, args) in filters {
-            res = WithSpan::new(
-                Self::Filter(Filter {
-                    name: fname,
-                    arguments: {
-                        let mut args = args.unwrap_or_default();
-                        args.insert(0, res);
-                        args
-                    },
-                }),
-                start,
-            );
+            let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
+            arguments.insert(0, res);
+
+            res = WithSpan::new(Self::Filter(Filter { name, arguments }), start);
         }
-
         Ok((i, res))
     }
 
