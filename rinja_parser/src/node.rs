@@ -58,6 +58,7 @@ impl<'a> Node<'a> {
             result.map(|(i, n)| (i, func(n)))
         }
 
+        let start = i;
         let (j, tag) = preceded(
             |i| s.tag_block_start(i),
             peek(preceded(
@@ -100,7 +101,7 @@ impl<'a> Node<'a> {
         )))(i)?;
         match closed {
             true => Ok((i, node)),
-            false => Err(ErrorContext::unclosed("block", s.syntax.block_end, i).into()),
+            false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).into()),
         }
     }
 
@@ -137,6 +138,7 @@ impl<'a> Node<'a> {
     }
 
     fn expr(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+        let start = i;
         let (i, (pws, expr)) = preceded(
             |i| s.tag_expr_start(i),
             cut(pair(
@@ -151,7 +153,7 @@ impl<'a> Node<'a> {
         ))(i)?;
         match closed {
             true => Ok((i, Self::Expr(Ws(pws, nws), expr))),
-            false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, i).into()),
+            false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).into()),
         }
     }
 
@@ -1140,9 +1142,12 @@ impl<'a> Comment<'a> {
         fn content<'a>(mut i: &'a str, s: &State<'_>) -> ParseResult<'a, ()> {
             let mut depth = 0usize;
             loop {
+                let start = i;
                 let (_, tag) = opt(skip_till(|i| tag(i, s)))(i)?;
                 let Some((j, tag)) = tag else {
-                    return Err(ErrorContext::unclosed("comment", s.syntax.comment_end, i).into());
+                    return Err(
+                        ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),
+                    );
                 };
                 match tag {
                     Tag::Open => match depth.checked_add(1) {
@@ -1150,7 +1155,7 @@ impl<'a> Comment<'a> {
                         None => {
                             return Err(nom::Err::Failure(ErrorContext::new(
                                 "too deeply nested comments",
-                                i,
+                                start,
                             )));
                         }
                     },
