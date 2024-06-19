@@ -684,20 +684,6 @@ fn test_odd_calls() {
             })),
         )]
     );
-    assert_eq!(
-        Ast::from_str("{{ a(b) |c }}", None, &syntax).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::BinOp(
-                "|",
-                Box::new(WithSpan::no_span(Expr::Call(
-                    Box::new(WithSpan::no_span(Expr::Var("a"))),
-                    vec![WithSpan::no_span(Expr::Var("b"))]
-                ))),
-                Box::new(WithSpan::no_span(Expr::Var("c")))
-            ),)
-        )]
-    );
 }
 
 #[test]
@@ -848,19 +834,6 @@ fn test_parse_tuple() {
         )],
     );
     assert_eq!(
-        Ast::from_str("{{ () | abs }}", None, &syntax)
-            .unwrap()
-            .nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::BinOp(
-                "|",
-                Box::new(WithSpan::no_span(Expr::Tuple(vec![]))),
-                Box::new(WithSpan::no_span(Expr::Var("abs")))
-            )),
-        )],
-    );
-    assert_eq!(
         Ast::from_str("{{ (1)|abs }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
@@ -870,21 +843,6 @@ fn test_parse_tuple() {
                     Expr::NumLit("1")
                 ))))]
             })),
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{ (1) | abs }}", None, &syntax)
-            .unwrap()
-            .nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::BinOp(
-                "|",
-                Box::new(WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
-                    Expr::NumLit("1")
-                ))))),
-                Box::new(WithSpan::no_span(Expr::Var("abs")))
-            )),
         )],
     );
     assert_eq!(
@@ -902,21 +860,6 @@ fn test_parse_tuple() {
         )],
     );
     assert_eq!(
-        Ast::from_str("{{ (1,) | abs }}", None, &syntax)
-            .unwrap()
-            .nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::BinOp(
-                "|",
-                Box::new(WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(
-                    Expr::NumLit("1")
-                )]))),
-                Box::new(WithSpan::no_span(Expr::Var("abs")))
-            )),
-        )],
-    );
-    assert_eq!(
         Ast::from_str("{{ (1, 2)|abs }}", None, &syntax)
             .unwrap()
             .nodes,
@@ -929,22 +872,6 @@ fn test_parse_tuple() {
                     WithSpan::no_span(Expr::NumLit("2"))
                 ]))]
             })),
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{ (1, 2) | abs }}", None, &syntax)
-            .unwrap()
-            .nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::BinOp(
-                "|",
-                Box::new(WithSpan::no_span(Expr::Tuple(vec![
-                    WithSpan::no_span(Expr::NumLit("1")),
-                    WithSpan::no_span(Expr::NumLit("2"))
-                ]))),
-                Box::new(WithSpan::no_span(Expr::Var("abs")))
-            )),
         )],
     );
 }
@@ -1048,17 +975,6 @@ fn test_parse_array() {
                 name: "foo",
                 arguments: vec![WithSpan::no_span(Expr::Array(vec![]))]
             }))
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{ [] |foo }}", None, &syntax).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::BinOp(
-                "|",
-                Box::new(WithSpan::no_span(Expr::Array(vec![]))),
-                Box::new(WithSpan::no_span(Expr::Var("foo")))
-            )),
         )],
     );
 }

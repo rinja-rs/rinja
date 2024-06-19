@@ -16,13 +16,13 @@
 {% if c >> b == a -%}
   lsh
 {%- endif -%}
-{% if a & b == b -%}
+{% if a bitand b == b -%}
   band
 {%- endif -%}
-{% if b ^ c == a + c -%}
+{% if b xor c == a + c -%}
   bxor
 {%- endif -%}
-{% if (b | c) == a + c -%}
+{% if b bitor c == a + c -%}
   bor
 {%- endif -%}
 {% if a == b && a + b == c -%}

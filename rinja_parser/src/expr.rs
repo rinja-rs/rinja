@@ -4,14 +4,14 @@ use std::str;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
-use nom::combinator::{cut, map, not, opt, peek, recognize};
+use nom::combinator::{cut, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
 use nom::multi::{fold_many0, many0, separated_list0};
 use nom::sequence::{pair, preceded, terminated, tuple};
 
 use super::{
-    char_lit, filter, identifier, not_ws, num_lit, path_or_identifier, str_lit, ws, Level,
+    char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws, Level,
     PathOrIdentifier,
 };
 use crate::{ErrorContext, ParseResult, WithSpan};
@@ -22,10 +22,7 @@ macro_rules! expr_prec_layer {
             let (_, level) = level.nest(i)?;
             let start = i;
             let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0(pair(
-                ws(tag($op)),
-                |i| Self::$inner(i, level),
-            ))(i)?;
+            let (i, right) = many0(pair(ws($op), |i| Self::$inner(i, level)))(i)?;
             Ok((
                 i,
                 right.into_iter().fold(left, |left, (op, right)| {
@@ -34,22 +31,28 @@ macro_rules! expr_prec_layer {
             ))
         }
     };
-    ( $name:ident, $inner:ident, $( $op:expr ),+ ) => {
-        fn $name(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-            let (_, level) = level.nest(i)?;
-            let start = i;
-            let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0(pair(
-                ws(alt(($( tag($op) ),+,))),
-                |i| Self::$inner(i, level),
-            ))(i)?;
-            Ok((
-                i,
-                right.into_iter().fold(left, |left, (op, right)| {
-                    WithSpan::new(Self::BinOp(op, Box::new(left), Box::new(right)), start)
-                }),
-            ))
+}
+
+fn alternative_binop<'a>(
+    rust: &'static str,
+    dont_match: Option<&'static str>,
+    rinja: &'static str,
+) -> impl Fn(&'a str) -> ParseResult<'a, &'static str> {
+    move |i: &'a str| -> ParseResult<'a, &'static str> {
+        let (_, fail) = opt(tag(rust))(i)?;
+        if fail.is_some() {
+            let succeed = match dont_match {
+                Some(dont_match) => opt(tag(dont_match))(i)?.1.is_some(),
+                None => false,
+            };
+            if !succeed {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    format!("the binary operator '{rust}' is called '{rinja}' in rinja"),
+                    i,
+                )));
+            }
         }
+        value(rust, keyword(rinja))(i)
     }
 }
 
@@ -189,15 +192,26 @@ impl<'a> Expr<'a> {
         ))(i)
     }
 
-    expr_prec_layer!(or, and, "||");
-    expr_prec_layer!(and, compare, "&&");
-    expr_prec_layer!(compare, bor, "==", "!=", ">=", ">", "<=", "<");
-    expr_prec_layer!(bor, bxor, "|");
-    expr_prec_layer!(bxor, band, "^");
-    expr_prec_layer!(band, shifts, "&");
-    expr_prec_layer!(shifts, addsub, ">>", "<<");
-    expr_prec_layer!(addsub, muldivmod, "+", "-");
-    expr_prec_layer!(muldivmod, filtered, "*", "/", "%");
+    expr_prec_layer!(or, and, tag("||"));
+    expr_prec_layer!(and, compare, tag("&&"));
+    expr_prec_layer!(
+        compare,
+        bor,
+        alt((
+            tag("=="),
+            tag("!="),
+            tag(">="),
+            tag(">"),
+            tag("<="),
+            tag("<"),
+        ))
+    );
+    expr_prec_layer!(bor, bxor, alternative_binop("|", Some("||"), "bitor"));
+    expr_prec_layer!(bxor, band, alternative_binop("^", None, "xor"));
+    expr_prec_layer!(band, shifts, alternative_binop("&", Some("&&"), "bitand"));
+    expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));
+    expr_prec_layer!(addsub, muldivmod, alt((tag("+"), tag("-"))));
+    expr_prec_layer!(muldivmod, filtered, alt((tag("*"), tag("/"), tag("%"))));
 
     fn filtered(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
