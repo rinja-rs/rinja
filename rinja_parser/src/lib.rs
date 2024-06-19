@@ -12,7 +12,7 @@ use std::{fmt, str};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
 use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{cut, eof, map, opt, recognize};
+use nom::combinator::{cut, eof, map, not, opt, recognize};
 use nom::error::{Error, ErrorKind, FromExternalError};
 use nom::multi::{many0_count, many1};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
@@ -727,14 +727,27 @@ impl Level {
     const MAX_DEPTH: u8 = 128;
 }
 
-#[allow(clippy::type_complexity)]
 fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (i, _) = char('|')(i)?;
-    *level = level.nest(i)?.1;
-    pair(ws(identifier), opt(|i| Expr::arguments(i, *level, false)))(i)
+    let (j, _) = take_till(not_ws)(i)?;
+    let had_spaces = i.len() != j.len();
+    let (j, _) = pair(char('|'), not(char('|')))(j)?;
+
+    if !had_spaces {
+        *level = level.nest(i)?.1;
+        cut(pair(
+            ws(identifier),
+            opt(|i| Expr::arguments(i, *level, false)),
+        ))(j)
+    } else {
+        Err(nom::Err::Failure(ErrorContext::new(
+            "the filter operator `|` must not be preceeded by any whitespace characters\n\
+            the binary OR operator is called `bitor` in rinja",
+            i,
+        )))
+    }
 }
 
 /// Returns the common parts of two paths.

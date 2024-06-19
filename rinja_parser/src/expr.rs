@@ -206,7 +206,7 @@ impl<'a> Expr<'a> {
             tag("<"),
         ))
     );
-    expr_prec_layer!(bor, bxor, alternative_binop("|", Some("||"), "bitor"));
+    expr_prec_layer!(bor, bxor, value("|", tag("bitor")));
     expr_prec_layer!(bxor, band, alternative_binop("^", None, "xor"));
     expr_prec_layer!(band, shifts, alternative_binop("&", Some("&&"), "bitand"));
     expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));

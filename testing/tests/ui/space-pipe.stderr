@@ -1,0 +1,21 @@
+error: the filter operator `|` must not be preceeded by any whitespace characters
+       the binary OR operator is called `bitor` in rinja
+       failed to parse template source at row 1, column 3 near:
+       " |lower}}"
+ --> tests/ui/space-pipe.rs:9:10
+  |
+9 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: the filter operator `|` must not be preceeded by any whitespace characters
+       the binary OR operator is called `bitor` in rinja
+       failed to parse template source at row 1, column 3 near:
+       " | lower}}"
+  --> tests/ui/space-pipe.rs:21:10
+   |
+21 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
