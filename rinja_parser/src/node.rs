@@ -1203,8 +1203,10 @@ impl<'a> Comment<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
 
-fn is_rust_keyword(ident: &str) -> bool {
-    const MAX_KW_LEN: usize = 8;
+const MAX_KW_LEN: usize = 8;
+const KWS: &[&[[u8; MAX_KW_LEN]]] = {
+    // FIXME: Replace `u8` with `[core:ascii::Char; MAX_REPL_LEN]` once
+    //        <https://github.com/rust-lang/rust/issues/110998> is stable.
 
     const KW0: &[[u8; MAX_KW_LEN]] = &[];
     const KW1: &[[u8; MAX_KW_LEN]] = &[];
@@ -1268,25 +1270,22 @@ fn is_rust_keyword(ident: &str) -> bool {
     const KW7: &[[u8; MAX_KW_LEN]] = &[*b"unsized_", *b"virtual_"];
     const KW8: &[[u8; MAX_KW_LEN]] = &[*b"abstract", *b"continue", *b"override"];
 
-    const KWS: &[&[[u8; MAX_KW_LEN]]] = &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8];
+    &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8]
+};
 
-    // Ensure that all strings are ASCII, because we use `from_utf8_unchecked()` further down.
-    const _: () = {
-        let mut i = 0;
-        while i < KWS.len() {
-            let mut j = 0;
-            while KWS[i].len() < j {
-                let mut k = 0;
-                while KWS[i][j].len() < k {
-                    assert!(KWS[i][j][k].is_ascii());
-                    k += 1;
-                }
-                j += 1;
+/// Ensure that all strings are UTF-8, because we use `from_utf8_unchecked()` further down.
+#[test]
+fn ensure_utf8() {
+    for kws in KWS {
+        for kw in *kws {
+            if std::str::from_utf8(kw).is_err() {
+                panic!("not UTF-8: {:?}", kw);
             }
-            i += 1;
         }
-    };
+    }
+}
 
+fn is_rust_keyword(ident: &str) -> bool {
     if ident.len() > MAX_KW_LEN {
         return false;
     }
