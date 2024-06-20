@@ -592,9 +592,9 @@ impl<'a> Macro<'a> {
             ))),
         ));
         let (j, (pws1, _, (name, params, nws1, _))) = start(i)?;
-        if name == "super" {
+        if is_rust_keyword(name) {
             return Err(nom::Err::Failure(ErrorContext::new(
-                "'super' is not a valid name for a macro",
+                format!("'{name}' is not a valid name for a macro"),
                 i,
             )));
         }
@@ -1202,3 +1202,99 @@ impl<'a> Comment<'a> {
 /// Second field is "minus/plus sign was used on the right part of the item".
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
+
+fn is_rust_keyword(ident: &str) -> bool {
+    const MAX_KW_LEN: usize = 8;
+
+    const KW0: &[[u8; MAX_KW_LEN]] = &[];
+    const KW1: &[[u8; MAX_KW_LEN]] = &[];
+    const KW2: &[[u8; MAX_KW_LEN]] = &[
+        *b"as______",
+        *b"do______",
+        *b"fn______",
+        *b"if______",
+        *b"in______",
+    ];
+    const KW3: &[[u8; MAX_KW_LEN]] = &[
+        *b"box_____",
+        *b"dyn_____",
+        *b"for_____",
+        *b"let_____",
+        *b"mod_____",
+        *b"mut_____",
+        *b"pub_____",
+        *b"ref_____",
+        *b"try_____",
+        *b"use_____",
+    ];
+    const KW4: &[[u8; MAX_KW_LEN]] = &[
+        *b"else____",
+        *b"enum____",
+        *b"impl____",
+        *b"loop____",
+        *b"move____",
+        *b"priv____",
+        *b"self____",
+        *b"Self____",
+        *b"true____",
+        *b"type____",
+    ];
+    const KW5: &[[u8; MAX_KW_LEN]] = &[
+        *b"async___",
+        *b"await___",
+        *b"break___",
+        *b"const___",
+        *b"crate___",
+        *b"false___",
+        *b"final___",
+        *b"macro___",
+        *b"match___",
+        *b"super___",
+        *b"trait___",
+        *b"union___",
+        *b"where___",
+        *b"while___",
+        *b"yield___",
+    ];
+    const KW6: &[[u8; MAX_KW_LEN]] = &[
+        *b"become__",
+        *b"extern__",
+        *b"return__",
+        *b"static__",
+        *b"struct__",
+        *b"typeof__",
+        *b"unsafe__",
+    ];
+    const KW7: &[[u8; MAX_KW_LEN]] = &[*b"unsized_", *b"virtual_"];
+    const KW8: &[[u8; MAX_KW_LEN]] = &[*b"abstract", *b"continue", *b"override"];
+
+    const KWS: &[&[[u8; MAX_KW_LEN]]] = &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8];
+
+    // Ensure that all strings are ASCII, because we use `from_utf8_unchecked()` further down.
+    const _: () = {
+        let mut i = 0;
+        while i < KWS.len() {
+            let mut j = 0;
+            while KWS[i].len() < j {
+                let mut k = 0;
+                while KWS[i][j].len() < k {
+                    assert!(KWS[i][j][k].is_ascii());
+                    k += 1;
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+    };
+
+    if ident.len() > MAX_KW_LEN {
+        return false;
+    }
+    let kws = KWS[ident.len()];
+
+    let mut padded_ident = [b'_'; MAX_KW_LEN];
+    padded_ident[..ident.len()].copy_from_slice(ident.as_bytes());
+
+    // Since the individual buckets are quite short, a linear search is faster than a binary search.
+    kws.iter().any(|&probe| padded_ident == probe)
+}
