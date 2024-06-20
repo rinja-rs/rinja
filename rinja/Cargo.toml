@@ -49,4 +49,5 @@ harness = false
 required-features = ["serde_json"]
 
 [package.metadata.docs.rs]
-features = ["config", "humansize", "num-traits", "serde_json"]
+features = ["default", "serde_json"]
+rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
