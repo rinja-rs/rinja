@@ -31,10 +31,6 @@ with-axum = ["rinja_derive/with-axum"]
 with-rocket = ["rinja_derive/with-rocket"]
 with-warp = ["rinja_derive/with-warp"]
 
-# deprecated
-mime = []
-mime_guess = []
-
 [dependencies]
 rinja_derive = { version = "0.13", path = "../rinja_derive" }
 rinja_escape = { version = "0.11", path = "../rinja_escape" }
