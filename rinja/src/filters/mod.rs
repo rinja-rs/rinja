@@ -3,8 +3,6 @@
 //! Contains all the built-in filter functions for use in templates.
 //! You can define your own filters, as well.
 
-#![allow(clippy::trivially_copy_pass_by_ref)]
-
 use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
@@ -15,16 +13,16 @@ mod json;
 pub use self::json::json;
 
 #[cfg(feature = "humansize")]
-use dep_humansize::{ISizeFormatter, ToF64, DECIMAL};
+use humansize::{ISizeFormatter, ToF64, DECIMAL};
 #[cfg(feature = "num-traits")]
-use dep_num_traits::{cast::NumCast, Signed};
-#[cfg(feature = "percent-encoding")]
+use num_traits::{cast::NumCast, Signed};
+#[cfg(feature = "urlencode")]
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use rinja_escape::{Escaper, MarkupDisplay};
 
 use crate::{Error, Result};
 
-#[cfg(feature = "percent-encoding")]
+#[cfg(feature = "urlencode")]
 // Urlencode char encoding set. Only the characters in the unreserved set don't
 // have any special purpose in any part of a URI and can be safely left
 // unencoded as specified in https://tools.ietf.org/html/rfc3986.html#section-2.3
@@ -34,7 +32,7 @@ const URLENCODE_STRICT_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'-')
     .remove(b'~');
 
-#[cfg(feature = "percent-encoding")]
+#[cfg(feature = "urlencode")]
 // Same as URLENCODE_STRICT_SET, but preserves forward slashes for encoding paths
 const URLENCODE_SET: &AsciiSet = &URLENCODE_STRICT_SET.remove(b'/');
 
@@ -119,7 +117,7 @@ impl fmt::Display for FilesizeFormatFilter {
     }
 }
 
-#[cfg(feature = "percent-encoding")]
+#[cfg(feature = "urlencode")]
 /// Percent-encodes the argument for safe use in URI; does not encode `/`.
 ///
 /// This should be safe for all parts of URI (paths segments, query keys, query
@@ -144,7 +142,7 @@ pub fn urlencode<T: fmt::Display>(s: T) -> Result<impl fmt::Display, Infallible>
     Ok(UrlencodeFilter(s, URLENCODE_SET))
 }
 
-#[cfg(feature = "percent-encoding")]
+#[cfg(feature = "urlencode")]
 /// Percent-encodes the argument for safe use in URI; encodes `/`.
 ///
 /// Use this filter for encoding query keys and values in the rare case that
@@ -164,10 +162,10 @@ pub fn urlencode_strict<T: fmt::Display>(s: T) -> Result<impl fmt::Display, Infa
     Ok(UrlencodeFilter(s, URLENCODE_STRICT_SET))
 }
 
-#[cfg(feature = "percent-encoding")]
+#[cfg(feature = "urlencode")]
 struct UrlencodeFilter<T>(T, &'static AsciiSet);
 
-#[cfg(feature = "percent-encoding")]
+#[cfg(feature = "urlencode")]
 impl<T: fmt::Display> fmt::Display for UrlencodeFilter<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct Writer<'a, 'b>(&'a mut fmt::Formatter<'b>, &'static AsciiSet);
@@ -556,7 +554,7 @@ mod tests {
         assert_eq!(filesizeformat(&1024usize).unwrap().to_string(), "1.02 kB");
     }
 
-    #[cfg(feature = "percent-encoding")]
+    #[cfg(feature = "urlencode")]
     #[test]
     fn test_urlencoding() {
         // Unreserved (https://tools.ietf.org/html/rfc3986.html#section-2.3)
