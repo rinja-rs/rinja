@@ -59,8 +59,10 @@
 //!   in the configuration file. The default syntax , "default",  is the one
 //!   provided by Rinja.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 mod error;
 pub mod filters;

@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 use std::iter::{Enumerate, Peekable};
 
 pub struct TemplateLoop<I>
