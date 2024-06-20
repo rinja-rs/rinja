@@ -2285,28 +2285,11 @@ struct WritePartsBuffers {
     expr: Option<Buffer>,
 }
 
-// Identifiers to be replaced with raw identifiers, so as to avoid
-// collisions between template syntax and Rust's syntax. In particular
-// [Rust keywords](https://doc.rust-lang.org/reference/keywords.html)
-// should be replaced, since they're not reserved words in Rinja
-// syntax but have a high probability of causing problems in the
-// generated code.
-//
-// This list excludes the Rust keywords *self*, *Self*, and *super*
-// because they are not allowed to be raw identifiers, and *loop*
-// because it's used something like a keyword in the template
-// language.
-fn normalize_identifier(ident: &str) -> &str {
-    // This table works for as long as the replacement string is the original string
-    // prepended with "r#". The strings get right-padded to the same length with b'_'.
-    // While the code does not need it, please keep the list sorted when adding new
-    // keywords.
-
-    // FIXME: Replace with `[core:ascii::Char; MAX_REPL_LEN]` once
+const MAX_KW_LEN: usize = 8;
+const MAX_REPL_LEN: usize = MAX_KW_LEN + 2;
+const KWS: &[&[[u8; MAX_REPL_LEN]]] = {
+    // FIXME: Replace `u8` with `[core:ascii::Char; MAX_REPL_LEN]` once
     //        <https://github.com/rust-lang/rust/issues/110998> is stable.
-
-    const MAX_KW_LEN: usize = 8;
-    const MAX_REPL_LEN: usize = MAX_KW_LEN + 2;
 
     const KW0: &[[u8; MAX_REPL_LEN]] = &[];
     const KW1: &[[u8; MAX_REPL_LEN]] = &[];
@@ -2365,24 +2348,37 @@ fn normalize_identifier(ident: &str) -> &str {
     const KW7: &[[u8; MAX_REPL_LEN]] = &[*b"r#unsized_", *b"r#virtual_"];
     const KW8: &[[u8; MAX_REPL_LEN]] = &[*b"r#abstract", *b"r#continue", *b"r#override"];
 
-    const KWS: &[&[[u8; MAX_REPL_LEN]]] = &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8];
+    &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8]
+};
 
-    // Ensure that all strings are ASCII, because we use `from_utf8_unchecked()` further down.
-    const _: () = {
-        let mut i = 0;
-        while i < KWS.len() {
-            let mut j = 0;
-            while KWS[i].len() < j {
-                let mut k = 0;
-                while KWS[i][j].len() < k {
-                    assert!(KWS[i][j][k].is_ascii());
-                    k += 1;
-                }
-                j += 1;
+/// Ensure that all strings are UTF-8, because we use `from_utf8_unchecked()` further down.
+#[test]
+fn ensure_utf8() {
+    for kws in KWS {
+        for kw in *kws {
+            if std::str::from_utf8(kw).is_err() {
+                panic!("not UTF-8: {:?}", kw);
             }
-            i += 1;
         }
-    };
+    }
+}
+
+/// Identifiers to be replaced with raw identifiers, so as to avoid
+/// collisions between template syntax and Rust's syntax. In particular
+/// [Rust keywords](https://doc.rust-lang.org/reference/keywords.html)
+/// should be replaced, since they're not reserved words in Rinja
+/// syntax but have a high probability of causing problems in the
+/// generated code.
+///
+/// This list excludes the Rust keywords *self*, *Self*, and *super*
+/// because they are not allowed to be raw identifiers, and *loop*
+/// because it's used something like a keyword in the template
+/// language.
+fn normalize_identifier(ident: &str) -> &str {
+    // This table works for as long as the replacement string is the original string
+    // prepended with "r#". The strings get right-padded to the same length with b'_'.
+    // While the code does not need it, please keep the list sorted when adding new
+    // keywords.
 
     if ident.len() > MAX_KW_LEN {
         return ident;
