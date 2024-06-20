@@ -7,9 +7,9 @@ use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 mod json;
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 pub use self::json::json;
 
 #[cfg(feature = "humansize")]

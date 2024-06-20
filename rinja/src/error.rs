@@ -31,7 +31,7 @@ pub enum Error {
     /// an error raised by using `?` in a template
     Custom(Box<dyn std::error::Error + Send + Sync>),
     /// json conversion error
-    #[cfg(feature = "serde-json")]
+    #[cfg(feature = "serde_json")]
     Json(serde_json::Error),
 }
 
@@ -40,7 +40,7 @@ impl std::error::Error for Error {
         match *self {
             Error::Fmt => None,
             Error::Custom(ref err) => Some(err.as_ref()),
-            #[cfg(feature = "serde-json")]
+            #[cfg(feature = "serde_json")]
             Error::Json(ref err) => Some(err),
         }
     }
@@ -51,7 +51,7 @@ impl Display for Error {
         match self {
             Error::Fmt => write!(formatter, "formatting error"),
             Error::Custom(err) => write!(formatter, "{err}"),
-            #[cfg(feature = "serde-json")]
+            #[cfg(feature = "serde_json")]
             Error::Json(err) => write!(formatter, "json conversion error: {err}"),
         }
     }

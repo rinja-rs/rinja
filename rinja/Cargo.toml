@@ -21,7 +21,7 @@ default = ["config", "humansize", "num-traits", "urlencode"]
 config = ["rinja_derive/config"]
 humansize = ["rinja_derive/humansize", "dep:humansize"]
 num-traits = ["rinja_derive/num-traits", "dep:num-traits"]
-serde-json = ["rinja_derive/serde-json", "dep:serde", "dep:serde_json"]
+serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
 urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
 
 # Please do not depend on the following features manually.
@@ -50,7 +50,7 @@ criterion = "0.5"
 [[bench]]
 name = "to-json"
 harness = false
-required-features = ["serde-json"]
+required-features = ["serde_json"]
 
 [package.metadata.docs.rs]
-features = ["config", "humansize", "num-traits", "serde-json"]
+features = ["config", "humansize", "num-traits", "serde_json"]

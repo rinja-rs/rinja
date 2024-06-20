@@ -1357,9 +1357,9 @@ impl<'a> Generator<'a> {
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
-        if cfg!(not(feature = "serde-json")) {
+        if cfg!(not(feature = "serde_json")) {
             return Err(ctx.generate_error(
-                "the `json` filter requires the `serde-json` feature to be enabled",
+                "the `json` filter requires the `serde_json` feature to be enabled",
                 node,
             ));
         }

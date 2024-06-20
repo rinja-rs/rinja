@@ -1,4 +1,4 @@
-#![cfg(feature = "serde-json")]
+#![cfg(feature = "serde_json")]
 
 use rinja::Template;
 
