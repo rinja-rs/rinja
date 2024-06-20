@@ -2285,84 +2285,6 @@ struct WritePartsBuffers {
     expr: Option<Buffer>,
 }
 
-const MAX_KW_LEN: usize = 8;
-const MAX_REPL_LEN: usize = MAX_KW_LEN + 2;
-const KWS: &[&[[u8; MAX_REPL_LEN]]] = {
-    // FIXME: Replace `u8` with `[core:ascii::Char; MAX_REPL_LEN]` once
-    //        <https://github.com/rust-lang/rust/issues/110998> is stable.
-
-    const KW0: &[[u8; MAX_REPL_LEN]] = &[];
-    const KW1: &[[u8; MAX_REPL_LEN]] = &[];
-    const KW2: &[[u8; MAX_REPL_LEN]] = &[
-        *b"r#as______",
-        *b"r#do______",
-        *b"r#fn______",
-        *b"r#if______",
-        *b"r#in______",
-    ];
-    const KW3: &[[u8; MAX_REPL_LEN]] = &[
-        *b"r#box_____",
-        *b"r#dyn_____",
-        *b"r#for_____",
-        *b"r#let_____",
-        *b"r#mod_____",
-        *b"r#mut_____",
-        *b"r#pub_____",
-        *b"r#ref_____",
-        *b"r#try_____",
-        *b"r#use_____",
-    ];
-    const KW4: &[[u8; MAX_REPL_LEN]] = &[
-        *b"r#else____",
-        *b"r#enum____",
-        *b"r#impl____",
-        *b"r#move____",
-        *b"r#priv____",
-        *b"r#true____",
-        *b"r#type____",
-    ];
-    const KW5: &[[u8; MAX_REPL_LEN]] = &[
-        *b"r#async___",
-        *b"r#await___",
-        *b"r#break___",
-        *b"r#const___",
-        *b"r#crate___",
-        *b"r#false___",
-        *b"r#final___",
-        *b"r#macro___",
-        *b"r#match___",
-        *b"r#trait___",
-        *b"r#where___",
-        *b"r#while___",
-        *b"r#yield___",
-    ];
-    const KW6: &[[u8; MAX_REPL_LEN]] = &[
-        *b"r#become__",
-        *b"r#extern__",
-        *b"r#return__",
-        *b"r#static__",
-        *b"r#struct__",
-        *b"r#typeof__",
-        *b"r#unsafe__",
-    ];
-    const KW7: &[[u8; MAX_REPL_LEN]] = &[*b"r#unsized_", *b"r#virtual_"];
-    const KW8: &[[u8; MAX_REPL_LEN]] = &[*b"r#abstract", *b"r#continue", *b"r#override"];
-
-    &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8]
-};
-
-/// Ensure that all strings are UTF-8, because we use `from_utf8_unchecked()` further down.
-#[test]
-fn ensure_utf8() {
-    for kws in KWS {
-        for kw in *kws {
-            if std::str::from_utf8(kw).is_err() {
-                panic!("not UTF-8: {:?}", kw);
-            }
-        }
-    }
-}
-
 /// Identifiers to be replaced with raw identifiers, so as to avoid
 /// collisions between template syntax and Rust's syntax. In particular
 /// [Rust keywords](https://doc.rust-lang.org/reference/keywords.html)
@@ -2380,19 +2302,18 @@ fn normalize_identifier(ident: &str) -> &str {
     // While the code does not need it, please keep the list sorted when adding new
     // keywords.
 
-    if ident.len() > MAX_KW_LEN {
+    if ident.len() > parser::node::MAX_KW_LEN {
         return ident;
     }
-    let kws = KWS[ident.len()];
+    let kws = parser::node::KWS[ident.len()];
 
-    let mut padded_ident = [b'_'; MAX_KW_LEN];
+    let mut padded_ident = [b'_'; parser::node::MAX_KW_LEN];
     padded_ident[..ident.len()].copy_from_slice(ident.as_bytes());
 
     // Since the individual buckets are quite short, a linear search is faster than a binary search.
-    let replacement = match kws
-        .iter()
-        .find(|probe| padded_ident == <[u8; MAX_KW_LEN]>::try_from(&probe[2..]).unwrap())
-    {
+    let replacement = match kws.iter().find(|probe| {
+        padded_ident == <[u8; parser::node::MAX_KW_LEN]>::try_from(&probe[2..]).unwrap()
+    }) {
         Some(replacement) => replacement,
         None => return ident,
     };
