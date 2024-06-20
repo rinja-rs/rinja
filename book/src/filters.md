@@ -438,13 +438,13 @@ The following filters can be enabled by requesting the respective feature in the
 
 ```toml
 [dependencies]
-rinja = { version = "0.11.2", features = "serde-json" }
+rinja = { version = "0.11.2", features = "serde_json" }
 ```
 
 ### `json` | `tojson`
 [#json]: #json--tojson
 
-Enabling the `serde-json` feature will enable the use of the `json` filter.
+Enabling the `serde_json` feature will enable the use of the `json` filter.
 This will output formatted JSON for any value that implements the required
 [`Serialize`](https://docs.rs/serde/1.*/serde/trait.Serialize.html) trait.
 The generated string does not contain ampersands `&`, chevrons `< >`, or apostrophes `'`.

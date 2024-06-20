@@ -19,24 +19,23 @@ maintenance = { status = "actively-developed" }
 [features]
 default = ["config", "humansize", "num-traits", "urlencode"]
 config = ["rinja_derive/config"]
-humansize = ["rinja_derive/humansize", "dep_humansize"]
-num-traits = ["rinja_derive/num-traits", "dep_num_traits"]
-serde-json = ["rinja_derive/serde-json", "serde", "serde_json"]
-urlencode = ["rinja_derive/urlencode", "percent-encoding"]
+humansize = ["rinja_derive/humansize", "dep:humansize"]
+num-traits = ["rinja_derive/num-traits", "dep:num-traits"]
+serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
+urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
+
+# Please do not depend on the following features manually.
+# Depend on the relevant integration crate instead!
 with-actix-web = ["rinja_derive/with-actix-web"]
 with-axum = ["rinja_derive/with-axum"]
 with-rocket = ["rinja_derive/with-rocket"]
 with-warp = ["rinja_derive/with-warp"]
 
-# deprecated
-mime = []
-mime_guess = []
-
 [dependencies]
 rinja_derive = { version = "0.13", path = "../rinja_derive" }
 rinja_escape = { version = "0.11", path = "../rinja_escape" }
-dep_humansize = { package = "humansize", version = "2", optional = true }
-dep_num_traits = { package = "num-traits", version = "0.2.6", optional = true }
+humansize = { version = "2", optional = true }
+num-traits = { version = "0.2.6", optional = true }
 percent-encoding = { version = "2.1.0", optional = true }
 serde = { version = "1.0", optional = true, features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
@@ -47,7 +46,7 @@ criterion = "0.5"
 [[bench]]
 name = "to-json"
 harness = false
-required-features = ["serde-json"]
+required-features = ["serde_json"]
 
 [package.metadata.docs.rs]
-features = ["config", "humansize", "num-traits", "serde-json"]
+features = ["config", "humansize", "num-traits", "serde_json"]

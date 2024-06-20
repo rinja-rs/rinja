@@ -1,9 +1,9 @@
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[macro_use]
 extern crate serde_json;
 
 use rinja::Template;
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 use serde_json::Value;
 
 #[derive(Template)]
@@ -162,7 +162,7 @@ fn test_vec_join() {
     assert_eq!(t.render().unwrap(), "foo, bar, bazz");
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[derive(Template)]
 #[template(path = "json.html")]
 struct JsonTemplate<'a> {
@@ -170,7 +170,7 @@ struct JsonTemplate<'a> {
     bar: &'a Value,
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[test]
 fn test_json() {
     let val = json!({"arr": [ "one", 2, true, null ]});
@@ -250,14 +250,14 @@ fn test_filter_truncate() {
     assert_eq!(t.render().unwrap(), "alpha baralpha...");
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[derive(Template)]
 #[template(source = r#"<li data-name="{{name|json}}"></li>"#, ext = "html")]
 struct JsonAttributeTemplate<'a> {
     name: &'a str,
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[test]
 fn test_json_attribute() {
     let t = JsonAttributeTemplate {
@@ -269,14 +269,14 @@ fn test_json_attribute() {
     );
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[derive(Template)]
 #[template(source = r#"<li data-name='{{name|json|safe}}'></li>"#, ext = "html")]
 struct JsonAttribute2Template<'a> {
     name: &'a str,
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[test]
 fn test_json_attribute2() {
     let t = JsonAttribute2Template {
@@ -288,7 +288,7 @@ fn test_json_attribute2() {
     );
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[derive(Template)]
 #[template(
     source = r#"<script>var user = {{name|json|safe}}</script>"#,
@@ -298,7 +298,7 @@ struct JsonScriptTemplate<'a> {
     name: &'a str,
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[test]
 fn test_json_script() {
     let t = JsonScriptTemplate {

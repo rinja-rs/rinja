@@ -8,8 +8,8 @@ rust-version = "1.65"
 publish = false
 
 [features]
-default = ["serde-json"]
-serde-json = ["serde_json", "rinja/serde-json"]
+default = ["serde_json"]
+serde_json = ["dep:serde_json", "rinja/serde_json"]
 
 [dependencies]
 rinja = { path = "../rinja", version = "0.13" }
