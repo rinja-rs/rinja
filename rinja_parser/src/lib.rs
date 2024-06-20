@@ -728,13 +728,13 @@ impl Level {
 }
 
 #[allow(clippy::type_complexity)]
-fn filter(i: &str, level: Level) -> ParseResult<'_, (&str, Option<Vec<WithSpan<'_, Expr<'_>>>>)> {
-    let (i, (_, fname, args)) = tuple((
-        char('|'),
-        ws(identifier),
-        opt(|i| Expr::arguments(i, level, false)),
-    ))(i)?;
-    Ok((i, (fname, args)))
+fn filter<'a>(
+    i: &'a str,
+    level: &mut Level,
+) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
+    let (i, _) = char('|')(i)?;
+    *level = level.nest(i)?.1;
+    pair(ws(identifier), opt(|i| Expr::arguments(i, *level, false)))(i)
 }
 
 /// Returns the common parts of two paths.
