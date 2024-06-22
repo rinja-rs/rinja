@@ -4,12 +4,12 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use mime::Mime;
+use parser::{Node, Parsed, Syntax};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
 use crate::config::{get_template_source, Config};
 use crate::CompileError;
-use parser::{Node, Parsed, Syntax};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,

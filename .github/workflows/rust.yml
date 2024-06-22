@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix:
         package: [
-          rinja, rinja_actix, rinja_axum, rinja_derive, rinja_escape,
+          rinja, rinja_actix, rinja_axum, rinja_derive, rinja_derive_standalone, rinja_escape,
           rinja_parser, rinja_rocket, rinja_warp, testing,
         ]
     runs-on: ubuntu-latest
