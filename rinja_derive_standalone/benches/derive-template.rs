@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use quote::quote;
 
 criterion_main!(benches);
@@ -19,7 +19,9 @@ fn hello_world(b: &mut criterion::Bencher<'_>) {
             user: &'a str,
         }
     };
-    b.iter(|| {
-        rinja_derive_standalone::derive_template2(black_box(&ts).clone());
-    })
+    b.iter_batched(
+        || ts.clone(),
+        |ts| rinja_derive_standalone::derive_template2(ts),
+        BatchSize::LargeInput,
+    );
 }
