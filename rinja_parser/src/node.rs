@@ -1203,97 +1203,130 @@ impl<'a> Comment<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
 
-const MAX_KW_LEN: usize = 8;
-const KWS: &[&[[u8; MAX_KW_LEN]]] = {
+#[doc(hidden)]
+pub const MAX_KW_LEN: usize = 8;
+const MAX_REPL_LEN: usize = MAX_KW_LEN + 2;
+#[doc(hidden)]
+pub const KWS: &[&[[u8; MAX_REPL_LEN]]] = {
     // FIXME: Replace `u8` with `[core:ascii::Char; MAX_REPL_LEN]` once
     //        <https://github.com/rust-lang/rust/issues/110998> is stable.
 
-    const KW0: &[[u8; MAX_KW_LEN]] = &[];
-    const KW1: &[[u8; MAX_KW_LEN]] = &[];
-    const KW2: &[[u8; MAX_KW_LEN]] = &[
-        *b"as______",
-        *b"do______",
-        *b"fn______",
-        *b"if______",
-        *b"in______",
+    const KW2: &[[u8; MAX_REPL_LEN]] = &[
+        *b"r#as______",
+        *b"r#do______",
+        *b"r#fn______",
+        *b"r#if______",
+        *b"r#in______",
     ];
-    const KW3: &[[u8; MAX_KW_LEN]] = &[
-        *b"box_____",
-        *b"dyn_____",
-        *b"for_____",
-        *b"let_____",
-        *b"mod_____",
-        *b"mut_____",
-        *b"pub_____",
-        *b"ref_____",
-        *b"try_____",
-        *b"use_____",
+    const KW3: &[[u8; MAX_REPL_LEN]] = &[
+        *b"r#box_____",
+        *b"r#dyn_____",
+        *b"r#for_____",
+        *b"r#let_____",
+        *b"r#mod_____",
+        *b"r#mut_____",
+        *b"r#pub_____",
+        *b"r#ref_____",
+        *b"r#try_____",
+        *b"r#use_____",
     ];
-    const KW4: &[[u8; MAX_KW_LEN]] = &[
-        *b"else____",
-        *b"enum____",
-        *b"impl____",
-        *b"loop____",
-        *b"move____",
-        *b"priv____",
-        *b"self____",
-        *b"Self____",
-        *b"true____",
-        *b"type____",
+    const KW4: &[[u8; MAX_REPL_LEN]] = &[
+        *b"r#else____",
+        *b"r#enum____",
+        *b"r#impl____",
+        *b"r#move____",
+        *b"r#priv____",
+        *b"r#true____",
+        *b"r#type____",
     ];
-    const KW5: &[[u8; MAX_KW_LEN]] = &[
-        *b"async___",
-        *b"await___",
-        *b"break___",
-        *b"const___",
-        *b"crate___",
-        *b"false___",
-        *b"final___",
-        *b"macro___",
-        *b"match___",
-        *b"super___",
-        *b"trait___",
-        *b"union___",
-        *b"where___",
-        *b"while___",
-        *b"yield___",
+    const KW5: &[[u8; MAX_REPL_LEN]] = &[
+        *b"r#async___",
+        *b"r#await___",
+        *b"r#break___",
+        *b"r#const___",
+        *b"r#crate___",
+        *b"r#false___",
+        *b"r#final___",
+        *b"r#macro___",
+        *b"r#match___",
+        *b"r#trait___",
+        *b"r#where___",
+        *b"r#while___",
+        *b"r#yield___",
     ];
-    const KW6: &[[u8; MAX_KW_LEN]] = &[
-        *b"become__",
-        *b"extern__",
-        *b"return__",
-        *b"static__",
-        *b"struct__",
-        *b"typeof__",
-        *b"unsafe__",
+    const KW6: &[[u8; MAX_REPL_LEN]] = &[
+        *b"r#become__",
+        *b"r#extern__",
+        *b"r#return__",
+        *b"r#static__",
+        *b"r#struct__",
+        *b"r#typeof__",
+        *b"r#unsafe__",
     ];
-    const KW7: &[[u8; MAX_KW_LEN]] = &[*b"unsized_", *b"virtual_"];
-    const KW8: &[[u8; MAX_KW_LEN]] = &[*b"abstract", *b"continue", *b"override"];
+    const KW7: &[[u8; MAX_REPL_LEN]] = &[*b"r#unsized_", *b"r#virtual_"];
+    const KW8: &[[u8; MAX_REPL_LEN]] = &[*b"r#abstract", *b"r#continue", *b"r#override"];
 
-    &[KW0, KW1, KW2, KW3, KW4, KW5, KW6, KW7, KW8]
+    &[&[], &[], KW2, KW3, KW4, KW5, KW6, KW7, KW8]
 };
 
-/// Ensure that all strings are UTF-8, because we use `from_utf8_unchecked()` further down.
-#[test]
-fn ensure_utf8() {
-    for kws in KWS {
-        for kw in *kws {
-            if std::str::from_utf8(kw).is_err() {
-                panic!("not UTF-8: {:?}", kw);
-            }
-        }
-    }
-}
+// These ones are only used in the parser, hence why they're private.
+const KWS_EXTRA: &[&[[u8; MAX_REPL_LEN]]] = {
+    const KW4: &[[u8; MAX_REPL_LEN]] = &[*b"r#loop____", *b"r#self____", *b"r#Self____"];
+    const KW5: &[[u8; MAX_REPL_LEN]] = &[*b"r#super___", *b"r#union___"];
+
+    &[&[], &[], &[], &[], KW4, KW5, &[], &[], &[]]
+};
 
 fn is_rust_keyword(ident: &str) -> bool {
+    fn is_rust_keyword_inner(
+        kws: &[&[[u8; MAX_REPL_LEN]]],
+        padded_ident: &[u8; MAX_KW_LEN],
+        ident_len: usize,
+    ) -> bool {
+        // Since the individual buckets are quite short, a linear search is faster than a binary search.
+        kws[ident_len]
+            .iter()
+            .any(|&probe| padded_ident == &probe[2..])
+    }
     if ident.len() > MAX_KW_LEN {
         return false;
     }
-    let kws = KWS[ident.len()];
+    let ident_len = ident.len();
 
     let mut padded_ident = [b'_'; MAX_KW_LEN];
     padded_ident[..ident.len()].copy_from_slice(ident.as_bytes());
 
-    // Since the individual buckets are quite short, a linear search is faster than a binary search.
-    kws.iter().any(|&probe| padded_ident == probe)
+    is_rust_keyword_inner(KWS, &padded_ident, ident_len)
+        || is_rust_keyword_inner(KWS_EXTRA, &padded_ident, ident_len)
+}
+
+#[cfg(test)]
+mod kws_tests {
+    use super::{is_rust_keyword, KWS, KWS_EXTRA, MAX_REPL_LEN};
+
+    fn ensure_utf8_inner(entry: &[&[[u8; MAX_REPL_LEN]]]) {
+        for kws in entry {
+            for kw in *kws {
+                if std::str::from_utf8(kw).is_err() {
+                    panic!("not UTF-8: {:?}", kw);
+                }
+            }
+        }
+    }
+
+    // Ensure that all strings are UTF-8, because we use `from_utf8_unchecked()` further down.
+    #[test]
+    fn ensure_utf8() {
+        assert_eq!(KWS.len(), KWS_EXTRA.len());
+        ensure_utf8_inner(KWS);
+        ensure_utf8_inner(KWS_EXTRA);
+    }
+
+    #[test]
+    fn test_is_rust_keyword() {
+        assert!(is_rust_keyword("super"));
+        assert!(is_rust_keyword("become"));
+        assert!(!is_rust_keyword("supeeeer"));
+        assert!(!is_rust_keyword("sur"));
+    }
 }
