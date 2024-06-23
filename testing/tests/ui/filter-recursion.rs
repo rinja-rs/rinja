@@ -1,7 +1,7 @@
 use rinja::Template;
 
 #[derive(Template)]
-#[template(source = "{{ s|a|a|a|a|a|a|a|A|a|a|a|a|a|a|a|a|a|a|a|a|a", ext = "txt")]
+#[template(path = "filter-recursion.html")]
 struct Filtered {
     s: &'static str,
 }

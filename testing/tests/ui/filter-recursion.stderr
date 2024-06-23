@@ -1,6 +1,6 @@
-error: unclosed expression, missing "}}"
-       failed to parse template source at row 1, column 0 near:
-       "{{ s|a|a|a|a|a|a|a|A|a|a|a|a|a|a|a|a|a|a"...
+error: failed to parse template source
+ --> testing/templates/filter-recursion.html:1:255
+       "|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A"...
  --> tests/ui/filter-recursion.rs:3:10
   |
 3 | #[derive(Template)]
