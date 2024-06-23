@@ -711,10 +711,10 @@ pub(crate) struct Level(u8);
 impl Level {
     fn nest(self, i: &str) -> ParseResult<'_, Level> {
         if self.0 >= Self::MAX_DEPTH {
-            return Err(ErrorContext::from_err(nom::Err::Failure(error_position!(
+            return Err(nom::Err::Failure(ErrorContext::new(
+                "your template code is too deeply nested, or last expression is too complex",
                 i,
-                ErrorKind::TooLarge
-            ))));
+            )));
         }
 
         Ok((i, Level(self.0 + 1)))

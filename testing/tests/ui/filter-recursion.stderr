@@ -1,5 +1,6 @@
-error: failed to parse template source
- --> testing/templates/filter-recursion.html:1:255
+error: your template code is too deeply nested, or last expression is too complex
+       failed to parse template source
+         --> testing/templates/filter-recursion.html:1:255
        "|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A"...
  --> tests/ui/filter-recursion.rs:3:10
   |

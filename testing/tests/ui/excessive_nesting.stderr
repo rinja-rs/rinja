@@ -1,4 +1,5 @@
-error: failed to parse template source at row 14, column 42 near:
+error: your template code is too deeply nested, or last expression is too complex
+       failed to parse template source at row 14, column 42 near:
        "%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1"...
  --> tests/ui/excessive_nesting.rs:3:10
   |
