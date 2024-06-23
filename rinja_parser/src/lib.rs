@@ -635,14 +635,17 @@ impl<'a> State<'a> {
         }
     }
 
-    fn nest<'b>(&self, i: &'b str) -> ParseResult<'b, ()> {
-        let (_, level) = self.level.get().nest(i)?;
+    fn nest<'b, T, F: FnOnce(&'b str) -> ParseResult<'b, T>>(
+        &self,
+        i: &'b str,
+        callback: F,
+    ) -> ParseResult<'b, T> {
+        let prev_level = self.level.get();
+        let (_, level) = prev_level.nest(i)?;
         self.level.set(level);
-        Ok((i, ()))
-    }
-
-    fn leave(&self) {
-        self.level.set(self.level.get().leave());
+        let ret = callback(i);
+        self.level.set(prev_level);
+        ret
     }
 
     fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
@@ -718,10 +721,6 @@ impl Level {
         }
 
         Ok((i, Level(self.0 + 1)))
-    }
-
-    fn leave(&self) -> Self {
-        Level(self.0 - 1)
     }
 
     const MAX_DEPTH: u8 = 128;
