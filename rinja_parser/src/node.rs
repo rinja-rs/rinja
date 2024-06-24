@@ -90,10 +90,7 @@ impl<'a> Node<'a> {
             }
         };
 
-        let (i, _) = s.nest(j)?;
-        let result = func(i, s);
-        s.leave();
-        let (i, node) = result?;
+        let (i, node) = s.nest(j, |i| func(i, s))?;
 
         let (i, closed) = cut(alt((
             value(true, |i| s.tag_block_end(i)),
@@ -197,12 +194,7 @@ impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         map(
-            separated_list1(ws(tag("or")), |i| {
-                s.nest(i)?;
-                let ret = Self::parse_one(i, s)?;
-                s.leave();
-                Ok(ret)
-            }),
+            separated_list1(ws(tag("or")), |i| s.nest(i, |i| Self::parse_one(i, s))),
             |mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
