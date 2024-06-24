@@ -4,14 +4,14 @@ use std::str;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
-use nom::combinator::{cut, map, not, opt, peek, recognize};
+use nom::combinator::{cut, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
 use nom::multi::{fold_many0, many0, separated_list0};
 use nom::sequence::{pair, preceded, terminated, tuple};
 
 use super::{
-    char_lit, filter, identifier, not_ws, num_lit, path_or_identifier, str_lit, ws, Level,
+    char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws, Level,
     PathOrIdentifier,
 };
 use crate::{ErrorContext, ParseResult, WithSpan};
@@ -22,10 +22,7 @@ macro_rules! expr_prec_layer {
             let (_, level) = level.nest(i)?;
             let start = i;
             let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0(pair(
-                ws(tag($op)),
-                |i| Self::$inner(i, level),
-            ))(i)?;
+            let (i, right) = many0(pair(ws($op), |i| Self::$inner(i, level)))(i)?;
             Ok((
                 i,
                 right.into_iter().fold(left, |left, (op, right)| {
@@ -34,23 +31,6 @@ macro_rules! expr_prec_layer {
             ))
         }
     };
-    ( $name:ident, $inner:ident, $( $op:expr ),+ ) => {
-        fn $name(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-            let (_, level) = level.nest(i)?;
-            let start = i;
-            let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0(pair(
-                ws(alt(($( tag($op) ),+,))),
-                |i| Self::$inner(i, level),
-            ))(i)?;
-            Ok((
-                i,
-                right.into_iter().fold(left, |left, (op, right)| {
-                    WithSpan::new(Self::BinOp(op, Box::new(left), Box::new(right)), start)
-                }),
-            ))
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -189,15 +169,26 @@ impl<'a> Expr<'a> {
         ))(i)
     }
 
-    expr_prec_layer!(or, and, "||");
-    expr_prec_layer!(and, compare, "&&");
-    expr_prec_layer!(compare, bor, "==", "!=", ">=", ">", "<=", "<");
-    expr_prec_layer!(bor, bxor, "|");
-    expr_prec_layer!(bxor, band, "^");
-    expr_prec_layer!(band, shifts, "&");
-    expr_prec_layer!(shifts, addsub, ">>", "<<");
-    expr_prec_layer!(addsub, muldivmod, "+", "-");
-    expr_prec_layer!(muldivmod, filtered, "*", "/", "%");
+    expr_prec_layer!(or, and, tag("||"));
+    expr_prec_layer!(and, compare, tag("&&"));
+    expr_prec_layer!(
+        compare,
+        bor,
+        alt((
+            tag("=="),
+            tag("!="),
+            tag(">="),
+            tag(">"),
+            tag("<="),
+            tag("<"),
+        ))
+    );
+    expr_prec_layer!(bor, bxor, value("|", tag("bitor")));
+    expr_prec_layer!(bxor, band, token_xor);
+    expr_prec_layer!(band, shifts, token_bitand);
+    expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));
+    expr_prec_layer!(addsub, muldivmod, alt((tag("+"), tag("-"))));
+    expr_prec_layer!(muldivmod, filtered, alt((tag("*"), tag("/"), tag("%"))));
 
     fn filtered(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
@@ -312,6 +303,33 @@ impl<'a> Expr<'a> {
     fn char(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         map(char_lit, |i| WithSpan::new(Self::CharLit(i), start))(i)
+    }
+}
+
+fn token_xor(i: &str) -> ParseResult<'_> {
+    let (i, good) = alt((value(true, keyword("xor")), value(false, char('^'))))(i)?;
+    if good {
+        Ok((i, "^"))
+    } else {
+        Err(nom::Err::Failure(ErrorContext::new(
+            "the binary XOR operator is called `xor` in rinja",
+            i,
+        )))
+    }
+}
+
+fn token_bitand(i: &str) -> ParseResult<'_> {
+    let (i, good) = alt((
+        value(true, keyword("bitand")),
+        value(false, pair(char('&'), not(char('&')))),
+    ))(i)?;
+    if good {
+        Ok((i, "&"))
+    } else {
+        Err(nom::Err::Failure(ErrorContext::new(
+            "the binary AND operator is called `bitand` in rinja",
+            i,
+        )))
     }
 }
 

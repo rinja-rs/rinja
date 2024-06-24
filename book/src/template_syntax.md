@@ -537,11 +537,8 @@ block to use includes more dynamically.
 Rinja supports string literals (`"foo"`) and integer literals (`1`).
 It supports almost all binary operators that Rust supports,
 including arithmetic, comparison and logic operators.
-The parser applies the same precedence order as the Rust compiler.
+The parser applies the same [operator precedence] as the Rust compiler.
 Expressions can be grouped using parentheses.
-The HTML special characters `&`, `<` and `>` will be replaced with their
-character entities unless the `escape` mode is disabled for a template.
-Methods can be called on variables that are in scope, including `self`.
 
 ```
 {{ 3 * 4 / 2 }}
@@ -549,14 +546,34 @@ Methods can be called on variables that are in scope, including `self`.
 {{ 3 % 2 * 6 }}
 {{ 1 * 2 + 4 }}
 {{ 11 - 15 / 3 }}
-{{ 4 + 5 % 3 }}
-{{ 4 | 2 + 5 & 2 }}
+{{ (4 + 5) % 3 }}
 ```
+
+The HTML special characters `&`, `<` and `>` will be replaced with their
+character entities unless the `escape` mode is disabled for a template,
+or the filter `|safe` is used.
+
+Methods can be called on variables that are in scope, including `self`.
 
 **Warning**: if the result of an expression (a `{{ }}` block) is
 equivalent to `self`, this can result in a stack overflow from infinite
 recursion. This is because the `Display` implementation for that expression
 will in turn evaluate the expression and yield `self` again.
+
+[operator precedence]: <https://doc.rust-lang.org/reference/expressions.html#expression-precedence>
+
+### Expressions containing bit-operators
+
+In Rinja, the binary AND, OR, and XOR operators (called `&`, `|`, `^` in Rust, resp.),
+are renamed to `bitand`, `bitor`, `xor` to avoid confusion with filter expressions.
+They still have the same operator precedende as in Rust.
+E.g. to test if the least significant bit is set in an integer field:
+
+```jinja
+{% if my_bitset bitand 1 != 0 %}
+    It is set!
+{% endif %}
+```
 
 
 ## Templates in templates
