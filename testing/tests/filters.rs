@@ -237,7 +237,7 @@ fn test_pretty_json() {
 #[template(source = r#"{{ bar|json(indent)|safe }}"#, ext = "txt")]
 struct DynamicJsonTemplate<'a> {
     bar: &'a Value,
-    indent: Option<&'a str>,
+    indent: &'a str,
 }
 
 #[cfg(feature = "serde-json")]
@@ -246,7 +246,7 @@ fn test_dynamic_json() {
     let val = json!({"arr": ["one", 2]});
     let t = DynamicJsonTemplate {
         bar: &val,
-        indent: Some("?"),
+        indent: "?",
     };
     assert_eq!(
         t.render().unwrap(),
@@ -257,12 +257,6 @@ fn test_dynamic_json() {
 ?]
 }"#
     );
-
-    let t = DynamicJsonTemplate {
-        bar: &val,
-        indent: None,
-    };
-    assert_eq!(t.render().unwrap(), r#"{"arr":["one",2]}"#);
 }
 
 #[derive(Template)]

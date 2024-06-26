@@ -10,7 +10,7 @@ use std::fmt::{self, Write};
 #[cfg(feature = "serde_json")]
 mod json;
 #[cfg(feature = "serde_json")]
-pub use self::json::{json, AsIndent};
+pub use self::json::{json, json_pretty, AsIndent};
 
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};

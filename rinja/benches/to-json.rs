@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use rinja::filters::json;
+use rinja::filters::{json, json_pretty};
 use rinja_escape::{Html, MarkupDisplay};
 
 criterion_main!(benches);
@@ -7,13 +7,24 @@ criterion_group!(benches, functions);
 
 fn functions(c: &mut Criterion) {
     c.bench_function("escape JSON", escape_json);
+    c.bench_function("escape JSON (pretty)", escape_json_pretty);
     c.bench_function("escape JSON for HTML", escape_json_for_html);
+    c.bench_function("escape JSON for HTML (pretty)", escape_json_for_html);
+    c.bench_function("escape JSON for HTML (pretty)", escape_json_for_html_pretty);
 }
 
 fn escape_json(b: &mut criterion::Bencher<'_>) {
     b.iter(|| {
         for &s in STRINGS {
-            format!("{}", json(s, ()).unwrap());
+            format!("{}", json(s).unwrap());
+        }
+    });
+}
+
+fn escape_json_pretty(b: &mut criterion::Bencher<'_>) {
+    b.iter(|| {
+        for &s in STRINGS {
+            format!("{}", json_pretty(s, 2).unwrap());
         }
     });
 }
@@ -21,7 +32,18 @@ fn escape_json(b: &mut criterion::Bencher<'_>) {
 fn escape_json_for_html(b: &mut criterion::Bencher<'_>) {
     b.iter(|| {
         for &s in STRINGS {
-            format!("{}", MarkupDisplay::new_unsafe(json(s, ()).unwrap(), Html));
+            format!("{}", MarkupDisplay::new_unsafe(json(s).unwrap(), Html));
+        }
+    });
+}
+
+fn escape_json_for_html_pretty(b: &mut criterion::Bencher<'_>) {
+    b.iter(|| {
+        for &s in STRINGS {
+            format!(
+                "{}",
+                MarkupDisplay::new_unsafe(json_pretty(s, 2).unwrap(), Html),
+            );
         }
     });
 }

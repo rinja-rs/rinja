@@ -19,105 +19,120 @@ use serde_json::ser::{to_writer, PrettyFormatter, Serializer};
 /// or in apostrophes with the (optional) safe filter `'{{data|json|safe}}'`.
 /// In HTML texts the output of e.g. `<pre>{{data|json|safe}}</pre>` is safe, too.
 #[inline]
-pub fn json(value: impl Serialize, indent: impl AsIndent) -> Result<impl fmt::Display, Infallible> {
-    Ok(ToJson { value, indent })
+pub fn json(value: impl Serialize) -> Result<impl fmt::Display, Infallible> {
+    Ok(ToJson { value })
+}
+
+/// Serialize to formatted/prettified JSON (requires `json` feature)
+///
+/// This filter works the same as [`json()`], but it formats the data for human readability.
+/// It has an additional "indent" argument, which can either be an integer how many spaces to use
+/// for indentation (capped to 16 characters), or a string (e.g. `"\u{A0}\u{A0}"` for two
+/// non-breaking spaces).
+///
+/// ### Note
+///
+/// In rinja's template language, this filter is called `|json`, too. The right function is
+/// automatically selected depending on whether an `indent` argument was provided or not.
+#[inline]
+pub fn json_pretty(
+    value: impl Serialize,
+    indent: impl AsIndent,
+) -> Result<impl fmt::Display, Infallible> {
+    Ok(ToJsonPretty { value, indent })
+}
+
+#[derive(Debug, Clone)]
+struct ToJson<S> {
+    value: S,
+}
+
+#[derive(Debug, Clone)]
+struct ToJsonPretty<S, I> {
+    value: S,
+    indent: I,
 }
 
 pub trait AsIndent {
-    fn as_indent(&self) -> Option<&str>;
+    fn as_indent(&self) -> &str;
 }
 
 impl AsIndent for str {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
-        Some(self)
+    fn as_indent(&self) -> &str {
+        self
     }
 }
 
 impl AsIndent for String {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
-        Some(self)
+    fn as_indent(&self) -> &str {
+        self
     }
 }
 
-impl AsIndent for isize {
-    fn as_indent(&self) -> Option<&str> {
-        const SPACES: &str = "                ";
-        match *self < 0 {
-            true => None,
-            false => Some(&SPACES[..(*self as usize).min(SPACES.len())]),
-        }
-    }
-}
-
-impl AsIndent for () {
+impl AsIndent for usize {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
-        None
+    fn as_indent(&self) -> &str {
+        const MAX_SPACES: usize = 16;
+        const SPACES: &str = match str::from_utf8(&[b' '; MAX_SPACES]) {
+            Ok(spaces) => spaces,
+            Err(_) => panic!(),
+        };
+
+        &SPACES[..(*self).min(SPACES.len())]
     }
 }
 
 impl<T: AsIndent + ?Sized> AsIndent for &T {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
+    fn as_indent(&self) -> &str {
         T::as_indent(self)
-    }
-}
-
-impl<T: AsIndent> AsIndent for Option<T> {
-    #[inline]
-    fn as_indent(&self) -> Option<&str> {
-        self.as_ref().and_then(T::as_indent)
     }
 }
 
 impl<T: AsIndent + ?Sized> AsIndent for Box<T> {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
+    fn as_indent(&self) -> &str {
         T::as_indent(self.as_ref())
     }
 }
 
 impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
+    fn as_indent(&self) -> &str {
         T::as_indent(self.as_ref())
     }
 }
 
 impl<T: AsIndent + ?Sized> AsIndent for std::rc::Rc<T> {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
+    fn as_indent(&self) -> &str {
         T::as_indent(self.as_ref())
     }
 }
 
 impl<T: AsIndent + ?Sized> AsIndent for std::sync::Arc<T> {
     #[inline]
-    fn as_indent(&self) -> Option<&str> {
+    fn as_indent(&self) -> &str {
         T::as_indent(self.as_ref())
     }
 }
 
-#[derive(Debug, Clone)]
-struct ToJson<S, I> {
-    value: S,
-    indent: I,
+impl<S: Serialize> fmt::Display for ToJson<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        to_writer(JsonWriter(f), &self.value).map_err(|_| fmt::Error)
+    }
 }
 
-impl<S: Serialize, I: AsIndent> fmt::Display for ToJson<S, I> {
+impl<S: Serialize, I: AsIndent> fmt::Display for ToJsonPretty<S, I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let f = JsonWriter(f);
-        if let Some(indent) = self.indent.as_indent() {
-            let formatter = PrettyFormatter::with_indent(indent.as_bytes());
-            let mut serializer = Serializer::with_formatter(f, formatter);
-            self.value
-                .serialize(&mut serializer)
-                .map_err(|_| fmt::Error)
-        } else {
-            to_writer(f, &self.value).map_err(|_| fmt::Error)
-        }
+        let indent = self.indent.as_indent();
+        let formatter = PrettyFormatter::with_indent(indent.as_bytes());
+        let mut serializer = Serializer::with_formatter(JsonWriter(f), formatter);
+        self.value
+            .serialize(&mut serializer)
+            .map_err(|_| fmt::Error)
     }
 }
 
@@ -166,51 +181,43 @@ mod tests {
 
     #[test]
     fn test_ugly() {
-        assert_eq!(json(true, ()).unwrap().to_string(), "true");
-        assert_eq!(json("foo", ()).unwrap().to_string(), r#""foo""#);
-        assert_eq!(json(true, ()).unwrap().to_string(), "true");
-        assert_eq!(json("foo", ()).unwrap().to_string(), r#""foo""#);
+        assert_eq!(json(true).unwrap().to_string(), "true");
+        assert_eq!(json("foo").unwrap().to_string(), r#""foo""#);
+        assert_eq!(json(true).unwrap().to_string(), "true");
+        assert_eq!(json("foo").unwrap().to_string(), r#""foo""#);
         assert_eq!(
-            json("<script>", ()).unwrap().to_string(),
+            json("<script>").unwrap().to_string(),
             r#""\u003cscript\u003e""#
         );
         assert_eq!(
-            json(vec!["foo", "bar"], ()).unwrap().to_string(),
+            json(vec!["foo", "bar"]).unwrap().to_string(),
             r#"["foo","bar"]"#
-        );
-        assert_eq!(json(true, -1).unwrap().to_string(), "true");
-        assert_eq!(json(true, Some(())).unwrap().to_string(), "true");
-        assert_eq!(
-            json(true, &Some(None::<isize>)).unwrap().to_string(),
-            "true"
         );
     }
 
     #[test]
     fn test_pretty() {
-        assert_eq!(json(true, "").unwrap().to_string(), "true");
+        assert_eq!(json_pretty(true, "").unwrap().to_string(), "true");
         assert_eq!(
-            json("<script>", Some("")).unwrap().to_string(),
+            json_pretty("<script>", "").unwrap().to_string(),
             r#""\u003cscript\u003e""#
         );
         assert_eq!(
-            json(vec!["foo", "bar"], Some("")).unwrap().to_string(),
+            json_pretty(vec!["foo", "bar"], "").unwrap().to_string(),
             r#"[
 "foo",
 "bar"
 ]"#
         );
         assert_eq!(
-            json(vec!["foo", "bar"], 2).unwrap().to_string(),
+            json_pretty(vec!["foo", "bar"], 2).unwrap().to_string(),
             r#"[
   "foo",
   "bar"
 ]"#
         );
         assert_eq!(
-            json(vec!["foo", "bar"], &Some(&"————"))
-                .unwrap()
-                .to_string(),
+            json_pretty(vec!["foo", "bar"], "————").unwrap().to_string(),
             r#"[
 ————"foo",
 ————"bar"

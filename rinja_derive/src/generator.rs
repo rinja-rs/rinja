@@ -1364,14 +1364,14 @@ impl<'a> Generator<'a> {
             ));
         }
 
-        buf.write(CRATE);
-        buf.write("::filters::json(");
-        self._visit_args(ctx, buf, args)?;
-        match args.len() {
-            1 => buf.write(", ()"),
-            2 => {}
+        let filter = match args.len() {
+            1 => "json",
+            2 => "json_pretty",
             _ => return Err(ctx.generate_error("unexpected argument(s) in `json` filter", node)),
-        }
+        };
+
+        buf.write(format_args!("{CRATE}::filters::{filter}("));
+        self._visit_args(ctx, buf, args)?;
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
     }
