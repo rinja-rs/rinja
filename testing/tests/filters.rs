@@ -193,7 +193,7 @@ fn test_json() {
     );
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[derive(Template)]
 #[template(
     source = r#"{
@@ -207,7 +207,7 @@ struct PrettyJsonTemplate<'a> {
     bar: &'a Value,
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[test]
 fn test_pretty_json() {
     let val = json!({"arr": [ "one", 2, true, null ]});
@@ -232,7 +232,7 @@ fn test_pretty_json() {
     );
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[derive(Template)]
 #[template(source = r#"{{ bar|json(indent)|safe }}"#, ext = "txt")]
 struct DynamicJsonTemplate<'a> {
@@ -240,7 +240,7 @@ struct DynamicJsonTemplate<'a> {
     indent: &'a str,
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 #[test]
 fn test_dynamic_json() {
     let val = json!({"arr": ["one", 2]});
