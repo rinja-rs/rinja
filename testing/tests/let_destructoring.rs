@@ -119,3 +119,29 @@ fn test_let_destruct_with_path_and_with_keyword() {
     };
     assert_eq!(t.render().unwrap(), "hello");
 }
+
+#[derive(Template)]
+#[template(
+    source = "
+{%- if let RestPattern2 { a, b } = x -%}hello {{ a }}{%- endif -%}
+{%- if let RestPattern2 { a, b, } = x -%}hello {{ b }}{%- endif -%}
+{%- if let RestPattern2 { a, .. } = x -%}hello {{ a }}{%- endif -%}
+",
+    ext = "html"
+)]
+struct RestPattern {
+    x: RestPattern2,
+}
+
+struct RestPattern2 {
+    a: u32,
+    b: u32,
+}
+
+#[test]
+fn test_has_rest_pattern() {
+    let t = RestPattern {
+        x: RestPattern2 { a: 0, b: 1 },
+    };
+    assert_eq!(t.render().unwrap(), "hello 0hello 1hello 0");
+}
