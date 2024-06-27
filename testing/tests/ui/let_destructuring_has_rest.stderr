@@ -1,0 +1,19 @@
+error: unexpected `,` character after `..`
+       failed to parse template source at row 2, column 16 near:
+       ", .., } = x -%}hello {{ a }}{%- endif -%"...
+ --> tests/ui/let_destructuring_has_rest.rs:8:10
+  |
+8 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: expected `,` character before `..`
+       failed to parse template source at row 2, column 16 near:
+       " .. } = x -%}hello {{ a }}{%- endif -%}\n"
+  --> tests/ui/let_destructuring_has_rest.rs:16:10
+   |
+16 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
