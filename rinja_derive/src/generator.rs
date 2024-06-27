@@ -870,8 +870,8 @@ impl<'a> Generator<'a> {
                 }
                 Ok(false)
             }
-            Target::Struct(_, named_targets) => {
-                for (_, target) in named_targets {
+            Target::Struct { targets, .. } => {
+                for (_, target) in targets {
                     match self.is_shadowing_variable(ctx, target, l) {
                         Ok(false) => continue,
                         outcome => return outcome,
@@ -1818,7 +1818,11 @@ impl<'a> Generator<'a> {
                 }
                 buf.write(")");
             }
-            Target::Struct(path, targets) => {
+            Target::Struct {
+                path,
+                targets,
+                has_rest_pattern,
+            } => {
                 buf.write(SeparatedPath(path));
                 buf.write(" { ");
                 for (name, target) in targets {
@@ -1826,6 +1830,9 @@ impl<'a> Generator<'a> {
                     buf.write(": ");
                     self.visit_target(buf, initialized, false, target);
                     buf.write(",");
+                }
+                if *has_rest_pattern {
+                    buf.write("..");
                 }
                 buf.write(" }");
             }

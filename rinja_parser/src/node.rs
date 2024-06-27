@@ -181,7 +181,11 @@ impl<'a> Node<'a> {
 pub enum Target<'a> {
     Name(&'a str),
     Tuple(Vec<&'a str>, Vec<Target<'a>>),
-    Struct(Vec<&'a str>, Vec<(&'a str, Target<'a>)>),
+    Struct {
+        path: Vec<&'a str>,
+        targets: Vec<(&'a str, Target<'a>)>,
+        has_rest_pattern: bool,
+    },
     NumLit(&'a str),
     StrLit(&'a str),
     CharLit(&'a str),
@@ -269,14 +273,51 @@ impl<'a> Target<'a> {
 
             let (i, is_named_struct) = opt_opening_brace(i)?;
             if is_named_struct {
-                let (i, targets) = alt((
-                    map(char('}'), |_| Vec::new()),
-                    terminated(
-                        cut(separated_list1(ws(char(',')), |i| Self::named(i, s))),
-                        pair(opt(ws(char(','))), ws(cut(char('}')))),
-                    ),
-                ))(i)?;
-                return Ok((i, Self::Struct(path, targets)));
+                let (i, (targets, (start, comma_before_rest, has_rest_pattern))) =
+                    alt((
+                        map(char('}'), |_| (Vec::new(), ("", false, false))),
+                        pair(
+                            cut(separated_list1(ws(char(',')), |i| Self::named(i, s))),
+                            |i| {
+                                let (ret, (comma_before_rest, rest_pattern, comma, _)) =
+                                    tuple((
+                                        opt(ws(char(','))),
+                                        opt(ws(tag(".."))),
+                                        opt(ws(char(','))),
+                                        ws(cut(char('}'))),
+                                    ))(i)?;
+                                // `..` cannot be followed by a comma.
+                                if rest_pattern.is_some() && comma.is_some() {
+                                    Err(nom::Err::Failure(ErrorContext::new(
+                                        "unexpected `,` character after `..`",
+                                        i,
+                                    )))
+                                } else {
+                                    Ok((
+                                        ret,
+                                        (i, comma_before_rest.is_some(), rest_pattern.is_some()),
+                                    ))
+                                }
+                            },
+                        ),
+                    ))(i)?;
+                if !targets.is_empty() && has_rest_pattern && !comma_before_rest {
+                    // We check that there is a comma before the `..`. Sadly, we can't do it
+                    // in the parsing directly because if there is no field before, it's okay
+                    // to not have a comma before `..`.
+                    return Err(nom::Err::Failure(ErrorContext::new(
+                        "expected `,` character before `..`",
+                        start,
+                    )));
+                }
+                return Ok((
+                    i,
+                    Self::Struct {
+                        path,
+                        targets,
+                        has_rest_pattern,
+                    },
+                ));
             }
 
             return Ok((i_before_matching_with, Self::Path(path)));
