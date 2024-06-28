@@ -22,6 +22,9 @@ pub mod expr;
 pub use expr::{Expr, Filter};
 pub mod node;
 pub use node::Node;
+
+mod target;
+pub use target::Target;
 #[cfg(test)]
 mod tests;
 

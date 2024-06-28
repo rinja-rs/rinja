@@ -12,10 +12,9 @@ use crate::input::{Source, TemplateInput};
 use crate::{CompileError, CRATE};
 
 use parser::node::{
-    Call, Comment, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Target, Whitespace,
-    Ws,
+    Call, Comment, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
-use parser::{Expr, Filter, Node, WithSpan};
+use parser::{Expr, Filter, Node, Target, WithSpan};
 use quote::quote;
 
 pub(crate) struct Generator<'a> {
