@@ -7,7 +7,7 @@ struct X {
 
 #[derive(Template)]
 #[template(source = "
-{%- if let X { a, .. } = x -%}hello {{ a }}{%- endif -%}
+{%- if let X { a, .., } = x -%}hello {{ a }}{%- endif -%}
 ", ext = "html")]
 struct T1 {
     x: X,
@@ -15,7 +15,7 @@ struct T1 {
 
 #[derive(Template)]
 #[template(source = "
-{%- if let X { a, .., } = x -%}hello {{ a }}{%- endif -%}
+{%- if let X { a .. } = x -%}hello {{ a }}{%- endif -%}
 ", ext = "html")]
 struct T2 {
     x: X,
@@ -23,17 +23,9 @@ struct T2 {
 
 #[derive(Template)]
 #[template(source = "
-{%- if let X { a .. } = x -%}hello {{ a }}{%- endif -%}
+{%- if let X { a, 1 } = x -%}hello {{ a }}{%- endif -%}
 ", ext = "html")]
 struct T3 {
-    x: X,
-}
-
-#[derive(Template)]
-#[template(source = "
-{%- if let X { .. } = x -%}hello {{ a }}{%- endif -%}
-", ext = "html")]
-struct T4 {
     x: X,
 }
 

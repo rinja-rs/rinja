@@ -145,3 +145,40 @@ fn test_has_rest_pattern() {
     };
     assert_eq!(t.render().unwrap(), "hello 0hello 1hello 0");
 }
+
+struct X {
+    a: u32,
+    b: u32,
+}
+
+#[derive(Template)]
+#[template(source = "
+{%- if let X { a, .. } = x -%}hello {{ a }}{%- endif -%}
+", ext = "html")]
+struct T1 {
+    x: X,
+}
+
+#[test]
+fn test_t1() {
+    let t = T1 {
+        x: X { a: 1, b: 2 },
+    };
+    assert_eq!(t.render().unwrap(), "hello 1");
+}
+
+#[derive(Template)]
+#[template(source = "
+{%- if let X { .. } = x -%}hello{%- endif -%}
+", ext = "html")]
+struct T2 {
+    x: X,
+}
+
+#[test]
+fn test_t2() {
+    let t = T2 {
+        x: X { a: 1, b: 2 },
+    };
+    assert_eq!(t.render().unwrap(), "hello");
+}
