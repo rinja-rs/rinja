@@ -3,19 +3,15 @@ use std::str;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
-use nom::combinator::{
-    complete, consumed, cut, eof, map, map_res, not, opt, peek, recognize, value,
-};
+use nom::combinator::{complete, consumed, cut, eof, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
-use nom::multi::{fold_many0, many0, many1, separated_list0, separated_list1};
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::multi::{many0, many1, separated_list0};
+use nom::sequence::{delimited, pair, preceded, tuple};
 
-use crate::{not_ws, ErrorContext, ParseResult, WithSpan};
-
-use super::{
-    bool_lit, char_lit, filter, identifier, is_ws, keyword, num_lit, path_or_identifier, skip_till,
-    str_lit, ws, Expr, Filter, PathOrIdentifier, State,
+use crate::{
+    filter, identifier, is_ws, keyword, not_ws, skip_till, str_lit, ws, ErrorContext, Expr, Filter,
+    ParseResult, State, Target, WithSpan,
 };
 
 #[derive(Debug, PartialEq)]
@@ -177,150 +173,6 @@ impl<'a> Node<'a> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Target<'a> {
-    Name(&'a str),
-    Tuple(Vec<&'a str>, Vec<Target<'a>>),
-    Struct(Vec<&'a str>, Vec<(&'a str, Target<'a>)>),
-    NumLit(&'a str),
-    StrLit(&'a str),
-    CharLit(&'a str),
-    BoolLit(&'a str),
-    Path(Vec<&'a str>),
-    OrChain(Vec<Target<'a>>),
-}
-
-impl<'a> Target<'a> {
-    /// Parses multiple targets with `or` separating them
-    pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        map(
-            separated_list1(ws(tag("or")), |i| s.nest(i, |i| Self::parse_one(i, s))),
-            |mut opts| match opts.len() {
-                1 => opts.pop().unwrap(),
-                _ => Self::OrChain(opts),
-            },
-        )(i)
-    }
-
-    /// Parses a single target without an `or`, unless it is wrapped in parentheses.
-    fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let mut opt_opening_paren = map(opt(ws(char('('))), |o| o.is_some());
-        let mut opt_closing_paren = map(opt(ws(char(')'))), |o| o.is_some());
-        let mut opt_opening_brace = map(opt(ws(char('{'))), |o| o.is_some());
-
-        let (i, lit) = opt(Self::lit)(i)?;
-        if let Some(lit) = lit {
-            return Ok((i, lit));
-        }
-
-        // match tuples and unused parentheses
-        let (i, target_is_tuple) = opt_opening_paren(i)?;
-        if target_is_tuple {
-            let (i, is_empty_tuple) = opt_closing_paren(i)?;
-            if is_empty_tuple {
-                return Ok((i, Self::Tuple(Vec::new(), Vec::new())));
-            }
-
-            let (i, first_target) = Self::parse(i, s)?;
-            let (i, is_unused_paren) = opt_closing_paren(i)?;
-            if is_unused_paren {
-                return Ok((i, first_target));
-            }
-
-            let mut targets = vec![first_target];
-            let (i, _) = cut(tuple((
-                fold_many0(
-                    preceded(ws(char(',')), |i| Self::parse(i, s)),
-                    || (),
-                    |_, target| {
-                        targets.push(target);
-                    },
-                ),
-                opt(ws(char(','))),
-                ws(cut(char(')'))),
-            )))(i)?;
-            return Ok((i, Self::Tuple(Vec::new(), targets)));
-        }
-
-        let path = |i| {
-            map_res(path_or_identifier, |v| match v {
-                PathOrIdentifier::Path(v) => Ok(v),
-                PathOrIdentifier::Identifier(v) => Err(v),
-            })(i)
-        };
-
-        // match structs
-        let (i, path) = opt(path)(i)?;
-        if let Some(path) = path {
-            let i_before_matching_with = i;
-            let (i, _) = opt(ws(keyword("with")))(i)?;
-
-            let (i, is_unnamed_struct) = opt_opening_paren(i)?;
-            if is_unnamed_struct {
-                let (i, targets) = alt((
-                    map(char(')'), |_| Vec::new()),
-                    terminated(
-                        cut(separated_list1(ws(char(',')), |i| Self::parse(i, s))),
-                        pair(opt(ws(char(','))), ws(cut(char(')')))),
-                    ),
-                ))(i)?;
-                return Ok((i, Self::Tuple(path, targets)));
-            }
-
-            let (i, is_named_struct) = opt_opening_brace(i)?;
-            if is_named_struct {
-                let (i, targets) = alt((
-                    map(char('}'), |_| Vec::new()),
-                    terminated(
-                        cut(separated_list1(ws(char(',')), |i| Self::named(i, s))),
-                        pair(opt(ws(char(','))), ws(cut(char('}')))),
-                    ),
-                ))(i)?;
-                return Ok((i, Self::Struct(path, targets)));
-            }
-
-            return Ok((i_before_matching_with, Self::Path(path)));
-        }
-
-        // neither literal nor struct nor path
-        let (new_i, name) = identifier(i)?;
-        Ok((new_i, Self::verify_name(i, name)?))
-    }
-
-    fn lit(i: &'a str) -> ParseResult<'a, Self> {
-        alt((
-            map(str_lit, Self::StrLit),
-            map(char_lit, Self::CharLit),
-            map(num_lit, Self::NumLit),
-            map(bool_lit, Self::BoolLit),
-        ))(i)
-    }
-
-    fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
-        let (i, (src, target)) = pair(
-            identifier,
-            opt(preceded(ws(char(':')), |i| Self::parse(i, s))),
-        )(init_i)?;
-
-        let target = match target {
-            Some(target) => target,
-            None => Self::verify_name(init_i, src)?,
-        };
-
-        Ok((i, (src, target)))
-    }
-
-    fn verify_name(input: &'a str, name: &'a str) -> Result<Self, nom::Err<ErrorContext<'a>>> {
-        match name {
-            "self" | "writer" => Err(nom::Err::Failure(ErrorContext::new(
-                format!("cannot use `{name}` as a name"),
-                input,
-            ))),
-            _ => Ok(Self::Name(name)),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct When<'a> {
     pub ws: Ws,
@@ -347,7 +199,7 @@ impl<'a> When<'a> {
             WithSpan::new(
                 Self {
                     ws: Ws(pws, nws),
-                    target: Target::Name("_"),
+                    target: Target::Placeholder("_"),
                     nodes,
                 },
                 start,
