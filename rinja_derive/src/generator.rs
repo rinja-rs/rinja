@@ -1788,8 +1788,8 @@ impl<'a> Generator<'a> {
         target: &Target<'a>,
     ) {
         match target {
-            Target::Name("_") => {
-                buf.write("_");
+            Target::Placeholder(s) | Target::Rest(s) => {
+                buf.write(s);
             }
             Target::Name(name) => {
                 let name = normalize_identifier(name);
@@ -1824,6 +1824,11 @@ impl<'a> Generator<'a> {
                 buf.write(SeparatedPath(path));
                 buf.write(" { ");
                 for (name, target) in targets {
+                    if let Target::Rest(s) = target {
+                        buf.write(s);
+                        continue;
+                    }
+
                     buf.write(normalize_identifier(name));
                     buf.write(": ");
                     self.visit_target(buf, initialized, false, target);
