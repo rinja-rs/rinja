@@ -113,7 +113,10 @@ impl<'a> Target<'a> {
             let (_, chr) = ws(opt(one_of(",:")))(i)?;
             if let Some(chr) = chr {
                 return Err(nom::Err::Failure(ErrorContext::new(
-                    format!("unexpected `{chr}` character after `..`"),
+                    format!(
+                        "unexpected `{chr}` character after `..`\n\
+                         note that in a named struct, `..` must come last to ignore other members"
+                    ),
                     i,
                 )));
             }

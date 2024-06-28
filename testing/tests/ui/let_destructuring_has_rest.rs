@@ -29,4 +29,20 @@ struct T3 {
     x: X,
 }
 
+#[derive(Template)]
+#[template(source = "
+{%- if let X { a, .., b } = x -%}hello {{ a }}{%- endif -%}
+", ext = "html")]
+struct T4 {
+    x: X,
+}
+
+#[derive(Template)]
+#[template(source = "
+{%- if let X { .., b } = x -%}hello {{ a }}{%- endif -%}
+", ext = "html")]
+struct T5 {
+    x: X,
+}
+
 fn main() {}
