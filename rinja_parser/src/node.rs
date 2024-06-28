@@ -8,8 +8,8 @@ use nom::combinator::{
 };
 use nom::error::ErrorKind;
 use nom::error_position;
-use nom::multi::{fold_many0, many0, many1, separated_list0, separated_list1};
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::multi::{many0, many1, separated_list0, separated_list1};
+use nom::sequence::{delimited, pair, preceded, tuple};
 
 use crate::{not_ws, ErrorContext, ParseErr, ParseResult, WithSpan};
 
@@ -207,7 +207,6 @@ impl<'a> Target<'a> {
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
     fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         let mut opt_opening_paren = map(opt(ws(char('('))), |o| o.is_some());
-        let mut opt_closing_paren = map(opt(ws(char(')'))), |o| o.is_some());
         let mut opt_opening_brace = map(opt(ws(char('{'))), |o| o.is_some());
 
         let (i, lit) = opt(Self::lit)(i)?;
@@ -218,29 +217,10 @@ impl<'a> Target<'a> {
         // match tuples and unused parentheses
         let (i, target_is_tuple) = opt_opening_paren(i)?;
         if target_is_tuple {
-            let (i, is_empty_tuple) = opt_closing_paren(i)?;
-            if is_empty_tuple {
-                return Ok((i, Self::Tuple(Vec::new(), Vec::new())));
+            let (i, (singleton, mut targets)) = collect_targets(i, s, ')', Self::unnamed)?;
+            if singleton {
+                return Ok((i, targets.pop().unwrap()));
             }
-
-            let (i, first_target) = Self::unnamed(i, s)?;
-            let (i, is_unused_paren) = opt_closing_paren(i)?;
-            if is_unused_paren {
-                return Ok((i, first_target));
-            }
-
-            let mut targets = vec![first_target];
-            let (i, _) = cut(tuple((
-                fold_many0(
-                    preceded(ws(char(',')), |i| Self::unnamed(i, s)),
-                    || (),
-                    |_, target| {
-                        targets.push(target);
-                    },
-                ),
-                opt(ws(char(','))),
-                ws(cut(char(')'))),
-            )))(i)?;
             return Ok((i, Self::Tuple(Vec::new(), only_one_rest_pattern(targets)?)));
         }
 
@@ -259,25 +239,13 @@ impl<'a> Target<'a> {
 
             let (i, is_unnamed_struct) = opt_opening_paren(i)?;
             if is_unnamed_struct {
-                let (i, targets) = alt((
-                    map(char(')'), |_| Vec::new()),
-                    terminated(
-                        cut(separated_list1(ws(char(',')), |i| Self::unnamed(i, s))),
-                        pair(opt(ws(char(','))), ws(cut(char(')')))),
-                    ),
-                ))(i)?;
+                let (i, (_, targets)) = collect_targets(i, s, ')', Self::unnamed)?;
                 return Ok((i, Self::Tuple(path, only_one_rest_pattern(targets)?)));
             }
 
             let (i, is_named_struct) = opt_opening_brace(i)?;
             if is_named_struct {
-                let (i, targets) = alt((
-                    map(char('}'), |_| Vec::new()),
-                    terminated(
-                        cut(separated_list1(ws(char(',')), |i| Self::named(i, s))),
-                        pair(opt(ws(char(','))), ws(cut(char('}')))),
-                    ),
-                ))(i)?;
+                let (i, (_, targets)) = collect_targets(i, s, '}', Self::named)?;
                 return Ok((i, Self::Struct(path, targets)));
             }
 
@@ -351,6 +319,41 @@ impl<'a> Target<'a> {
             _ => Ok(Self::Name(name)),
         }
     }
+}
+
+fn collect_targets<'a, T>(
+    i: &'a str,
+    s: &State<'_>,
+    delim: char,
+    mut one: impl FnMut(&'a str, &State<'_>) -> ParseResult<'a, T>,
+) -> ParseResult<'a, (bool, Vec<T>)> {
+    let opt_comma = |i| map(ws(opt(char(','))), |o| o.is_some())(i);
+    let opt_end = |i| map(ws(opt(char(delim))), |o| o.is_some())(i);
+
+    let (i, has_end) = opt_end(i)?;
+    if has_end {
+        return Ok((i, (false, Vec::new())));
+    }
+
+    let (i, targets) = opt(separated_list1(ws(char(',')), |i| one(i, s)))(i)?;
+    let Some(targets) = targets else {
+        return Err(nom::Err::Failure(ErrorContext::new(
+            "expected comma separated list of members",
+            i,
+        )));
+    };
+
+    let (i, (has_comma, has_end)) = pair(opt_comma, opt_end)(i)?;
+    if !has_end {
+        let msg = match has_comma {
+            true => format!("expected member, or `{delim}` as terminator"),
+            false => format!("expected `,` for more members, or `{delim}` as terminator"),
+        };
+        return Err(nom::Err::Failure(ErrorContext::new(msg, i)));
+    }
+
+    let singleton = !has_comma && targets.len() == 1;
+    Ok((i, (singleton, targets)))
 }
 
 fn only_one_rest_pattern(targets: Vec<Target<'_>>) -> Result<Vec<Target<'_>>, ParseErr<'_>> {

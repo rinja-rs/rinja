@@ -8,7 +8,8 @@ error: unexpected `,` character after `..`
    |
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: failed to parse template source at row 2, column 17 near:
+error: expected `,` for more members, or `}` as terminator
+       failed to parse template source at row 2, column 17 near:
        ".. } = x -%}hello {{ a }}{%- endif -%}\n"
   --> tests/ui/let_destructuring_has_rest.rs:24:10
    |
