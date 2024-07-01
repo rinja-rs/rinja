@@ -1622,7 +1622,7 @@ impl<'a> Generator<'a> {
                 match sub_left {
                     Expr::Var(name) => match self.locals.resolve(name) {
                         Some(resolved) => buf.write(resolved),
-                        None => buf.write(format_args!("(&self.{})", normalize_identifier(name))),
+                        None => buf.write(format_args!("self.{}", normalize_identifier(name))),
                     },
                     _ => {
                         self.visit_expr(ctx, buf, left)?;
