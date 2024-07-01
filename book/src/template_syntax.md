@@ -246,12 +246,11 @@ struct MyTemplate;
 ### Struct / trait implementations
 
 Finally, we can invoke functions that are implementation methods of our
-template struct, by referencing `Self` (note the uppercase `S`) as the path,
-before calling our function:
+template struct:
 
 ```rust
 #[derive(Template)]
-#[template(source = "{{ Self::foo(self, 123) }}", ext = "txt")]
+#[template(source = "{{ foo(123) }}", ext = "txt")]
 struct MyTemplate {
   count: u32,
 };
@@ -263,9 +262,8 @@ impl MyTemplate {
 }
 ```
 
-If the implemented method requires a reference to the struct itself,
-such as is demonstrated in the above example, we can pass `self`
-(note the lowercase `s`) as the first argument.
+You can also use `self.foo(123)`, or even `Self::foo(self, 123)`, as you see
+fit.
 
 Similarly, using the `Self` path, we can also call any method belonging
 to a trait that has been implemented for our template struct:
@@ -283,6 +281,17 @@ impl Hello for MyTemplate {
   fn greet(name: &str) -> String {
     format!("Hello {}", name)
   }
+}
+```
+
+If you want to call a closure which is a field, you'll need to follow Rust's
+syntax by surrounding the call with parens:
+
+```rust
+#[derive(Template)]
+#[template(source = "{{ (closure)(12) }}", ext = "txt")]
+struct MyTemplate {
+    closure: fn(i32) -> i32,
 }
 ```
 
