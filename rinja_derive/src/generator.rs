@@ -1297,13 +1297,13 @@ impl<'a> Generator<'a> {
         filter: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         match name {
-            "as_ref" => return self._visit_as_ref_filter(ctx, buf, args, filter),
             "deref" => return self._visit_deref_filter(ctx, buf, args, filter),
             "escape" | "e" => return self._visit_escape_filter(ctx, buf, args, filter),
             "fmt" => return self._visit_fmt_filter(ctx, buf, args, filter),
             "format" => return self._visit_format_filter(ctx, buf, args, filter),
             "join" => return self._visit_join_filter(ctx, buf, args),
             "json" | "tojson" => return self._visit_json_filter(ctx, buf, args, filter),
+            "ref" => return self._visit_ref_filter(ctx, buf, args, filter),
             "safe" => return self._visit_safe_filter(ctx, buf, args, filter),
             _ => {}
         }
@@ -1318,7 +1318,7 @@ impl<'a> Generator<'a> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_as_ref_filter<T>(
+    fn _visit_ref_filter<T>(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
