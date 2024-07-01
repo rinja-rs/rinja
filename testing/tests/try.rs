@@ -28,14 +28,22 @@ fn test_int_parser() {
 #[derive(Template)]
 #[template(source = "{{ value()? }}", ext = "txt")]
 struct FailFmt {
-    value: fn() -> Result<&'static str, std::fmt::Error>,
+    inner: Option<&'static str>,
+}
+
+impl FailFmt {
+    fn value(&self) -> Result<&'static str, std::fmt::Error> {
+        if let Some(inner) = self.inner {
+            Ok(inner)
+        } else {
+            Err(std::fmt::Error)
+        }
+    }
 }
 
 #[test]
 fn fail_fmt() {
-    let template = FailFmt {
-        value: || Err(std::fmt::Error),
-    };
+    let template = FailFmt { inner: None };
     assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
@@ -43,7 +51,7 @@ fn fail_fmt() {
     );
 
     let template = FailFmt {
-        value: || Ok("hello world"),
+        inner: Some("hello world"),
     };
     assert_eq!(template.render().unwrap(), "hello world");
 }
@@ -51,19 +59,25 @@ fn fail_fmt() {
 #[derive(Template)]
 #[template(source = "{{ value()? }}", ext = "txt")]
 struct FailStr {
-    value: fn() -> Result<&'static str, &'static str>,
+    value: bool,
+}
+
+impl FailStr {
+    fn value(&self) -> Result<&'static str, &'static str> {
+        if !self.value {
+            Err("FAIL")
+        } else {
+            Ok("hello world")
+        }
+    }
 }
 
 #[test]
 fn fail_str() {
-    let template = FailStr {
-        value: || Err("FAIL"),
-    };
+    let template = FailStr { value: false };
     assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
     assert_eq!(format!("{}", &template.render().unwrap_err()), "FAIL");
 
-    let template = FailStr {
-        value: || Ok("hello world"),
-    };
+    let template = FailStr { value: true };
     assert_eq!(template.render().unwrap(), "hello world");
 }

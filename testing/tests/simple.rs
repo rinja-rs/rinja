@@ -304,15 +304,17 @@ fn test_slice_literal() {
 
 #[derive(Template)]
 #[template(source = "Hello, {{ world(\"123\", 4) }}!", ext = "txt")]
-struct FunctionRefTemplate {
-    world: fn(s: &str, v: u8) -> String,
+struct FunctionRefTemplate;
+
+impl FunctionRefTemplate {
+    fn world(&self, s: &str, v: u8) -> String {
+        format!("world({s}, {v})")
+    }
 }
 
 #[test]
 fn test_func_ref_call() {
-    let t = FunctionRefTemplate {
-        world: |s, r| format!("world({s}, {r})"),
-    };
+    let t = FunctionRefTemplate;
     assert_eq!(t.render().unwrap(), "Hello, world(123, 4)!");
 }
 
