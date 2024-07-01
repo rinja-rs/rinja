@@ -687,6 +687,9 @@ impl<'a> Generator<'a> {
                     names.write(arg);
 
                     values.write("(");
+                    if !is_copyable(expr) {
+                        values.write("&");
+                    }
                     values.write(self.visit_expr_root(ctx, expr)?);
                     values.write(")");
                     self.locals.insert_with_default(Cow::Borrowed(arg));
