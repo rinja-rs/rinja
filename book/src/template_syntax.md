@@ -510,6 +510,29 @@ of matches surrounded by curly braces instead (`{ field }`).  New names
 for the fields can be specified after a colon in the list of matches
 (`{ field: val }`).
 
+### Referencing and dereferencing variables
+
+If you need to put something behind a reference or to dereference it, you
+can use `&` and `*` operators:
+
+```jinja
+{% let x = &"bla" %}
+{% if *x == "bla" %}
+Just talking
+{% else if x == &"another" %}
+Another?!
+{% endif %}
+```
+
+They have the same effect as in Rust and you can put multiple of them:
+
+```jinja
+{% let x = &&"bla" %}
+{% if *&**x == "bla" %}
+You got it
+{% endif %}
+```
+
 ### Include
 
 The *include* statement lets you split large or repetitive blocks into
