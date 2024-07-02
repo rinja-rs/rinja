@@ -207,9 +207,10 @@ impl<'a> Expr<'a> {
     fn prefix(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let (_, nested) = level.nest(i)?;
         let start = i;
-        let (i, (ops, mut expr)) = pair(many0(ws(alt((tag("!"), tag("-"))))), |i| {
-            Suffix::parse(i, nested)
-        })(i)?;
+        let (i, (ops, mut expr)) = pair(
+            many0(ws(alt((tag("!"), tag("-"), tag("*"), tag("&"))))),
+            |i| Suffix::parse(i, nested),
+        )(i)?;
 
         for op in ops.iter().rev() {
             // This is a rare place where we create recursion in the parsed AST

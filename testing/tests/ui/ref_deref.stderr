@@ -1,0 +1,8 @@
+error: failed to parse template source at row 1, column 7 near:
+       "*x = 2 %}"
+ --> tests/ui/ref_deref.rs:3:10
+  |
+3 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
