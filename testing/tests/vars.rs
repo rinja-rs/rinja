@@ -131,3 +131,23 @@ fn test_decl_assign_range() {
     let t = DeclAssignRange;
     assert_eq!(t.render().unwrap(), "1");
 }
+
+#[derive(Template)]
+#[template(
+    source = "
+{%- set t = title -%}
+{{t}}/{{title -}}
+",
+    ext = "txt"
+)]
+struct DoNotMoveFields {
+    title: String,
+}
+
+#[test]
+fn test_not_moving_fields_in_var() {
+    let x = DoNotMoveFields {
+        title: "a".to_string(),
+    };
+    assert_eq!(x.render().unwrap(), "a/a");
+}

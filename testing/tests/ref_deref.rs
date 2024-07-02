@@ -39,7 +39,7 @@ fn test_ref_deref() {
 #[derive(Template)]
 #[template(
     source = r#"
-{%- let x = *title -%}
+{%- let x = **title -%}
 {%- if x == "another" -%}
 another2
 {%- else -%}
