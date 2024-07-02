@@ -376,7 +376,7 @@ fn test_json_script() {
 
 #[derive(rinja::Template)]
 #[template(
-    source = r#"{% let word = s|as_ref %}{{ word }}
+    source = r#"{% let word = s|ref %}{{ word }}
 {%- let hello = String::from("hello") %}
 {%- if word|deref == hello %}1{% else %}2{% endif %}"#,
     ext = "html"
