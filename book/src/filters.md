@@ -22,7 +22,6 @@ Enable it with Cargo features (see below for more information).
 * **[Built-in filters][#built-in-filters]:**  
 
   * [`abs`][#abs]
-  * [`as_ref`][#as_ref]
   * [`capitalize`][#capitalize]
   * [`center`][#center]
   * [`deref`][#deref]
@@ -35,6 +34,7 @@ Enable it with Cargo features (see below for more information).
   * [`linebreaks`][#linebreaks]
   * [`linebreaksbr`][#linebreaksbr]
   * [`lower|lowercase`][#lower]
+  * [`ref`][#ref]
   * [`safe`][#safe]
   * [`title`][#title]
   * [`trim`][#trim]
@@ -64,23 +64,6 @@ Output:
 
 ```text
 2
-```
-
-### as_ref
-[#as_ref]: #as_ref
-
-Creates a reference to the given argument.
-
-```jinja
-{{ "a"|as_ref }}
-{{ self.x|as_ref }}
-```
-
-will become:
-
-```rust
-&"a"
-&self.x
 ```
 
 ### capitalize
@@ -321,6 +304,23 @@ Output:
 
 ```text
 hello
+```
+
+### ref
+[#ref]: #ref
+
+Creates a reference to the given argument.
+
+```jinja
+{{ "a"|ref }}
+{{ self.x|ref }}
+```
+
+will become:
+
+```rust
+&"a"
+&self.x
 ```
 
 ### safe
