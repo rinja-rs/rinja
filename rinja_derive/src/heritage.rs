@@ -78,7 +78,12 @@ impl Context<'_> {
                 match n {
                     Node::Extends(e) if top => match extends {
                         Some(_) => {
-                            return Err(CompileError::no_file_info("multiple extend blocks found"))
+                            return Err(generate_error(
+                                path,
+                                parsed.source(),
+                                "multiple extend blocks found",
+                                e,
+                            ))
                         }
                         None => {
                             extends = Some(config.find_template(e.path, Some(path))?);
@@ -91,9 +96,28 @@ impl Context<'_> {
                         let path = config.find_template(import.path, Some(path))?;
                         imports.insert(import.scope, path);
                     }
-                    Node::Extends(_) | Node::Macro(_) | Node::Import(_) if !top => {
-                        return Err(CompileError::no_file_info(
-                            "extends, macro or import blocks not allowed below top level",
+                    Node::Extends(e) if !top => {
+                        return Err(generate_error(
+                            path,
+                            parsed.source(),
+                            "extends blocks are not allowed below top level",
+                            e,
+                        ));
+                    }
+                    Node::Macro(e) if !top => {
+                        return Err(generate_error(
+                            path,
+                            parsed.source(),
+                            "macro blocks are not allowed below top level",
+                            e,
+                        ));
+                    }
+                    Node::Import(e) if !top => {
+                        return Err(generate_error(
+                            path,
+                            parsed.source(),
+                            "import blocks are not allowed below top level",
+                            e,
                         ));
                     }
                     Node::BlockDef(b) => {
@@ -133,15 +157,15 @@ impl Context<'_> {
 
     pub(crate) fn generate_error<T>(&self, msg: &str, node: &WithSpan<'_, T>) -> CompileError {
         match self.path {
-            Some(path) => CompileError::new(
-                msg,
-                Some(FileInfo::new(
-                    path,
-                    Some(self.parsed.source()),
-                    Some(node.span()),
-                )),
-            ),
+            Some(path) => generate_error(path, self.parsed.source(), msg, node),
             None => CompileError::new(msg, None),
         }
     }
+}
+
+fn generate_error<T>(path: &Path, source: &str, msg: &str, node: &WithSpan<'_, T>) -> CompileError {
+    CompileError::new(
+        msg,
+        Some(FileInfo::new(path, Some(source), Some(node.span()))),
+    )
 }
