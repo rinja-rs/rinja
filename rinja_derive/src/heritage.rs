@@ -76,25 +76,39 @@ impl Context<'_> {
         while let Some(nodes) = nested.pop() {
             for n in nodes {
                 match n {
-                    Node::Extends(e) if top => match extends {
-                        Some(_) => {
-                            return Err(CompileError::no_file_info("multiple extend blocks found"))
+                    Node::Extends(e) => {
+                        if !top {
+                            return Err(CompileError::no_file_info(
+                                "extends blocks are only allowed at the top level",
+                            ));
                         }
-                        None => {
-                            extends = Some(config.find_template(e.path, Some(path))?);
+                        match extends {
+                            Some(_) => {
+                                return Err(CompileError::no_file_info(
+                                    "multiple extend blocks found",
+                                ))
+                            }
+                            None => {
+                                extends = Some(config.find_template(e.path, Some(path))?);
+                            }
                         }
-                    },
-                    Node::Macro(m) if top => {
+                    }
+                    Node::Macro(m) => {
+                        if !top {
+                            return Err(CompileError::no_file_info(
+                                "macro blocks are only allowed at the top level",
+                            ));
+                        }
                         macros.insert(m.name, &**m);
                     }
-                    Node::Import(import) if top => {
+                    Node::Import(import) => {
+                        if !top {
+                            return Err(CompileError::no_file_info(
+                                "import blocks are only allowed at the top level",
+                            ));
+                        }
                         let path = config.find_template(import.path, Some(path))?;
                         imports.insert(import.scope, path);
-                    }
-                    Node::Extends(_) | Node::Macro(_) | Node::Import(_) if !top => {
-                        return Err(CompileError::no_file_info(
-                            "extends, macro or import blocks not allowed below top level",
-                        ));
                     }
                     Node::BlockDef(b) => {
                         blocks.insert(b.name, &**b);
