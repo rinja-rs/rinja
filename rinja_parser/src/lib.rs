@@ -147,7 +147,7 @@ impl<'a, T> WithSpan<'a, T> {
         Self { inner, span }
     }
 
-    pub fn span(&self) -> &str {
+    pub fn span(&self) -> &'a str {
         self.span
     }
 }
