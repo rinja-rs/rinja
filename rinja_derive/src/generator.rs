@@ -921,7 +921,12 @@ impl<'a> Generator<'a> {
         }
 
         self.visit_target(buf, true, true, &l.var);
-        buf.writeln(format_args!(" = {};", &expr_buf.buf));
+        let (before, after) = if !is_copyable(val) {
+            ("&(", ")")
+        } else {
+            ("", "")
+        };
+        buf.writeln(format_args!(" = {before}{}{after};", &expr_buf.buf));
         Ok(())
     }
 
@@ -2121,7 +2126,7 @@ fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
         // The result of a call likely doesn't need to be borrowed,
         // as in that case the call is more likely to return a
         // reference in the first place then.
-        Expr::Call(..) | Expr::Path(..) => true,
+        Expr::Call(..) | Expr::Path(..) | Expr::Filter(..) => true,
         // If the `expr` is within a `Unary` or `BinOp` then
         // an assumption can be made that the operand is copy.
         // If not, then the value is moved and adding `.clone()`
