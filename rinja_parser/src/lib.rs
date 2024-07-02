@@ -797,6 +797,9 @@ mod test {
 
     #[test]
     fn test_strip_common() {
+        // Full path is returned instead of empty when the entire path is in common.
+        assert_eq!(strip_common(Path::new("home"), Path::new("home")), "home");
+
         let cwd = std::env::current_dir().expect("current_dir failed");
 
         // We need actual existing paths for `canonicalize` to work, so let's do that.
@@ -814,13 +817,6 @@ mod test {
             entry.file_name().to_string_lossy()
         );
 
-        #[cfg(target_os = "linux")]
-        {
-            // They both start with `/home` (normally), making the path empty, so in this case,
-            // the whole path should be returned.
-            assert_eq!(strip_common(&cwd, Path::new("/home")), "/home");
-        }
-
         // In this case it cannot canonicalize `/a/b/c` so it returns the path as is.
         assert_eq!(strip_common(&cwd, Path::new("/a/b/c")), "/a/b/c");
     }
@@ -831,7 +827,7 @@ mod test {
         assert!(num_lit(".").is_err());
         // Should succeed.
         assert_eq!(num_lit("1.2E-02").unwrap(), ("", "1.2E-02"));
-        // Not supported (because rust want a number before the `.`).
+        // Not supported because Rust wants a number before the `.`.
         assert!(num_lit(".1").is_err());
         assert!(num_lit(".1E-02").is_err());
         // Not supported (voluntarily because of `1..` syntax).
