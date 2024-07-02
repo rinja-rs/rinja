@@ -99,3 +99,31 @@ fn test_double_attr_arg() {
     let t = DoubleAttrArg { x: (10,) };
     assert_eq!(t.render().unwrap(), "156");
 }
+
+// Ensures that fields are not moved when calling a jinja macro.
+#[derive(Template)]
+#[template(
+    source = "
+{%- macro package_navigation(title, show) -%}
+{%- if show -%}
+{{title}}
+{%- else -%}
+no show
+{%- endif -%}
+{%- endmacro -%}
+
+{%- call package_navigation(title=title, show=true) -%}
+",
+    ext = "html"
+)]
+struct DoNotMoveFields {
+    title: String,
+}
+
+#[test]
+fn test_do_not_move_fields() {
+    let x = DoNotMoveFields {
+        title: "a".to_string(),
+    };
+    assert_eq!(x.render().unwrap(), "a");
+}
