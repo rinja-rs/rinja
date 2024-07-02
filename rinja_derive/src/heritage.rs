@@ -76,49 +76,24 @@ impl Context<'_> {
         while let Some(nodes) = nested.pop() {
             for n in nodes {
                 match n {
-                    Node::Extends(e) if top => match extends {
-                        Some(_) => {
-                            return Err(generate_error(
-                                path,
-                                parsed.source(),
+                    Node::Extends(e) => {
+                        ensure_top(top, e, path, parsed, "extends")?;
+                        if extends.is_some() {
+                            return Err(CompileError::new(
                                 "multiple extend blocks found",
-                                e,
-                            ))
+                                Some(FileInfo::of(e, path, parsed)),
+                            ));
                         }
-                        None => {
-                            extends = Some(config.find_template(e.path, Some(path))?);
-                        }
-                    },
-                    Node::Macro(m) if top => {
+                        extends = Some(config.find_template(e.path, Some(path))?);
+                    }
+                    Node::Macro(m) => {
+                        ensure_top(top, m, path, parsed, "macro")?;
                         macros.insert(m.name, &**m);
                     }
-                    Node::Import(import) if top => {
+                    Node::Import(import) => {
+                        ensure_top(top, import, path, parsed, "import")?;
                         let path = config.find_template(import.path, Some(path))?;
                         imports.insert(import.scope, path);
-                    }
-                    Node::Extends(e) if !top => {
-                        return Err(generate_error(
-                            path,
-                            parsed.source(),
-                            "extends blocks are not allowed below top level",
-                            e,
-                        ));
-                    }
-                    Node::Macro(e) if !top => {
-                        return Err(generate_error(
-                            path,
-                            parsed.source(),
-                            "macro blocks are not allowed below top level",
-                            e,
-                        ));
-                    }
-                    Node::Import(e) if !top => {
-                        return Err(generate_error(
-                            path,
-                            parsed.source(),
-                            "import blocks are not allowed below top level",
-                            e,
-                        ));
                     }
                     Node::BlockDef(b) => {
                         blocks.insert(b.name, &**b);
@@ -156,16 +131,26 @@ impl Context<'_> {
     }
 
     pub(crate) fn generate_error<T>(&self, msg: &str, node: &WithSpan<'_, T>) -> CompileError {
-        match self.path {
-            Some(path) => generate_error(path, self.parsed.source(), msg, node),
-            None => CompileError::new(msg, None),
-        }
+        CompileError::new(
+            msg,
+            self.path.map(|path| FileInfo::of(node, path, self.parsed)),
+        )
     }
 }
 
-fn generate_error<T>(path: &Path, source: &str, msg: &str, node: &WithSpan<'_, T>) -> CompileError {
-    CompileError::new(
-        msg,
-        Some(FileInfo::new(path, Some(source), Some(node.span()))),
-    )
+fn ensure_top<T>(
+    top: bool,
+    node: &WithSpan<'_, T>,
+    path: &Path,
+    parsed: &Parsed,
+    kind: &str,
+) -> Result<(), CompileError> {
+    if top {
+        Ok(())
+    } else {
+        Err(CompileError::new(
+            format!("`{kind}` blocks are not allowed below top level"),
+            Some(FileInfo::of(node, path, parsed)),
+        ))
+    }
 }

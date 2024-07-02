@@ -16,7 +16,7 @@ use config::{read_config_file, Config};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
-use parser::{generate_error_info, strip_common, ErrorInfo, ParseError};
+use parser::{generate_error_info, strip_common, ErrorInfo, ParseError, Parsed, WithSpan};
 use proc_macro2::{Span, TokenStream};
 
 #[cfg(not(feature = "__standalone"))]
@@ -190,6 +190,14 @@ impl<'a> FileInfo<'a> {
             path,
             source,
             node_source,
+        }
+    }
+
+    fn of<T>(node: &WithSpan<'a, T>, path: &'a Path, parsed: &'a Parsed) -> Self {
+        Self {
+            path,
+            source: Some(parsed.source()),
+            node_source: Some(node.span()),
         }
     }
 }
