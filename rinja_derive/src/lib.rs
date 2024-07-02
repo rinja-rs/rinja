@@ -138,7 +138,7 @@ struct CompileError {
 }
 
 impl CompileError {
-    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_, '_, '_>>) -> Self {
+    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
@@ -178,14 +178,14 @@ impl From<ParseError> for CompileError {
     }
 }
 
-struct FileInfo<'a, 'b, 'c> {
+struct FileInfo<'a> {
     path: &'a Path,
-    source: Option<&'b str>,
-    node_source: Option<&'c str>,
+    source: Option<&'a str>,
+    node_source: Option<&'a str>,
 }
 
-impl<'a, 'b, 'c> FileInfo<'a, 'b, 'c> {
-    fn new(path: &'a Path, source: Option<&'b str>, node_source: Option<&'c str>) -> Self {
+impl<'a> FileInfo<'a> {
+    fn new(path: &'a Path, source: Option<&'a str>, node_source: Option<&'a str>) -> Self {
         Self {
             path,
             source,
@@ -194,7 +194,7 @@ impl<'a, 'b, 'c> FileInfo<'a, 'b, 'c> {
     }
 }
 
-impl<'a, 'b, 'c> fmt::Display for FileInfo<'a, 'b, 'c> {
+impl fmt::Display for FileInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.source, self.node_source) {
             (Some(source), Some(node_source)) => {
