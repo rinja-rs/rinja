@@ -16,7 +16,7 @@ use config::{read_config_file, Config};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
-use parser::{generate_error_info, strip_common, ErrorInfo, ParseError};
+use parser::{generate_error_info, strip_common, ErrorInfo, ParseError, Parsed, WithSpan};
 use proc_macro2::{Span, TokenStream};
 
 #[cfg(not(feature = "__standalone"))]
@@ -138,7 +138,7 @@ struct CompileError {
 }
 
 impl CompileError {
-    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_, '_, '_>>) -> Self {
+    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
@@ -178,23 +178,31 @@ impl From<ParseError> for CompileError {
     }
 }
 
-struct FileInfo<'a, 'b, 'c> {
+struct FileInfo<'a> {
     path: &'a Path,
-    source: Option<&'b str>,
-    node_source: Option<&'c str>,
+    source: Option<&'a str>,
+    node_source: Option<&'a str>,
 }
 
-impl<'a, 'b, 'c> FileInfo<'a, 'b, 'c> {
-    fn new(path: &'a Path, source: Option<&'b str>, node_source: Option<&'c str>) -> Self {
+impl<'a> FileInfo<'a> {
+    fn new(path: &'a Path, source: Option<&'a str>, node_source: Option<&'a str>) -> Self {
         Self {
             path,
             source,
             node_source,
         }
     }
+
+    fn of<T>(node: &WithSpan<'a, T>, path: &'a Path, parsed: &'a Parsed) -> Self {
+        Self {
+            path,
+            source: Some(parsed.source()),
+            node_source: Some(node.span()),
+        }
+    }
 }
 
-impl<'a, 'b, 'c> fmt::Display for FileInfo<'a, 'b, 'c> {
+impl fmt::Display for FileInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.source, self.node_source) {
             (Some(source), Some(node_source)) => {

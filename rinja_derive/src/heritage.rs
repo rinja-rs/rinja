@@ -76,25 +76,24 @@ impl Context<'_> {
         while let Some(nodes) = nested.pop() {
             for n in nodes {
                 match n {
-                    Node::Extends(e) if top => match extends {
-                        Some(_) => {
-                            return Err(CompileError::no_file_info("multiple extend blocks found"))
+                    Node::Extends(e) => {
+                        ensure_top(top, e, path, parsed, "extends")?;
+                        if extends.is_some() {
+                            return Err(CompileError::new(
+                                "multiple extend blocks found",
+                                Some(FileInfo::of(e, path, parsed)),
+                            ));
                         }
-                        None => {
-                            extends = Some(config.find_template(e.path, Some(path))?);
-                        }
-                    },
-                    Node::Macro(m) if top => {
+                        extends = Some(config.find_template(e.path, Some(path))?);
+                    }
+                    Node::Macro(m) => {
+                        ensure_top(top, m, path, parsed, "macro")?;
                         macros.insert(m.name, &**m);
                     }
-                    Node::Import(import) if top => {
+                    Node::Import(import) => {
+                        ensure_top(top, import, path, parsed, "import")?;
                         let path = config.find_template(import.path, Some(path))?;
                         imports.insert(import.scope, path);
-                    }
-                    Node::Extends(_) | Node::Macro(_) | Node::Import(_) if !top => {
-                        return Err(CompileError::no_file_info(
-                            "extends, macro or import blocks not allowed below top level",
-                        ));
                     }
                     Node::BlockDef(b) => {
                         blocks.insert(b.name, &**b);
@@ -132,16 +131,26 @@ impl Context<'_> {
     }
 
     pub(crate) fn generate_error<T>(&self, msg: &str, node: &WithSpan<'_, T>) -> CompileError {
-        match self.path {
-            Some(path) => CompileError::new(
-                msg,
-                Some(FileInfo::new(
-                    path,
-                    Some(self.parsed.source()),
-                    Some(node.span()),
-                )),
-            ),
-            None => CompileError::new(msg, None),
-        }
+        CompileError::new(
+            msg,
+            self.path.map(|path| FileInfo::of(node, path, self.parsed)),
+        )
+    }
+}
+
+fn ensure_top<T>(
+    top: bool,
+    node: &WithSpan<'_, T>,
+    path: &Path,
+    parsed: &Parsed,
+    kind: &str,
+) -> Result<(), CompileError> {
+    if top {
+        Ok(())
+    } else {
+        Err(CompileError::new(
+            format!("`{kind}` blocks are not allowed below top level"),
+            Some(FileInfo::of(node, path, parsed)),
+        ))
     }
 }
