@@ -298,37 +298,26 @@ where
     vals.iter().map(|s| s.to_string()).collect()
 }
 
-#[allow(clippy::match_wild_err_arm)]
 pub(crate) fn get_template_source(
     tpl_path: &Path,
     import_from: Option<(&Rc<Path>, &str, &str)>,
-) -> std::result::Result<String, CompileError> {
+) -> Result<String, CompileError> {
     match fs::read_to_string(tpl_path) {
-        Err(_) => {
-            if let Some((node_file, file_source, node_source)) = import_from {
-                Err(CompileError::new(
-                    format!(
-                        "unable to open template file '{}'",
-                        tpl_path.to_str().unwrap(),
-                    ),
-                    Some(FileInfo::new(
-                        node_file,
-                        Some(file_source),
-                        Some(node_source),
-                    )),
-                ))
-            } else {
-                Err(CompileError::no_file_info(format!(
-                    "unable to open template file '{}'",
-                    tpl_path.to_str().unwrap()
-                )))
-            }
-        }
         Ok(mut source) => {
             if source.ends_with('\n') {
                 let _ = source.pop();
             }
             Ok(source)
+        }
+        Err(err) => {
+            let msg = format!(
+                "unable to open template file '{}': {err}",
+                tpl_path.to_str().unwrap(),
+            );
+            let file_info = import_from.map(|(node_file, file_source, node_source)| {
+                FileInfo::new(node_file, Some(file_source), Some(node_source))
+            });
+            Err(CompileError::new(msg, file_info))
         }
     }
 }
