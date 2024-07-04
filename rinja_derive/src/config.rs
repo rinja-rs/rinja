@@ -307,23 +307,15 @@ pub(crate) fn get_template_source(
             let _ = source.pop();
         }
         Ok(source)
-    } else if let Some((node_file, file_source, node_source)) = import_from {
-        Err(CompileError::new(
-            format!(
-                "unable to open template file '{}'",
-                tpl_path.to_str().unwrap(),
-            ),
-            Some(FileInfo::new(
-                node_file,
-                Some(file_source),
-                Some(node_source),
-            )),
-        ))
     } else {
-        Err(CompileError::no_file_info(format!(
+        let msg = format!(
             "unable to open template file '{}'",
-            tpl_path.to_str().unwrap(),
-        )))
+            tpl_path.to_str().unwrap()
+        );
+        let file_info = import_from.map(|(node_file, file_source, node_source)| {
+            FileInfo::new(node_file, Some(file_source), Some(node_source))
+        });
+        Err(CompileError::new(msg, file_info))
     }
 }
 
