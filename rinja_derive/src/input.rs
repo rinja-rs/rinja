@@ -57,7 +57,7 @@ impl TemplateInput<'_> {
             (&Source::Source(_), None) => {
                 return Err(CompileError::no_file_info(
                     "must include 'ext' attribute when using 'source' attribute",
-                ))
+                ));
             }
         };
 
@@ -240,12 +240,12 @@ impl TemplateArgs {
                 Ok(_) => {
                     return Err(CompileError::no_file_info(
                         "duplicated 'template' attribute",
-                    ))
+                    ));
                 }
                 Err(e) => {
                     return Err(CompileError::no_file_info(format!(
                         "unable to parse template arguments: {e}"
-                    )))
+                    )));
                 }
             };
         }
@@ -264,7 +264,7 @@ impl TemplateArgs {
                     return Err(CompileError::no_file_info(format!(
                         "unsupported attribute argument {:?}",
                         item.to_token_stream()
-                    )))
+                    )));
                 }
             };
 
@@ -280,13 +280,13 @@ impl TemplateArgs {
                     _ => {
                         return Err(CompileError::no_file_info(format!(
                             "unsupported argument value type for {ident:?}"
-                        )))
+                        )));
                     }
                 },
                 _ => {
                     return Err(CompileError::no_file_info(format!(
                         "unsupported argument value type for {ident:?}"
-                    )))
+                    )));
                 }
             };
 
@@ -440,7 +440,7 @@ impl FromStr for Print {
             v => {
                 return Err(CompileError::no_file_info(format!(
                     "invalid value for print option: {v}"
-                )))
+                )));
             }
         })
     }

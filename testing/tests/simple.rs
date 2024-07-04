@@ -1,8 +1,8 @@
 #![allow(clippy::disallowed_names)] // For the use of `foo` in test cases
 
-use rinja::Template;
-
 use std::collections::HashMap;
+
+use rinja::Template;
 
 #[derive(Template)]
 #[template(path = "simple.html")]

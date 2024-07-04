@@ -9,9 +9,6 @@ use std::fmt::{self, Write};
 
 #[cfg(feature = "serde_json")]
 mod json;
-#[cfg(feature = "serde_json")]
-pub use self::json::{json, json_pretty, AsIndent};
-
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
 #[cfg(feature = "num-traits")]
@@ -20,6 +17,8 @@ use num_traits::{cast::NumCast, Signed};
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use rinja_escape::{Escaper, MarkupDisplay};
 
+#[cfg(feature = "serde_json")]
+pub use self::json::{json, json_pretty, AsIndent};
 use crate::{Error, Result};
 
 #[cfg(feature = "urlencode")]
@@ -427,7 +426,6 @@ where
 /// This struct implements [`fmt::Display`], but only produces a string once.
 /// Any subsequent call to `.to_string()` will result in an empty string, because the iterator is
 /// already consumed.
-//
 // The filter contains a [`Cell`], so we can modify iterator inside a method that takes `self` by
 // reference: [`fmt::Display::fmt()`] normally has the contract that it will produce the same result
 // in multiple invocations for the same object. We break this contract, because have to consume the

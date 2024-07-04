@@ -792,8 +792,9 @@ pub fn strip_common(base: &Path, path: &Path) -> String {
 #[cfg(not(windows))]
 #[cfg(test)]
 mod test {
-    use super::{char_lit, num_lit, strip_common};
     use std::path::Path;
+
+    use super::{char_lit, num_lit, strip_common};
 
     #[test]
     fn test_strip_common() {

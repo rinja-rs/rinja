@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::{env, fs};
 
+use parser::node::Whitespace;
+use parser::Syntax;
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
 use crate::{CompileError, FileInfo, CRATE};
-use parser::node::Whitespace;
-use parser::Syntax;
 
 #[derive(Debug)]
 pub(crate) struct Config<'a> {
@@ -65,7 +65,7 @@ impl<'a> Config<'a> {
                     return Err(CompileError::new(
                         format!("invalid value for `whitespace`: \"{s}\""),
                         file_info,
-                    ))
+                    ));
                 }
             };
         }
