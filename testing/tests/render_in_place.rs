@@ -34,6 +34,6 @@ fn test_render_in_place() {
     };
     assert_eq!(
         t.render().unwrap(),
-       "Section 1: A=A\nB=B\nSection 2: C=C\nD=D\nSection 3 for:\n* A=1\nB=2\n* A=A\nB=B\n* A=a\nB=b\n"
+        "Section 1: A=A\nB=B\nSection 2: C=C\nD=D\nSection 3 for:\n* A=1\nB=2\n* A=A\nB=B\n* A=a\nB=b\n"
     );
 }

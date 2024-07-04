@@ -169,8 +169,9 @@ pub trait Escaper {
 mod tests {
     extern crate std;
 
-    use super::*;
     use std::string::ToString;
+
+    use super::*;
 
     #[test]
     fn test_escape() {

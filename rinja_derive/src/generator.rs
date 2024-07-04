@@ -6,16 +6,16 @@ use std::path::Path;
 use std::rc::Rc;
 use std::{cmp, hash, mem, str};
 
-use crate::config::WhitespaceHandling;
-use crate::heritage::{Context, Heritage};
-use crate::input::{Source, TemplateInput};
-use crate::{CompileError, CRATE};
-
 use parser::node::{
     Call, Comment, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
 use parser::{Expr, Filter, Node, Target, WithSpan};
 use quote::quote;
+
+use crate::config::WhitespaceHandling;
+use crate::heritage::{Context, Heritage};
+use crate::input::{Source, TemplateInput};
+use crate::{CompileError, CRATE};
 
 pub(crate) struct Generator<'a> {
     // The template input state: original struct AST and attributes
@@ -240,7 +240,7 @@ impl<'a> Generator<'a> {
         ));
     }
 
-    /* Helper methods for handling node types */
+    // Helper methods for handling node types
 
     fn handle(
         &mut self,
@@ -960,7 +960,7 @@ impl<'a> Generator<'a> {
             (None, Some((prev_name, gen))) => (prev_name, gen + 1),
             // `super()` is called from outside a block
             (None, None) => {
-                return Err(ctx.generate_error("cannot call 'super()' outside block", node))
+                return Err(ctx.generate_error("cannot call 'super()' outside block", node));
             }
         };
 
@@ -1225,7 +1225,7 @@ impl<'a> Generator<'a> {
         self.handle_ws(comment.ws);
     }
 
-    /* Visitor methods for expression types */
+    // Visitor methods for expression types
 
     fn visit_expr_root(
         &mut self,
@@ -1415,7 +1415,7 @@ impl<'a> Generator<'a> {
         let opt_escaper = match args.get(1).map(|expr| &**expr) {
             Some(Expr::StrLit(name)) => Some(*name),
             Some(_) => {
-                return Err(ctx.generate_error("invalid escaper type for escape filter", node))
+                return Err(ctx.generate_error("invalid escaper type for escape filter", node));
             }
             None => None,
         };
@@ -1618,7 +1618,7 @@ impl<'a> Generator<'a> {
                     _ => {
                         return Err(
                             ctx.generate_error("loop.cycle(…) cannot use an empty array", left)
-                        )
+                        );
                     }
                 },
                 s => return Err(ctx.generate_error(&format!("unknown loop method: {s:?}"), left)),
@@ -1873,7 +1873,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /* Helper methods for dealing with whitespace nodes */
+    // Helper methods for dealing with whitespace nodes
 
     // Combines `flush_ws()` and `prepare_ws()` to handle both trailing whitespace from the
     // preceding literal and leading whitespace from the succeeding literal.

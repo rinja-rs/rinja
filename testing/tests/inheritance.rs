@@ -62,8 +62,9 @@ pub mod parent {
 }
 
 pub mod child {
-    use super::parent::*;
     use rinja::Template;
+
+    use super::parent::*;
 
     #[derive(Template)]
     #[template(path = "child.html")]

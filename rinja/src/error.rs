@@ -22,7 +22,6 @@ pub type Result<I, E = Error> = std::result::Result<I, E>;
 /// using a adapter the benefits `failure` would
 /// bring to this crate are small, which is why
 /// `std::error::Error` was used.
-///
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum Error {
