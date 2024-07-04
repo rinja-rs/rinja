@@ -1,0 +1,9 @@
+error: unable to open template file '$WORKSPACE/target/tests/trybuild/rinja_testing/templates/a_file_that_is_actually_a_folder.html': Is a directory (os error 21)
+ --> YouCannotIncludeFolders.txt:1:2
+       " include \"a_file_that_is_actually_a_fold"...
+ --> tests/ui/include-a-folder.rs:3:10
+  |
+3 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)

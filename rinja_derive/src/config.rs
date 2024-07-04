@@ -302,20 +302,23 @@ pub(crate) fn get_template_source(
     tpl_path: &Path,
     import_from: Option<(&Rc<Path>, &str, &str)>,
 ) -> Result<String, CompileError> {
-    if let Ok(mut source) = fs::read_to_string(tpl_path) {
-        if source.ends_with('\n') {
-            let _ = source.pop();
+    match fs::read_to_string(tpl_path) {
+        Ok(mut source) => {
+            if source.ends_with('\n') {
+                let _ = source.pop();
+            }
+            Ok(source)
         }
-        Ok(source)
-    } else {
-        let msg = format!(
-            "unable to open template file '{}'",
-            tpl_path.to_str().unwrap()
-        );
-        let file_info = import_from.map(|(node_file, file_source, node_source)| {
-            FileInfo::new(node_file, Some(file_source), Some(node_source))
-        });
-        Err(CompileError::new(msg, file_info))
+        Err(err) => {
+            let msg = format!(
+                "unable to open template file '{}': {err}",
+                tpl_path.to_str().unwrap(),
+            );
+            let file_info = import_from.map(|(node_file, file_source, node_source)| {
+                FileInfo::new(node_file, Some(file_source), Some(node_source))
+            });
+            Err(CompileError::new(msg, file_info))
+        }
     }
 }
 
