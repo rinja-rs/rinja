@@ -292,13 +292,13 @@ fn str_set<'a>(vals: &[&'a str]) -> Vec<Cow<'a, str>> {
 pub(crate) fn get_template_source(
     tpl_path: &Path,
     import_from: Option<(&Rc<Path>, &str, &str)>,
-) -> Result<String, CompileError> {
+) -> Result<Rc<str>, CompileError> {
     match fs::read_to_string(tpl_path) {
         Ok(mut source) => {
             if source.ends_with('\n') {
                 let _ = source.pop();
             }
-            Ok(source)
+            Ok(source.into())
         }
         Err(err) => {
             let msg = format!(
@@ -333,7 +333,7 @@ mod tests {
         let path = Config::new("", None, None)
             .and_then(|config| config.find_template("b.html", None))
             .unwrap();
-        assert_eq!(get_template_source(&path, None).unwrap(), "bar");
+        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
     }
 
     #[test]

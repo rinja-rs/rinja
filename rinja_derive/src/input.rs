@@ -113,7 +113,7 @@ impl TemplateInput<'_> {
         map: &mut HashMap<Rc<Path>, Parsed>,
     ) -> Result<(), CompileError> {
         let (source, source_path) = match &self.source {
-            Source::Source(s) => (s.into(), None),
+            Source::Source(s) => (s.clone(), None),
             Source::Path(_) => (
                 get_template_source(&self.path, None)?,
                 Some(Rc::clone(&self.path)),
@@ -312,7 +312,7 @@ impl TemplateArgs {
                             "must specify 'source' or 'path', not both",
                         ));
                     }
-                    args.source = Some(Source::Source(s.value()));
+                    args.source = Some(Source::Source(s.value().into()));
                 } else {
                     return Err(CompileError::no_file_info(
                         "template source must be string literal",
@@ -386,7 +386,7 @@ impl TemplateArgs {
 
     pub(crate) fn fallback() -> Self {
         Self {
-            source: Some(Source::Source("".to_string())),
+            source: Some(Source::Source("".into())),
             ext: Some("txt".to_string()),
             ..Self::default()
         }
@@ -419,7 +419,7 @@ fn extension(path: &Path) -> Option<&str> {
 #[derive(Debug, Hash, PartialEq)]
 pub(crate) enum Source {
     Path(String),
-    Source(String),
+    Source(Rc<str>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]

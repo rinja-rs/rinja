@@ -36,26 +36,25 @@ mod _parsed {
     use super::node::Node;
     use super::{Ast, ParseError, Syntax};
 
-    #[derive(Default)]
     pub struct Parsed {
         // `source` must outlive `ast`, so `ast` must be declared before `source`
         ast: Ast<'static>,
         #[allow(dead_code)]
-        source: String,
+        source: Rc<str>,
     }
 
     impl Parsed {
         /// If `file_path` is `None`, it means the `source` is an inline template. Therefore, if
         /// a parsing error occurs, we won't display the path as it wouldn't be useful.
         pub fn new(
-            source: String,
+            source: Rc<str>,
             file_path: Option<Rc<Path>>,
             syntax: &Syntax<'_>,
         ) -> Result<Self, ParseError> {
             // Self-referential borrowing: `self` will keep the source alive as `String`,
             // internally we will transmute it to `&'static str` to satisfy the compiler.
             // However, we only expose the nodes with a lifetime limited to `self`.
-            let src = unsafe { mem::transmute::<&str, &'static str>(source.as_str()) };
+            let src = unsafe { mem::transmute::<&str, &'static str>(source.as_ref()) };
             let ast = Ast::from_str(src, file_path, syntax)?;
             Ok(Self { ast, source })
         }
@@ -81,6 +80,15 @@ mod _parsed {
     impl PartialEq for Parsed {
         fn eq(&self, other: &Self) -> bool {
             self.ast.nodes == other.ast.nodes
+        }
+    }
+
+    impl Default for Parsed {
+        fn default() -> Self {
+            Self {
+                ast: Ast::default(),
+                source: "".into(),
+            }
         }
     }
 }
