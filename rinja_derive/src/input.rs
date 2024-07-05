@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::hash_map::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -77,17 +78,17 @@ impl TemplateInput<'_> {
             .as_deref()
             .unwrap_or_else(|| path.extension().map(|s| s.to_str().unwrap()).unwrap_or(""));
 
-        let mut escaper = None;
-        for (extensions, path) in &config.escapers {
-            if extensions.contains(escaping) {
-                escaper = Some(path);
-                break;
-            }
-        }
-
-        let escaper = escaper.ok_or_else(|| {
-            CompileError::no_file_info(format!("no escaper defined for extension '{escaping}'"))
-        })?;
+        let escaper = config
+            .escapers
+            .iter()
+            .find_map(|(extensions, path)| {
+                extensions
+                    .contains(&Cow::Borrowed(escaping))
+                    .then_some(path.as_ref())
+            })
+            .ok_or_else(|| {
+                CompileError::no_file_info(format!("no escaper defined for extension '{escaping}'"))
+            })?;
 
         let mime_type =
             extension_to_mime_type(ext_default_to_path(ext.as_deref(), &path).unwrap_or("txt"))
@@ -414,13 +415,13 @@ fn extension(path: &Path) -> Option<&str> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq)]
 pub(crate) enum Source {
     Path(String),
     Source(String),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub(crate) enum Print {
     All,
     Ast,

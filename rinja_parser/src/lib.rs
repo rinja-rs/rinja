@@ -688,7 +688,7 @@ impl<'a> State<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq)]
 pub struct Syntax<'a> {
     pub block_start: &'a str,
     pub block_end: &'a str,
