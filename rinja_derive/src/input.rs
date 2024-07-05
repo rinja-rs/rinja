@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::hash_map::HashMap;
+use std::collections::hash_map::{Entry, HashMap};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -130,15 +130,16 @@ impl TemplateInput<'_> {
             while let Some(nodes) = nested.pop() {
                 for n in nodes {
                     let mut add_to_check = |new_path: Rc<Path>| -> Result<(), CompileError> {
-                        if !map.contains_key(&new_path) {
+                        if let Entry::Vacant(e) = map.entry(new_path) {
                             // Add a dummy entry to `map` in order to prevent adding `path`
                             // multiple times to `check`.
-                            map.insert(Rc::clone(&new_path), Parsed::default());
+                            let new_path = e.key();
                             let source = get_template_source(
-                                &new_path,
+                                new_path,
                                 Some((&path, parsed.source(), n.span())),
                             )?;
-                            check.push((new_path.clone(), source, Some(new_path)));
+                            check.push((new_path.clone(), source, Some(new_path.clone())));
+                            e.insert(Parsed::default());
                         }
                         Ok(())
                     };
