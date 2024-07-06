@@ -1,4 +1,5 @@
-use std::collections::hash_map::HashMap;
+use std::borrow::Cow;
+use std::collections::hash_map::{Entry, HashMap};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -77,17 +78,17 @@ impl TemplateInput<'_> {
             .as_deref()
             .unwrap_or_else(|| path.extension().map(|s| s.to_str().unwrap()).unwrap_or(""));
 
-        let mut escaper = None;
-        for (extensions, path) in &config.escapers {
-            if extensions.contains(escaping) {
-                escaper = Some(path);
-                break;
-            }
-        }
-
-        let escaper = escaper.ok_or_else(|| {
-            CompileError::no_file_info(format!("no escaper defined for extension '{escaping}'"))
-        })?;
+        let escaper = config
+            .escapers
+            .iter()
+            .find_map(|(extensions, path)| {
+                extensions
+                    .contains(&Cow::Borrowed(escaping))
+                    .then_some(path.as_ref())
+            })
+            .ok_or_else(|| {
+                CompileError::no_file_info(format!("no escaper defined for extension '{escaping}'"))
+            })?;
 
         let mime_type =
             extension_to_mime_type(ext_default_to_path(ext.as_deref(), &path).unwrap_or("txt"))
@@ -112,7 +113,7 @@ impl TemplateInput<'_> {
         map: &mut HashMap<Rc<Path>, Parsed>,
     ) -> Result<(), CompileError> {
         let (source, source_path) = match &self.source {
-            Source::Source(s) => (s.into(), None),
+            Source::Source(s) => (s.clone(), None),
             Source::Path(_) => (
                 get_template_source(&self.path, None)?,
                 Some(Rc::clone(&self.path)),
@@ -129,15 +130,16 @@ impl TemplateInput<'_> {
             while let Some(nodes) = nested.pop() {
                 for n in nodes {
                     let mut add_to_check = |new_path: Rc<Path>| -> Result<(), CompileError> {
-                        if !map.contains_key(&new_path) {
+                        if let Entry::Vacant(e) = map.entry(new_path) {
                             // Add a dummy entry to `map` in order to prevent adding `path`
                             // multiple times to `check`.
-                            map.insert(Rc::clone(&new_path), Parsed::default());
+                            let new_path = e.key();
                             let source = get_template_source(
-                                &new_path,
+                                new_path,
                                 Some((&path, parsed.source(), n.span())),
                             )?;
-                            check.push((new_path.clone(), source, Some(new_path)));
+                            check.push((new_path.clone(), source, Some(new_path.clone())));
+                            e.insert(Parsed::default());
                         }
                         Ok(())
                     };
@@ -310,7 +312,7 @@ impl TemplateArgs {
                             "must specify 'source' or 'path', not both",
                         ));
                     }
-                    args.source = Some(Source::Source(s.value()));
+                    args.source = Some(Source::Source(s.value().into()));
                 } else {
                     return Err(CompileError::no_file_info(
                         "template source must be string literal",
@@ -384,7 +386,7 @@ impl TemplateArgs {
 
     pub(crate) fn fallback() -> Self {
         Self {
-            source: Some(Source::Source("".to_string())),
+            source: Some(Source::Source("".into())),
             ext: Some("txt".to_string()),
             ..Self::default()
         }
@@ -414,13 +416,13 @@ fn extension(path: &Path) -> Option<&str> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq)]
 pub(crate) enum Source {
     Path(String),
-    Source(String),
+    Source(Rc<str>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub(crate) enum Print {
     All,
     Ast,

@@ -1425,7 +1425,11 @@ impl<'a> Generator<'a> {
                 .config
                 .escapers
                 .iter()
-                .find_map(|(escapers, escaper)| escapers.contains(name).then_some(escaper))
+                .find_map(|(extensions, path)| {
+                    extensions
+                        .contains(&Cow::Borrowed(name))
+                        .then_some(path.as_ref())
+                })
                 .ok_or_else(|| ctx.generate_error("invalid escaper for escape filter", node))?,
             None => self.input.escaper,
         };

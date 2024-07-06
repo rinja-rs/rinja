@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashSet};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::{env, fs};
@@ -10,12 +11,12 @@ use serde::Deserialize;
 
 use crate::{CompileError, FileInfo, CRATE};
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq)]
 pub(crate) struct Config<'a> {
     pub(crate) dirs: Vec<PathBuf>,
     pub(crate) syntaxes: BTreeMap<String, Syntax<'a>>,
     pub(crate) default_syntax: &'a str,
-    pub(crate) escapers: Vec<(HashSet<String>, String)>,
+    pub(crate) escapers: Vec<(Vec<Cow<'a, str>>, Cow<'a, str>)>,
     pub(crate) whitespace: WhitespaceHandling,
 }
 
@@ -96,18 +97,11 @@ impl<'a> Config<'a> {
         let mut escapers = Vec::new();
         if let Some(configured) = raw.escaper {
             for escaper in configured {
-                escapers.push((
-                    escaper
-                        .extensions
-                        .iter()
-                        .map(|ext| (*ext).to_string())
-                        .collect(),
-                    escaper.path.to_string(),
-                ));
+                escapers.push((str_set(&escaper.extensions), escaper.path.into()));
             }
         }
         for (extensions, path) in DEFAULT_ESCAPERS {
-            escapers.push((str_set(extensions), format!("{CRATE}{path}")));
+            escapers.push((str_set(extensions), format!("{CRATE}{path}").into()));
         }
 
         Ok(Config {
@@ -217,7 +211,7 @@ impl RawConfig<'_> {
     }
 }
 
-#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "config", derive(Deserialize))]
 #[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
 pub(crate) enum WhitespaceHandling {
@@ -291,23 +285,20 @@ pub(crate) fn read_config_file(
     }
 }
 
-fn str_set<T>(vals: &[T]) -> HashSet<String>
-where
-    T: ToString,
-{
-    vals.iter().map(|s| s.to_string()).collect()
+fn str_set<'a>(vals: &[&'a str]) -> Vec<Cow<'a, str>> {
+    vals.iter().copied().map(Cow::from).collect()
 }
 
 pub(crate) fn get_template_source(
     tpl_path: &Path,
     import_from: Option<(&Rc<Path>, &str, &str)>,
-) -> Result<String, CompileError> {
+) -> Result<Rc<str>, CompileError> {
     match fs::read_to_string(tpl_path) {
         Ok(mut source) => {
             if source.ends_with('\n') {
                 let _ = source.pop();
             }
-            Ok(source)
+            Ok(source.into())
         }
         Err(err) => {
             let msg = format!(
@@ -342,7 +333,7 @@ mod tests {
         let path = Config::new("", None, None)
             .and_then(|config| config.find_template("b.html", None))
             .unwrap();
-        assert_eq!(get_template_source(&path, None).unwrap(), "bar");
+        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
     }
 
     #[test]
