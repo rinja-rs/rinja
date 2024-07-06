@@ -1,8 +1,5 @@
-#[macro_use]
-extern crate criterion;
-
-use criterion::Criterion;
-use rinja_escape::{Html, MarkupDisplay};
+use criterion::{criterion_group, criterion_main, Criterion};
+use rinja::{Html, MarkupDisplay};
 
 criterion_main!(benches);
 criterion_group!(benches, functions);

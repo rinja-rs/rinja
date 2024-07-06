@@ -70,8 +70,8 @@ pub mod helpers;
 
 use std::fmt;
 
+pub use filters::escape::{Html, MarkupDisplay, Text};
 pub use rinja_derive::Template;
-pub use rinja_escape::{Html, MarkupDisplay, Text};
 
 #[doc(hidden)]
 pub use crate as shared;

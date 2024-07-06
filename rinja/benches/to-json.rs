@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rinja::filters::{json, json_pretty};
-use rinja_escape::{Html, MarkupDisplay};
+use rinja::{Html, MarkupDisplay};
 
 criterion_main!(benches);
 criterion_group!(benches, functions);

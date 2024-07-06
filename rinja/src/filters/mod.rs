@@ -3,22 +3,24 @@
 //! Contains all the built-in filter functions for use in templates.
 //! You can define your own filters, as well.
 
+pub mod escape;
+#[cfg(feature = "serde_json")]
+mod json;
+
 use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
 
-#[cfg(feature = "serde_json")]
-mod json;
+use escape::{Escaper, MarkupDisplay};
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
+#[cfg(feature = "serde_json")]
+pub use json::{json, json_pretty, AsIndent};
 #[cfg(feature = "num-traits")]
 use num_traits::{cast::NumCast, Signed};
 #[cfg(feature = "urlencode")]
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
-use rinja_escape::{Escaper, MarkupDisplay};
 
-#[cfg(feature = "serde_json")]
-pub use self::json::{json, json_pretty, AsIndent};
 use crate::{Error, Result};
 
 #[cfg(feature = "urlencode")]
