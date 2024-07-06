@@ -1,0 +1,20 @@
+[package]
+name = "actix-web-app"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rinja_actix = { version = "0.15.0", path = "../../rinja_actix" }
+
+actix-web = { version = "4.8.0", default-features = false, features = ["macros"] }
+env_logger = "0.11.3"
+log = "0.4.22"
+pretty-error-debug = "0.3.0"
+serde = { version = "1.0.203", features = ["derive"] }
+strum = { version = "0.26.3", features = ["derive"] }
+thiserror = "1.0.61"
+tokio = { version = "1.38.0", features = ["sync", "rt-multi-thread"] }
+
+[workspace]
+members = ["."]

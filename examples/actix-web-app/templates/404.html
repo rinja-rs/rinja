@@ -1,0 +1,10 @@
+{% extends "_layout.html" %}
+
+{% block title -%}
+    404: Not Found
+{%- endblock %}
+
+{% block content -%}
+    <h1>404: Not Found</h1>
+    <h2><a href="{{ req.url_for_static("start_handler")? }}">Back to the first page.</a></h2>
+{%- endblock %}

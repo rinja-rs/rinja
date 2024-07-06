@@ -1,0 +1,67 @@
+{% extends "_layout.html" %}
+
+{% block title -%}
+    {%- match lang -%}
+        {%- when Lang::en -%} Hello
+        {%- when Lang::de -%} Hallo
+    {%- endmatch -%}
+{%- endblock %}
+
+{%- block content -%}
+    <h1>
+        {%- match lang -%}
+            {%- when Lang::en -%} Hello
+            {%- when Lang::de -%} Hallo
+        {%- endmatch -%}
+    </h1>
+    <form
+        method="GET"
+        action="{{ req.url_for("greeting_handler", [lang])? }}"
+        autocomplete="off"
+    >
+        <p>
+            {%- match lang -%}
+                {%- when Lang::en -%}
+                    I would like to say <em>hello</em>. {#-~#}
+                    Would you please tell me your name?
+                {%- when Lang::de -%}
+                    Ich möchte dir gerne <em>hallo</em> sagen. {#-~#}
+                    Bitte nenne mir doch deinen Namen!
+            {%- endmatch -%}
+        </p>
+        <p>
+            <label>
+                {%- match lang -%}
+                    {%- when Lang::en -%} My name is
+                    {%- when Lang::de -%} Ich heiße
+                {%- endmatch -%}:
+                <input
+                    type="text"
+                    value="{{name}}"
+                    name="name"
+                    required
+                    style="width: 10em"
+                />
+            </label>
+        </p>
+        <p>
+            <label>
+                <button type="submit">
+                    {%- match lang -%}
+                        {%- when Lang::en -%} Greet me, then!
+                        {%- when Lang::de -%} Dann begrüße mich!
+                    {%- endmatch -%}
+                </button>
+            </label>
+        </p>
+    </form>
+
+    <ul id="lang-select">
+        {%- if lang != Lang::en -%}
+            <li><a href="{{ req.url_for("index_handler", [Lang::en])? }}">This page in English</a></li>
+        {%- endif -%}
+        {%- if lang != Lang::de -%}
+            <li><a href="{{ req.url_for("index_handler", [Lang::de])? }}">Diese Seite auf deutsch.</a></li>
+        {%- endif -%}
+    </ul>
+{%- endblock %}
