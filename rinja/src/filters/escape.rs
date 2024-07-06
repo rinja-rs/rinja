@@ -1,112 +1,74 @@
-use core::fmt::{self, Display, Formatter, Write};
-use core::str;
+use std::convert::Infallible;
+use std::fmt::{self, Display, Formatter, Write};
+use std::str;
 
-#[derive(Debug)]
-pub struct MarkupDisplay<E, T>
-where
-    E: Escaper,
-    T: Display,
-{
-    value: DisplayValue<T>,
-    escaper: E,
+/// Marks a string (or other `Display` type) as safe
+///
+/// Use this is you want to allow markup in an expression, or if you know
+/// that the expression's contents don't need to be escaped.
+///
+/// Rinja will automatically insert the first (`Escaper`) argument,
+/// so this filter only takes a single argument of any type that implements
+/// `Display`.
+#[inline]
+pub fn safe(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
+    let _ = escaper; // it should not be part of the interface that the `escaper` is unused
+    Ok(text)
 }
 
-impl<E, T> MarkupDisplay<E, T>
-where
-    E: Escaper,
-    T: Display,
-{
-    pub fn new_unsafe(value: T, escaper: E) -> Self {
-        Self {
-            value: DisplayValue::Unsafe(value),
-            escaper,
+/// Escapes strings according to the escape mode.
+///
+/// Rinja will automatically insert the first (`Escaper`) argument,
+/// so this filter only takes a single argument of any type that implements
+/// `Display`.
+///
+/// It is possible to optionally specify an escaper other than the default for
+/// the template's extension, like `{{ val|escape("txt") }}`.
+#[inline]
+pub fn escape(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
+    struct EscapeDisplay<T, E>(T, E);
+    struct EscapeWriter<W, E>(W, E);
+
+    impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
+        #[inline]
+        fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+            write!(EscapeWriter(fmt, self.1), "{}", &self.0)
         }
     }
 
-    pub fn new_safe(value: T, escaper: E) -> Self {
-        Self {
-            value: DisplayValue::Safe(value),
-            escaper,
+    impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
+        #[inline]
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            self.1.write_escaped_str(&mut self.0, s)
+        }
+
+        #[inline]
+        fn write_char(&mut self, c: char) -> fmt::Result {
+            self.1.write_escaped_char(&mut self.0, c)
         }
     }
 
-    #[must_use]
-    pub fn mark_safe(mut self) -> MarkupDisplay<E, T> {
-        self.value = match self.value {
-            DisplayValue::Unsafe(t) => DisplayValue::Safe(t),
-            _ => self.value,
-        };
-        self
-    }
+    Ok(EscapeDisplay(text, escaper))
 }
 
-impl<E, T> Display for MarkupDisplay<E, T>
-where
-    E: Escaper,
-    T: Display,
-{
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        match self.value {
-            DisplayValue::Unsafe(ref t) => write!(
-                EscapeWriter {
-                    fmt,
-                    escaper: &self.escaper
-                },
-                "{t}"
-            ),
-            DisplayValue::Safe(ref t) => t.fmt(fmt),
-        }
-    }
+/// Alias for [`escape()`]
+#[inline]
+pub fn e(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
+    escape(text, escaper)
 }
 
-#[derive(Debug)]
-pub struct EscapeWriter<'a, E, W> {
-    fmt: W,
-    escaper: &'a E,
-}
-
-impl<E, W> Write for EscapeWriter<'_, E, W>
-where
-    W: Write,
-    E: Escaper,
-{
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.escaper.write_escaped(&mut self.fmt, s)
-    }
-}
-
-pub fn escape<E>(string: &str, escaper: E) -> Escaped<'_, E>
-where
-    E: Escaper,
-{
-    Escaped { string, escaper }
-}
-
-#[derive(Debug)]
-pub struct Escaped<'a, E>
-where
-    E: Escaper,
-{
-    string: &'a str,
-    escaper: E,
-}
-
-impl<E> Display for Escaped<'_, E>
-where
-    E: Escaper,
-{
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.escaper.write_escaped(fmt, self.string)
-    }
-}
-
+/// Escape characters in a safe way for HTML texts and attributes
+///
+/// * `<` => `&lt;`
+/// * `>` => `&gt;`
+/// * `&` => `&amp;`
+/// * `"` => `&quot;`
+/// * `'` => `&#x27;`
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Html;
 
 impl Escaper for Html {
-    fn write_escaped<W>(&self, mut fmt: W, string: &str) -> fmt::Result
-    where
-        W: Write,
-    {
+    fn write_escaped_str<W: Write>(&self, mut fmt: W, string: &str) -> fmt::Result {
         let mut last = 0;
         for (index, byte) in string.bytes().enumerate() {
             const MIN_CHAR: u8 = b'"';
@@ -133,48 +95,55 @@ impl Escaper for Html {
         }
         fmt.write_str(&string[last..])
     }
+
+    fn write_escaped_char<W: Write>(&self, mut fmt: W, c: char) -> fmt::Result {
+        fmt.write_str(match (c.is_ascii(), c as u8) {
+            (true, b'<') => "&lt;",
+            (true, b'>') => "&gt;",
+            (true, b'&') => "&amp;",
+            (true, b'"') => "&quot;",
+            (true, b'\'') => "&#x27;",
+            _ => return fmt.write_char(c),
+        })
+    }
 }
 
+/// Don't escape the input but return in verbatim
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Text;
 
 impl Escaper for Text {
-    fn write_escaped<W>(&self, mut fmt: W, string: &str) -> fmt::Result
-    where
-        W: Write,
-    {
+    #[inline]
+    fn write_escaped_str<W: Write>(&self, mut fmt: W, string: &str) -> fmt::Result {
         fmt.write_str(string)
     }
-}
 
-#[derive(Debug, PartialEq)]
-enum DisplayValue<T>
-where
-    T: Display,
-{
-    Safe(T),
-    Unsafe(T),
-}
-
-pub trait Escaper {
-    fn write_escaped<W>(&self, fmt: W, string: &str) -> fmt::Result
-    where
-        W: Write;
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate std;
-
-    use std::string::ToString;
-
-    use super::*;
-
-    #[test]
-    fn test_escape() {
-        assert_eq!(escape("", Html).to_string(), "");
-        assert_eq!(escape("<&>", Html).to_string(), "&lt;&amp;&gt;");
-        assert_eq!(escape("bla&", Html).to_string(), "bla&amp;");
-        assert_eq!(escape("<foo", Html).to_string(), "&lt;foo");
-        assert_eq!(escape("bla&h", Html).to_string(), "bla&amp;h");
+    #[inline]
+    fn write_escaped_char<W: Write>(&self, mut fmt: W, c: char) -> fmt::Result {
+        fmt.write_char(c)
     }
+}
+
+pub trait Escaper: Copy {
+    fn write_escaped_str<W: Write>(&self, fmt: W, string: &str) -> fmt::Result;
+
+    #[inline]
+    fn write_escaped_char<W: Write>(&self, fmt: W, c: char) -> fmt::Result {
+        self.write_escaped_str(fmt, c.encode_utf8(&mut [0; 4]))
+    }
+}
+
+#[test]
+fn test_escape() {
+    assert_eq!(escape("", Html).unwrap().to_string(), "");
+    assert_eq!(escape("<&>", Html).unwrap().to_string(), "&lt;&amp;&gt;");
+    assert_eq!(escape("bla&", Html).unwrap().to_string(), "bla&amp;");
+    assert_eq!(escape("<foo", Html).unwrap().to_string(), "&lt;foo");
+    assert_eq!(escape("bla&h", Html).unwrap().to_string(), "bla&amp;h");
+
+    assert_eq!(escape("", Text).unwrap().to_string(), "");
+    assert_eq!(escape("<&>", Text).unwrap().to_string(), "<&>");
+    assert_eq!(escape("bla&", Text).unwrap().to_string(), "bla&");
+    assert_eq!(escape("<foo", Text).unwrap().to_string(), "<foo");
+    assert_eq!(escape("bla&h", Text).unwrap().to_string(), "bla&h");
 }

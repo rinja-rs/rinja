@@ -3,7 +3,7 @@
 //! Contains all the built-in filter functions for use in templates.
 //! You can define your own filters, as well.
 
-pub mod escape;
+mod escape;
 #[cfg(feature = "serde_json")]
 mod json;
 
@@ -11,7 +11,7 @@ use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
 
-use escape::{Escaper, MarkupDisplay};
+pub use escape::{e, escape, safe, Escaper, Html, Text};
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
 #[cfg(feature = "serde_json")]
@@ -39,50 +39,6 @@ const URLENCODE_SET: &AsciiSet = &URLENCODE_STRICT_SET.remove(b'/');
 
 // MAX_LEN is maximum allowed length for filters.
 const MAX_LEN: usize = 10_000;
-
-/// Marks a string (or other `Display` type) as safe
-///
-/// Use this is you want to allow markup in an expression, or if you know
-/// that the expression's contents don't need to be escaped.
-///
-/// Rinja will automatically insert the first (`Escaper`) argument,
-/// so this filter only takes a single argument of any type that implements
-/// `Display`.
-#[inline]
-pub fn safe<E, T>(e: E, v: T) -> Result<MarkupDisplay<E, T>, Infallible>
-where
-    E: Escaper,
-    T: fmt::Display,
-{
-    Ok(MarkupDisplay::new_safe(v, e))
-}
-
-/// Escapes strings according to the escape mode.
-///
-/// Rinja will automatically insert the first (`Escaper`) argument,
-/// so this filter only takes a single argument of any type that implements
-/// `Display`.
-///
-/// It is possible to optionally specify an escaper other than the default for
-/// the template's extension, like `{{ val|escape("txt") }}`.
-#[inline]
-pub fn escape<E, T>(e: E, v: T) -> Result<MarkupDisplay<E, T>, Infallible>
-where
-    E: Escaper,
-    T: fmt::Display,
-{
-    Ok(MarkupDisplay::new_unsafe(v, e))
-}
-
-/// Alias for [`escape()`]
-#[inline]
-pub fn e<E, T>(e: E, v: T) -> Result<MarkupDisplay<E, T>, Infallible>
-where
-    E: Escaper,
-    T: fmt::Display,
-{
-    escape(e, v)
-}
 
 #[cfg(feature = "humansize")]
 /// Returns adequate string representation (in KB, ..) of number of bytes

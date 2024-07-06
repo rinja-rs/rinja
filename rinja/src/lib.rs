@@ -70,7 +70,6 @@ pub mod helpers;
 
 use std::fmt;
 
-pub use filters::escape::{Html, MarkupDisplay, Text};
 pub use rinja_derive::Template;
 
 #[doc(hidden)]
