@@ -100,8 +100,11 @@ impl<'a> Config<'a> {
                 escapers.push((str_set(&escaper.extensions), escaper.path.into()));
             }
         }
-        for (extensions, path) in DEFAULT_ESCAPERS {
-            escapers.push((str_set(extensions), format!("{CRATE}{path}").into()));
+        for (extensions, name) in DEFAULT_ESCAPERS {
+            escapers.push((
+                str_set(extensions),
+                format!("{CRATE}::filters::{name}").into(),
+            ));
         }
 
         Ok(Config {
@@ -316,9 +319,11 @@ pub(crate) fn get_template_source(
 static CONFIG_FILE_NAME: &str = "rinja.toml";
 static DEFAULT_SYNTAX_NAME: &str = "default";
 static DEFAULT_ESCAPERS: &[(&[&str], &str)] = &[
-    (&["html", "htm", "svg", "xml"], "::Html"),
-    (&["md", "none", "txt", "yml", ""], "::Text"),
-    (&["j2", "jinja", "jinja2"], "::Html"),
+    (
+        &["html", "htm", "j2", "jinja", "jinja2", "svg", "xml"],
+        "Html",
+    ),
+    (&["md", "none", "txt", "yml", ""], "Text"),
 ];
 
 #[cfg(test)]
@@ -571,7 +576,7 @@ mod tests {
         let config = Config::new(
             r#"
             [[escaper]]
-            path = "::rinja::Js"
+            path = "::my_filters::Js"
             extensions = ["js"]
         "#,
             None,
@@ -581,16 +586,15 @@ mod tests {
         assert_eq!(
             config.escapers,
             vec![
-                (str_set(&["js"]), "::rinja::Js".into()),
+                (str_set(&["js"]), "::my_filters::Js".into()),
                 (
-                    str_set(&["html", "htm", "svg", "xml"]),
-                    "::rinja::Html".into()
+                    str_set(&["html", "htm", "j2", "jinja", "jinja2", "svg", "xml"]),
+                    "::rinja::filters::Html".into()
                 ),
                 (
                     str_set(&["md", "none", "txt", "yml", ""]),
-                    "::rinja::Text".into()
+                    "::rinja::filters::Text".into()
                 ),
-                (str_set(&["j2", "jinja", "jinja2"]), "::rinja::Html".into()),
             ]
         );
     }

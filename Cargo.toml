@@ -5,7 +5,6 @@ members = [
     "rinja_axum",
     "rinja_derive",
     "rinja_derive_standalone",
-    "rinja_escape",
     "rinja_parser",
     "rinja_rocket",
     "rinja_warp",
@@ -16,7 +15,6 @@ resolver = "2"
 default-members = [
     "rinja",
     "rinja_derive",
-    "rinja_escape",
     "rinja_parser",
     "testing",
 ]

@@ -1,8 +1,5 @@
-#[macro_use]
-extern crate criterion;
-
-use criterion::Criterion;
-use rinja_escape::{Html, MarkupDisplay};
+use criterion::{criterion_group, criterion_main, Criterion};
+use rinja::filters::{escape, Html};
 
 criterion_main!(benches);
 criterion_group!(benches, functions);
@@ -68,10 +65,10 @@ quis lacus at, gravida maximus elit. Duis tristique, nisl nullam.
     "#;
 
     b.iter(|| {
-        format!("{}", MarkupDisplay::new_unsafe(string_long, Html));
-        format!("{}", MarkupDisplay::new_unsafe(string_short, Html));
-        format!("{}", MarkupDisplay::new_unsafe(empty, Html));
-        format!("{}", MarkupDisplay::new_unsafe(no_escape, Html));
-        format!("{}", MarkupDisplay::new_unsafe(no_escape_long, Html));
+        format!("{}", escape(string_long, Html).unwrap());
+        format!("{}", escape(string_short, Html).unwrap());
+        format!("{}", escape(empty, Html).unwrap());
+        format!("{}", escape(no_escape, Html).unwrap());
+        format!("{}", escape(no_escape_long, Html).unwrap());
     });
 }

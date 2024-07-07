@@ -8,6 +8,7 @@ use crate::build_template;
 fn check_if_let() {
     // This function makes it much easier to compare expected code by adding the wrapping around
     // the code we want to check.
+    #[track_caller]
     fn compare(jinja: &str, expected: &str) {
         let jinja = format!(
             r##"#[template(source = r#"{jinja}"#, ext = "txt")]
@@ -57,7 +58,7 @@ impl ::std::fmt::Display for Foo {{
     ::std::write!(
         writer,
         "{expr0}",
-        expr0 = &::rinja::MarkupDisplay::new_unsafe(&(query), ::rinja::Text),
+        expr0 = &::rinja::filters::escape(&(query), ::rinja::filters::Text)?,
     )?;
 }"#,
     );
@@ -70,7 +71,7 @@ impl ::std::fmt::Display for Foo {{
     ::std::write!(
         writer,
         "{expr0}",
-        expr0 = &::rinja::MarkupDisplay::new_unsafe(&(s), ::rinja::Text),
+        expr0 = &::rinja::filters::escape(&(s), ::rinja::filters::Text)?,
     )?;
 }"#,
     );
@@ -83,7 +84,7 @@ impl ::std::fmt::Display for Foo {{
     ::std::write!(
         writer,
         "{expr0}",
-        expr0 = &::rinja::MarkupDisplay::new_unsafe(&(s), ::rinja::Text),
+        expr0 = &::rinja::filters::escape(&(s), ::rinja::filters::Text)?,
     )?;
 }"#,
     );

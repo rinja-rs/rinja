@@ -15,7 +15,7 @@ use quote::quote;
 use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::input::{Source, TemplateInput};
-use crate::{CompileError, CRATE};
+use crate::{CompileError, MsgValidEscapers, CRATE};
 
 pub(crate) struct Generator<'a> {
     // The template input state: original struct AST and attributes
@@ -1166,8 +1166,8 @@ impl<'a> Generator<'a> {
         let expression = match wrapped {
             DisplayWrap::Wrapped => expr,
             DisplayWrap::Unwrapped => format!(
-                "{CRATE}::MarkupDisplay::new_unsafe(&({}), {})",
-                expr, self.input.escaper
+                "{CRATE}::filters::escape(&({expr}), {})?",
+                self.input.escaper,
             ),
         };
         let id = match expr_cache.entry(expression) {
@@ -1393,12 +1393,9 @@ impl<'a> Generator<'a> {
         if args.len() != 1 {
             return Err(ctx.generate_error("unexpected argument(s) in `safe` filter", node));
         }
-        buf.write(CRATE);
-        buf.write("::filters::safe(");
-        buf.write(self.input.escaper);
-        buf.write(", ");
+        buf.write(format_args!("{CRATE}::filters::safe("));
         self._visit_args(ctx, buf, args)?;
-        buf.write(")?");
+        buf.write(format_args!(", {})?", self.input.escaper));
         Ok(DisplayWrap::Wrapped)
     }
 
@@ -1430,15 +1427,20 @@ impl<'a> Generator<'a> {
                         .contains(&Cow::Borrowed(name))
                         .then_some(path.as_ref())
                 })
-                .ok_or_else(|| ctx.generate_error("invalid escaper for escape filter", node))?,
+                .ok_or_else(|| {
+                    ctx.generate_error(
+                        &format!(
+                            "invalid escaper '{name}' for `escape` filter. {}",
+                            MsgValidEscapers(&self.input.config.escapers),
+                        ),
+                        node,
+                    )
+                })?,
             None => self.input.escaper,
         };
-        buf.write(CRATE);
-        buf.write("::filters::escape(");
-        buf.write(escaper);
-        buf.write(", ");
+        buf.write(format_args!("{CRATE}::filters::escape("));
         self._visit_args(ctx, buf, &args[..1])?;
-        buf.write(")?");
+        buf.write(format_args!(", {escaper})?"));
         Ok(DisplayWrap::Wrapped)
     }
 

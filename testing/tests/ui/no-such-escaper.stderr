@@ -1,0 +1,17 @@
+error: invalid escaper 'latex' for `escape` filter. The available extensions are: "", "htm", "html", "j2", "jinja", "jinja2", "md", "none", "svg", "txt", "xml", "yml"
+ --> LocalEscaper.html:1:38
+       "text|escape(\"latex\")}}`."
+ --> tests/ui/no-such-escaper.rs:3:10
+  |
+3 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: no escaper defined for extension 'tex'. The available extensions are: "", "htm", "html", "j2", "jinja", "jinja2", "md", "none", "svg", "txt", "xml", "yml"
+  --> tests/ui/no-such-escaper.rs:12:10
+   |
+12 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)

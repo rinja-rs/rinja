@@ -8,6 +8,7 @@ mod input;
 #[cfg(test)]
 mod tests;
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
@@ -228,6 +229,21 @@ impl fmt::Display for FileInfo<'_> {
                 write!(f, "\n --> {file_path}")
             }
         }
+    }
+}
+
+struct MsgValidEscapers<'a>(&'a [(Vec<Cow<'a, str>>, Cow<'a, str>)]);
+
+impl fmt::Display for MsgValidEscapers<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut exts = self
+            .0
+            .iter()
+            .flat_map(|(exts, _)| exts)
+            .map(|x| format!("{x:?}"))
+            .collect::<Vec<_>>();
+        exts.sort();
+        write!(f, "The available extensions are: {}", exts.join(", "))
     }
 }
 
