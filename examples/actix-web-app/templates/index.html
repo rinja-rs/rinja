@@ -1,17 +1,19 @@
 {% extends "_layout.html" %}
 
-{% block title -%}
+{%- block title -%}
     {%- match lang -%}
-        {%- when Lang::en -%} Hello
-        {%- when Lang::de -%} Hallo
+        {%- when Lang::en -%} Hello!
+        {%- when Lang::de -%} Hallo!
+        {%- when Lang::fr -%} Bonjour!
     {%- endmatch -%}
-{%- endblock %}
+{%- endblock -%}
 
 {%- block content -%}
     <h1>
         {%- match lang -%}
-            {%- when Lang::en -%} Hello
-            {%- when Lang::de -%} Hallo
+            {%- when Lang::en -%} Hello!
+            {%- when Lang::de -%} Hallo!
+            {%- when Lang::fr -%} Bonjour!
         {%- endmatch -%}
     </h1>
     <form
@@ -27,6 +29,9 @@
                 {%- when Lang::de -%}
                     Ich möchte dir gerne <em>hallo</em> sagen. {#-~#}
                     Bitte nenne mir doch deinen Namen!
+                {%- when Lang::fr -%}
+                    Je voudrais vous dire <em>bonjour</em>. {#-~#}
+                    Pourriez-vous me donner votre nom ?
             {%- endmatch -%}
         </p>
         <p>
@@ -34,6 +39,7 @@
                 {%- match lang -%}
                     {%- when Lang::en -%} My name is
                     {%- when Lang::de -%} Ich heiße
+                    {%- when Lang::fr -%} Je m'appelle
                 {%- endmatch -%}:
                 <input
                     type="text"
@@ -50,6 +56,7 @@
                     {%- match lang -%}
                         {%- when Lang::en -%} Greet me, then!
                         {%- when Lang::de -%} Dann begrüße mich!
+                        {%- when Lang::fr -%} Saluons-nous !
                     {%- endmatch -%}
                 </button>
             </label>
@@ -63,5 +70,8 @@
         {%- if lang != Lang::de -%}
             <li><a href="{{ req.url_for("index_handler", [Lang::de])? }}">Diese Seite auf deutsch.</a></li>
         {%- endif -%}
+        {%- if lang != Lang::fr -%}
+            <li><a href="{{ req.url_for("index_handler", [Lang::fr])? }}">Cette page est en français.</a></li>
+        {%- endif -%}
     </ul>
-{%- endblock %}
+{%- endblock -%}

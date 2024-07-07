@@ -43,6 +43,24 @@
                 font-size: 80%;
                 width: max-content;
                 margin: 2em 0 0 auto;
+                display: flex;
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            #lang-select li {
+                flex-grow: 1;
+                flex-basis: auto;
+                margin: .25em 0 0 0;
+                padding: 0 1em;
+                text-align: center;
+                list-style-type: none;
+                border-left: 0.1rem solid currentColor;
+            }
+            #lang-select li:first-of-type {
+                border-left: 0 none transparent;
+            }
+            #lang-select li:last-of-type {
+                padding-right: 0;
             }
         /*]]>*/
         </style>

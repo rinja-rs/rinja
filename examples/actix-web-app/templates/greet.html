@@ -1,17 +1,19 @@
 {% extends "_layout.html" %}
 
-{% block title -%}
+{%- block title -%}
     {%- match lang -%}
         {%- when Lang::en -%} Hello, {{name}}!
         {%- when Lang::de -%} Hallo, {{name}}!
+        {%- when Lang::fr -%} Bonjour, {{name}}!
     {%- endmatch -%}
-{%- endblock %}
+{%- endblock -%}
 
 {%- block content -%}
     <h1>
         {%- match lang -%}
-            {%- when Lang::en -%} Hello
-            {%- when Lang::de -%} Hallo
+            {%- when Lang::en -%} Hello!
+            {%- when Lang::de -%} Hallo!
+            {%- when Lang::fr -%} Bonjour!
         {%- endmatch -%}
     </h1>
     <p>
@@ -22,6 +24,9 @@
             {%- when Lang::de -%}
                 Hallo, <strong>{{name}}</strong>, schön dich kennenzulernen! {#-~#}
                 Ich bin eine <a href="https://rinja.readthedocs.io/en/latest/">Rinja</a>-Beispielanwendung.
+            {%- when Lang::fr -%}
+                Bonjour, <strong>{{name}}</strong>, ravi de vous rencontrer ! {#-~#}
+                Je suis une application d'exemple de <a href="https://rinja.readthedocs.io/en/latest/">Rinja</a>.
         {%- endmatch -%}
     </p>
     <h2>
@@ -29,6 +34,7 @@
             {%- match lang -%}
                 {%- when Lang::en -%} Back to the first page.
                 {%- when Lang::de -%} Zurück zur ersten Seite.
+                {%- when Lang::fr -%} Retour à la première page.
             {%- endmatch -%}
         </a>
     </h2>
@@ -40,5 +46,8 @@
         {%- if lang != Lang::de -%}
             <li><a href="{{ req.url_for("greeting_handler", [Lang::de])? }}?name={{ name|urlencode }}">Diese Seite auf deutsch.</a></li>
         {%- endif -%}
+        {%- if lang != Lang::fr -%}
+            <li><a href="{{ req.url_for("greeting_handler", [Lang::fr])? }}?name={{ name|urlencode }}">Cette page est en français.</a></li>
+        {%- endif -%}
     </ul>
-{%- endblock %}
+{%- endblock -%}

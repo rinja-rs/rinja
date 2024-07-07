@@ -54,6 +54,7 @@ enum Lang {
     #[default]
     en,
     de,
+    fr,
 }
 
 async fn not_found_handler(req: HttpRequest) -> Result<impl Responder> {
