@@ -27,6 +27,7 @@ struct Foo;"##
         let expected = format!(
             r#"impl ::rinja::Template for Foo {{
     fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> ::rinja::Result<()> {{
+        use ::rinja::filters::AutoEscape as _;
         {new_expected}
         ::rinja::Result::Ok(())
     }}
@@ -58,7 +59,7 @@ impl ::std::fmt::Display for Foo {{
     ::std::write!(
         writer,
         "{expr0}",
-        expr0 = &::rinja::filters::escape(&(query), ::rinja::filters::Text)?,
+        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(query), ::rinja::filters::Text)).rinja_auto_escape()?,
     )?;
 }"#,
     );
@@ -71,7 +72,7 @@ impl ::std::fmt::Display for Foo {{
     ::std::write!(
         writer,
         "{expr0}",
-        expr0 = &::rinja::filters::escape(&(s), ::rinja::filters::Text)?,
+        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?,
     )?;
 }"#,
     );
@@ -84,7 +85,7 @@ impl ::std::fmt::Display for Foo {{
     ::std::write!(
         writer,
         "{expr0}",
-        expr0 = &::rinja::filters::escape(&(s), ::rinja::filters::Text)?,
+        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?,
     )?;
 }"#,
     );

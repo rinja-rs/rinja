@@ -27,29 +27,30 @@ pub fn safe(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Displ
 /// the template's extension, like `{{ val|escape("txt") }}`.
 #[inline]
 pub fn escape(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
-    struct EscapeDisplay<T, E>(T, E);
-    struct EscapeWriter<W, E>(W, E);
-
-    impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
-        #[inline]
-        fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-            write!(EscapeWriter(fmt, self.1), "{}", &self.0)
-        }
-    }
-
-    impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
-        #[inline]
-        fn write_str(&mut self, s: &str) -> fmt::Result {
-            self.1.write_escaped_str(&mut self.0, s)
-        }
-
-        #[inline]
-        fn write_char(&mut self, c: char) -> fmt::Result {
-            self.1.write_escaped_char(&mut self.0, c)
-        }
-    }
-
     Ok(EscapeDisplay(text, escaper))
+}
+
+pub struct EscapeDisplay<T, E>(T, E);
+
+impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
+    #[inline]
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        struct EscapeWriter<W, E>(W, E);
+
+        impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
+            #[inline]
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                self.1.write_escaped_str(&mut self.0, s)
+            }
+
+            #[inline]
+            fn write_char(&mut self, c: char) -> fmt::Result {
+                self.1.write_escaped_char(&mut self.0, c)
+            }
+        }
+
+        write!(EscapeWriter(fmt, self.1), "{}", &self.0)
+    }
 }
 
 /// Alias for [`escape()`]
@@ -160,6 +161,107 @@ pub trait Escaper: Copy {
     }
 }
 
+/// Used internally by rinja to select the appropriate escaper
+pub trait AutoEscape {
+    type Escaped: fmt::Display;
+    type Error: Into<crate::Error>;
+
+    fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error>;
+}
+
+/// Used internally by rinja to select the appropriate escaper
+#[derive(Debug, Clone)]
+pub struct AutoEscaper<'a, T: fmt::Display + ?Sized, E: Escaper> {
+    text: &'a T,
+    escaper: E,
+}
+
+impl<'a, T: fmt::Display + ?Sized, E: Escaper> AutoEscaper<'a, T, E> {
+    #[inline]
+    pub fn new(text: &'a T, escaper: E) -> Self {
+        Self { text, escaper }
+    }
+}
+
+/// Use the provided escaper
+impl<'a, T: fmt::Display + ?Sized, E: Escaper> AutoEscape for &&AutoEscaper<'a, T, E> {
+    type Escaped = EscapeDisplay<&'a T, E>;
+    type Error = Infallible;
+
+    #[inline]
+    fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+        Ok(EscapeDisplay(self.text, self.escaper))
+    }
+}
+
+/// Types that implement this marker trait don't need to be HTML escaped
+///
+/// Please note that this trait is only meant as speed-up helper. In some odd circumcises rinja
+/// might still decide to HTML escape the input, so if this must not happen, then you need to use
+/// the [`|safe`](super::safe) filter to prevent the auto escaping.
+///
+/// If you are unsure if your type generates HTML safe output in all cases, then DON'T mark it.
+/// Better safe than sorry!
+pub trait HtmlSafeMarker: fmt::Display {}
+
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for &T {}
+
+/// Don't escape HTML safe types
+impl<'a, T: HtmlSafeMarker + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
+    type Escaped = &'a T;
+    type Error = Infallible;
+
+    #[inline]
+    fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+        Ok(self.text)
+    }
+}
+
+macro_rules! mark_html_safe {
+    ($($ty:ty),* $(,)?) => {$(
+        impl HtmlSafeMarker for $ty {}
+    )*};
+}
+
+mark_html_safe! {
+    bool,
+    f32, f64,
+    i8, i16, i32, i64, i128, isize,
+    u8, u16, u32, u64, u128, usize,
+    std::num::NonZeroI8, std::num::NonZeroI16, std::num::NonZeroI32,
+    std::num::NonZeroI64, std::num::NonZeroI128, std::num::NonZeroIsize,
+    std::num::NonZeroU8, std::num::NonZeroU16, std::num::NonZeroU32,
+    std::num::NonZeroU64, std::num::NonZeroU128, std::num::NonZeroUsize,
+}
+
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for Box<T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::cell::Ref<'_, T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::cell::RefMut<'_, T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::rc::Rc<T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::Arc<T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::MutexGuard<'_, T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::RwLockReadGuard<'_, T> {}
+impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::RwLockWriteGuard<'_, T> {}
+impl<T: HtmlSafeMarker> HtmlSafeMarker for std::num::Wrapping<T> {}
+
+impl<T> HtmlSafeMarker for std::borrow::Cow<'_, T>
+where
+    T: HtmlSafeMarker + std::borrow::ToOwned + ?Sized,
+    T::Owned: HtmlSafeMarker,
+{
+}
+
+/// Texts are always safe
+impl<'a, T: fmt::Display + ?Sized> AutoEscape for &AutoEscaper<'a, T, Text> {
+    type Escaped = &'a T;
+    type Error = Infallible;
+
+    #[inline]
+    fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+        Ok(self.text)
+    }
+}
+
 #[test]
 fn test_escape() {
     assert_eq!(escape("", Html).unwrap().to_string(), "");
@@ -173,4 +275,54 @@ fn test_escape() {
     assert_eq!(escape("bla&", Text).unwrap().to_string(), "bla&");
     assert_eq!(escape("<foo", Text).unwrap().to_string(), "<foo");
     assert_eq!(escape("bla&h", Text).unwrap().to_string(), "bla&h");
+}
+
+#[test]
+fn test_html_safe_marker() {
+    struct Script1;
+    struct Script2;
+
+    impl fmt::Display for Script1 {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.write_str("<script>")
+        }
+    }
+
+    impl fmt::Display for Script2 {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.write_str("<script>")
+        }
+    }
+
+    impl HtmlSafeMarker for Script2 {}
+
+    assert_eq!(
+        (&&AutoEscaper::new(&Script1, Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "&lt;script&gt;",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(&Script2, Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+
+    assert_eq!(
+        (&&AutoEscaper::new(&Script1, Text))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(&Script2, Text))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
 }
