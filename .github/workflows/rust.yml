@@ -33,7 +33,7 @@ jobs:
       matrix:
         package: [
           rinja, rinja_actix, rinja_axum, rinja_derive, rinja_derive_standalone, rinja_escape,
-          rinja_parser, rinja_rocket, rinja_warp, testing,
+          rinja_parser, rinja_rocket, rinja_warp, testing, examples/actix-web-app,
         ]
     runs-on: ubuntu-latest
     steps:
