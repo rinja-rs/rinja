@@ -39,7 +39,7 @@ struct EscapeTemplate<'a> {
 fn test_escape() {
     let s = EscapeTemplate { name: "<>&\"'" };
 
-    assert_eq!(s.render().unwrap(), "Hello, &lt;&gt;&amp;&quot;&#x27;!");
+    assert_eq!(s.render().unwrap(), "Hello, &#60;&#62;&#38;&#34;&#39;!");
 }
 
 #[derive(Template)]
@@ -155,7 +155,7 @@ fn test_literals_escape() {
     let s = LiteralsEscapeTemplate {};
     assert_eq!(
         s.render().unwrap(),
-        "A\n\r\t\\\0♥&#x27;&quot;&quot;\nA\n\r\t\\\0♥&#x27;&quot;&#x27;"
+        "A\n\r\t\\\0♥&#39;&#34;&#34;\nA\n\r\t\\\0♥&#39;&#34;&#39;"
     );
 }
 

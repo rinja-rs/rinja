@@ -115,7 +115,7 @@ struct D;
 #[test]
 fn filter_block_html_escape() {
     let template = D;
-    assert_eq!(template.render().unwrap(), r#"&lt;block&gt;"#);
+    assert_eq!(template.render().unwrap(), r#"&#60;block&#62;"#);
 }
 
 // This test ensures that it is not escaped if it is not HTML.
