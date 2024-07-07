@@ -1427,7 +1427,12 @@ impl<'a> Generator<'a> {
                         .contains(&Cow::Borrowed(name))
                         .then_some(path.as_ref())
                 })
-                .ok_or_else(|| ctx.generate_error("invalid escaper for escape filter", node))?,
+                .ok_or_else(|| {
+                    ctx.generate_error(
+                        &format!("invalid escaper '{name}' for `escape` filter"),
+                        node,
+                    )
+                })?,
             None => self.input.escaper,
         };
         buf.write(format_args!("{CRATE}::filters::escape("));

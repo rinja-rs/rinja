@@ -4,7 +4,7 @@ use std::str;
 
 /// Marks a string (or other `Display` type) as safe
 ///
-/// Use this is you want to allow markup in an expression, or if you know
+/// Use this if you want to allow markup in an expression, or if you know
 /// that the expression's contents don't need to be escaped.
 ///
 /// Rinja will automatically insert the first (`Escaper`) argument,
