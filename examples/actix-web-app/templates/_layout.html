@@ -51,3 +51,17 @@
         {%~ block content %}{% endblock ~%}
     </body>
 </html>
+
+{%- macro lang_select(handler, query) -%}
+    <ul id="lang-select">
+        {%- if lang != Lang::en -%}
+            <li><a href="{{ req.url_for(handler, [Lang::en])? }}{{ query|safe }}">This page in English</a></li>
+        {%- endif -%}
+        {%- if lang != Lang::de -%}
+            <li><a href="{{ req.url_for(handler, [Lang::de])? }}{{ query|safe }}">Diese Seite auf deutsch.</a></li>
+        {%- endif -%}
+        {%- if lang != Lang::fr -%}
+            <li><a href="{{ req.url_for(handler, [Lang::fr])? }}{{ query|safe }}">Cette page est en français.</a></li>
+        {%- endif -%}
+    </ul>
+{%- endmacro lang_select -%}

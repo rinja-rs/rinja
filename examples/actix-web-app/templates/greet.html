@@ -39,15 +39,5 @@
         </a>
     </h2>
 
-    <ul id="lang-select">
-        {%- if lang != Lang::en -%}
-            <li><a href="{{ req.url_for("greeting_handler", [Lang::en])? }}?name={{ name|urlencode }}">This page in English</a></li>
-        {%- endif -%}
-        {%- if lang != Lang::de -%}
-            <li><a href="{{ req.url_for("greeting_handler", [Lang::de])? }}?name={{ name|urlencode }}">Diese Seite auf deutsch.</a></li>
-        {%- endif -%}
-        {%- if lang != Lang::fr -%}
-            <li><a href="{{ req.url_for("greeting_handler", [Lang::fr])? }}?name={{ name|urlencode }}">Cette page est en français.</a></li>
-        {%- endif -%}
-    </ul>
+    {%- call lang_select("greeting_handler", name|urlencode|fmt("?name={}")) -%}
 {%- endblock -%}

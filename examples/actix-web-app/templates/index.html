@@ -81,15 +81,9 @@
         </p>
     </form>
 
-    <ul id="lang-select">
-        {%- if lang != Lang::en -%}
-            <li><a href="{{ req.url_for("index_handler", [Lang::en])? }}">This page in English</a></li>
-        {%- endif -%}
-        {%- if lang != Lang::de -%}
-            <li><a href="{{ req.url_for("index_handler", [Lang::de])? }}">Diese Seite auf deutsch.</a></li>
-        {%- endif -%}
-        {%- if lang != Lang::fr -%}
-            <li><a href="{{ req.url_for("index_handler", [Lang::fr])? }}">Cette page est en français.</a></li>
-        {%- endif -%}
-    </ul>
+    {#-
+        The called macro is defined in base template "_layout.html",
+        and used to display the language selection footer.
+    ~#}
+    {%- call lang_select("index_handler", "") -%}
 {%- endblock -%}
