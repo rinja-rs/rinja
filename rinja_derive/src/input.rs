@@ -10,7 +10,7 @@ use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
 use crate::config::{get_template_source, Config};
-use crate::CompileError;
+use crate::{CompileError, MsgValidEscapers};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
@@ -87,7 +87,10 @@ impl TemplateInput<'_> {
                     .then_some(path.as_ref())
             })
             .ok_or_else(|| {
-                CompileError::no_file_info(format!("no escaper defined for extension '{escaping}'"))
+                CompileError::no_file_info(format!(
+                    "no escaper defined for extension '{escaping}'. {}",
+                    MsgValidEscapers(&config.escapers),
+                ))
             })?;
 
         let mime_type =

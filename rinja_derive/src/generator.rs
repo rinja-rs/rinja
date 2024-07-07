@@ -15,7 +15,7 @@ use quote::quote;
 use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::input::{Source, TemplateInput};
-use crate::{CompileError, CRATE};
+use crate::{CompileError, MsgValidEscapers, CRATE};
 
 pub(crate) struct Generator<'a> {
     // The template input state: original struct AST and attributes
@@ -1429,7 +1429,10 @@ impl<'a> Generator<'a> {
                 })
                 .ok_or_else(|| {
                     ctx.generate_error(
-                        &format!("invalid escaper '{name}' for `escape` filter"),
+                        &format!(
+                            "invalid escaper '{name}' for `escape` filter. {}",
+                            MsgValidEscapers(&self.input.config.escapers),
+                        ),
                         node,
                     )
                 })?,
