@@ -1,67 +1,49 @@
+{#-
+    This is the basic layout of our example application.
+    It is the core skeletton shared between all pages.
+    It expects the struct of any template that `{% extends %}` this layout to contain
+    (at least) a field `lang: Lang`, so it can be used in the `<html lang=` attribute.
+-#}
+
 <!DOCTYPE html>
 <html lang="{{lang}}">
     <head>
         <meta charset="UTF-8" />
+        {#-
+            A base template can contain `blocks`, which my be overridden templates that use
+            this base template. A block may contain a default content, if the extending
+            template does want to / need to override the content of a block.
+
+            E.g. maybe you would like to have "Rinja example application" as default title for
+            your pages, then simply add this text (without quotation marks) in the block!
+
+            The default content can be as complex as you need to to be.
+            E.g. it may contain any nodes like `{% if … %}`, and even other blocks.
+        ~#}
         <title>{% block title %}{% endblock %}</title>
+
         <meta http-equiv="expires" content="Sat, 01 Dec 2001 00:00:00 GMT" />
         <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
         <meta http-equiv="pragma" content="no-cache" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
 
+        {#-
+            In a real application you most likely would want to link style sheets,
+            any JavaScripts etc. using e.g. `actix-files`, instead of embedding the content
+            in your generated HTML.
+
+            As you can see, this comment starts with `-`, which will tells the comment
+            to strip all white spaces before it, until it finds the first non-white space
+            character, a `>`.
+
+            The comment is also terminated with `~`. This also strips white spaces, but
+            will leave one space, or a newline character, if the stripped content contained
+            a newline.
+        ~#}
         <style>
         /*<![CDATA[*/
-            html {
-                background-color: #eee;
-                color: #111;
-                font-size: 62.5%;
-                min-height: 100vh;
-                color-scheme: light;
-            }
-            * {
-                line-height: 1.2em;
-            }
-            body {
-                background-color: #fff;
-                font-size: 1.8rem;
-                max-width: 40em;
-                margin: 1em auto;
-                padding: 2em;
-            }
-            h1 { font-size: 2.4rem; }
-            h2 { font-size: 2.2rem; }
-            h3 { font-size: 2.0rem; }
-            a:link, a:visited {
-                color: #36c;
-                text-decoration: none;
-            }
-            a:active, a:hover, a:focus {
-                text-decoration: underline;
-                text-underline-offset: 0.3em;
-            }
-            #lang-select {
-                font-size: 80%;
-                width: max-content;
-                margin: 2em 0 0 auto;
-                display: flex;
-                flex-direction: row;
-                flex-wrap: wrap;
-            }
-            #lang-select li {
-                flex-grow: 1;
-                flex-basis: auto;
-                margin: .25em 0 0 0;
-                padding: 0 1em;
-                text-align: center;
-                list-style-type: none;
-                border-left: 0.1rem solid currentColor;
-            }
-            #lang-select li:first-of-type {
-                border-left: 0 none transparent;
-            }
-            #lang-select li:last-of-type {
-                padding-right: 0;
-            }
+            {%~ include "_layout.css" ~%}
         /*]]>*/
         </style>
     </head>
