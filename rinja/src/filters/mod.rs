@@ -11,7 +11,10 @@ use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
 
-pub use escape::{e, escape, safe, AutoEscape, AutoEscaper, Escaper, Html, HtmlSafeMarker, Text};
+pub use escape::{
+    e, escape, safe, AutoEscape, AutoEscaper, Escaper, Html, HtmlSafeMarker, MaybeSafe, Safe, Text,
+    Unsafe,
+};
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
 #[cfg(feature = "serde_json")]

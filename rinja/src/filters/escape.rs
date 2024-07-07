@@ -217,6 +217,108 @@ impl<'a, T: HtmlSafeMarker + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
     }
 }
 
+/// Mark the output of a filter as "maybe safe"
+///
+/// This struct can be used as a transparent return type of custom filters that want to mark
+/// their output as "safe" depending on some circumstances, i.e. that their output maybe does not
+/// need to be escaped.
+///
+/// If the filter is not used as the last element in the filter chain, then any assumption is void.
+/// Let the next filter decide if the output is safe or not.
+pub struct MaybeSafe<T: fmt::Display> {
+    pub text: T,
+    pub safe: bool,
+}
+
+const _: () = {
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: fmt::Display> fmt::Display for MaybeSafe<T> {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.text)
+        }
+    }
+
+    impl<'a, T: fmt::Display, E: Escaper> AutoEscape for &AutoEscaper<'a, MaybeSafe<T>, E> {
+        type Escaped = Wrapped<'a, T, E>;
+        type Error = Infallible;
+
+        #[inline]
+        fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+            match self.text.safe {
+                true => Ok(Wrapped::Safe(&self.text.text)),
+                false => Ok(Wrapped::Unsafe(&self.text.text, self.escaper)),
+            }
+        }
+    }
+
+    pub enum Wrapped<'a, T: fmt::Display + ?Sized, E: Escaper> {
+        Unsafe(&'a T, E),
+        Safe(&'a T),
+    }
+
+    impl<T: fmt::Display + ?Sized, E: Escaper> fmt::Display for Wrapped<'_, T, E> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            match *self {
+                Self::Unsafe(text, escaper) => EscapeDisplay(text, escaper).fmt(f),
+                Self::Safe(text) => write!(f, "{text}"),
+            }
+        }
+    }
+};
+
+/// Mark the output of a filter as "safe"
+///
+/// This struct can be used as a transparent return type of custom filters that want to mark their
+/// output as "safe" no matter what, i.e. that their output does not need to be escaped.
+///
+/// If the filter is not used as the last element in the filter chain, then any assumption is void.
+/// Let the next filter decide if the output is safe or not.
+pub struct Safe<T: fmt::Display>(pub T);
+
+const _: () = {
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: fmt::Display> fmt::Display for Safe<T> {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl<'a, T: fmt::Display, E: Escaper> AutoEscape for &AutoEscaper<'a, Safe<T>, E> {
+        type Escaped = &'a T;
+        type Error = Infallible;
+
+        #[inline]
+        fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+            Ok(&self.text.0)
+        }
+    }
+};
+
+/// There is not need to mark the output of a custom filter as "unsafe"; this is simply the default
+pub struct Unsafe<T: fmt::Display>(pub T);
+
+const _: () = {
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: fmt::Display> fmt::Display for Unsafe<T> {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl<'a, T: fmt::Display, E: Escaper> AutoEscape for &AutoEscaper<'a, Unsafe<T>, E> {
+        type Escaped = EscapeDisplay<&'a T, E>;
+        type Error = Infallible;
+
+        #[inline]
+        fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+            Ok(EscapeDisplay(&self.text.0, self.escaper))
+        }
+    }
+};
+
 macro_rules! mark_html_safe {
     ($($ty:ty),* $(,)?) => {$(
         impl HtmlSafeMarker for $ty {}
@@ -249,17 +351,6 @@ where
     T: HtmlSafeMarker + std::borrow::ToOwned + ?Sized,
     T::Owned: HtmlSafeMarker,
 {
-}
-
-/// Texts are always safe
-impl<'a, T: fmt::Display + ?Sized> AutoEscape for &AutoEscaper<'a, T, Text> {
-    type Escaped = &'a T;
-    type Error = Infallible;
-
-    #[inline]
-    fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
-        Ok(self.text)
-    }
 }
 
 #[test]
@@ -324,5 +415,88 @@ fn test_html_safe_marker() {
             .unwrap()
             .to_string(),
         "<script>",
+    );
+
+    assert_eq!(
+        (&&AutoEscaper::new(&Safe(Script1), Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(&Safe(Script2), Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+
+    assert_eq!(
+        (&&AutoEscaper::new(&Unsafe(Script1), Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "&lt;script&gt;",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(&Unsafe(Script2), Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "&lt;script&gt;",
+    );
+
+    assert_eq!(
+        (&&AutoEscaper::new(
+            &MaybeSafe {
+                safe: true,
+                text: Script1
+            },
+            Html
+        ))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(
+            &MaybeSafe {
+                safe: true,
+                text: Script2
+            },
+            Html,
+        ))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(
+            &MaybeSafe {
+                safe: false,
+                text: Script1
+            },
+            Html,
+        ))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "&lt;script&gt;",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(
+            &MaybeSafe {
+                safe: false,
+                text: Script2
+            },
+            Html,
+        ))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "&lt;script&gt;",
     );
 }
