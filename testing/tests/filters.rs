@@ -19,8 +19,8 @@ fn filter_escape() {
     };
     assert_eq!(
         s.render().unwrap(),
-        "// my &lt;html&gt; is &quot;unsafe&quot; &amp; \
-         should be &#x27;escaped&#x27;"
+        "// my &#60;html&#62; is &#34;unsafe&#34; &#38; \
+         should be &#39;escaped&#39;"
     );
 }
 
@@ -42,7 +42,7 @@ fn filter_opt_escaper_none() {
     assert_eq!(
         t.render().unwrap(),
         r#"<h1 class="title">Foo Bar</h1>
-&lt;h1 class=&quot;title&quot;&gt;Foo Bar&lt;/h1&gt;
+&#60;h1 class=&#34;title&#34;&#62;Foo Bar&#60;/h1&#62;
 <h1 class="title">Foo Bar</h1>
 <h1 class="title">Foo Bar</h1>
 "#
@@ -67,9 +67,9 @@ fn filter_opt_escaper_html() {
     assert_eq!(
         t.render().unwrap(),
         r#"<h1 class="title">Foo Bar</h1>
-&lt;h1 class=&quot;title&quot;&gt;Foo Bar&lt;/h1&gt;
-&lt;h1 class=&quot;title&quot;&gt;Foo Bar&lt;/h1&gt;
-&lt;h1 class=&quot;title&quot;&gt;Foo Bar&lt;/h1&gt;
+&#60;h1 class=&#34;title&#34;&#62;Foo Bar&#60;/h1&#62;
+&#60;h1 class=&#34;title&#34;&#62;Foo Bar&#60;/h1&#62;
+&#60;h1 class=&#34;title&#34;&#62;Foo Bar&#60;/h1&#62;
 "#
     );
 }
@@ -329,7 +329,7 @@ fn test_json_attribute() {
     };
     assert_eq!(
         t.render().unwrap(),
-        r#"<li data-name="&quot;\&quot;\u003e\u003cbutton\u003eHacked!\u003c/button\u003e&quot;"></li>"#
+        r#"<li data-name="&#34;\&#34;\u003e\u003cbutton\u003eHacked!\u003c/button\u003e&#34;"></li>"#
     );
 }
 

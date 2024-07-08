@@ -41,7 +41,7 @@ fn test_extra_whitespace() {
     template.nested_1.nested_2.hash.insert("key", "value");
     assert_eq!(
         template.render().unwrap(),
-        "\n0\n0\n0\n0\n\n\n\n0\n0\n0\n0\n0\n\na0\na1\nvalue\n\n\n\n\n\n[\n  &quot;a0&quot;,\n  &quot;a1&quot;,\n  &quot;a2&quot;,\n  &quot;a3&quot;\n]\n[\n  &quot;a0&quot;,\n  &quot;a1&quot;,\n  &quot;a2&quot;,\n  &quot;a3&quot;\n][\n  &quot;a0&quot;,\n  &quot;a1&quot;,\n  &quot;a2&quot;,\n  &quot;a3&quot;\n]\n[\n  &quot;a1&quot;\n][\n  &quot;a1&quot;\n]\n[\n  &quot;a1&quot;,\n  &quot;a2&quot;\n][\n  &quot;a1&quot;,\n  &quot;a2&quot;\n]\n[\n  &quot;a1&quot;\n][\n  &quot;a1&quot;\n]1-1-1\n3333 3\n2222 2\n0000 0\n3333 3\n\ntruefalse\nfalsefalsefalse\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "\n0\n0\n0\n0\n\n\n\n0\n0\n0\n0\n0\n\na0\na1\nvalue\n\n\n\n\n\n[\n  &#34;a0&#34;,\n  &#34;a1&#34;,\n  &#34;a2&#34;,\n  &#34;a3&#34;\n]\n[\n  &#34;a0&#34;,\n  &#34;a1&#34;,\n  &#34;a2&#34;,\n  &#34;a3&#34;\n][\n  &#34;a0&#34;,\n  &#34;a1&#34;,\n  &#34;a2&#34;,\n  &#34;a3&#34;\n]\n[\n  &#34;a1&#34;\n][\n  &#34;a1&#34;\n]\n[\n  &#34;a1&#34;,\n  &#34;a2&#34;\n][\n  &#34;a1&#34;,\n  &#34;a2&#34;\n]\n[\n  &#34;a1&#34;\n][\n  &#34;a1&#34;\n]1-1-1\n3333 3\n2222 2\n0000 0\n3333 3\n\ntruefalse\nfalsefalsefalse\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
     );
 }
 

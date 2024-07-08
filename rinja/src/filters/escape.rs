@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 use std::fmt::{self, Display, Formatter, Write};
+use std::num::NonZeroU8;
 use std::str;
 
 /// Marks a string (or other `Display` type) as safe
@@ -59,37 +60,63 @@ pub fn e(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display,
 
 /// Escape characters in a safe way for HTML texts and attributes
 ///
-/// * `<` => `&lt;`
-/// * `>` => `&gt;`
-/// * `&` => `&amp;`
-/// * `"` => `&quot;`
-/// * `'` => `&#x27;`
+/// * `"` => `&#34;`
+/// * `&` => `&#38;`
+/// * `'` => `&#39;`
+/// * `<` => `&#60;`
+/// * `>` => `&#62;`
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Html;
 
 impl Escaper for Html {
     fn write_escaped_str<W: Write>(&self, mut fmt: W, string: &str) -> fmt::Result {
+        let mut escaped_buf = *b"&#__;";
         let mut last = 0;
+
         for (index, byte) in string.bytes().enumerate() {
             const MIN_CHAR: u8 = b'"';
             const MAX_CHAR: u8 = b'>';
-            const TABLE: [Option<&&str>; (MAX_CHAR - MIN_CHAR + 1) as usize] = {
-                let mut table = [None; (MAX_CHAR - MIN_CHAR + 1) as usize];
-                table[(b'<' - MIN_CHAR) as usize] = Some(&"&lt;");
-                table[(b'>' - MIN_CHAR) as usize] = Some(&"&gt;");
-                table[(b'&' - MIN_CHAR) as usize] = Some(&"&amp;");
-                table[(b'"' - MIN_CHAR) as usize] = Some(&"&quot;");
-                table[(b'\'' - MIN_CHAR) as usize] = Some(&"&#x27;");
+
+            struct Table {
+                _align: [usize; 0],
+                lookup: [Option<[NonZeroU8; 2]>; (MAX_CHAR - MIN_CHAR + 1) as usize],
+            }
+
+            const TABLE: Table = {
+                const fn n(c: u8) -> Option<[NonZeroU8; 2]> {
+                    let n0 = match NonZeroU8::new(c / 10 + b'0') {
+                        Some(n) => n,
+                        None => panic!(),
+                    };
+                    let n1 = match NonZeroU8::new(c % 10 + b'0') {
+                        Some(n) => n,
+                        None => panic!(),
+                    };
+                    Some([n0, n1])
+                }
+
+                let mut table = Table {
+                    _align: [],
+                    lookup: [None; (MAX_CHAR - MIN_CHAR + 1) as usize],
+                };
+
+                table.lookup[(b'"' - MIN_CHAR) as usize] = n(b'"');
+                table.lookup[(b'&' - MIN_CHAR) as usize] = n(b'&');
+                table.lookup[(b'\'' - MIN_CHAR) as usize] = n(b'\'');
+                table.lookup[(b'<' - MIN_CHAR) as usize] = n(b'<');
+                table.lookup[(b'>' - MIN_CHAR) as usize] = n(b'>');
                 table
             };
 
             let escaped = match byte {
-                MIN_CHAR..=MAX_CHAR => TABLE[(byte - MIN_CHAR) as usize],
+                MIN_CHAR..=MAX_CHAR => TABLE.lookup[(byte - MIN_CHAR) as usize],
                 _ => None,
             };
             if let Some(escaped) = escaped {
+                escaped_buf[2] = escaped[0].get();
+                escaped_buf[3] = escaped[1].get();
                 fmt.write_str(&string[last..index])?;
-                fmt.write_str(escaped)?;
+                fmt.write_str(unsafe { std::str::from_utf8_unchecked(escaped_buf.as_slice()) })?;
                 last = index + 1;
             }
         }
@@ -98,11 +125,11 @@ impl Escaper for Html {
 
     fn write_escaped_char<W: Write>(&self, mut fmt: W, c: char) -> fmt::Result {
         fmt.write_str(match (c.is_ascii(), c as u8) {
-            (true, b'<') => "&lt;",
-            (true, b'>') => "&gt;",
-            (true, b'&') => "&amp;",
-            (true, b'"') => "&quot;",
-            (true, b'\'') => "&#x27;",
+            (true, b'"') => "&#34;",
+            (true, b'&') => "&#38;",
+            (true, b'\'') => "&#39;",
+            (true, b'<') => "&#60;",
+            (true, b'>') => "&#62;",
             _ => return fmt.write_char(c),
         })
     }
@@ -136,10 +163,10 @@ pub trait Escaper: Copy {
 #[test]
 fn test_escape() {
     assert_eq!(escape("", Html).unwrap().to_string(), "");
-    assert_eq!(escape("<&>", Html).unwrap().to_string(), "&lt;&amp;&gt;");
-    assert_eq!(escape("bla&", Html).unwrap().to_string(), "bla&amp;");
-    assert_eq!(escape("<foo", Html).unwrap().to_string(), "&lt;foo");
-    assert_eq!(escape("bla&h", Html).unwrap().to_string(), "bla&amp;h");
+    assert_eq!(escape("<&>", Html).unwrap().to_string(), "&#60;&#38;&#62;");
+    assert_eq!(escape("bla&", Html).unwrap().to_string(), "bla&#38;");
+    assert_eq!(escape("<foo", Html).unwrap().to_string(), "&#60;foo");
+    assert_eq!(escape("bla&h", Html).unwrap().to_string(), "bla&#38;h");
 
     assert_eq!(escape("", Text).unwrap().to_string(), "");
     assert_eq!(escape("<&>", Text).unwrap().to_string(), "<&>");
