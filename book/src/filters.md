@@ -48,6 +48,10 @@ Enable it with Cargo features (see below for more information).
 
 * **[Custom filters][#custom-filters]**
 
+* **[HTML-safe types][#html-safe-types]**
+
+  * **[Safe output of custom filters][#safe-output-of-custom-filters]**
+
 ## Built-In Filters
 [#built-in-filters]: #built-in-filters
 
@@ -550,5 +554,62 @@ mod filters {
 fn main() {
     let t = MyFilterTemplate { s: "foo" };
     assert_eq!(t.render().unwrap(), "faaaa");
+}
+```
+
+## HTML-safe types
+[#html-safe-types]: #html-safe-types
+
+Rinja will try to avoid escaping types that generate string representations that do not contain
+"HTML-unsafe characters".
+HTML-safe characters are characters that can be used in any context in HTML texts and attributes.
+The "unsafe" characters are: `<`, `>`, `&`, `"` and `'`.
+
+In order to know which types do not need to be escaped, rinja has the marker trait
+`rinja::filters::HtmlSafe`, and any type that implements that trait won't get automatically
+escaped in a `{{expr}}` expression.
+By default e.g. all primitive integer types are marked as HTML-safe.
+
+You can also mark your custom type `MyStruct` as HTML-safe using:
+
+```rust
+impl rinja::filters::HtmlSafe for MyStruct {}
+```
+
+This automatically marks references `&MyStruct` as HTML-safe, too.
+
+### Safe output of custom filters
+[#safe-output-of-custom-filters]: #safe-output-of-custom-filters
+
+Say, you have a custom filter `|strip` that removes all HTML-unsafe characters:
+
+```rust
+fn strip(s: impl ToString) -> Result<String, rinja::Error> {
+    Ok(s.to_string()
+        .chars()
+        .filter(|c| !matches!(c, '<' | '>' | '&' | '"' | '\''))
+        .collect()
+    )
+}
+```
+
+Then you can also mark the output as safe using `rinja::filters::Safe`:
+
+```rust
+fn strip(s: impl ToString) -> Result<Safe<String>, rinja::Error> {
+    Ok(Safe(...))
+}
+```
+
+There also is `rinja::filters::MaybeSafe` that can be used to mark *some* output as safe,
+if you know that *some* inputs for our filter will always result in a safe output:
+
+```rust
+fn as_sign(i: i32) -> Result<MaybeSafe<&'static str>, rinja::Error> {
+    match i.into() {
+        i if i < 0 => Ok(MaybeSafe { text: "<0", safe: false }),
+        i if i > 0 => Ok(MaybeSafe { text: ">0", safe: false }),
+        _          => Ok(MaybeSafe { text: "=0", safe: true }),
+    }
 }
 ```

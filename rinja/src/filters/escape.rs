@@ -202,12 +202,12 @@ impl<'a, T: fmt::Display + ?Sized, E: Escaper> AutoEscape for &&AutoEscaper<'a, 
 ///
 /// If you are unsure if your type generates HTML safe output in all cases, then DON'T mark it.
 /// Better safe than sorry!
-pub trait HtmlSafeMarker: fmt::Display {}
+pub trait HtmlSafe: fmt::Display {}
 
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for &T {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for &T {}
 
 /// Don't escape HTML safe types
-impl<'a, T: HtmlSafeMarker + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
+impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
     type Escaped = &'a T;
     type Error = Infallible;
 
@@ -321,7 +321,7 @@ const _: () = {
 
 macro_rules! mark_html_safe {
     ($($ty:ty),* $(,)?) => {$(
-        impl HtmlSafeMarker for $ty {}
+        impl HtmlSafe for $ty {}
     )*};
 }
 
@@ -336,20 +336,20 @@ mark_html_safe! {
     std::num::NonZeroU64, std::num::NonZeroU128, std::num::NonZeroUsize,
 }
 
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for Box<T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::cell::Ref<'_, T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::cell::RefMut<'_, T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::rc::Rc<T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::Arc<T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::MutexGuard<'_, T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::RwLockReadGuard<'_, T> {}
-impl<T: HtmlSafeMarker + ?Sized> HtmlSafeMarker for std::sync::RwLockWriteGuard<'_, T> {}
-impl<T: HtmlSafeMarker> HtmlSafeMarker for std::num::Wrapping<T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for Box<T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::Ref<'_, T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::RefMut<'_, T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::rc::Rc<T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::Arc<T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::MutexGuard<'_, T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockReadGuard<'_, T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockWriteGuard<'_, T> {}
+impl<T: HtmlSafe> HtmlSafe for std::num::Wrapping<T> {}
 
-impl<T> HtmlSafeMarker for std::borrow::Cow<'_, T>
+impl<T> HtmlSafe for std::borrow::Cow<'_, T>
 where
-    T: HtmlSafeMarker + std::borrow::ToOwned + ?Sized,
-    T::Owned: HtmlSafeMarker,
+    T: HtmlSafe + std::borrow::ToOwned + ?Sized,
+    T::Owned: HtmlSafe,
 {
 }
 
@@ -385,14 +385,14 @@ fn test_html_safe_marker() {
         }
     }
 
-    impl HtmlSafeMarker for Script2 {}
+    impl HtmlSafe for Script2 {}
 
     assert_eq!(
         (&&AutoEscaper::new(&Script1, Html))
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
-        "&lt;script&gt;",
+        "&#60;script&#62;",
     );
     assert_eq!(
         (&&AutoEscaper::new(&Script2, Html))
@@ -437,14 +437,14 @@ fn test_html_safe_marker() {
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
-        "&lt;script&gt;",
+        "&#60;script&#62;",
     );
     assert_eq!(
         (&&AutoEscaper::new(&Unsafe(Script2), Html))
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
-        "&lt;script&gt;",
+        "&#60;script&#62;",
     );
 
     assert_eq!(
@@ -484,7 +484,7 @@ fn test_html_safe_marker() {
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
-        "&lt;script&gt;",
+        "&#60;script&#62;",
     );
     assert_eq!(
         (&&AutoEscaper::new(
@@ -497,6 +497,6 @@ fn test_html_safe_marker() {
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
-        "&lt;script&gt;",
+        "&#60;script&#62;",
     );
 }
