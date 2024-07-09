@@ -219,7 +219,7 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 
 /// Mark the output of a filter as "maybe safe"
 ///
-/// This struct can be used as a transparent return type of custom filters that want to mark
+/// This enum can be used as a transparent return type of custom filters that want to mark
 /// their output as "safe" depending on some circumstances, i.e. that their output maybe does not
 /// need to be escaped.
 ///
@@ -233,10 +233,10 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 ///     use rinja::{filters::MaybeSafe, Result};
 ///
 ///     // Do not actually use this filter! It's an intentionally bad example.
-///     pub fn backdoor(s: impl ToString, enable: &bool) -> Result<MaybeSafe<String>> {
-///         Ok(MaybeSafe {
-///             text: s.to_string(),
-///             needs_escaping: !*enable,
+///     pub fn backdoor<T: std::fmt::Display>(s: T, enable: &bool) -> Result<MaybeSafe<T>> {
+///         Ok(match *enable {
+///             true => MaybeSafe::Safe(s),
+///             false => MaybeSafe::NeedsEscaping(s),
 ///         })
 ///     }
 /// }
@@ -260,9 +260,9 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 ///     "<div class='<script>'></div>",
 /// );
 /// ```
-pub struct MaybeSafe<T: fmt::Display> {
-    pub text: T,
-    pub needs_escaping: bool,
+pub enum MaybeSafe<T: fmt::Display> {
+    Safe(T),
+    NeedsEscaping(T),
 }
 
 const _: () = {
@@ -270,7 +270,11 @@ const _: () = {
     impl<T: fmt::Display> fmt::Display for MaybeSafe<T> {
         #[inline]
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "{}", self.text)
+            let inner = match self {
+                MaybeSafe::Safe(inner) => inner,
+                MaybeSafe::NeedsEscaping(inner) => inner,
+            };
+            write!(f, "{inner}")
         }
     }
 
@@ -280,23 +284,23 @@ const _: () = {
 
         #[inline]
         fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
-            match self.text.needs_escaping {
-                true => Ok(Wrapped::DoEscape(&self.text.text, self.escaper)),
-                false => Ok(Wrapped::NoEscapeNeeded(&self.text.text)),
+            match self.text {
+                MaybeSafe::Safe(t) => Ok(Wrapped::Safe(t)),
+                MaybeSafe::NeedsEscaping(t) => Ok(Wrapped::NeedsEscaping(t, self.escaper)),
             }
         }
     }
 
     pub enum Wrapped<'a, T: fmt::Display + ?Sized, E: Escaper> {
-        DoEscape(&'a T, E),
-        NoEscapeNeeded(&'a T),
+        Safe(&'a T),
+        NeedsEscaping(&'a T, E),
     }
 
     impl<T: fmt::Display + ?Sized, E: Escaper> fmt::Display for Wrapped<'_, T, E> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             match *self {
-                Self::DoEscape(text, escaper) => EscapeDisplay(text, escaper).fmt(f),
-                Self::NoEscapeNeeded(text) => write!(f, "{text}"),
+                Wrapped::Safe(t) => write!(f, "{t}"),
+                Wrapped::NeedsEscaping(t, e) => EscapeDisplay(t, e).fmt(f),
             }
         }
     }
@@ -526,52 +530,28 @@ fn test_html_safe_marker() {
     );
 
     assert_eq!(
-        (&&AutoEscaper::new(
-            &MaybeSafe {
-                needs_escaping: false,
-                text: Script1
-            },
-            Html
-        ))
+        (&&AutoEscaper::new(&MaybeSafe::Safe(Script1), Html))
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
         "<script>",
     );
     assert_eq!(
-        (&&AutoEscaper::new(
-            &MaybeSafe {
-                needs_escaping: false,
-                text: Script2
-            },
-            Html,
-        ))
+        (&&AutoEscaper::new(&MaybeSafe::Safe(Script2), Html))
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
         "<script>",
     );
     assert_eq!(
-        (&&AutoEscaper::new(
-            &MaybeSafe {
-                needs_escaping: true,
-                text: Script1
-            },
-            Html,
-        ))
+        (&&AutoEscaper::new(&MaybeSafe::NeedsEscaping(Script1), Html))
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
         "&#60;script&#62;",
     );
     assert_eq!(
-        (&&AutoEscaper::new(
-            &MaybeSafe {
-                needs_escaping: true,
-                text: Script2
-            },
-            Html,
-        ))
+        (&&AutoEscaper::new(&MaybeSafe::NeedsEscaping(Script2), Html))
             .rinja_auto_escape()
             .unwrap()
             .to_string(),
