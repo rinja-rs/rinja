@@ -18,41 +18,86 @@ use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
 use parser::{generate_error_info, strip_common, ErrorInfo, ParseError, Parsed, WithSpan};
+#[cfg(not(feature = "__standalone"))]
+use proc_macro::TokenStream as TokenStream12;
+#[cfg(feature = "__standalone")]
+use proc_macro2::TokenStream as TokenStream12;
 use proc_macro2::{Span, TokenStream};
 
-#[cfg(not(feature = "__standalone"))]
-macro_rules! pub_if_standalone {
-    (pub $($tt:tt)*) => {
-        $($tt)*
-    }
-}
-
-#[cfg(feature = "__standalone")]
-macro_rules! pub_if_standalone {
-    ($($tt:tt)*) => {
-        $($tt)*
-    }
-}
-
-#[cfg(not(feature = "__standalone"))]
-#[proc_macro_derive(Template, attributes(template))]
-pub fn derive_template(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    derive_template2(input.into()).into()
-}
-
-pub_if_standalone! {
-    pub fn derive_template2(input: TokenStream) -> TokenStream {
-        let ast = syn::parse2(input).unwrap();
-        match build_template(&ast) {
-            Ok(source) => source.parse().unwrap(),
-            Err(e) => {
-                let mut e = e.into_compile_error();
-                if let Ok(source) = build_skeleton(&ast) {
-                    let source: TokenStream = source.parse().unwrap();
-                    e.extend(source);
-                }
-                e
+/// The `Template` derive macro and its `template()` attribute.
+///
+/// Rinja works by generating one or more trait implementations for any
+/// `struct` type decorated with the `#[derive(Template)]` attribute. The
+/// code generation process takes some options that can be specified through
+/// the `template()` attribute.
+///
+/// ## Attributes
+///
+/// The following sub-attributes are currently recognized:
+///
+/// ### path
+///
+/// E.g. `path = "foo.html"`
+///
+/// Sets the path to the template file.
+/// The path is interpreted as relative to the configured template directories
+/// (by default, this is a `templates` directory next to your `Cargo.toml`).
+/// The file name extension is used to infer an escape mode (see below). In
+/// web framework integrations, the path's extension may also be used to
+/// infer the content type of the resulting response.
+/// Cannot be used together with `source`.
+///
+/// ### source
+///
+/// E.g. `source = "{{ foo }}"`
+///
+/// Directly sets the template source.
+/// This can be useful for test cases or short templates. The generated path
+/// is undefined, which generally makes it impossible to refer to this
+/// template from other templates. If `source` is specified, `ext` must also
+/// be specified (see below). Cannot be used together with `path`.
+/// `ext` (e.g. `ext = "txt"`): lets you specify the content type as a file
+/// extension. This is used to infer an escape mode (see below), and some
+/// web framework integrations use it to determine the content type.
+/// Cannot be used together with `path`.
+///
+/// ### print
+///
+/// E.g. `print = "code"`
+///
+/// Enable debugging by printing nothing (`none`), the parsed syntax tree (`ast`),
+/// the generated code (`code`) or `all` for both.
+/// The requested data will be printed to stdout at compile time.
+///
+/// ### escape
+///
+/// E.g. `escape = "none"`
+///
+/// Override the template's extension used for the purpose of determining the escaper for
+/// this template. See the section on configuring custom escapers for more information.
+///
+/// ### syntax
+///
+/// E.g. `syntax = "foo"`
+///
+/// Set the syntax name for a parser defined in the configuration file.
+/// The default syntax, `"default"`,  is the one provided by Rinja.
+#[allow(clippy::useless_conversion)] // To be compatible with both `TokenStream`s
+#[cfg_attr(
+    not(feature = "__standalone"),
+    proc_macro_derive(Template, attributes(template))
+)]
+pub fn derive_template(input: TokenStream12) -> TokenStream12 {
+    let ast = syn::parse2(input.into()).unwrap();
+    match build_template(&ast) {
+        Ok(source) => source.parse().unwrap(),
+        Err(e) => {
+            let mut e = e.into_compile_error();
+            if let Ok(source) = build_skeleton(&ast) {
+                let source: TokenStream = source.parse().unwrap();
+                e.extend(source);
             }
+            e.into()
         }
     }
 }
