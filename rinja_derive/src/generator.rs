@@ -87,9 +87,11 @@ impl<'a> Generator<'a> {
     // Implement `Template` for the given context struct.
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
         self.write_header(buf, format_args!("{CRATE}::Template"), None);
-        buf.write("fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> ");
-        buf.write(CRATE);
-        buf.writeln("::Result<()> {");
+        buf.writeln(format_args!(
+            "fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) \
+            -> {CRATE}::Result<()> {{",
+        ));
+        buf.writeln(format_args!("use {CRATE}::filters::AutoEscape as _;"));
 
         buf.discard = self.buf_writable.discard;
         // Make sure the compiler understands that the generated code depends on the template files.
@@ -1166,7 +1168,7 @@ impl<'a> Generator<'a> {
         let expression = match wrapped {
             DisplayWrap::Wrapped => expr,
             DisplayWrap::Unwrapped => format!(
-                "{CRATE}::filters::escape(&({expr}), {})?",
+                "(&&{CRATE}::filters::AutoEscaper::new(&({expr}), {})).rinja_auto_escape()?",
                 self.input.escaper,
             ),
         };
