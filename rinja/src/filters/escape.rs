@@ -225,9 +225,44 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 ///
 /// If the filter is not used as the last element in the filter chain, then any assumption is void.
 /// Let the next filter decide if the output is safe or not.
+///
+/// ## Example
+///
+/// ```rust
+/// mod filters {
+///     use rinja::{filters::MaybeSafe, Result};
+///
+///     // Do not actually use this filter! It's an intentionally bad example.
+///     pub fn backdoor(s: impl ToString, enable: &bool) -> Result<MaybeSafe<String>> {
+///         Ok(MaybeSafe {
+///             text: s.to_string(),
+///             needs_escaping: !*enable,
+///         })
+///     }
+/// }
+///
+/// #[derive(rinja::Template)]
+/// #[template(
+///     source = "<div class='{{ klass|backdoor(enable_backdoor) }}'></div>",
+///     ext = "html"
+/// )]
+/// struct DivWithBackdoor<'a> {
+///     klass: &'a str,
+///     enable_backdoor: bool,
+/// }
+///
+/// assert_eq!(
+///     DivWithBackdoor { klass: "<script>", enable_backdoor: false }.to_string(),
+///     "<div class='&#60;script&#62;'></div>",
+/// );
+/// assert_eq!(
+///     DivWithBackdoor { klass: "<script>", enable_backdoor: true }.to_string(),
+///     "<div class='<script>'></div>",
+/// );
+/// ```
 pub struct MaybeSafe<T: fmt::Display> {
     pub text: T,
-    pub safe: bool,
+    pub needs_escaping: bool,
 }
 
 const _: () = {
@@ -245,23 +280,23 @@ const _: () = {
 
         #[inline]
         fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
-            match self.text.safe {
-                true => Ok(Wrapped::Safe(&self.text.text)),
-                false => Ok(Wrapped::Unsafe(&self.text.text, self.escaper)),
+            match self.text.needs_escaping {
+                true => Ok(Wrapped::DoEscape(&self.text.text, self.escaper)),
+                false => Ok(Wrapped::NoEscapeNeeded(&self.text.text)),
             }
         }
     }
 
     pub enum Wrapped<'a, T: fmt::Display + ?Sized, E: Escaper> {
-        Unsafe(&'a T, E),
-        Safe(&'a T),
+        DoEscape(&'a T, E),
+        NoEscapeNeeded(&'a T),
     }
 
     impl<T: fmt::Display + ?Sized, E: Escaper> fmt::Display for Wrapped<'_, T, E> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             match *self {
-                Self::Unsafe(text, escaper) => EscapeDisplay(text, escaper).fmt(f),
-                Self::Safe(text) => write!(f, "{text}"),
+                Self::DoEscape(text, escaper) => EscapeDisplay(text, escaper).fmt(f),
+                Self::NoEscapeNeeded(text) => write!(f, "{text}"),
             }
         }
     }
@@ -274,6 +309,38 @@ const _: () = {
 ///
 /// If the filter is not used as the last element in the filter chain, then any assumption is void.
 /// Let the next filter decide if the output is safe or not.
+///
+/// ## Example
+///
+/// ```rust
+/// mod filters {
+///     use rinja::{filters::Safe, Result};
+///
+///     // Do not actually use this filter! It's an intentionally bad example.
+///     pub fn strip_except_apos(s: impl ToString) -> Result<Safe<String>> {
+///         Ok(Safe(s
+///             .to_string()
+///             .chars()
+///             .filter(|c| !matches!(c, '<' | '>' | '"' | '&'))
+///             .collect()
+///         ))
+///     }
+/// }
+///
+/// #[derive(rinja::Template)]
+/// #[template(
+///     source = "<div class='{{ klass|strip_except_apos }}'></div>",
+///     ext = "html"
+/// )]
+/// struct DivWithClass<'a> {
+///     klass: &'a str,
+/// }
+///
+/// assert_eq!(
+///     DivWithClass { klass: "<&'lifetime X>" }.to_string(),
+///     "<div class=''lifetime X'></div>",
+/// );
+/// ```
 pub struct Safe<T: fmt::Display>(pub T);
 
 const _: () = {
@@ -450,7 +517,7 @@ fn test_html_safe_marker() {
     assert_eq!(
         (&&AutoEscaper::new(
             &MaybeSafe {
-                safe: true,
+                needs_escaping: false,
                 text: Script1
             },
             Html
@@ -463,7 +530,7 @@ fn test_html_safe_marker() {
     assert_eq!(
         (&&AutoEscaper::new(
             &MaybeSafe {
-                safe: true,
+                needs_escaping: false,
                 text: Script2
             },
             Html,
@@ -476,7 +543,7 @@ fn test_html_safe_marker() {
     assert_eq!(
         (&&AutoEscaper::new(
             &MaybeSafe {
-                safe: false,
+                needs_escaping: true,
                 text: Script1
             },
             Html,
@@ -489,7 +556,7 @@ fn test_html_safe_marker() {
     assert_eq!(
         (&&AutoEscaper::new(
             &MaybeSafe {
-                safe: false,
+                needs_escaping: true,
                 text: Script2
             },
             Html,

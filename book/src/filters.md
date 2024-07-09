@@ -607,9 +607,9 @@ if you know that *some* inputs for our filter will always result in a safe outpu
 ```rust
 fn as_sign(i: i32) -> Result<MaybeSafe<&'static str>, rinja::Error> {
     match i.into() {
-        i if i < 0 => Ok(MaybeSafe { text: "<0", safe: false }),
-        i if i > 0 => Ok(MaybeSafe { text: ">0", safe: false }),
-        _          => Ok(MaybeSafe { text: "=0", safe: true }),
+        i if i < 0 => Ok(MaybeSafe { text: "<0", needs_escaping: true }),
+        i if i > 0 => Ok(MaybeSafe { text: ">0", needs_escaping: true }),
+        _          => Ok(MaybeSafe { text: "=0", needs_escaping: false }),
     }
 }
 ```
