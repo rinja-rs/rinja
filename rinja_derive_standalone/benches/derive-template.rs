@@ -18,7 +18,7 @@ fn hello_world(c: &mut Criterion) {
     c.bench_function("hello_world", |b| {
         b.iter_batched(
             || ts.clone(),
-            rinja_derive_standalone::derive_template2,
+            rinja_derive_standalone::derive_template,
             BatchSize::LargeInput,
         )
     });
@@ -38,7 +38,7 @@ fn librustdoc(c: &mut Criterion) {
             c.bench_function($name, |b| {
                 b.iter_batched(
                     || ts.clone(),
-                    rinja_derive_standalone::derive_template2,
+                    rinja_derive_standalone::derive_template,
                     BatchSize::LargeInput,
                 )
             });

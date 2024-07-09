@@ -12,9 +12,34 @@
 //!
 //! # Creating Rinja templates
 //!
-//! An Rinja template is a `struct` definition which provides the template
-//! context combined with a UTF-8 encoded text file (or inline source, see
-//! below). Rinja can be used to generate any kind of text-based format.
+//! The main feature of Rinja is the [`Template`] derive macro
+//! which reads your template code, so your `struct` can implement
+//! the [`Template`] trait and [`Display`][std::fmt::Display], type-safe and fast:
+//!
+//! ```rust
+//! # use rinja::Template;
+//! #[derive(Template)]
+//! #[template(
+//!     ext = "html",
+//!     source = "<p>© {{ year }} {{ enterprise|upper }}</p>"
+//! )]
+//! struct Footer<'a> {
+//!     year: u16,
+//!     enterprise: &'a str,
+//! }
+//!
+//! assert_eq!(
+//!     Footer { year: 2024, enterprise: "<em>Rinja</em> developers" }.to_string(),
+//!     "<p>© 2024 &#60;EM&#62;RINJA&#60;/EM&#62; DEVELOPERS</p>",
+//! );
+//! // In here you see can Rinja's auto-escaping. You, the developer,
+//! // can easily disable the auto-escaping with the `|safe` filter,
+//! // but a malicious user cannot insert e.g. HTML scripts this way.
+//! ```
+//!
+//! A Rinja template is a `struct` definition which provides the template
+//! context combined with a UTF-8 encoded text file (or inline source).
+//! Rinja can be used to generate any kind of text-based format.
 //! The template file's extension may be used to provide content type hints.
 //!
 //! A template consists of **text contents**, which are passed through as-is,
@@ -23,41 +48,6 @@
 //! The template syntax is very similar to [Jinja](http://jinja.pocoo.org/),
 //! as well as Jinja-derivatives like [Twig](http://twig.sensiolabs.org/) or
 //! [Tera](https://github.com/Keats/tera).
-//!
-//! ## The `template()` attribute
-//!
-//! Rinja works by generating one or more trait implementations for any
-//! `struct` type decorated with the `#[derive(Template)]` attribute. The
-//! code generation process takes some options that can be specified through
-//! the `template()` attribute. The following sub-attributes are currently
-//! recognized:
-//!
-//! * `path` (as `path = "foo.html"`): sets the path to the template file. The
-//!   path is interpreted as relative to the configured template directories
-//!   (by default, this is a `templates` directory next to your `Cargo.toml`).
-//!   The file name extension is used to infer an escape mode (see below). In
-//!   web framework integrations, the path's extension may also be used to
-//!   infer the content type of the resulting response.
-//!   Cannot be used together with `source`.
-//! * `source` (as `source = "{{ foo }}"`): directly sets the template source.
-//!   This can be useful for test cases or short templates. The generated path
-//!   is undefined, which generally makes it impossible to refer to this
-//!   template from other templates. If `source` is specified, `ext` must also
-//!   be specified (see below). Cannot be used together with `path`.
-//! * `ext` (as `ext = "txt"`): lets you specify the content type as a file
-//!   extension. This is used to infer an escape mode (see below), and some
-//!   web framework integrations use it to determine the content type.
-//!   Cannot be used together with `path`.
-//! * `print` (as `print = "code"`): enable debugging by printing nothing
-//!   (`none`), the parsed syntax tree (`ast`), the generated code (`code`)
-//!   or `all` for both. The requested data will be printed to stdout at
-//!   compile time.
-//! * `escape` (as `escape = "none"`): override the template's extension used for
-//!   the purpose of determining the escaper for this template. See the section
-//!   on configuring custom escapers for more information.
-//! * `syntax` (as `syntax = "foo"`): set the syntax name for a parser defined
-//!   in the configuration file. The default syntax , "default",  is the one
-//!   provided by Rinja.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(elided_lifetimes_in_paths)]
