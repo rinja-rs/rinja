@@ -1,6 +1,6 @@
 [package]
 name = "rinja_axum"
-version = "0.5.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.65"
 description = "Axum integration for Rinja templates"
@@ -14,7 +14,7 @@ workspace = ".."
 readme = "README.md"
 
 [dependencies]
-rinja = { version = "0.13", path = "../rinja", default-features = false, features = ["with-axum"] }
+rinja = { version = "0.2.0", path = "../rinja", default-features = false, features = ["with-axum"] }
 axum-core = "0.4"
 http = "1.0"
 
