@@ -1,6 +1,6 @@
 [package]
 name = "actix-web-app"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 publish = false
@@ -10,7 +10,7 @@ publish = false
 # and actix-web as your web-framework.
 # rinja_actix makes it easy to use rinja templates as `Responder` of an actix-web request.
 # The rendered template is simply the response of your handler!
-rinja_actix = { version = "0.15.0", path = "../../rinja_actix" }
+rinja_actix = { version = "0.2.0", path = "../../rinja_actix" }
 actix-web = { version = "4.8.0", default-features = false, features = ["macros"] }
 tokio = { version = "1.38.0", features = ["sync", "rt-multi-thread"] }
 
