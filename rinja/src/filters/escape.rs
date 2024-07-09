@@ -386,6 +386,16 @@ const _: () = {
     }
 };
 
+/// Like [`Safe`], but only for HTML output
+pub struct HtmlSafeOutput<T: fmt::Display>(pub T);
+
+impl<T: fmt::Display> fmt::Display for HtmlSafeOutput<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 macro_rules! mark_html_safe {
     ($($ty:ty),* $(,)?) => {$(
         impl HtmlSafe for $ty {}
@@ -411,6 +421,7 @@ impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::Arc<T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::MutexGuard<'_, T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockReadGuard<'_, T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockWriteGuard<'_, T> {}
+impl<T: HtmlSafe> HtmlSafe for HtmlSafeOutput<T> {}
 impl<T: HtmlSafe> HtmlSafe for std::num::Wrapping<T> {}
 
 impl<T> HtmlSafe for std::borrow::Cow<'_, T>

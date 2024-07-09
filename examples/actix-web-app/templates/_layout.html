@@ -17,7 +17,7 @@
             E.g. maybe you would like to have "Rinja example application" as default title for
             your pages, then simply add this text (without quotation marks) in the block!
 
-            The default content can be as complex as you need to to be.
+            The default content can be as complex as you need it to be.
             E.g. it may contain any nodes like `{% if … %}`, and even other blocks.
         ~#}
         <title>{% block title %}{% endblock %}</title>
@@ -55,13 +55,13 @@
 {%- macro lang_select(handler, query) -%}
     <ul id="lang-select">
         {%- if lang != Lang::en -%}
-            <li><a href="{{ req.url_for(handler, [Lang::en])? }}{{ query|safe }}">This page in English</a></li>
+            <li><a href="{{ req.url_for(handler, [Lang::en])? }}{{ query }}">This page in English</a></li>
         {%- endif -%}
         {%- if lang != Lang::de -%}
-            <li><a href="{{ req.url_for(handler, [Lang::de])? }}{{ query|safe }}">Diese Seite auf deutsch.</a></li>
+            <li><a href="{{ req.url_for(handler, [Lang::de])? }}{{ query }}">Diese Seite auf deutsch.</a></li>
         {%- endif -%}
         {%- if lang != Lang::fr -%}
-            <li><a href="{{ req.url_for(handler, [Lang::fr])? }}{{ query|safe }}">Cette page est en français.</a></li>
+            <li><a href="{{ req.url_for(handler, [Lang::fr])? }}{{ query }}">Cette page est en français.</a></li>
         {%- endif -%}
     </ul>
 {%- endmacro lang_select -%}

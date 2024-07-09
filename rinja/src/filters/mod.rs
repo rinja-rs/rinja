@@ -12,8 +12,8 @@ use std::convert::Infallible;
 use std::fmt::{self, Write};
 
 pub use escape::{
-    e, escape, safe, AutoEscape, AutoEscaper, Escaper, Html, HtmlSafe, MaybeSafe, Safe, Text,
-    Unsafe,
+    e, escape, safe, AutoEscape, AutoEscaper, Escaper, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
+    Safe, Text, Unsafe,
 };
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
@@ -98,8 +98,8 @@ impl fmt::Display for FilesizeFormatFilter {
 ///
 /// [`urlencode_strict`]: ./fn.urlencode_strict.html
 #[inline]
-pub fn urlencode<T: fmt::Display>(s: T) -> Result<impl fmt::Display, Infallible> {
-    Ok(UrlencodeFilter(s, URLENCODE_SET))
+pub fn urlencode(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Display>, Infallible> {
+    Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_SET)))
 }
 
 #[cfg(feature = "urlencode")]
@@ -118,8 +118,10 @@ pub fn urlencode<T: fmt::Display>(s: T) -> Result<impl fmt::Display, Infallible>
 ///
 /// If you want to preserve `/`, see [`urlencode`](./fn.urlencode.html).
 #[inline]
-pub fn urlencode_strict<T: fmt::Display>(s: T) -> Result<impl fmt::Display, Infallible> {
-    Ok(UrlencodeFilter(s, URLENCODE_STRICT_SET))
+pub fn urlencode_strict(
+    s: impl fmt::Display,
+) -> Result<HtmlSafeOutput<impl fmt::Display>, Infallible> {
+    Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_STRICT_SET)))
 }
 
 #[cfg(feature = "urlencode")]
