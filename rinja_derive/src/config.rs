@@ -1,8 +1,9 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::collections::btree_map::{BTreeMap, Entry};
+use std::mem::transmute;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{env, fs};
 
 use parser::node::Whitespace;
@@ -14,20 +15,91 @@ use serde::Deserialize;
 use crate::{CompileError, FileInfo, CRATE};
 
 #[derive(Debug)]
-pub(crate) struct Config<'a> {
+pub(crate) struct Config {
     pub(crate) dirs: Vec<PathBuf>,
-    pub(crate) syntaxes: BTreeMap<String, SyntaxAndCache<'a>>,
-    pub(crate) default_syntax: &'a str,
-    pub(crate) escapers: Vec<(Vec<Cow<'a, str>>, Cow<'a, str>)>,
+    pub(crate) syntaxes: BTreeMap<String, SyntaxAndCache<'static>>,
+    pub(crate) default_syntax: &'static str,
+    pub(crate) escapers: Vec<(Vec<Cow<'static, str>>, Cow<'static, str>)>,
     pub(crate) whitespace: WhitespaceHandling,
+    // `Config` is self referencial and `_key` owns it data, so it must come last
+    _key: OwnedConfigKey,
 }
 
-impl<'a> Config<'a> {
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct OwnedConfigKey(Arc<ConfigKey<'static>>);
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct ConfigKey<'a> {
+    source: Cow<'a, str>,
+    config_path: Option<Cow<'a, str>>,
+    template_whitespace: Option<Cow<'a, str>>,
+}
+
+impl<'a> ToOwned for ConfigKey<'a> {
+    type Owned = OwnedConfigKey;
+
+    fn to_owned(&self) -> Self::Owned {
+        OwnedConfigKey(Arc::new(ConfigKey {
+            source: Cow::Owned(self.source.as_ref().to_owned()),
+            config_path: self
+                .config_path
+                .as_ref()
+                .map(|s| Cow::Owned(s.as_ref().to_owned())),
+            template_whitespace: self
+                .template_whitespace
+                .as_ref()
+                .map(|s| Cow::Owned(s.as_ref().to_owned())),
+        }))
+    }
+}
+
+impl<'a> Borrow<ConfigKey<'a>> for OwnedConfigKey {
+    fn borrow(&self) -> &ConfigKey<'a> {
+        self.0.as_ref()
+    }
+}
+
+impl Config {
     pub(crate) fn new(
-        s: &'a str,
+        source: &str,
         config_path: Option<&str>,
         template_whitespace: Option<&str>,
-    ) -> std::result::Result<Config<'a>, CompileError> {
+    ) -> Result<&'static Config, CompileError> {
+        static CACHE: OnceLock<Cache<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
+
+        let key = ConfigKey {
+            source: source.into(),
+            config_path: config_path.map(Cow::Borrowed),
+            template_whitespace: template_whitespace.map(Cow::Borrowed),
+        };
+
+        let cache = CACHE.get_or_init(|| Cache::new(8));
+        let config = match cache.get_value_or_guard(&key, None) {
+            GuardResult::Value(config) => config,
+            GuardResult::Guard(guard) => {
+                // we won't be able to use `guard.insert()` because we want to use our own key
+                let config = Config::new_uncached(key.to_owned())?;
+                cache.insert(config._key.clone(), Arc::clone(&config));
+                drop(guard); // `guard` must be dropped after insert
+                config
+            }
+            GuardResult::Timeout => unreachable!("we don't define a timeout"),
+        };
+
+        // SAFETY: an inserted `Config` will never be evicted
+        Ok(unsafe { transmute::<&Config, &'static Config>(config.as_ref()) })
+    }
+}
+
+impl Config {
+    fn new_uncached(key: OwnedConfigKey) -> Result<Arc<Config>, CompileError> {
+        // SAFETY: the resulting `Config` will keep a reference to the `key`
+        let eternal_key =
+            unsafe { transmute::<&ConfigKey<'_>, &'static ConfigKey<'static>>(key.borrow()) };
+        let s = eternal_key.source.as_ref();
+        let config_path = eternal_key.config_path.as_deref();
+        let template_whitespace = eternal_key.template_whitespace.as_deref();
+
         let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let default_dirs = vec![root.join("templates")];
 
@@ -110,20 +182,21 @@ impl<'a> Config<'a> {
             ));
         }
 
-        Ok(Config {
+        Ok(Arc::new(Config {
             dirs,
             syntaxes,
             default_syntax,
             escapers,
             whitespace,
-        })
+            _key: key,
+        }))
     }
 
     pub(crate) fn find_template(
         &self,
         path: &str,
         start_at: Option<&Path>,
-    ) -> std::result::Result<Arc<Path>, CompileError> {
+    ) -> Result<Arc<Path>, CompileError> {
         if let Some(root) = start_at {
             let relative = root.with_file_name(path);
             if relative.exists() {
@@ -271,14 +344,14 @@ struct RawConfig<'a> {
 
 impl RawConfig<'_> {
     #[cfg(feature = "config")]
-    fn from_toml_str(s: &str) -> std::result::Result<RawConfig<'_>, CompileError> {
+    fn from_toml_str(s: &str) -> Result<RawConfig<'_>, CompileError> {
         basic_toml::from_str(s).map_err(|e| {
             CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"))
         })
     }
 
     #[cfg(not(feature = "config"))]
-    fn from_toml_str(_: &str) -> std::result::Result<RawConfig<'_>, CompileError> {
+    fn from_toml_str(_: &str) -> Result<RawConfig<'_>, CompileError> {
         Err(CompileError::no_file_info("TOML support not available"))
     }
 }
@@ -334,9 +407,7 @@ struct RawEscaper<'a> {
     extensions: Vec<&'a str>,
 }
 
-pub(crate) fn read_config_file(
-    config_path: Option<&str>,
-) -> std::result::Result<String, CompileError> {
+pub(crate) fn read_config_file(config_path: Option<&str>) -> Result<String, CompileError> {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let filename = match config_path {
         Some(config_path) => root.join(config_path),
@@ -357,8 +428,8 @@ pub(crate) fn read_config_file(
     }
 }
 
-fn str_set<'a>(vals: &[&'a str]) -> Vec<Cow<'a, str>> {
-    vals.iter().copied().map(Cow::from).collect()
+fn str_set(vals: &[&'static str]) -> Vec<Cow<'static, str>> {
+    vals.iter().map(|s| Cow::Borrowed(*s)).collect()
 }
 
 static CONFIG_FILE_NAME: &str = "rinja.toml";
@@ -536,6 +607,14 @@ mod tests {
     #[cfg(feature = "config")]
     #[test]
     fn illegal_delimiters() {
+        #[track_caller]
+        fn expect_err<T, E>(result: Result<T, E>) -> E {
+            match result {
+                Ok(_) => panic!("should have failed"),
+                Err(err) => err,
+            }
+        }
+
         let raw_config = r#"
         [[syntax]]
         name = "too_short"
@@ -543,7 +622,7 @@ mod tests {
         "#;
         let config = Config::new(raw_config, None, None);
         assert_eq!(
-            config.unwrap_err().msg,
+            expect_err(config).msg,
             r#"delimiters must be at least two characters long: "<""#,
         );
 
@@ -554,7 +633,7 @@ mod tests {
         "#;
         let config = Config::new(raw_config, None, None);
         assert_eq!(
-            config.unwrap_err().msg,
+            expect_err(config).msg,
             r#"delimiters may not contain white spaces: " {{ ""#,
         );
 
@@ -567,7 +646,7 @@ mod tests {
         "#;
         let config = Config::new(raw_config, None, None);
         assert_eq!(
-            config.unwrap_err().msg,
+            expect_err(config).msg,
             r#"a delimiter may not be the prefix of another delimiter: "{{" vs "{{$""#,
         );
     }

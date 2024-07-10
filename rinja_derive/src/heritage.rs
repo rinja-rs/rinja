@@ -62,7 +62,7 @@ impl Context<'_> {
     }
 
     pub(crate) fn new<'n>(
-        config: &Config<'_>,
+        config: &Config,
         path: &'n Path,
         parsed: &'n Parsed,
     ) -> Result<Context<'n>, CompileError> {
