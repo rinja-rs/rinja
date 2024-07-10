@@ -2,7 +2,7 @@
 name = "rinja_axum"
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.71"
 description = "Axum integration for Rinja templates"
 keywords = ["markup", "template", "jinja2", "html", "axum"]
 categories = ["template-engine"]
