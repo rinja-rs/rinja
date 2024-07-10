@@ -1,21 +1,21 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use mime::Mime;
-use parser::{Node, Parsed, Syntax};
+use parser::{Node, Parsed};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
-use crate::config::{get_template_source, Config};
+use crate::config::{get_template_source, Config, SyntaxAndCache};
 use crate::{CompileError, MsgValidEscapers};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
     pub(crate) config: &'a Config<'a>,
-    pub(crate) syntax: &'a Syntax<'a>,
+    pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
@@ -113,7 +113,7 @@ impl TemplateInput<'_> {
 
     pub(crate) fn find_used_templates(
         &self,
-        map: &mut HashMap<Arc<Path>, Parsed>,
+        map: &mut HashMap<Arc<Path>, Arc<Parsed>>,
     ) -> Result<(), CompileError> {
         let (source, source_path) = match &self.source {
             Source::Source(s) => (s.clone(), None),
@@ -126,7 +126,7 @@ impl TemplateInput<'_> {
         let mut dependency_graph = Vec::new();
         let mut check = vec![(Arc::clone(&self.path), source, source_path)];
         while let Some((path, source, source_path)) = check.pop() {
-            let parsed = Parsed::new(source, source_path, self.syntax)?;
+            let parsed = self.syntax.parse(source, source_path)?;
 
             let mut top = true;
             let mut nested = vec![parsed.nodes()];
@@ -142,7 +142,7 @@ impl TemplateInput<'_> {
                                 Some((&path, parsed.source(), n.span())),
                             )?;
                             check.push((new_path.clone(), source, Some(new_path.clone())));
-                            e.insert(Parsed::default());
+                            e.insert(Arc::default());
                         }
                         Ok(())
                     };

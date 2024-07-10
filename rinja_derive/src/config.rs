@@ -1,20 +1,22 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{env, fs};
 
 use parser::node::Whitespace;
-use parser::Syntax;
+use parser::{ParseError, Parsed, Syntax};
+use quick_cache::sync::{Cache, GuardResult};
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
 use crate::{CompileError, FileInfo, CRATE};
 
-#[derive(Debug, Hash, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct Config<'a> {
     pub(crate) dirs: Vec<PathBuf>,
-    pub(crate) syntaxes: BTreeMap<String, Syntax<'a>>,
+    pub(crate) syntaxes: BTreeMap<String, SyntaxAndCache<'a>>,
     pub(crate) default_syntax: &'a str,
     pub(crate) escapers: Vec<(Vec<Cow<'a, str>>, Cow<'a, str>)>,
     pub(crate) whitespace: WhitespaceHandling,
@@ -30,7 +32,7 @@ impl<'a> Config<'a> {
         let default_dirs = vec![root.join("templates")];
 
         let mut syntaxes = BTreeMap::new();
-        syntaxes.insert(DEFAULT_SYNTAX_NAME.to_string(), Syntax::default());
+        syntaxes.insert(DEFAULT_SYNTAX_NAME.to_string(), SyntaxAndCache::default());
 
         let raw = if s.is_empty() {
             RawConfig::default()
@@ -74,15 +76,16 @@ impl<'a> Config<'a> {
         if let Some(raw_syntaxes) = raw.syntax {
             for raw_s in raw_syntaxes {
                 let name = raw_s.name;
-
-                if syntaxes
-                    .insert(name.to_string(), raw_s.try_into()?)
-                    .is_some()
-                {
-                    return Err(CompileError::new(
-                        format!("syntax \"{name}\" is already defined",),
-                        file_info,
-                    ));
+                match syntaxes.entry(name.to_string()) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(SyntaxAndCache::new(raw_s.try_into()?));
+                    }
+                    Entry::Occupied(_) => {
+                        return Err(CompileError::new(
+                            format_args!("syntax {name:?} is already defined"),
+                            file_info,
+                        ));
+                    }
                 }
             }
         }
@@ -139,6 +142,72 @@ impl<'a> Config<'a> {
             "template {:?} not found in directories {:?}",
             path, self.dirs
         )))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SyntaxAndCache<'a> {
+    syntax: Syntax<'a>,
+    cache: Cache<Arc<str>, ParseResult>,
+}
+
+#[derive(Clone)]
+enum ParseResult {
+    Success(Arc<Parsed>),
+    Failure(Arc<ParseError>),
+}
+
+impl Default for SyntaxAndCache<'static> {
+    fn default() -> Self {
+        Self {
+            syntax: Default::default(),
+            cache: Cache::new(8),
+        }
+    }
+}
+
+impl<'a> Deref for SyntaxAndCache<'a> {
+    type Target = Syntax<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.syntax
+    }
+}
+
+impl<'a> SyntaxAndCache<'a> {
+    fn new(syntax: Syntax<'a>) -> Self {
+        Self {
+            syntax,
+            cache: Cache::new(8),
+        }
+    }
+
+    pub(crate) fn parse(
+        &self,
+        source: Arc<str>,
+        source_path: Option<Arc<Path>>,
+    ) -> Result<Arc<Parsed>, ParseError> {
+        let guard = match self.cache.get_value_or_guard(&source, None) {
+            GuardResult::Value(outcome) => match outcome {
+                ParseResult::Success(data) => return Ok(data),
+                ParseResult::Failure(msg) => return Err(ParseError::clone(&msg)),
+            },
+            GuardResult::Guard(guard) => guard,
+            GuardResult::Timeout => unreachable!("we don't define a timeout"),
+        };
+
+        let (outcome, result) = match Parsed::new(source, source_path, &self.syntax) {
+            Ok(parsed) => {
+                let result = Arc::new(parsed);
+                let outcome = ParseResult::Success(Arc::clone(&result));
+                (outcome, Ok(result))
+            }
+            Err(err) => (ParseResult::Failure(Arc::new(err.clone())), Err(err)),
+        };
+        if guard.insert(outcome).is_err() {
+            unreachable!("we never evict items");
+        }
+        result
     }
 }
 
