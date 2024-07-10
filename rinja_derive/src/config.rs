@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::{env, fs};
 
 use parser::node::Whitespace;
@@ -120,7 +120,7 @@ impl<'a> Config<'a> {
         &self,
         path: &str,
         start_at: Option<&Path>,
-    ) -> std::result::Result<Rc<Path>, CompileError> {
+    ) -> std::result::Result<Arc<Path>, CompileError> {
         if let Some(root) = start_at {
             let relative = root.with_file_name(path);
             if relative.exists() {
@@ -294,8 +294,8 @@ fn str_set<'a>(vals: &[&'a str]) -> Vec<Cow<'a, str>> {
 
 pub(crate) fn get_template_source(
     tpl_path: &Path,
-    import_from: Option<(&Rc<Path>, &str, &str)>,
-) -> Result<Rc<str>, CompileError> {
+    import_from: Option<(&Arc<Path>, &str, &str)>,
+) -> Result<Arc<str>, CompileError> {
     match fs::read_to_string(tpl_path) {
         Ok(mut source) => {
             if source.ends_with('\n') {

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::str::FromStr;
 
 use mime::Mime;
@@ -22,7 +22,7 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) escaper: &'a str,
     pub(crate) ext: Option<&'a str>,
     pub(crate) mime_type: String,
-    pub(crate) path: Rc<Path>,
+    pub(crate) path: Arc<Path>,
 }
 
 impl TemplateInput<'_> {
@@ -113,18 +113,18 @@ impl TemplateInput<'_> {
 
     pub(crate) fn find_used_templates(
         &self,
-        map: &mut HashMap<Rc<Path>, Parsed>,
+        map: &mut HashMap<Arc<Path>, Parsed>,
     ) -> Result<(), CompileError> {
         let (source, source_path) = match &self.source {
             Source::Source(s) => (s.clone(), None),
             Source::Path(_) => (
                 get_template_source(&self.path, None)?,
-                Some(Rc::clone(&self.path)),
+                Some(Arc::clone(&self.path)),
             ),
         };
 
         let mut dependency_graph = Vec::new();
-        let mut check = vec![(Rc::clone(&self.path), source, source_path)];
+        let mut check = vec![(Arc::clone(&self.path), source, source_path)];
         while let Some((path, source, source_path)) = check.pop() {
             let parsed = Parsed::new(source, source_path, self.syntax)?;
 
@@ -132,7 +132,7 @@ impl TemplateInput<'_> {
             let mut nested = vec![parsed.nodes()];
             while let Some(nodes) = nested.pop() {
                 for n in nodes {
-                    let mut add_to_check = |new_path: Rc<Path>| -> Result<(), CompileError> {
+                    let mut add_to_check = |new_path: Arc<Path>| -> Result<(), CompileError> {
                         if let Entry::Vacant(e) = map.entry(new_path) {
                             // Add a dummy entry to `map` in order to prevent adding `path`
                             // multiple times to `check`.
@@ -422,7 +422,7 @@ fn extension(path: &Path) -> Option<&str> {
 #[derive(Debug, Hash, PartialEq)]
 pub(crate) enum Source {
     Path(String),
-    Source(Rc<str>),
+    Source(Arc<str>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
@@ -483,7 +483,7 @@ const TEXT_TYPES: [(Mime, Mime); 7] = [
     (mime::IMAGE_SVG, mime::IMAGE_SVG),
 ];
 
-fn cyclic_graph_error(dependency_graph: &[(Rc<Path>, Rc<Path>)]) -> Result<(), CompileError> {
+fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
     Err(CompileError::no_file_info(format!(
         "cyclic dependency in graph {:#?}",
         dependency_graph

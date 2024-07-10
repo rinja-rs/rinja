@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use parser::node::{BlockDef, Macro};
 use parser::{Node, Parsed, WithSpan};
@@ -16,7 +16,7 @@ pub(crate) struct Heritage<'a> {
 impl Heritage<'_> {
     pub(crate) fn new<'n>(
         mut ctx: &'n Context<'n>,
-        contexts: &'n HashMap<&'n Rc<Path>, Context<'n>>,
+        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>>,
     ) -> Heritage<'n> {
         let mut blocks: BlockAncestry<'n> = ctx
             .blocks
@@ -40,10 +40,10 @@ type BlockAncestry<'a> = HashMap<&'a str, Vec<(&'a Context<'a>, &'a BlockDef<'a>
 #[derive(Clone)]
 pub(crate) struct Context<'a> {
     pub(crate) nodes: &'a [Node<'a>],
-    pub(crate) extends: Option<Rc<Path>>,
+    pub(crate) extends: Option<Arc<Path>>,
     pub(crate) blocks: HashMap<&'a str, &'a BlockDef<'a>>,
     pub(crate) macros: HashMap<&'a str, &'a Macro<'a>>,
-    pub(crate) imports: HashMap<&'a str, Rc<Path>>,
+    pub(crate) imports: HashMap<&'a str, Arc<Path>>,
     path: Option<&'a Path>,
     parsed: &'a Parsed,
 }

@@ -3,7 +3,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::fmt::{Arguments, Display, Write};
 use std::ops::Deref;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::{cmp, hash, mem, str};
 
 use parser::node::{
@@ -21,7 +21,7 @@ pub(crate) struct Generator<'a> {
     // The template input state: original struct AST and attributes
     input: &'a TemplateInput<'a>,
     // All contexts, keyed by the package-relative template path
-    contexts: &'a HashMap<&'a Rc<Path>, Context<'a>>,
+    contexts: &'a HashMap<&'a Arc<Path>, Context<'a>>,
     // The heritage contains references to blocks and their ancestry
     heritage: Option<&'a Heritage<'a>>,
     // Variables accessible directly from the current scope (not redirected to context)
@@ -44,7 +44,7 @@ pub(crate) struct Generator<'a> {
 impl<'a> Generator<'a> {
     pub(crate) fn new<'n>(
         input: &'n TemplateInput<'_>,
-        contexts: &'n HashMap<&'n Rc<Path>, Context<'n>>,
+        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>>,
         heritage: Option<&'n Heritage<'_>>,
         locals: MapChain<'n, Cow<'n, str>, LocalMeta>,
         buf_writable_discard: bool,
