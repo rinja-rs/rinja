@@ -3,10 +3,11 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
 use parser::{Node, Parsed};
+use quick_cache::sync::{Cache, GuardResult};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
@@ -494,28 +495,56 @@ fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(),
     )))
 }
 
-fn get_template_source(
-    tpl_path: &Path,
+pub(crate) fn get_template_source(
+    tpl_path: &Arc<Path>,
     import_from: Option<(&Arc<Path>, &str, &str)>,
 ) -> Result<Arc<str>, CompileError> {
-    match read_to_string(tpl_path) {
+    static CACHE: OnceLock<Cache<Arc<Path>, Outcome>> = OnceLock::new();
+
+    #[derive(Clone)]
+    enum Outcome {
+        Success(Arc<str>),
+        Failure(Arc<str>),
+    }
+
+    let mk_file_info = || {
+        import_from.map(|(node_file, file_source, node_source)| {
+            FileInfo::new(node_file, Some(file_source), Some(node_source))
+        })
+    };
+
+    let cache = CACHE.get_or_init(|| Cache::new(8));
+    let guard = match cache.get_value_or_guard(tpl_path, None) {
+        GuardResult::Value(outcome) => match outcome {
+            Outcome::Success(data) => return Ok(data),
+            Outcome::Failure(msg) => return Err(CompileError::new(msg, mk_file_info())),
+        },
+        GuardResult::Guard(guard) => guard,
+        GuardResult::Timeout => unreachable!("we don't define a timeout"),
+    };
+
+    let (outcome, result) = match read_to_string(tpl_path) {
         Ok(mut source) => {
             if source.ends_with('\n') {
                 let _ = source.pop();
             }
-            Ok(source.into())
+            let source: Arc<str> = source.into();
+            (Outcome::Success(source.clone()), Ok(source))
         }
         Err(err) => {
             let msg = format!(
                 "unable to open template file '{}': {err}",
                 tpl_path.to_str().unwrap(),
             );
-            let file_info = import_from.map(|(node_file, file_source, node_source)| {
-                FileInfo::new(node_file, Some(file_source), Some(node_source))
-            });
-            Err(CompileError::new(msg, file_info))
+            let result = Err(CompileError::new(msg.as_str(), mk_file_info()));
+            let outcome = Outcome::Failure(msg.into());
+            (outcome, result)
         }
+    };
+    if guard.insert(outcome).is_err() {
+        unreachable!("we never evict items");
     }
+    result
 }
 
 #[cfg(test)]
