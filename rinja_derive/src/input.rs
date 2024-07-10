@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
+use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -9,8 +10,8 @@ use parser::{Node, Parsed};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
-use crate::config::{get_template_source, Config, SyntaxAndCache};
-use crate::{CompileError, MsgValidEscapers};
+use crate::config::{Config, SyntaxAndCache};
+use crate::{CompileError, FileInfo, MsgValidEscapers};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
@@ -493,6 +494,30 @@ fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(),
     )))
 }
 
+fn get_template_source(
+    tpl_path: &Path,
+    import_from: Option<(&Arc<Path>, &str, &str)>,
+) -> Result<Arc<str>, CompileError> {
+    match read_to_string(tpl_path) {
+        Ok(mut source) => {
+            if source.ends_with('\n') {
+                let _ = source.pop();
+            }
+            Ok(source.into())
+        }
+        Err(err) => {
+            let msg = format!(
+                "unable to open template file '{}': {err}",
+                tpl_path.to_str().unwrap(),
+            );
+            let file_info = import_from.map(|(node_file, file_source, node_source)| {
+                FileInfo::new(node_file, Some(file_source), Some(node_source))
+            });
+            Err(CompileError::new(msg, file_info))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -540,5 +565,13 @@ mod tests {
         assert_eq!(extension(Path::new("foo-bar.j2")), Some("j2"));
         assert_eq!(extension(Path::new("foo-bar.jinja")), Some("jinja"));
         assert_eq!(extension(Path::new("foo-bar.jinja2")), Some("jinja2"));
+    }
+
+    #[test]
+    fn get_source() {
+        let path = Config::new("", None, None)
+            .and_then(|config| config.find_template("b.html", None))
+            .unwrap();
+        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
     }
 }

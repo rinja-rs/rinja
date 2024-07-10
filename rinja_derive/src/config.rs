@@ -361,30 +361,6 @@ fn str_set<'a>(vals: &[&'a str]) -> Vec<Cow<'a, str>> {
     vals.iter().copied().map(Cow::from).collect()
 }
 
-pub(crate) fn get_template_source(
-    tpl_path: &Path,
-    import_from: Option<(&Arc<Path>, &str, &str)>,
-) -> Result<Arc<str>, CompileError> {
-    match fs::read_to_string(tpl_path) {
-        Ok(mut source) => {
-            if source.ends_with('\n') {
-                let _ = source.pop();
-            }
-            Ok(source.into())
-        }
-        Err(err) => {
-            let msg = format!(
-                "unable to open template file '{}': {err}",
-                tpl_path.to_str().unwrap(),
-            );
-            let file_info = import_from.map(|(node_file, file_source, node_source)| {
-                FileInfo::new(node_file, Some(file_source), Some(node_source))
-            });
-            Err(CompileError::new(msg, file_info))
-        }
-    }
-}
-
 static CONFIG_FILE_NAME: &str = "rinja.toml";
 static DEFAULT_SYNTAX_NAME: &str = "default";
 static DEFAULT_ESCAPERS: &[(&[&str], &str)] = &[
@@ -401,14 +377,6 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::*;
-
-    #[test]
-    fn get_source() {
-        let path = Config::new("", None, None)
-            .and_then(|config| config.find_template("b.html", None))
-            .unwrap();
-        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
-    }
 
     #[test]
     fn test_default_config() {
