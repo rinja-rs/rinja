@@ -5,11 +5,13 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use mime::Mime;
-use parser::{Node, Parsed, Syntax};
+use parser::node::IfdefTest;
+use parser::{Node, Parsed, Syntax, WithSpan};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
 use crate::config::{get_template_source, Config};
+use crate::heritage::Context;
 use crate::{CompileError, MsgValidEscapers};
 
 pub(crate) struct TemplateInput<'a> {
@@ -192,6 +194,9 @@ impl TemplateInput<'_> {
                                 nested.push(&arm.nodes);
                             }
                         }
+                        Node::Ifdef(i) => {
+                            nested.push(&i.nodes);
+                        }
                         Node::Lit(_)
                         | Node::Comment(_)
                         | Node::Expr(_, _)
@@ -215,6 +220,37 @@ impl TemplateInput<'_> {
     #[inline]
     pub(crate) fn extension(&self) -> Option<&str> {
         ext_default_to_path(self.ext, &self.path)
+    }
+
+    pub(crate) fn test_ifdef_cond(
+        &self,
+        ctx: &Context<'_>,
+        cond: &WithSpan<'_, IfdefTest<'_>>,
+    ) -> Result<bool, CompileError> {
+        fn test_ifdef_cond(fields: &[String], cond: &WithSpan<'_, IfdefTest<'_>>) -> bool {
+            match &**cond {
+                &IfdefTest::Field(name) => fields.iter().any(|s| s == name),
+                IfdefTest::All(list) => list.iter().all(|cond| test_ifdef_cond(fields, cond)),
+                IfdefTest::Any(list) => list.iter().any(|cond| test_ifdef_cond(fields, cond)),
+                IfdefTest::Not(cond) => !test_ifdef_cond(fields, cond),
+            }
+        }
+
+        let syn::Data::Struct(struct_) = &self.ast.data else {
+            return Err(ctx.generate_error("you can use `ifdef` only with `structs`", cond));
+        };
+        let syn::Fields::Named(fields) = &struct_.fields else {
+            unreachable!("we checked that we are using a struct");
+        };
+        let fields = fields
+            .named
+            .iter()
+            .map(|f| match &f.ident {
+                Some(ident) => ident.to_string(),
+                None => unreachable!("we checked that we are using a struct"),
+            })
+            .collect::<Vec<_>>();
+        Ok(test_ifdef_cond(&fields, cond))
     }
 }
 

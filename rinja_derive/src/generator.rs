@@ -7,7 +7,8 @@ use std::rc::Rc;
 use std::{cmp, hash, mem, str};
 
 use parser::node::{
-    Call, Comment, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
+    Call, Comment, CondTest, FilterBlock, If, IfdefBlock, Include, Let, Lit, Loop, Match,
+    Whitespace, Ws,
 };
 use parser::{Expr, Filter, Node, Target, WithSpan};
 use quote::quote;
@@ -328,6 +329,9 @@ impl<'a> Generator<'a> {
                     self.handle_ws(**ws);
                     self.write_buf_writable(ctx, buf)?;
                     buf.writeln("continue;");
+                }
+                Node::Ifdef(ref ifdef) => {
+                    size_hint += self.write_ifdef_block(ctx, buf, ifdef, level)?;
                 }
             }
         }
@@ -711,6 +715,22 @@ impl<'a> Generator<'a> {
         buf.writeln("}");
         self.locals.pop();
         self.prepare_ws(ws);
+        Ok(size_hint)
+    }
+
+    fn write_ifdef_block(
+        &mut self,
+        ctx: &Context<'a>,
+        buf: &mut Buffer,
+        ifdef: &'a WithSpan<'_, IfdefBlock<'_>>,
+        level: AstLevel,
+    ) -> Result<usize, CompileError> {
+        self.handle_ws(ifdef.ws1);
+        let size_hint = match self.input.test_ifdef_cond(ctx, &ifdef.cond)? {
+            true => self.handle(ctx, &ifdef.nodes, buf, level)?,
+            false => 0,
+        };
+        self.prepare_ws(ifdef.ws2);
         Ok(size_hint)
     }
 

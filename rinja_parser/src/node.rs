@@ -6,7 +6,7 @@ use nom::character::complete::char;
 use nom::combinator::{complete, consumed, cut, eof, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
-use nom::multi::{many0, many1, separated_list0};
+use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded, tuple};
 
 use crate::{
@@ -33,6 +33,7 @@ pub enum Node<'a> {
     Break(WithSpan<'a, Ws>),
     Continue(WithSpan<'a, Ws>),
     FilterBlock(WithSpan<'a, FilterBlock<'a>>),
+    Ifdef(WithSpan<'a, IfdefBlock<'a>>),
 }
 
 impl<'a> Node<'a> {
@@ -78,6 +79,7 @@ impl<'a> Node<'a> {
             "break" => |i, s| Self::r#break(i, s),
             "continue" => |i, s| Self::r#continue(i, s),
             "filter" => |i, s| wrap(Self::FilterBlock, FilterBlock::parse(i, s)),
+            "ifdef" => |i, s| wrap(Self::Ifdef, IfdefBlock::parse(i, s)),
             _ => {
                 return Err(ErrorContext::from_err(nom::Err::Error(error_position!(
                     i,
@@ -169,6 +171,7 @@ impl<'a> Node<'a> {
             Self::Break(span) => span.span,
             Self::Continue(span) => span.span,
             Self::FilterBlock(span) => span.span,
+            Self::Ifdef(span) => span.span,
         }
     }
 }
@@ -1038,6 +1041,86 @@ impl<'a> Comment<'a> {
                 start,
             ),
         ))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IfdefBlock<'a> {
+    pub ws1: Ws,
+    pub cond: WithSpan<'a, IfdefTest<'a>>,
+    pub nodes: Vec<Node<'a>>,
+    pub ws2: Ws,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum IfdefTest<'a> {
+    Field(&'a str),
+    All(Vec<WithSpan<'a, IfdefTest<'a>>>),
+    Any(Vec<WithSpan<'a, IfdefTest<'a>>>),
+    Not(Box<WithSpan<'a, IfdefTest<'a>>>),
+}
+
+impl<'a> IfdefBlock<'a> {
+    fn parse(start: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let (i, (pws1, _, (cond, nws1, _, nodes, _, pws2, _, nws2))) = tuple((
+            opt(Whitespace::parse),
+            ws(keyword("ifdef")),
+            cut(tuple((
+                ws(|i| IfdefTest::parse(i, s)),
+                opt(Whitespace::parse),
+                |i| s.tag_block_end(i),
+                |i| Node::many(i, s),
+                |i| s.tag_block_start(i),
+                opt(Whitespace::parse),
+                ws(keyword("endifdef")),
+                opt(Whitespace::parse),
+            ))),
+        ))(start)?;
+        Ok((
+            i,
+            WithSpan::new(
+                Self {
+                    ws1: Ws(pws1, nws1),
+                    cond,
+                    nodes,
+                    ws2: Ws(pws2, nws2),
+                },
+                start,
+            ),
+        ))
+    }
+}
+
+impl<'a> IfdefTest<'a> {
+    fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = i;
+        let (i, (ident, open)) = pair(identifier, ws(opt(char('('))))(i)?;
+        if open.is_none() {
+            return Ok((i, WithSpan::new(Self::Field(ident), start)));
+        }
+
+        let (i, inner) = match ident {
+            "not" => cut(map(
+                |i| s.nest(i, |i| Self::parse(i, s)),
+                |v| Self::Not(Box::new(v)),
+            ))(i)?,
+            "all" => cut(map(
+                |i| s.nest(i, separated_list1(ws(char(',')), |i| Self::parse(i, s))),
+                Self::All,
+            ))(i)?,
+            "any" => cut(map(
+                |i| s.nest(i, separated_list1(ws(char(',')), |i| Self::parse(i, s))),
+                Self::Any,
+            ))(i)?,
+            _ => {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    "unexpected `(`",
+                    start,
+                )));
+            }
+        };
+        let (i, _) = cut(ws(char(')')))(i)?;
+        Ok((i, WithSpan::new(inner, start)))
     }
 }
 
