@@ -6,8 +6,8 @@ use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
+use once_map::OnceMap;
 use parser::{Node, Parsed};
-use quick_cache::sync::{Cache, GuardResult};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
@@ -499,52 +499,32 @@ pub(crate) fn get_template_source(
     tpl_path: &Arc<Path>,
     import_from: Option<(&Arc<Path>, &str, &str)>,
 ) -> Result<Arc<str>, CompileError> {
-    static CACHE: OnceLock<Cache<Arc<Path>, Outcome>> = OnceLock::new();
+    static CACHE: OnceLock<OnceMap<Arc<Path>, Arc<str>>> = OnceLock::new();
 
-    #[derive(Clone)]
-    enum Outcome {
-        Success(Arc<str>),
-        Failure(Arc<str>),
-    }
-
-    let mk_file_info = || {
-        import_from.map(|(node_file, file_source, node_source)| {
-            FileInfo::new(node_file, Some(file_source), Some(node_source))
-        })
-    };
-
-    let cache = CACHE.get_or_init(|| Cache::new(8));
-    let guard = match cache.get_value_or_guard(tpl_path, None) {
-        GuardResult::Value(outcome) => match outcome {
-            Outcome::Success(data) => return Ok(data),
-            Outcome::Failure(msg) => return Err(CompileError::new(msg, mk_file_info())),
-        },
-        GuardResult::Guard(guard) => guard,
-        GuardResult::Timeout => unreachable!("we don't define a timeout"),
-    };
-
-    let (outcome, result) = match read_to_string(tpl_path) {
-        Ok(mut source) => {
-            if source.ends_with('\n') {
-                let _ = source.pop();
+    CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+        tpl_path,
+        (),
+        Arc::clone,
+        |_, tpl_path| match read_to_string(tpl_path) {
+            Ok(mut source) => {
+                if source.ends_with('\n') {
+                    let _ = source.pop();
+                }
+                let source = Arc::from(source);
+                Ok((Arc::clone(&source), source))
             }
-            let source: Arc<str> = source.into();
-            (Outcome::Success(source.clone()), Ok(source))
-        }
-        Err(err) => {
-            let msg = format!(
-                "unable to open template file '{}': {err}",
-                tpl_path.to_str().unwrap(),
-            );
-            let result = Err(CompileError::new(msg.as_str(), mk_file_info()));
-            let outcome = Outcome::Failure(msg.into());
-            (outcome, result)
-        }
-    };
-    if guard.insert(outcome).is_err() {
-        unreachable!("we never evict items");
-    }
-    result
+            Err(err) => Err(CompileError::new(
+                format_args!(
+                    "unable to open template file '{}': {err}",
+                    tpl_path.to_str().unwrap(),
+                ),
+                import_from.map(|(node_file, file_source, node_source)| {
+                    FileInfo::new(node_file, Some(file_source), Some(node_source))
+                }),
+            )),
+        },
+        |_, _, cached| Arc::clone(cached),
+    )
 }
 
 #[cfg(test)]

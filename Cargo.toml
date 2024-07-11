@@ -4,7 +4,6 @@ members = [
     "rinja_actix",
     "rinja_axum",
     "rinja_derive",
-    "rinja_derive_standalone",
     "rinja_parser",
     "rinja_rocket",
     "rinja_warp",

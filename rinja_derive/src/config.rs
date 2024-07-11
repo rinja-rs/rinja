@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::{env, fs};
 
+use once_map::sync::OnceMap;
 use parser::node::Whitespace;
 use parser::{ParseError, Parsed, Syntax};
-use quick_cache::sync::{Cache, GuardResult};
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
@@ -23,6 +23,13 @@ pub(crate) struct Config {
     pub(crate) whitespace: WhitespaceHandling,
     // `Config` is self referencial and `_key` owns it data, so it must come last
     _key: OwnedConfigKey,
+}
+
+impl Drop for Config {
+    #[track_caller]
+    fn drop(&mut self) {
+        panic!();
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -65,27 +72,22 @@ impl Config {
         config_path: Option<&str>,
         template_whitespace: Option<&str>,
     ) -> Result<&'static Config, CompileError> {
-        static CACHE: OnceLock<Cache<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
+        static CACHE: OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
 
-        let key = ConfigKey {
-            source: source.into(),
-            config_path: config_path.map(Cow::Borrowed),
-            template_whitespace: template_whitespace.map(Cow::Borrowed),
-        };
-
-        let cache = CACHE.get_or_init(|| Cache::new(8));
-        let config = match cache.get_value_or_guard(&key, None) {
-            GuardResult::Value(config) => config,
-            GuardResult::Guard(guard) => {
-                // we won't be able to use `guard.insert()` because we want to use our own key
-                let config = Config::new_uncached(key.to_owned())?;
-                cache.insert(config._key.clone(), Arc::clone(&config));
-                drop(guard); // `guard` must be dropped after insert
-                config
-            }
-            GuardResult::Timeout => unreachable!("we don't define a timeout"),
-        };
-
+        let config = CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+            &ConfigKey {
+                source: source.into(),
+                config_path: config_path.map(Cow::Borrowed),
+                template_whitespace: template_whitespace.map(Cow::Borrowed),
+            },
+            (),
+            ConfigKey::to_owned,
+            |_, key| match Config::new_uncached(key.clone()) {
+                Ok(config) => Ok((Arc::clone(&config), config)),
+                Err(err) => Err(err),
+            },
+            |_, _, value| Arc::clone(value),
+        )?;
         // SAFETY: an inserted `Config` will never be evicted
         Ok(unsafe { transmute::<&Config, &'static Config>(config.as_ref()) })
     }
@@ -218,25 +220,10 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct SyntaxAndCache<'a> {
     syntax: Syntax<'a>,
-    cache: Cache<Arc<str>, ParseResult>,
-}
-
-#[derive(Clone)]
-enum ParseResult {
-    Success(Arc<Parsed>),
-    Failure(Arc<ParseError>),
-}
-
-impl Default for SyntaxAndCache<'static> {
-    fn default() -> Self {
-        Self {
-            syntax: Default::default(),
-            cache: Cache::new(8),
-        }
-    }
+    cache: OnceMap<OwnedSyntaxAndCacheKey, Arc<Parsed>>,
 }
 
 impl<'a> Deref for SyntaxAndCache<'a> {
@@ -247,11 +234,34 @@ impl<'a> Deref for SyntaxAndCache<'a> {
     }
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct OwnedSyntaxAndCacheKey(SyntaxAndCacheKey<'static>);
+
+impl Deref for OwnedSyntaxAndCacheKey {
+    type Target = SyntaxAndCacheKey<'static>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct SyntaxAndCacheKey<'a> {
+    source: Cow<'a, Arc<str>>,
+    source_path: Option<Cow<'a, Arc<Path>>>,
+}
+
+impl<'a> Borrow<SyntaxAndCacheKey<'a>> for OwnedSyntaxAndCacheKey {
+    fn borrow(&self) -> &SyntaxAndCacheKey<'a> {
+        &self.0
+    }
+}
+
 impl<'a> SyntaxAndCache<'a> {
     fn new(syntax: Syntax<'a>) -> Self {
         Self {
             syntax,
-            cache: Cache::new(8),
+            cache: OnceMap::new(),
         }
     }
 
@@ -260,27 +270,29 @@ impl<'a> SyntaxAndCache<'a> {
         source: Arc<str>,
         source_path: Option<Arc<Path>>,
     ) -> Result<Arc<Parsed>, ParseError> {
-        let guard = match self.cache.get_value_or_guard(&source, None) {
-            GuardResult::Value(outcome) => match outcome {
-                ParseResult::Success(data) => return Ok(data),
-                ParseResult::Failure(msg) => return Err(ParseError::clone(&msg)),
+        self.cache.get_or_try_insert_ref(
+            &SyntaxAndCacheKey {
+                source: Cow::Owned(source),
+                source_path: source_path.map(Cow::Owned),
             },
-            GuardResult::Guard(guard) => guard,
-            GuardResult::Timeout => unreachable!("we don't define a timeout"),
-        };
-
-        let (outcome, result) = match Parsed::new(source, source_path, &self.syntax) {
-            Ok(parsed) => {
-                let result = Arc::new(parsed);
-                let outcome = ParseResult::Success(Arc::clone(&result));
-                (outcome, Ok(result))
-            }
-            Err(err) => (ParseResult::Failure(Arc::new(err.clone())), Err(err)),
-        };
-        if guard.insert(outcome).is_err() {
-            unreachable!("we never evict items");
-        }
-        result
+            &self.syntax,
+            |key| {
+                OwnedSyntaxAndCacheKey(SyntaxAndCacheKey {
+                    source: Cow::Owned(Arc::clone(key.source.as_ref())),
+                    source_path: key
+                        .source_path
+                        .as_deref()
+                        .map(|v| Cow::Owned(Arc::clone(v))),
+                })
+            },
+            |syntax, key| {
+                let source = Arc::clone(key.source.as_ref());
+                let source_path = key.source_path.as_deref().map(Arc::clone);
+                let parsed = Arc::new(Parsed::new(source, source_path, syntax)?);
+                Ok((Arc::clone(&parsed), parsed))
+            },
+            |_, _, cached| Arc::clone(cached),
+        )
     }
 }
 
