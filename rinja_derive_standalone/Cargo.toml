@@ -5,10 +5,9 @@ description = "Procedural macro package for Rinja"
 homepage = "https://github.com/rinja-rs/rinja"
 repository = "https://github.com/rinja-rs/rinja"
 license = "MIT/Apache-2.0"
-workspace = ".."
 readme = "README.md"
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.71"
 publish = false
 
 [features]
@@ -26,13 +25,15 @@ with-warp = []
 
 [dependencies]
 parser = { package = "rinja_parser", version = "0.2.0", path = "../rinja_parser" }
+basic-toml = { version = "0.1.1", optional = true }
 mime = "0.3"
 mime_guess = "2"
+once_map = "0.4.18"
 proc-macro2 = "1"
+quick_cache = "0.6.0"
 quote = "1"
 serde = { version = "1.0", optional = true, features = ["derive"] }
 syn = "2"
-basic-toml = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
@@ -41,3 +42,6 @@ criterion = "0.5"
 name = "derive-template"
 harness = false
 required-features = ["__standalone"]
+
+[workspace]
+members = ["."]

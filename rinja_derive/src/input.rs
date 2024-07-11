@@ -1,28 +1,30 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
+use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
-use parser::{Node, Parsed, Syntax};
+use once_map::OnceMap;
+use parser::{Node, Parsed};
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
-use crate::config::{get_template_source, Config};
-use crate::{CompileError, MsgValidEscapers};
+use crate::config::{Config, SyntaxAndCache};
+use crate::{CompileError, FileInfo, MsgValidEscapers};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
-    pub(crate) config: &'a Config<'a>,
-    pub(crate) syntax: &'a Syntax<'a>,
+    pub(crate) config: &'a Config,
+    pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
     pub(crate) ext: Option<&'a str>,
     pub(crate) mime_type: String,
-    pub(crate) path: Rc<Path>,
+    pub(crate) path: Arc<Path>,
 }
 
 impl TemplateInput<'_> {
@@ -31,7 +33,7 @@ impl TemplateInput<'_> {
     /// `template()` attribute list fields.
     pub(crate) fn new<'n>(
         ast: &'n syn::DeriveInput,
-        config: &'n Config<'_>,
+        config: &'n Config,
         args: &'n TemplateArgs,
     ) -> Result<TemplateInput<'n>, CompileError> {
         let TemplateArgs {
@@ -113,26 +115,26 @@ impl TemplateInput<'_> {
 
     pub(crate) fn find_used_templates(
         &self,
-        map: &mut HashMap<Rc<Path>, Parsed>,
+        map: &mut HashMap<Arc<Path>, Arc<Parsed>>,
     ) -> Result<(), CompileError> {
         let (source, source_path) = match &self.source {
             Source::Source(s) => (s.clone(), None),
             Source::Path(_) => (
                 get_template_source(&self.path, None)?,
-                Some(Rc::clone(&self.path)),
+                Some(Arc::clone(&self.path)),
             ),
         };
 
         let mut dependency_graph = Vec::new();
-        let mut check = vec![(Rc::clone(&self.path), source, source_path)];
+        let mut check = vec![(Arc::clone(&self.path), source, source_path)];
         while let Some((path, source, source_path)) = check.pop() {
-            let parsed = Parsed::new(source, source_path, self.syntax)?;
+            let parsed = self.syntax.parse(source, source_path)?;
 
             let mut top = true;
             let mut nested = vec![parsed.nodes()];
             while let Some(nodes) = nested.pop() {
                 for n in nodes {
-                    let mut add_to_check = |new_path: Rc<Path>| -> Result<(), CompileError> {
+                    let mut add_to_check = |new_path: Arc<Path>| -> Result<(), CompileError> {
                         if let Entry::Vacant(e) = map.entry(new_path) {
                             // Add a dummy entry to `map` in order to prevent adding `path`
                             // multiple times to `check`.
@@ -142,7 +144,7 @@ impl TemplateInput<'_> {
                                 Some((&path, parsed.source(), n.span())),
                             )?;
                             check.push((new_path.clone(), source, Some(new_path.clone())));
-                            e.insert(Parsed::default());
+                            e.insert(Arc::default());
                         }
                         Ok(())
                     };
@@ -422,7 +424,7 @@ fn extension(path: &Path) -> Option<&str> {
 #[derive(Debug, Hash, PartialEq)]
 pub(crate) enum Source {
     Path(String),
-    Source(Rc<str>),
+    Source(Arc<str>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
@@ -483,7 +485,7 @@ const TEXT_TYPES: [(Mime, Mime); 7] = [
     (mime::IMAGE_SVG, mime::IMAGE_SVG),
 ];
 
-fn cyclic_graph_error(dependency_graph: &[(Rc<Path>, Rc<Path>)]) -> Result<(), CompileError> {
+fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
     Err(CompileError::no_file_info(format!(
         "cyclic dependency in graph {:#?}",
         dependency_graph
@@ -491,6 +493,38 @@ fn cyclic_graph_error(dependency_graph: &[(Rc<Path>, Rc<Path>)]) -> Result<(), C
             .map(|e| format!("{:#?} --> {:#?}", e.0, e.1))
             .collect::<Vec<String>>()
     )))
+}
+
+pub(crate) fn get_template_source(
+    tpl_path: &Arc<Path>,
+    import_from: Option<(&Arc<Path>, &str, &str)>,
+) -> Result<Arc<str>, CompileError> {
+    static CACHE: OnceLock<OnceMap<Arc<Path>, Arc<str>>> = OnceLock::new();
+
+    CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+        tpl_path,
+        (),
+        Arc::clone,
+        |_, tpl_path| match read_to_string(tpl_path) {
+            Ok(mut source) => {
+                if source.ends_with('\n') {
+                    let _ = source.pop();
+                }
+                let source = Arc::from(source);
+                Ok((Arc::clone(&source), source))
+            }
+            Err(err) => Err(CompileError::new(
+                format_args!(
+                    "unable to open template file '{}': {err}",
+                    tpl_path.to_str().unwrap(),
+                ),
+                import_from.map(|(node_file, file_source, node_source)| {
+                    FileInfo::new(node_file, Some(file_source), Some(node_source))
+                }),
+            )),
+        },
+        |_, _, cached| Arc::clone(cached),
+    )
 }
 
 #[cfg(test)]
@@ -540,5 +574,13 @@ mod tests {
         assert_eq!(extension(Path::new("foo-bar.j2")), Some("j2"));
         assert_eq!(extension(Path::new("foo-bar.jinja")), Some("jinja"));
         assert_eq!(extension(Path::new("foo-bar.jinja2")), Some("jinja2"));
+    }
+
+    #[test]
+    fn get_source() {
+        let path = Config::new("", None, None)
+            .and_then(|config| config.find_template("b.html", None))
+            .unwrap();
+        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
     }
 }

@@ -1,36 +1,112 @@
-use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::borrow::{Borrow, Cow};
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::mem::transmute;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, OnceLock};
 use std::{env, fs};
 
+use once_map::sync::OnceMap;
 use parser::node::Whitespace;
-use parser::Syntax;
+use parser::{ParseError, Parsed, Syntax};
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
 use crate::{CompileError, FileInfo, CRATE};
 
-#[derive(Debug, Hash, PartialEq)]
-pub(crate) struct Config<'a> {
+#[derive(Debug)]
+pub(crate) struct Config {
     pub(crate) dirs: Vec<PathBuf>,
-    pub(crate) syntaxes: BTreeMap<String, Syntax<'a>>,
-    pub(crate) default_syntax: &'a str,
-    pub(crate) escapers: Vec<(Vec<Cow<'a, str>>, Cow<'a, str>)>,
+    pub(crate) syntaxes: BTreeMap<String, SyntaxAndCache<'static>>,
+    pub(crate) default_syntax: &'static str,
+    pub(crate) escapers: Vec<(Vec<Cow<'static, str>>, Cow<'static, str>)>,
     pub(crate) whitespace: WhitespaceHandling,
+    // `Config` is self referencial and `_key` owns it data, so it must come last
+    _key: OwnedConfigKey,
 }
 
-impl<'a> Config<'a> {
+impl Drop for Config {
+    #[track_caller]
+    fn drop(&mut self) {
+        panic!();
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct OwnedConfigKey(Arc<ConfigKey<'static>>);
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct ConfigKey<'a> {
+    source: Cow<'a, str>,
+    config_path: Option<Cow<'a, str>>,
+    template_whitespace: Option<Cow<'a, str>>,
+}
+
+impl<'a> ToOwned for ConfigKey<'a> {
+    type Owned = OwnedConfigKey;
+
+    fn to_owned(&self) -> Self::Owned {
+        OwnedConfigKey(Arc::new(ConfigKey {
+            source: Cow::Owned(self.source.as_ref().to_owned()),
+            config_path: self
+                .config_path
+                .as_ref()
+                .map(|s| Cow::Owned(s.as_ref().to_owned())),
+            template_whitespace: self
+                .template_whitespace
+                .as_ref()
+                .map(|s| Cow::Owned(s.as_ref().to_owned())),
+        }))
+    }
+}
+
+impl<'a> Borrow<ConfigKey<'a>> for OwnedConfigKey {
+    fn borrow(&self) -> &ConfigKey<'a> {
+        self.0.as_ref()
+    }
+}
+
+impl Config {
     pub(crate) fn new(
-        s: &'a str,
+        source: &str,
         config_path: Option<&str>,
         template_whitespace: Option<&str>,
-    ) -> std::result::Result<Config<'a>, CompileError> {
+    ) -> Result<&'static Config, CompileError> {
+        static CACHE: OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
+
+        let config = CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+            &ConfigKey {
+                source: source.into(),
+                config_path: config_path.map(Cow::Borrowed),
+                template_whitespace: template_whitespace.map(Cow::Borrowed),
+            },
+            (),
+            ConfigKey::to_owned,
+            |_, key| match Config::new_uncached(key.clone()) {
+                Ok(config) => Ok((Arc::clone(&config), config)),
+                Err(err) => Err(err),
+            },
+            |_, _, value| Arc::clone(value),
+        )?;
+        // SAFETY: an inserted `Config` will never be evicted
+        Ok(unsafe { transmute::<&Config, &'static Config>(config.as_ref()) })
+    }
+}
+
+impl Config {
+    fn new_uncached(key: OwnedConfigKey) -> Result<Arc<Config>, CompileError> {
+        // SAFETY: the resulting `Config` will keep a reference to the `key`
+        let eternal_key =
+            unsafe { transmute::<&ConfigKey<'_>, &'static ConfigKey<'static>>(key.borrow()) };
+        let s = eternal_key.source.as_ref();
+        let config_path = eternal_key.config_path.as_deref();
+        let template_whitespace = eternal_key.template_whitespace.as_deref();
+
         let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let default_dirs = vec![root.join("templates")];
 
         let mut syntaxes = BTreeMap::new();
-        syntaxes.insert(DEFAULT_SYNTAX_NAME.to_string(), Syntax::default());
+        syntaxes.insert(DEFAULT_SYNTAX_NAME.to_string(), SyntaxAndCache::default());
 
         let raw = if s.is_empty() {
             RawConfig::default()
@@ -74,15 +150,16 @@ impl<'a> Config<'a> {
         if let Some(raw_syntaxes) = raw.syntax {
             for raw_s in raw_syntaxes {
                 let name = raw_s.name;
-
-                if syntaxes
-                    .insert(name.to_string(), raw_s.try_into()?)
-                    .is_some()
-                {
-                    return Err(CompileError::new(
-                        format!("syntax \"{name}\" is already defined",),
-                        file_info,
-                    ));
+                match syntaxes.entry(name.to_string()) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(SyntaxAndCache::new(raw_s.try_into()?));
+                    }
+                    Entry::Occupied(_) => {
+                        return Err(CompileError::new(
+                            format_args!("syntax {name:?} is already defined"),
+                            file_info,
+                        ));
+                    }
                 }
             }
         }
@@ -107,20 +184,21 @@ impl<'a> Config<'a> {
             ));
         }
 
-        Ok(Config {
+        Ok(Arc::new(Config {
             dirs,
             syntaxes,
             default_syntax,
             escapers,
             whitespace,
-        })
+            _key: key,
+        }))
     }
 
     pub(crate) fn find_template(
         &self,
         path: &str,
         start_at: Option<&Path>,
-    ) -> std::result::Result<Rc<Path>, CompileError> {
+    ) -> Result<Arc<Path>, CompileError> {
         if let Some(root) = start_at {
             let relative = root.with_file_name(path);
             if relative.exists() {
@@ -139,6 +217,82 @@ impl<'a> Config<'a> {
             "template {:?} not found in directories {:?}",
             path, self.dirs
         )))
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct SyntaxAndCache<'a> {
+    syntax: Syntax<'a>,
+    cache: OnceMap<OwnedSyntaxAndCacheKey, Arc<Parsed>>,
+}
+
+impl<'a> Deref for SyntaxAndCache<'a> {
+    type Target = Syntax<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.syntax
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct OwnedSyntaxAndCacheKey(SyntaxAndCacheKey<'static>);
+
+impl Deref for OwnedSyntaxAndCacheKey {
+    type Target = SyntaxAndCacheKey<'static>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct SyntaxAndCacheKey<'a> {
+    source: Cow<'a, Arc<str>>,
+    source_path: Option<Cow<'a, Arc<Path>>>,
+}
+
+impl<'a> Borrow<SyntaxAndCacheKey<'a>> for OwnedSyntaxAndCacheKey {
+    fn borrow(&self) -> &SyntaxAndCacheKey<'a> {
+        &self.0
+    }
+}
+
+impl<'a> SyntaxAndCache<'a> {
+    fn new(syntax: Syntax<'a>) -> Self {
+        Self {
+            syntax,
+            cache: OnceMap::new(),
+        }
+    }
+
+    pub(crate) fn parse(
+        &self,
+        source: Arc<str>,
+        source_path: Option<Arc<Path>>,
+    ) -> Result<Arc<Parsed>, ParseError> {
+        self.cache.get_or_try_insert_ref(
+            &SyntaxAndCacheKey {
+                source: Cow::Owned(source),
+                source_path: source_path.map(Cow::Owned),
+            },
+            &self.syntax,
+            |key| {
+                OwnedSyntaxAndCacheKey(SyntaxAndCacheKey {
+                    source: Cow::Owned(Arc::clone(key.source.as_ref())),
+                    source_path: key
+                        .source_path
+                        .as_deref()
+                        .map(|v| Cow::Owned(Arc::clone(v))),
+                })
+            },
+            |syntax, key| {
+                let source = Arc::clone(key.source.as_ref());
+                let source_path = key.source_path.as_deref().map(Arc::clone);
+                let parsed = Arc::new(Parsed::new(source, source_path, syntax)?);
+                Ok((Arc::clone(&parsed), parsed))
+            },
+            |_, _, cached| Arc::clone(cached),
+        )
     }
 }
 
@@ -202,14 +356,14 @@ struct RawConfig<'a> {
 
 impl RawConfig<'_> {
     #[cfg(feature = "config")]
-    fn from_toml_str(s: &str) -> std::result::Result<RawConfig<'_>, CompileError> {
+    fn from_toml_str(s: &str) -> Result<RawConfig<'_>, CompileError> {
         basic_toml::from_str(s).map_err(|e| {
             CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"))
         })
     }
 
     #[cfg(not(feature = "config"))]
-    fn from_toml_str(_: &str) -> std::result::Result<RawConfig<'_>, CompileError> {
+    fn from_toml_str(_: &str) -> Result<RawConfig<'_>, CompileError> {
         Err(CompileError::no_file_info("TOML support not available"))
     }
 }
@@ -265,9 +419,7 @@ struct RawEscaper<'a> {
     extensions: Vec<&'a str>,
 }
 
-pub(crate) fn read_config_file(
-    config_path: Option<&str>,
-) -> std::result::Result<String, CompileError> {
+pub(crate) fn read_config_file(config_path: Option<&str>) -> Result<String, CompileError> {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let filename = match config_path {
         Some(config_path) => root.join(config_path),
@@ -288,32 +440,8 @@ pub(crate) fn read_config_file(
     }
 }
 
-fn str_set<'a>(vals: &[&'a str]) -> Vec<Cow<'a, str>> {
-    vals.iter().copied().map(Cow::from).collect()
-}
-
-pub(crate) fn get_template_source(
-    tpl_path: &Path,
-    import_from: Option<(&Rc<Path>, &str, &str)>,
-) -> Result<Rc<str>, CompileError> {
-    match fs::read_to_string(tpl_path) {
-        Ok(mut source) => {
-            if source.ends_with('\n') {
-                let _ = source.pop();
-            }
-            Ok(source.into())
-        }
-        Err(err) => {
-            let msg = format!(
-                "unable to open template file '{}': {err}",
-                tpl_path.to_str().unwrap(),
-            );
-            let file_info = import_from.map(|(node_file, file_source, node_source)| {
-                FileInfo::new(node_file, Some(file_source), Some(node_source))
-            });
-            Err(CompileError::new(msg, file_info))
-        }
-    }
+fn str_set(vals: &[&'static str]) -> Vec<Cow<'static, str>> {
+    vals.iter().map(|s| Cow::Borrowed(*s)).collect()
 }
 
 static CONFIG_FILE_NAME: &str = "rinja.toml";
@@ -332,14 +460,6 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::*;
-
-    #[test]
-    fn get_source() {
-        let path = Config::new("", None, None)
-            .and_then(|config| config.find_template("b.html", None))
-            .unwrap();
-        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
-    }
 
     #[test]
     fn test_default_config() {
@@ -499,6 +619,14 @@ mod tests {
     #[cfg(feature = "config")]
     #[test]
     fn illegal_delimiters() {
+        #[track_caller]
+        fn expect_err<T, E>(result: Result<T, E>) -> E {
+            match result {
+                Ok(_) => panic!("should have failed"),
+                Err(err) => err,
+            }
+        }
+
         let raw_config = r#"
         [[syntax]]
         name = "too_short"
@@ -506,7 +634,7 @@ mod tests {
         "#;
         let config = Config::new(raw_config, None, None);
         assert_eq!(
-            config.unwrap_err().msg,
+            expect_err(config).msg,
             r#"delimiters must be at least two characters long: "<""#,
         );
 
@@ -517,7 +645,7 @@ mod tests {
         "#;
         let config = Config::new(raw_config, None, None);
         assert_eq!(
-            config.unwrap_err().msg,
+            expect_err(config).msg,
             r#"delimiters may not contain white spaces: " {{ ""#,
         );
 
@@ -530,7 +658,7 @@ mod tests {
         "#;
         let config = Config::new(raw_config, None, None);
         assert_eq!(
-            config.unwrap_err().msg,
+            expect_err(config).msg,
             r#"a delimiter may not be the prefix of another delimiter: "{{" vs "{{$""#,
         );
     }

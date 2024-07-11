@@ -6,7 +6,7 @@ use std::cell::Cell;
 use std::env::current_dir;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::{fmt, str};
 
 use nom::branch::alt;
@@ -30,7 +30,7 @@ mod tests;
 
 mod _parsed {
     use std::path::Path;
-    use std::rc::Rc;
+    use std::sync::Arc;
     use std::{fmt, mem};
 
     use super::node::Node;
@@ -40,15 +40,15 @@ mod _parsed {
         // `source` must outlive `ast`, so `ast` must be declared before `source`
         ast: Ast<'static>,
         #[allow(dead_code)]
-        source: Rc<str>,
+        source: Arc<str>,
     }
 
     impl Parsed {
         /// If `file_path` is `None`, it means the `source` is an inline template. Therefore, if
         /// a parsing error occurs, we won't display the path as it wouldn't be useful.
         pub fn new(
-            source: Rc<str>,
-            file_path: Option<Rc<Path>>,
+            source: Arc<str>,
+            file_path: Option<Arc<Path>>,
             syntax: &Syntax<'_>,
         ) -> Result<Self, ParseError> {
             // Self-referential borrowing: `self` will keep the source alive as `String`,
@@ -105,7 +105,7 @@ impl<'a> Ast<'a> {
     /// a parsing error occurs, we won't display the path as it wouldn't be useful.
     pub fn from_str(
         src: &'a str,
-        file_path: Option<Rc<Path>>,
+        file_path: Option<Arc<Path>>,
         syntax: &Syntax<'_>,
     ) -> Result<Self, ParseError> {
         let parse = |i: &'a str| Node::many(i, &State::new(syntax));
@@ -204,7 +204,7 @@ pub enum ParseError {
         row: usize,
         column: usize,
         source_after: String,
-        file_path: Option<Rc<Path>>,
+        file_path: Option<Arc<Path>>,
     },
 }
 

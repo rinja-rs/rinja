@@ -105,7 +105,7 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
 fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let template_args = TemplateArgs::fallback();
     let config = Config::new("", None, None)?;
-    let input = TemplateInput::new(ast, &config, &template_args)?;
+    let input = TemplateInput::new(ast, config, &template_args)?;
     let mut contexts = HashMap::new();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
@@ -131,7 +131,7 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
     let config_path = template_args.config_path();
     let s = read_config_file(config_path)?;
     let config = Config::new(&s, config_path, template_args.whitespace.as_deref())?;
-    let input = TemplateInput::new(ast, &config, &template_args)?;
+    let input = TemplateInput::new(ast, config, &template_args)?;
 
     let mut templates = HashMap::new();
     input.find_used_templates(&mut templates)?;
