@@ -45,6 +45,7 @@ pub enum Expr<'a> {
     Attr(Box<WithSpan<'a, Expr<'a>>>, &'a str),
     Index(Box<WithSpan<'a, Expr<'a>>>, Box<WithSpan<'a, Expr<'a>>>),
     Filter(Filter<'a>),
+    As(Box<WithSpan<'a, Expr<'a>>>, &'a str),
     NamedArgument(&'a str, Box<WithSpan<'a, Expr<'a>>>),
     Unary(&'a str, Box<WithSpan<'a, Expr<'a>>>),
     BinOp(
@@ -190,26 +191,49 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));
     expr_prec_layer!(addsub, muldivmod, alt((tag("+"), tag("-"))));
-    expr_prec_layer!(muldivmod, is_defined, alt((tag("*"), tag("/"), tag("%"))));
+    expr_prec_layer!(muldivmod, is_as, alt((tag("*"), tag("/"), tag("%"))));
 
-    fn is_defined(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let (i, lhs) = Self::filtered(i, level)?;
-        let (i, rhs) = opt(preceded(
-            ws(keyword("is")),
-            opt(terminated(opt(keyword("not")), ws(keyword("defined")))),
-        ))(i)?;
-        let is_neg = match rhs {
-            None => return Ok((i, lhs)),
-            Some(None) => {
+        let (j, rhs) = opt(ws(identifier))(i)?;
+        let i = match rhs {
+            Some("is") => j,
+            Some("as") => {
+                let (i, target) = opt(identifier)(j)?;
+                let target = target.unwrap_or_default();
+                return match target {
+                    "bool" | "f16" | "f32" | "f64" | "f128" | "i8" | "i16" | "i32" | "i64"
+                    | "i128" | "isize" | "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
+                        Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)))
+                    }
+                    "" => Err(nom::Err::Failure(ErrorContext::new(
+                        "`as` operator expects the name of a primitive type on its right-hand side",
+                        start,
+                    ))),
+                    _ => Err(nom::Err::Failure(ErrorContext::new(
+                        format!(
+                            "`as` operator expects the name of a primitive type on its right-hand \
+                              side, found `{target}`"
+                        ),
+                        start,
+                    ))),
+                };
+            }
+            _ => return Ok((i, lhs)),
+        };
+
+        let (i, rhs) = opt(terminated(opt(keyword("not")), ws(keyword("defined"))))(i)?;
+        let ctor = match rhs {
+            None => {
                 return Err(nom::Err::Failure(ErrorContext::new(
                     "expected `defined` or `not defined` after `is`",
                     // We use `start` to show the whole `var is` thing instead of the current token.
                     start,
                 )));
             }
-            Some(Some(None)) => false,
-            Some(Some(Some(_))) => true,
+            Some(None) => Self::IsDefined,
+            Some(Some(_)) => Self::IsNotDefined,
         };
         let var_name = match *lhs {
             Self::Var(var_name) => var_name,
@@ -226,18 +250,7 @@ impl<'a> Expr<'a> {
                 )));
             }
         };
-
-        Ok((
-            i,
-            WithSpan::new(
-                if is_neg {
-                    Self::IsNotDefined(var_name)
-                } else {
-                    Self::IsDefined(var_name)
-                },
-                start,
-            ),
-        ))
+        Ok((i, WithSpan::new(ctor(var_name), start)))
     }
 
     fn filtered(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {

@@ -263,7 +263,7 @@ writer.write_str("bla")?;"#,
         "{% if x == 12 %}bli
          {%- else if x is defined %}12
          {%- else %}nope{% endif %}",
-        r#"if *(&(self.x == 12) as &bool) {
+        r#"if *(&(self.x == 12) as &::core::primitive::bool) {
 writer.write_str("bli")?;
 } else {
 writer.write_str("12")?;
@@ -276,7 +276,7 @@ writer.write_str("12")?;
     // are present.
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(false || self.x == 12) as &bool) {
+        r#"if *(&(false || self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -291,7 +291,7 @@ writer.write_str("12")?;
     );
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(true || self.x == 12) as &bool) {
+        r#"if *(&(true || self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -379,7 +379,7 @@ fn check_bool_conditions() {
 
     compare(
         "{% if true || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(true || self.x == 12) as &bool) {
+        r#"if *(&(true || self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -394,7 +394,7 @@ fn check_bool_conditions() {
     );
     compare(
         "{% if false || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(false || self.x == 12) as &bool) {
+        r#"if *(&(false || self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(
             &(self.x),

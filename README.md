@@ -1,6 +1,6 @@
 # rinja
 
-`rinja` is based on [Askama](https://crates.io/crates/askama).
+**Rinja** is based on [Askama](https://crates.io/crates/askama).
 It implements a template rendering engine based on [Jinja](https://jinja.palletsprojects.com/), and
 generates type-safe Rust code from your templates at compile time
 based on a user-defined `struct` to hold the template's context.

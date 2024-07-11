@@ -296,7 +296,7 @@ struct MyTemplate {
 
 ## Calling functions
 
-If you only provide a function name, `rinja` will assume it's a method. If
+If you only provide a function name, rinja will assume it's a method. If
 you want to call a method, you will need to use a path instead:
 
 ```jinja
@@ -658,6 +658,16 @@ E.g. to test if the least significant bit is set in an integer field:
 {% endif %}
 ```
 
+### Type conversion
+
+You can use the [`as`](https://doc.rust-lang.org/std/keyword.as.html) operator in `{{ … }}`
+expressions, and `{% … %}` blocks. It works the same as in Rust, but with some deliberate
+restrictions:
+
+- You can only use [primitive types](https://doc.rust-lang.org/std/primitive/index.html)
+  like `i32` or `f64` both as source variable type and as target type.
+- If the source is a reference to a primitive type, e.g. `&&&bool`, then rinja automatically
+  dereferences the value until it gets the underlying `bool`.
 
 ## Templates in templates
 

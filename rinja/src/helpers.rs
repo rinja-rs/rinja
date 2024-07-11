@@ -89,3 +89,42 @@ where
         Ok(())
     }
 }
+
+pub fn get_primitive_value<T: PrimitiveType>(value: &T) -> T::Value {
+    value.get()
+}
+
+pub trait PrimitiveType: Copy {
+    type Value: Copy;
+
+    fn get(self) -> Self::Value;
+}
+
+impl<T: PrimitiveType> PrimitiveType for &T {
+    type Value = T::Value;
+
+    #[inline]
+    fn get(self) -> Self::Value {
+        T::get(*self)
+    }
+}
+
+macro_rules! primitive_type {
+    ($($ty:ty),* $(,)?) => {$(
+        impl PrimitiveType for $ty {
+            type Value = $ty;
+
+            #[inline]
+            fn get(self) -> Self::Value {
+                self
+            }
+        }
+    )*};
+}
+
+primitive_type! {
+    bool,
+    f32, f64,
+    i8, i16, i32, i64, i128, isize,
+    u8, u16, u32, u64, u128, usize,
+}
