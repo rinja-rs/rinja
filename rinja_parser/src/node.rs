@@ -1046,10 +1046,15 @@ impl<'a> Comment<'a> {
 
 #[derive(Debug, PartialEq)]
 pub struct IfdefBlock<'a> {
-    pub ws1: Ws,
-    pub cond: WithSpan<'a, IfdefTest<'a>>,
+    pub branches: Vec<WithSpan<'a, IfdefBranch<'a>>>,
+    pub last_ws: Ws,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IfdefBranch<'a> {
+    pub ws: Ws,
+    pub cond: Option<WithSpan<'a, IfdefTest<'a>>>,
     pub nodes: Vec<Node<'a>>,
-    pub ws2: Ws,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1062,28 +1067,85 @@ pub enum IfdefTest<'a> {
 
 impl<'a> IfdefBlock<'a> {
     fn parse(start: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let (i, (pws1, _, (cond, nws1, _, nodes, _, pws2, _, nws2))) = tuple((
+        let end = map(
+            tuple((
+                opt(Whitespace::parse),
+                ws(keyword("endifdef")),
+                opt(Whitespace::parse),
+            )),
+            |(pws, _, nws)| Ws(pws, nws),
+        );
+
+        let (i, (fst, (mut branches, otherwise, last_ws))) = s.nest(
+            start,
+            pair(
+                |i| IfdefBranch::parse(i, s, "ifdef"),
+                cut(tuple((
+                    many0(|i| IfdefBranch::parse(i, s, "elifdef")),
+                    opt(|i| IfdefBranch::parse_else(i, s)),
+                    end,
+                ))),
+            ),
+        )?;
+
+        branches.reserve_exact(1 + otherwise.is_some() as usize);
+        branches.insert(0, fst);
+        if let Some(otherwise) = otherwise {
+            branches.push(otherwise);
+        }
+
+        Ok((i, WithSpan::new(Self { branches, last_ws }, start)))
+    }
+}
+
+impl<'a> IfdefBranch<'a> {
+    fn parse(
+        start: &'a str,
+        s: &State<'_>,
+        kw: &'static str,
+    ) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let (i, (pws, _, (cond, nws, _, nodes, _))) = tuple((
             opt(Whitespace::parse),
-            ws(keyword("ifdef")),
+            ws(keyword(kw)),
             cut(tuple((
                 ws(|i| IfdefTest::parse(i, s)),
                 opt(Whitespace::parse),
                 |i| s.tag_block_end(i),
                 |i| Node::many(i, s),
                 |i| s.tag_block_start(i),
-                opt(Whitespace::parse),
-                ws(keyword("endifdef")),
-                opt(Whitespace::parse),
             ))),
         ))(start)?;
         Ok((
             i,
             WithSpan::new(
-                Self {
-                    ws1: Ws(pws1, nws1),
-                    cond,
+                IfdefBranch {
+                    ws: Ws(pws, nws),
+                    cond: Some(cond),
                     nodes,
-                    ws2: Ws(pws2, nws2),
+                },
+                start,
+            ),
+        ))
+    }
+
+    fn parse_else(start: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let (i, (pws, _, (nws, _, nodes, _))) = tuple((
+            opt(Whitespace::parse),
+            ws(keyword("else")),
+            cut(tuple((
+                opt(Whitespace::parse),
+                |i| s.tag_block_end(i),
+                |i| Node::many(i, s),
+                |i| s.tag_block_start(i),
+            ))),
+        ))(start)?;
+        Ok((
+            i,
+            WithSpan::new(
+                IfdefBranch {
+                    ws: Ws(pws, nws),
+                    cond: None,
+                    nodes,
                 },
                 start,
             ),

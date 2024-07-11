@@ -725,12 +725,21 @@ impl<'a> Generator<'a> {
         ifdef: &'a WithSpan<'_, IfdefBlock<'_>>,
         level: AstLevel,
     ) -> Result<usize, CompileError> {
-        self.handle_ws(ifdef.ws1);
-        let size_hint = match self.input.test_ifdef_cond(ctx, &ifdef.cond)? {
-            true => self.handle(ctx, &ifdef.nodes, buf, level)?,
-            false => 0,
-        };
-        self.prepare_ws(ifdef.ws2);
+        let mut size_hint = 0;
+        let mut found = false;
+        for branch in &ifdef.branches {
+            self.handle_ws(branch.ws);
+            if !found {
+                found = match &branch.cond {
+                    Some(cond) => self.input.test_ifdef_cond(ctx, cond)?,
+                    None => true,
+                };
+                if found {
+                    size_hint = self.handle(ctx, &branch.nodes, buf, level)?
+                }
+            }
+        }
+        self.handle_ws(ifdef.last_ws);
         Ok(size_hint)
     }
 

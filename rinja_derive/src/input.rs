@@ -195,7 +195,9 @@ impl TemplateInput<'_> {
                             }
                         }
                         Node::Ifdef(i) => {
-                            nested.push(&i.nodes);
+                            for branch in &i.branches {
+                                nested.push(&branch.nodes);
+                            }
                         }
                         Node::Lit(_)
                         | Node::Comment(_)
