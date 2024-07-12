@@ -753,7 +753,7 @@ fn filter<'a>(
         ))(j)
     } else {
         Err(nom::Err::Failure(ErrorContext::new(
-            "the filter operator `|` must not be preceeded by any whitespace characters\n\
+            "the filter operator `|` must not be preceded by any whitespace characters\n\
             the binary OR operator is called `bitor` in rinja",
             i,
         )))
