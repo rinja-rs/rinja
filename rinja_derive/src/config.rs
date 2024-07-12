@@ -21,7 +21,7 @@ pub(crate) struct Config {
     pub(crate) default_syntax: &'static str,
     pub(crate) escapers: Vec<(Vec<Cow<'static, str>>, Cow<'static, str>)>,
     pub(crate) whitespace: WhitespaceHandling,
-    // `Config` is self referencial and `_key` owns it data, so it must come last
+    // `Config` is self referential and `_key` owns it data, so it must come last
     _key: OwnedConfigKey,
 }
 

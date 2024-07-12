@@ -1,4 +1,4 @@
-error: the filter operator `|` must not be preceeded by any whitespace characters
+error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
        failed to parse template source at row 1, column 3 near:
        " |lower}}"
@@ -9,7 +9,7 @@ error: the filter operator `|` must not be preceeded by any whitespace character
   |
   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: the filter operator `|` must not be preceeded by any whitespace characters
+error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
        failed to parse template source at row 1, column 3 near:
        " | lower}}"
