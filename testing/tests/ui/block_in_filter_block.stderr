@@ -1,0 +1,9 @@
+error: cannot have a block inside a filter block
+ --> BlockInFilter.html:7:10
+       " block title %}New title{% endblock %}\n "...
+ --> tests/ui/block_in_filter_block.rs:3:10
+  |
+3 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
