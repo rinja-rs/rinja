@@ -8,7 +8,6 @@ categories = ["template-engine"]
 homepage = "https://github.com/rinja-rs/rinja"
 repository = "https://github.com/rinja-rs/rinja"
 license = "MIT OR Apache-2.0"
-workspace = ".."
 readme = "README.md"
 edition = "2021"
 rust-version = "1.71"
@@ -27,3 +26,6 @@ humansize = ["rinja/humansize"]
 num-traits = ["rinja/num-traits"]
 serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
+
+[workspace]
+members = ["."]

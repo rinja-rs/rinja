@@ -1,19 +1,8 @@
 [workspace]
 members = [
     "rinja",
-    "rinja_actix",
-    "rinja_axum",
     "rinja_derive",
     "rinja_parser",
-    "rinja_rocket",
-    "rinja_warp",
     "testing",
 ]
 resolver = "2"
-
-default-members = [
-    "rinja",
-    "rinja_derive",
-    "rinja_parser",
-    "testing",
-]
