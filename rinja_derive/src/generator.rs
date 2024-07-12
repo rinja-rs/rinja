@@ -39,6 +39,8 @@ pub(crate) struct Generator<'a> {
     buf_writable: WritableBuffer<'a>,
     // Counter for write! hash named arguments
     named: usize,
+    // Used in blocks to check if we are inside a filter block.
+    is_in_filter_block: usize,
 }
 
 impl<'a> Generator<'a> {
@@ -48,6 +50,7 @@ impl<'a> Generator<'a> {
         heritage: Option<&'n Heritage<'_>>,
         locals: MapChain<'n, Cow<'n, str>, LocalMeta>,
         buf_writable_discard: bool,
+        is_in_filter_block: usize,
     ) -> Generator<'n> {
         Generator {
             input,
@@ -62,6 +65,7 @@ impl<'a> Generator<'a> {
                 ..Default::default()
             },
             named: 0,
+            is_in_filter_block,
         }
     }
 
@@ -92,6 +96,7 @@ impl<'a> Generator<'a> {
             -> {CRATE}::Result<()> {{",
         ));
         buf.writeln(format_args!("use {CRATE}::filters::AutoEscape as _;"));
+        buf.writeln(format_args!("use ::core::fmt::Write as _;"));
 
         buf.discard = self.buf_writable.discard;
         // Make sure the compiler understands that the generated code depends on the template files.
@@ -720,7 +725,9 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         filter: &'a WithSpan<'_, FilterBlock<'_>>,
     ) -> Result<usize, CompileError> {
+        self.write_buf_writable(ctx, buf)?;
         self.flush_ws(filter.ws1);
+        self.is_in_filter_block += 1;
         let mut var_name = String::new();
         for id in 0.. {
             var_name = format!("__filter_block{id}");
@@ -729,6 +736,9 @@ impl<'a> Generator<'a> {
                 break;
             }
         }
+        buf.write(format_args!(
+            "let mut {var_name} = String::new(); {{ let writer = &mut {var_name};"
+        ));
         let current_buf = mem::take(&mut self.buf_writable.buf);
 
         self.prepare_ws(filter.ws1);
@@ -739,26 +749,24 @@ impl<'a> Generator<'a> {
             size_hint: write_size_hint,
             buffers,
         } = self.prepare_format(ctx)?;
-        size_hint += match buffers {
-            None => return Ok(0),
+        self.buf_writable.buf = current_buf;
+        size_hint += write_size_hint;
+        match buffers {
+            None => {}
             Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(format_args!("let {var_name} = {:#?};", &format.buf));
-                write_size_hint
+                buf.writeln(format_args!("writer.write_str({:#?})?;", &format.buf));
             }
             Some(WritePartsBuffers {
                 format,
                 expr: Some(expr),
             }) => {
                 buf.writeln(format_args!(
-                    "let {var_name} = format!({:#?}, {});",
+                    "::std::write!(writer, {:#?}, {})?;",
                     &format.buf,
-                    expr.buf.trim(),
+                    expr.buf.trim()
                 ));
-                write_size_hint
             }
         };
-
-        self.buf_writable.buf = current_buf;
 
         let mut filter_buf = Buffer::new();
         let Filter {
@@ -778,6 +786,9 @@ impl<'a> Generator<'a> {
         // We don't forget to add the created variable into the list of variables in the scope.
         self.locals
             .insert(Cow::Owned(var_name), LocalMeta::initialized());
+
+        buf.writeln("}");
+        self.is_in_filter_block -= 1;
 
         Ok(size_hint)
     }
@@ -839,6 +850,7 @@ impl<'a> Generator<'a> {
             heritage.as_ref(),
             locals,
             self.buf_writable.discard,
+            self.is_in_filter_block,
         );
         let mut size_hint = child.handle(handle_ctx, handle_ctx.nodes, buf, AstLevel::Top)?;
         size_hint += child.write_buf_writable(handle_ctx, buf)?;
@@ -943,6 +955,9 @@ impl<'a> Generator<'a> {
         outer: Ws,
         node: &WithSpan<'_, T>,
     ) -> Result<usize, CompileError> {
+        if self.is_in_filter_block > 0 {
+            return Err(ctx.generate_error("cannot have a block inside a filter block", node));
+        }
         // Flush preceding whitespace according to the outer WS spec
         self.flush_ws(outer);
 
@@ -1010,6 +1025,7 @@ impl<'a> Generator<'a> {
             // Variables are NOT inherited from the parent scope.
             MapChain::default(),
             self.buf_writable.discard,
+            self.is_in_filter_block,
         );
         child.buf_writable = mem::take(&mut self.buf_writable);
 
