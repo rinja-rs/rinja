@@ -233,7 +233,7 @@ fn filter_block_include() {
     <body class=""><h1>Metadata</h1>
         
 
-    100</body>
+    99</body>
 </html>"#
     );
 }
@@ -271,4 +271,63 @@ fn filter_block_conditions() {
         v: Some("hoho".to_string()),
     };
     assert_eq!(s.render().unwrap(), "21x Is Big\n\n    V Is Hoho",);
+}
+
+// The output of `|upper` is not marked as `|safe`, so the output of `|paragraphbreaks` gets
+// escaped. The '&' in the input is is not marked as `|safe`, so it should get escaped, twice.
+#[derive(Template)]
+#[template(
+    source = r#"
+    {%- let count = 1 -%}
+    {%- let canary = 2 -%}
+    {%- filter upper -%}
+        {%- let canary = 3 -%}
+        [
+            {%- for _ in 0..=count %}
+                {%~ filter paragraphbreaks|safe -%}
+                    {{v}}
+                {%~ endfilter -%}
+            {%- endfor -%}
+        ]
+    {%~ endfilter %}{{ canary }}"#,
+    ext = "html"
+)]
+struct NestedFilterBlocks2 {
+    v: &'static str,
+}
+
+#[test]
+fn filter_nested_filter_blocks() {
+    let template = NestedFilterBlocks2 {
+        v: "Hello &\n\ngoodbye!",
+    };
+    assert_eq!(
+        template.render().unwrap(),
+        r#"[
+&#60;P&#62;HELLO &#38;#38;&#60;/P&#62;&#60;P&#62;GOODBYE!
+&#60;/P&#62;
+&#60;P&#62;HELLO &#38;#38;&#60;/P&#62;&#60;P&#62;GOODBYE!
+&#60;/P&#62;]
+2"#
+    );
+}
+
+#[derive(Template)]
+#[template(
+    source = r#"
+    {%- filter urlencode|urlencode|urlencode|urlencode -%}
+        {{ msg.clone()? }}
+    {%~ endfilter %}"#,
+    ext = "html"
+)]
+struct FilterBlockCustomErrors {
+    msg: Result<String, String>,
+}
+
+#[test]
+fn filter_block_custom_errors() {
+    let template = FilterBlockCustomErrors {
+        msg: Err("🐢".to_owned()),
+    };
+    assert_eq!(template.render().unwrap_err().to_string(), "🐢");
 }
