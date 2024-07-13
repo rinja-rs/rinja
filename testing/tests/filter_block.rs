@@ -254,8 +254,7 @@ fn filter_block_include() {
     {% endif -%}
 {% endfilter -%}
 "#,
-    ext = "html",
-    print = "code"
+    ext = "html"
 )]
 struct ConditionInFilter {
     x: usize,
