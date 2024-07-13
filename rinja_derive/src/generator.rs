@@ -1300,6 +1300,9 @@ impl<'a> Generator<'a> {
             "format" => return self._visit_format_filter(ctx, buf, args, filter),
             "join" => return self._visit_join_filter(ctx, buf, args),
             "json" | "tojson" => return self._visit_json_filter(ctx, buf, args, filter),
+            "linebreaks" | "linebreaksbr" | "paragraphbreaks" => {
+                return self._visit_linebreaks_filter(ctx, buf, name, args, filter);
+            }
             "ref" => return self._visit_ref_filter(ctx, buf, args, filter),
             "safe" => return self._visit_safe_filter(ctx, buf, args, filter),
             _ => {}
@@ -1312,6 +1315,31 @@ impl<'a> Generator<'a> {
         }
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_linebreaks_filter<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if args.len() != 1 {
+            return Err(
+                ctx.generate_error(&format!("unexpected argument(s) in `{name}` filter"), node)
+            );
+        }
+        buf.write(format_args!(
+            "{CRATE}::filters::{name}(&(&&{CRATE}::filters::AutoEscaper::new(&(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        // The input is always HTML escaped, regardless of the selected escaper:
+        buf.write(format_args!(
+            "), {CRATE}::filters::Html)).rinja_auto_escape()?)?",
+        ));
+        // The output is marked as HTML safe, not safe in all contexts:
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -1759,8 +1787,10 @@ impl<'a> Generator<'a> {
     }
 
     fn visit_filter_source(&mut self, buf: &mut Buffer) -> DisplayWrap {
-        buf.write(FILTER_SOURCE);
-        DisplayWrap::Unwrapped
+        // We can assume that the body of the `{% filter %}` was already escaped.
+        // And if it's not, then this was done intentionally.
+        buf.write(format_args!("{CRATE}::filters::Safe(&{FILTER_SOURCE})"));
+        DisplayWrap::Wrapped
     }
 
     fn visit_bool_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {

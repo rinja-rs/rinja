@@ -177,21 +177,21 @@ pub fn format() {}
 /// A single newline becomes an HTML line break `<br>` and a new line
 /// followed by a blank line becomes a paragraph break `<p>`.
 #[inline]
-pub fn linebreaks(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
-    fn linebreaks(s: String) -> Result<String, fmt::Error> {
+pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Display>, fmt::Error> {
+    fn linebreaks(s: String) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace('\n', "<br/>");
-        Ok(format!("<p>{linebroken}</p>"))
+        format!("<p>{linebroken}</p>")
     }
-    linebreaks(try_to_string(s)?)
+    Ok(HtmlSafeOutput(linebreaks(try_to_string(s)?)))
 }
 
 /// Converts all newlines in a piece of plain text to HTML line breaks
 #[inline]
-pub fn linebreaksbr(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
-    fn linebreaksbr(s: String) -> Result<String, fmt::Error> {
-        Ok(s.replace('\n', "<br/>"))
+pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Display>, fmt::Error> {
+    fn linebreaksbr(s: String) -> String {
+        s.replace('\n', "<br/>")
     }
-    linebreaksbr(try_to_string(s)?)
+    Ok(HtmlSafeOutput(linebreaksbr(try_to_string(s)?)))
 }
 
 /// Replaces only paragraph breaks in plain text with appropriate HTML
@@ -200,12 +200,14 @@ pub fn linebreaksbr(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Erro
 /// Paragraph tags only wrap content; empty paragraphs are removed.
 /// No `<br/>` tags are added.
 #[inline]
-pub fn paragraphbreaks(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
-    fn paragraphbreaks(s: String) -> Result<String, fmt::Error> {
+pub fn paragraphbreaks(
+    s: impl fmt::Display,
+) -> Result<HtmlSafeOutput<impl fmt::Display>, fmt::Error> {
+    fn paragraphbreaks(s: String) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace("<p></p>", "");
-        Ok(format!("<p>{linebroken}</p>"))
+        format!("<p>{linebroken}</p>")
     }
-    paragraphbreaks(try_to_string(s)?)
+    Ok(HtmlSafeOutput(paragraphbreaks(try_to_string(s)?)))
 }
 
 /// Converts to lowercase

@@ -254,8 +254,7 @@ fn filter_block_include() {
     {% endif -%}
 {% endfilter -%}
 "#,
-    ext = "html",
-    print = "code"
+    ext = "html"
 )]
 struct ConditionInFilter {
     x: usize,
@@ -284,7 +283,7 @@ fn filter_block_conditions() {
         {%- let canary = 3 -%}
         [
             {%- for _ in 0..=count %}
-                {%~ filter paragraphbreaks|safe -%}
+                {%~ filter paragraphbreaks -%}
                     {{v}}
                 {%~ endfilter -%}
             {%- endfor -%}

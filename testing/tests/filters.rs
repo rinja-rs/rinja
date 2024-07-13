@@ -392,3 +392,52 @@ fn test_let_borrow() {
     };
     assert_eq!(template.render().unwrap(), "hello1")
 }
+
+#[test]
+fn test_linebreaks() {
+    let s = "<script>\nalert('Hello, world!')\n</script>";
+
+    #[derive(Template)]
+    #[template(source = r#"{{ s|linebreaks }}"#, ext = "html")]
+    struct LineBreaks {
+        s: &'static str,
+    }
+
+    assert_eq!(
+        LineBreaks { s }.render().unwrap(),
+        "<p>&#60;script&#62;<br/>alert(&#39;Hello, world!&#39;)<br/>&#60;/script&#62;</p>",
+    );
+
+    #[derive(Template)]
+    #[template(source = r#"{{ s|escape|linebreaks }}"#, ext = "html")]
+    struct LineBreaksExtraEscape {
+        s: &'static str,
+    }
+
+    assert_eq!(
+        LineBreaksExtraEscape { s }.render().unwrap(),
+        "<p>&#60;script&#62;<br/>alert(&#39;Hello, world!&#39;)<br/>&#60;/script&#62;</p>",
+    );
+
+    #[derive(Template)]
+    #[template(source = r#"{{ s|linebreaks|safe }}"#, ext = "html")]
+    struct LineBreaksExtraSafe {
+        s: &'static str,
+    }
+
+    assert_eq!(
+        LineBreaksExtraSafe { s }.render().unwrap(),
+        "<p>&#60;script&#62;<br/>alert(&#39;Hello, world!&#39;)<br/>&#60;/script&#62;</p>",
+    );
+
+    #[derive(Template)]
+    #[template(source = r#"{{ s|escape|linebreaks|safe }}"#, ext = "html")]
+    struct LineBreaksExtraBoth {
+        s: &'static str,
+    }
+
+    assert_eq!(
+        LineBreaksExtraBoth { s }.render().unwrap(),
+        "<p>&#60;script&#62;<br/>alert(&#39;Hello, world!&#39;)<br/>&#60;/script&#62;</p>",
+    );
+}
