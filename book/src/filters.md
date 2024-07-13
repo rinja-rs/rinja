@@ -34,6 +34,7 @@ Enable it with Cargo features (see below for more information).
   * [`linebreaks`][#linebreaks]
   * [`linebreaksbr`][#linebreaksbr]
   * [`lower|lowercase`][#lower]
+  * [`paragraphbreaks`][#paragraphbreaks]
   * [`ref`][#ref]
   * [`safe`][#safe]
   * [`title`][#title]

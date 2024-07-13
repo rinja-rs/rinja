@@ -92,8 +92,10 @@ impl<'a> Generator<'a> {
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
         self.write_header(buf, format_args!("{CRATE}::Template"), None);
         buf.writeln(format_args!(
-            "fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) \
-            -> {CRATE}::Result<()> {{",
+            "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> {CRATE}::Result<()>\n\
+            where\n\
+                RinjaW: ::core::fmt::Write + ?::core::marker::Sized,\n\
+            {{",
         ));
         buf.writeln(format_args!("use {CRATE}::filters::AutoEscape as _;"));
         buf.writeln(format_args!("use ::core::fmt::Write as _;"));
@@ -728,68 +730,48 @@ impl<'a> Generator<'a> {
         self.write_buf_writable(ctx, buf)?;
         self.flush_ws(filter.ws1);
         self.is_in_filter_block += 1;
-        let mut var_name = String::new();
-        for id in 0.. {
-            var_name = format!("__filter_block{id}");
-            if self.locals.get(&Cow::Borrowed(&var_name)).is_none() {
-                // No variable with this name exists, we're in the clear!
-                break;
-            }
-        }
-        buf.write(format_args!(
-            "let mut {var_name} = String::new(); {{ let writer = &mut {var_name};"
+        self.write_buf_writable(ctx, buf)?;
+        buf.writeln("{");
+
+        // build `FmtCell` that contains the inner block
+        buf.writeln(format_args!(
+            "let {FILTER_SOURCE} = {CRATE}::helpers::FmtCell::new(\
+                |writer: &mut ::core::fmt::Formatter<'_>| -> {CRATE}::Result<()> {{"
         ));
-        let current_buf = mem::take(&mut self.buf_writable.buf);
-
+        self.locals.push();
         self.prepare_ws(filter.ws1);
-        let mut size_hint = self.handle(ctx, &filter.nodes, buf, AstLevel::Nested)?;
+        let size_hint = self.handle(ctx, &filter.nodes, buf, AstLevel::Nested)?;
         self.flush_ws(filter.ws2);
+        self.write_buf_writable(ctx, buf)?;
+        self.locals.pop();
+        buf.writeln(format_args!("{CRATE}::Result::Ok(())"));
+        buf.writeln("});");
 
-        let WriteParts {
-            size_hint: write_size_hint,
-            buffers,
-        } = self.prepare_format(ctx)?;
-        self.buf_writable.buf = current_buf;
-        size_hint += write_size_hint;
-        match buffers {
-            None => {}
-            Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(format_args!("writer.write_str({:#?})?;", &format.buf));
-            }
-            Some(WritePartsBuffers {
-                format,
-                expr: Some(expr),
-            }) => {
-                buf.writeln(format_args!(
-                    "::std::write!(writer, {:#?}, {})?;",
-                    &format.buf,
-                    expr.buf.trim()
-                ));
-            }
-        };
-
+        // display the `FmtCell`
         let mut filter_buf = Buffer::new();
-        let Filter {
-            name: filter_name,
-            arguments,
-        } = &filter.filters;
-        let mut arguments = arguments.clone();
-
-        insert_first_filter_argument(&mut arguments, var_name.clone());
-
-        let wrap = self.visit_filter(ctx, &mut filter_buf, filter_name, &arguments, filter)?;
-
-        self.buf_writable
-            .push(Writable::Generated(filter_buf.buf, wrap));
-        self.prepare_ws(filter.ws2);
-
-        // We don't forget to add the created variable into the list of variables in the scope.
-        self.locals
-            .insert(Cow::Owned(var_name), LocalMeta::initialized());
+        let display_wrap = self.visit_filter(
+            ctx,
+            &mut filter_buf,
+            filter.filters.name,
+            &filter.filters.arguments,
+            filter,
+        )?;
+        let filter_buf = match display_wrap {
+            DisplayWrap::Wrapped => filter_buf.buf,
+            DisplayWrap::Unwrapped => format!(
+                "(&&{CRATE}::filters::AutoEscaper::new(&({}), {})).rinja_auto_escape()?",
+                filter_buf.buf, self.input.escaper,
+            ),
+        };
+        buf.writeln(format_args!(
+            "if ::core::write!(writer, \"{{}}\", {filter_buf}).is_err() {{\n\
+                return {FILTER_SOURCE}.take_err();\n\
+            }}"
+        ));
 
         buf.writeln("}");
         self.is_in_filter_block -= 1;
-
+        self.prepare_ws(filter.ws2);
         Ok(size_hint)
     }
 
@@ -1151,16 +1133,6 @@ impl<'a> Generator<'a> {
                         &mut expr_cache,
                     );
                 }
-                Writable::Generated(s, wrapped) => {
-                    size_hint += self.named_expression(
-                        &mut buf_expr,
-                        &mut buf_format,
-                        s,
-                        wrapped,
-                        false,
-                        &mut expr_cache,
-                    );
-                }
             }
         }
         Ok(WriteParts {
@@ -1286,7 +1258,7 @@ impl<'a> Generator<'a> {
             Expr::Try(ref expr) => self.visit_try(ctx, buf, expr)?,
             Expr::Tuple(ref exprs) => self.visit_tuple(ctx, buf, exprs)?,
             Expr::NamedArgument(_, ref expr) => self.visit_named_argument(ctx, buf, expr)?,
-            Expr::Generated(ref s) => self.visit_generated(buf, s),
+            Expr::FilterSource => self.visit_filter_source(buf),
         })
     }
 
@@ -1786,8 +1758,8 @@ impl<'a> Generator<'a> {
         DisplayWrap::Unwrapped
     }
 
-    fn visit_generated(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(s);
+    fn visit_filter_source(&mut self, buf: &mut Buffer) -> DisplayWrap {
+        buf.write(FILTER_SOURCE);
         DisplayWrap::Unwrapped
     }
 
@@ -2201,9 +2173,12 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::Call(_, _) => false,
         Expr::RustMacro(_, _) => false,
         Expr::Try(_) => false,
-        Expr::Generated(_) => true,
+        // Should never be encountered:
+        Expr::FilterSource => unreachable!("FilterSource in expression?"),
     }
 }
+
+const FILTER_SOURCE: &str = "__rinja_filter_block";
 
 fn median(sizes: &mut [usize]) -> usize {
     sizes.sort_unstable();
@@ -2212,51 +2187,6 @@ fn median(sizes: &mut [usize]) -> usize {
     } else {
         (sizes[sizes.len() / 2 - 1] + sizes[sizes.len() / 2]) / 2
     }
-}
-
-/// In `FilterBlock`, we have a recursive `Expr::Filter` entry, where the more you go "down",
-/// the sooner you are called in the Rust code. Example:
-///
-/// ```text
-/// {% filter a|b|c %}bla{% endfilter %}
-/// ```
-///
-/// Will be translated as:
-///
-/// ```text
-/// FilterBlock {
-///    filters: Filter {
-///        name: "c",
-///        arguments: vec![
-///            Filter {
-///                name: "b",
-///                arguments: vec![
-///                    Filter {
-///                        name: "a",
-///                        arguments: vec![],
-///                    }.
-///                ],
-///            }
-///        ],
-///    },
-///    // ...
-/// }
-/// ```
-///
-/// So in here, we want to insert the variable containing the content of the filter block inside
-/// the call to `"a"`. To do so, we recursively go through all `Filter` and finally insert our
-/// variable as the first argument to the `"a"` call.
-fn insert_first_filter_argument(args: &mut Vec<WithSpan<'_, Expr<'_>>>, var_name: String) {
-    if let Some(expr) = args.first_mut() {
-        if let Expr::Filter(Filter {
-            ref mut arguments, ..
-        }) = **expr
-        {
-            insert_first_filter_argument(arguments, var_name);
-            return;
-        }
-    }
-    args.insert(0, WithSpan::new(Expr::Generated(var_name), ""));
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -2298,7 +2228,6 @@ impl<'a> Deref for WritableBuffer<'a> {
 enum Writable<'a> {
     Lit(&'a str),
     Expr(&'a WithSpan<'a, Expr<'a>>),
-    Generated(String, DisplayWrap),
 }
 
 struct WriteParts {

@@ -12,9 +12,12 @@ use std::str;
 /// so this filter only takes a single argument of any type that implements
 /// `Display`.
 #[inline]
-pub fn safe(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
+pub fn safe(
+    text: impl fmt::Display,
+    escaper: impl Escaper,
+) -> Result<Safe<impl Display>, Infallible> {
     let _ = escaper; // it should not be part of the interface that the `escaper` is unused
-    Ok(text)
+    Ok(Safe(text))
 }
 
 /// Escapes strings according to the escape mode.
@@ -26,8 +29,11 @@ pub fn safe(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Displ
 /// It is possible to optionally specify an escaper other than the default for
 /// the template's extension, like `{{ val|escape("txt") }}`.
 #[inline]
-pub fn escape(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
-    Ok(EscapeDisplay(text, escaper))
+pub fn escape(
+    text: impl fmt::Display,
+    escaper: impl Escaper,
+) -> Result<Safe<impl Display>, Infallible> {
+    Ok(Safe(EscapeDisplay(text, escaper)))
 }
 
 pub struct EscapeDisplay<T, E>(T, E);
@@ -55,7 +61,7 @@ impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
 
 /// Alias for [`escape()`]
 #[inline]
-pub fn e(text: impl fmt::Display, escaper: impl Escaper) -> Result<impl Display, Infallible> {
+pub fn e(text: impl fmt::Display, escaper: impl Escaper) -> Result<Safe<impl Display>, Infallible> {
     escape(text, escaper)
 }
 

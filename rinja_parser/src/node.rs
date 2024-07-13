@@ -502,9 +502,11 @@ impl<'a> FilterBlock<'a> {
         ));
         let (i, (pws1, _, (filter_name, params, extra_filters, _, nws1, _))) = start(i)?;
 
+        let mut arguments = params.unwrap_or_default();
+        arguments.insert(0, WithSpan::new(Expr::FilterSource, start_s));
         let mut filters = Filter {
             name: filter_name,
-            arguments: params.unwrap_or_default(),
+            arguments,
         };
         for (filter_name, args, span) in extra_filters {
             filters = Filter {
