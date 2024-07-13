@@ -177,21 +177,21 @@ pub fn format() {}
 /// A single newline becomes an HTML line break `<br>` and a new line
 /// followed by a blank line becomes a paragraph break `<p>`.
 #[inline]
-pub fn linebreaks(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
-    fn linebreaks(s: String) -> Result<String, Infallible> {
+pub fn linebreaks(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+    fn linebreaks(s: String) -> Result<String, fmt::Error> {
         let linebroken = s.replace("\n\n", "</p><p>").replace('\n', "<br/>");
         Ok(format!("<p>{linebroken}</p>"))
     }
-    linebreaks(s.to_string())
+    linebreaks(try_to_string(s)?)
 }
 
 /// Converts all newlines in a piece of plain text to HTML line breaks
 #[inline]
-pub fn linebreaksbr(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
-    fn linebreaksbr(s: String) -> Result<String, Infallible> {
+pub fn linebreaksbr(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+    fn linebreaksbr(s: String) -> Result<String, fmt::Error> {
         Ok(s.replace('\n', "<br/>"))
     }
-    linebreaksbr(s.to_string())
+    linebreaksbr(try_to_string(s)?)
 }
 
 /// Replaces only paragraph breaks in plain text with appropriate HTML
@@ -200,41 +200,41 @@ pub fn linebreaksbr(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
 /// Paragraph tags only wrap content; empty paragraphs are removed.
 /// No `<br/>` tags are added.
 #[inline]
-pub fn paragraphbreaks(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
-    fn paragraphbreaks(s: String) -> Result<String, Infallible> {
+pub fn paragraphbreaks(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+    fn paragraphbreaks(s: String) -> Result<String, fmt::Error> {
         let linebroken = s.replace("\n\n", "</p><p>").replace("<p></p>", "");
         Ok(format!("<p>{linebroken}</p>"))
     }
-    paragraphbreaks(s.to_string())
+    paragraphbreaks(try_to_string(s)?)
 }
 
 /// Converts to lowercase
 #[inline]
-pub fn lower(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
-    fn lower(s: String) -> Result<String, Infallible> {
+pub fn lower(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+    fn lower(s: String) -> Result<String, fmt::Error> {
         Ok(s.to_lowercase())
     }
-    lower(s.to_string())
+    lower(try_to_string(s)?)
 }
 
 /// Alias for the `lower()` filter
 #[inline]
-pub fn lowercase(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
+pub fn lowercase(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
     lower(s)
 }
 
 /// Converts to uppercase
 #[inline]
-pub fn upper(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
-    fn upper(s: String) -> Result<String, Infallible> {
+pub fn upper(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+    fn upper(s: String) -> Result<String, fmt::Error> {
         Ok(s.to_uppercase())
     }
-    upper(s.to_string())
+    upper(try_to_string(s)?)
 }
 
 /// Alias for the `upper()` filter
 #[inline]
-pub fn uppercase(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
+pub fn uppercase(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
     upper(s)
 }
 
@@ -333,8 +333,8 @@ impl<S: fmt::Display> fmt::Display for TruncateFilter<S> {
 
 /// Indent lines with `width` spaces
 #[inline]
-pub fn indent(s: impl ToString, width: usize) -> Result<impl fmt::Display, Infallible> {
-    fn indent(s: String, width: usize) -> Result<String, Infallible> {
+pub fn indent(s: impl fmt::Display, width: usize) -> Result<impl fmt::Display, fmt::Error> {
+    fn indent(s: String, width: usize) -> Result<String, fmt::Error> {
         if width >= MAX_LEN || s.len() >= MAX_LEN {
             return Ok(s);
         }
@@ -350,7 +350,7 @@ pub fn indent(s: impl ToString, width: usize) -> Result<impl fmt::Display, Infal
         }
         Ok(indented)
     }
-    indent(s.to_string(), width)
+    indent(try_to_string(s)?, width)
 }
 
 #[cfg(feature = "num-traits")]
@@ -427,8 +427,8 @@ where
 
 /// Capitalize a value. The first character will be uppercase, all others lowercase.
 #[inline]
-pub fn capitalize(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
-    fn capitalize(s: String) -> Result<String, Infallible> {
+pub fn capitalize(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+    fn capitalize(s: String) -> Result<String, fmt::Error> {
         match s.chars().next() {
             Some(c) => {
                 let mut replacement: String = c.to_uppercase().collect();
@@ -438,7 +438,7 @@ pub fn capitalize(s: impl ToString) -> Result<impl fmt::Display, Infallible> {
             _ => Ok(s),
         }
     }
-    capitalize(s.to_string())
+    capitalize(try_to_string(s)?)
 }
 
 /// Centers the value in a field of a given width
@@ -464,18 +464,17 @@ impl<T: fmt::Display> fmt::Display for Center<T> {
 
 /// Count the words in that string.
 #[inline]
-pub fn wordcount(s: impl ToString) -> Result<usize, Infallible> {
-    fn wordcount(s: String) -> Result<usize, Infallible> {
+pub fn wordcount(s: impl fmt::Display) -> Result<usize, fmt::Error> {
+    fn wordcount(s: String) -> Result<usize, fmt::Error> {
         Ok(s.split_whitespace().count())
     }
-    wordcount(s.to_string())
+    wordcount(try_to_string(s)?)
 }
 
 /// Return a title cased version of the value. Words will start with uppercase letters, all
 /// remaining characters are lowercase.
-#[inline]
-pub fn title(s: impl ToString) -> Result<String, Infallible> {
-    let s = s.to_string();
+pub fn title(s: impl fmt::Display) -> Result<String, fmt::Error> {
+    let s = try_to_string(s)?;
     let mut need_capitalization = true;
 
     // Sadly enough, we can't mutate a string when iterating over its chars, likely because it could
@@ -499,6 +498,12 @@ pub fn title(s: impl ToString) -> Result<String, Infallible> {
         }
     }
     Ok(output)
+}
+
+fn try_to_string(s: impl fmt::Display) -> Result<String, fmt::Error> {
+    let mut result = String::new();
+    write!(result, "{s}")?;
+    Ok(result)
 }
 
 #[cfg(test)]
