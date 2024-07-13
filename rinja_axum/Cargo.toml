@@ -10,7 +10,6 @@ homepage = "https://github.com/rinja-rs/rinja"
 repository = "https://github.com/rinja-rs/rinja"
 documentation = "https://docs.rs/rinja"
 license = "MIT OR Apache-2.0"
-workspace = ".."
 readme = "README.md"
 
 [dependencies]
@@ -31,3 +30,6 @@ humansize = ["rinja/humansize"]
 num-traits = ["rinja/num-traits"]
 serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
+
+[workspace]
+members = ["."]

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ['main']
+    branches: ['master']
   pull_request:
   schedule:
     - cron: "32 4 * * 5"
@@ -24,9 +24,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --all-targets
-      - run: cargo test
+      - run: cargo nextest run
 
   Package:
     strategy:
@@ -38,20 +41,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-      - run: cd ${{ matrix.package }} && cargo test --all-targets
-      - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
-
-  Lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: clippy
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cd ${{ matrix.package }} && cargo nextest run
+      - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
+
+  Rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      # No need to test `rinja_derive_standalone`. It has same the `src` folder as `rinja_derive`.
+      # No need to run the checks in parallel. They are fast enough.
+      # No need for caching. No code is compiled at all.
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: |
+          set -eu
+          for PKG in \
+            rinja rinja_actix rinja_axum rinja_derive rinja_derive_standalone \
+            rinja_parser rinja_rocket rinja_warp testing examples/actix-web-app
+          do
+            cd "$PKG"
+            echo "Testing: $PKG"
+            cargo fmt -- --check
+            cd -
+          done
 
   MSRV:
     runs-on: ubuntu-latest
