@@ -58,7 +58,7 @@ mod error;
 pub mod filters;
 pub mod helpers;
 
-use std::fmt;
+use std::{fmt, io};
 
 pub use rinja_derive::Template;
 
@@ -79,11 +79,11 @@ pub trait Template: fmt::Display {
     }
 
     /// Renders the template to the given `writer` fmt buffer
-    fn render_into(&self, writer: &mut (impl std::fmt::Write + ?Sized)) -> Result<()>;
+    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()>;
 
     /// Renders the template to the given `writer` io buffer
     #[inline]
-    fn write_into(&self, writer: &mut (impl std::io::Write + ?Sized)) -> std::io::Result<()> {
+    fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         writer.write_fmt(format_args!("{self}"))
     }
 
@@ -107,7 +107,7 @@ pub trait Template: fmt::Display {
 
 impl<T: Template + ?Sized> Template for &T {
     #[inline]
-    fn render_into(&self, writer: &mut (impl std::fmt::Write + ?Sized)) -> Result<()> {
+    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
         T::render_into(self, writer)
     }
 
@@ -117,7 +117,7 @@ impl<T: Template + ?Sized> Template for &T {
     }
 
     #[inline]
-    fn write_into(&self, writer: &mut (impl std::io::Write + ?Sized)) -> std::io::Result<()> {
+    fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         T::write_into(self, writer)
     }
 
@@ -136,10 +136,10 @@ pub trait DynTemplate {
     fn dyn_render(&self) -> Result<String>;
 
     /// Renders the template to the given `writer` fmt buffer
-    fn dyn_render_into(&self, writer: &mut dyn std::fmt::Write) -> Result<()>;
+    fn dyn_render_into(&self, writer: &mut dyn fmt::Write) -> Result<()>;
 
     /// Renders the template to the given `writer` io buffer
-    fn dyn_write_into(&self, writer: &mut dyn std::io::Write) -> std::io::Result<()>;
+    fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()>;
 
     /// Helper function to inspect the template's extension
     fn extension(&self) -> Option<&'static str>;
@@ -156,13 +156,13 @@ impl<T: Template> DynTemplate for T {
         <Self as Template>::render(self)
     }
 
-    fn dyn_render_into(&self, writer: &mut dyn std::fmt::Write) -> Result<()> {
+    fn dyn_render_into(&self, writer: &mut dyn fmt::Write) -> Result<()> {
         <Self as Template>::render_into(self, writer)
     }
 
     #[inline]
-    fn dyn_write_into(&self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        writer.write_fmt(format_args!("{self}"))
+    fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()> {
+        <Self as Template>::write_into(self, writer)
     }
 
     fn extension(&self) -> Option<&'static str> {
@@ -180,7 +180,7 @@ impl<T: Template> DynTemplate for T {
 
 impl fmt::Display for dyn DynTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.dyn_render_into(f).map_err(|_| ::std::fmt::Error {})
+        self.dyn_render_into(f).map_err(|_| fmt::Error {})
     }
 }
 
@@ -195,7 +195,7 @@ mod tests {
     fn dyn_template() {
         struct Test;
         impl Template for Test {
-            fn render_into(&self, writer: &mut (impl std::fmt::Write + ?Sized)) -> Result<()> {
+            fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
                 Ok(writer.write_str("test")?)
             }
 

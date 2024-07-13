@@ -26,7 +26,10 @@ struct Foo;"##
         }
         let expected = format!(
             r#"impl ::rinja::Template for Foo {{
-    fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> ::rinja::Result<()> {{
+    fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> ::rinja::Result<()>
+    where
+        RinjaW: ::core::fmt::Write + ?::core::marker::Sized,
+    {{
         use ::rinja::filters::AutoEscape as _;
         use ::core::fmt::Write as _;
         {new_expected}

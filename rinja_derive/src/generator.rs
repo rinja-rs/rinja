@@ -92,8 +92,10 @@ impl<'a> Generator<'a> {
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
         self.write_header(buf, format_args!("{CRATE}::Template"), None);
         buf.writeln(format_args!(
-            "fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) \
-            -> {CRATE}::Result<()> {{",
+            "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> {CRATE}::Result<()>\n\
+            where\n\
+                RinjaW: ::core::fmt::Write + ?::core::marker::Sized,\n\
+            {{",
         ));
         buf.writeln(format_args!("use {CRATE}::filters::AutoEscape as _;"));
         buf.writeln(format_args!("use ::core::fmt::Write as _;"));
