@@ -28,6 +28,7 @@ struct Foo;"##
             r#"impl ::rinja::Template for Foo {{
     fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> ::rinja::Result<()> {{
         use ::rinja::filters::AutoEscape as _;
+        use ::core::fmt::Write as _;
         {new_expected}
         ::rinja::Result::Ok(())
     }}

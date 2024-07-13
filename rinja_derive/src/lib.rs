@@ -115,6 +115,7 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
         None,
         MapChain::default(),
         input.block.is_some(),
+        0,
     )
     .build(&contexts[&input.path])
 }
@@ -169,6 +170,7 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
         heritage.as_ref(),
         MapChain::default(),
         input.block.is_some(),
+        0,
     )
     .build(&contexts[&input.path])?;
     if input.print == Print::Code || input.print == Print::All {

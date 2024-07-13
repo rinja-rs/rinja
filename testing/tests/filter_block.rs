@@ -197,3 +197,78 @@ hello
   pika"#
     );
 }
+
+#[derive(Template)]
+#[template(
+    source = r#"{% extends "html-base.html" %}
+
+{%- block body -%}
+    <h1>Metadata</h1>
+        {% set y = 12 %}
+
+    {% filter wordcount %}
+        {%- include "../Cargo.toml" +%}
+        y is {{ y }}
+    {% endfilter %}
+{%- endblock body %}
+"#,
+    ext = "html"
+)]
+struct IncludeInFilter;
+
+// This test ensures that `include` are correctly working inside filter blocks and that external
+// variables are used correctly.
+#[test]
+fn filter_block_include() {
+    assert_eq!(
+        IncludeInFilter.render().unwrap(),
+        r#"<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+
+        <title>Default title</title>
+    </head>
+
+    <body class=""><h1>Metadata</h1>
+        
+
+    100</body>
+</html>"#
+    );
+}
+
+#[derive(Template)]
+#[template(
+    source = r#"
+{%- filter title %}
+    {{- x -}}
+    {%- if x == 21 -%}
+        X is big
+    {%- else -%}
+        No clue what X is
+    {%- endif %}
+
+    {% if let Some(v) = v -%}
+        v is {{ v -}}
+    {% endif -%}
+{% endfilter -%}
+"#,
+    ext = "html",
+    print = "code"
+)]
+struct ConditionInFilter {
+    x: usize,
+    v: Option<String>,
+}
+
+// This test ensures that `include` are correctly working inside filter blocks and that external
+// variables are used correctly.
+#[test]
+fn filter_block_conditions() {
+    let s = ConditionInFilter {
+        x: 21,
+        v: Some("hoho".to_string()),
+    };
+    assert_eq!(s.render().unwrap(), "21x Is Big\n\n    V Is Hoho",);
+}
