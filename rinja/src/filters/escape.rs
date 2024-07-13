@@ -284,18 +284,25 @@ const _: () = {
         }
     }
 
-    impl<'a, T: fmt::Display, E: Escaper> AutoEscape for &AutoEscaper<'a, MaybeSafe<T>, E> {
-        type Escaped = Wrapped<'a, T, E>;
-        type Error = Infallible;
+    macro_rules! add_ref {
+        ($([$($tt:tt)*])*) => { $(
+            impl<'a, T: fmt::Display, E: Escaper> AutoEscape
+            for &AutoEscaper<'a, $($tt)* MaybeSafe<T>, E> {
+                type Escaped = Wrapped<'a, T, E>;
+                type Error = Infallible;
 
-        #[inline]
-        fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
-            match self.text {
-                MaybeSafe::Safe(t) => Ok(Wrapped::Safe(t)),
-                MaybeSafe::NeedsEscaping(t) => Ok(Wrapped::NeedsEscaping(t, self.escaper)),
+                #[inline]
+                fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+                    match self.text {
+                        MaybeSafe::Safe(t) => Ok(Wrapped::Safe(t)),
+                        MaybeSafe::NeedsEscaping(t) => Ok(Wrapped::NeedsEscaping(t, self.escaper)),
+                    }
+                }
             }
-        }
+        )* };
     }
+
+    add_ref!([] [&] [&&] [&&&]);
 
     pub enum Wrapped<'a, T: fmt::Display + ?Sized, E: Escaper> {
         Safe(&'a T),
@@ -362,39 +369,33 @@ const _: () = {
         }
     }
 
-    impl<'a, T: fmt::Display, E: Escaper> AutoEscape for &AutoEscaper<'a, Safe<T>, E> {
-        type Escaped = &'a T;
-        type Error = Infallible;
+    macro_rules! add_ref {
+        ($([$($tt:tt)*])*) => { $(
+            impl<'a, T: fmt::Display, E: Escaper> AutoEscape
+            for &AutoEscaper<'a, $($tt)* Safe<T>, E> {
+                type Escaped = &'a T;
+                type Error = Infallible;
 
-        #[inline]
-        fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
-            Ok(&self.text.0)
-        }
+                #[inline]
+                fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
+                    Ok(&self.text.0)
+                }
+            }
+        )* };
     }
+
+    add_ref!([] [&] [&&] [&&&]);
 };
 
 /// There is not need to mark the output of a custom filter as "unsafe"; this is simply the default
 pub struct Unsafe<T: fmt::Display>(pub T);
 
-const _: () = {
-    // This is the fallback. The filter is not the last element of the filter chain.
-    impl<T: fmt::Display> fmt::Display for Unsafe<T> {
-        #[inline]
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "{}", self.0)
-        }
+impl<T: fmt::Display> fmt::Display for Unsafe<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
-
-    impl<'a, T: fmt::Display, E: Escaper> AutoEscape for &AutoEscaper<'a, Unsafe<T>, E> {
-        type Escaped = EscapeDisplay<&'a T, E>;
-        type Error = Infallible;
-
-        #[inline]
-        fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error> {
-            Ok(EscapeDisplay(&self.text.0, self.escaper))
-        }
-    }
-};
+}
 
 /// Like [`Safe`], but only for HTML output
 pub struct HtmlSafeOutput<T: fmt::Display>(pub T);
