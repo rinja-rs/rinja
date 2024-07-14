@@ -25,6 +25,7 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) ext: Option<&'a str>,
     pub(crate) mime_type: String,
     pub(crate) path: Arc<Path>,
+    pub(crate) fields: Vec<String>,
 }
 
 impl TemplateInput<'_> {
@@ -99,6 +100,25 @@ impl TemplateInput<'_> {
             extension_to_mime_type(ext_default_to_path(ext.as_deref(), &path).unwrap_or("txt"))
                 .to_string();
 
+        let empty_punctuated = syn::punctuated::Punctuated::new();
+        let fields = match ast.data {
+            syn::Data::Struct(ref struct_) => {
+                if let syn::Fields::Named(ref fields) = &struct_.fields {
+                    &fields.named
+                } else {
+                    &empty_punctuated
+                }
+            }
+            syn::Data::Union(ref union_) => &union_.fields.named,
+            syn::Data::Enum(_) => &empty_punctuated,
+        }
+        .iter()
+        .map(|f| match &f.ident {
+            Some(ident) => ident.to_string(),
+            None => unreachable!("we checked that we are using a struct"),
+        })
+        .collect::<Vec<_>>();
+
         Ok(TemplateInput {
             ast,
             config,
@@ -110,6 +130,7 @@ impl TemplateInput<'_> {
             ext: ext.as_deref(),
             mime_type,
             path,
+            fields,
         })
     }
 

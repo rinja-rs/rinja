@@ -17,6 +17,13 @@ use crate::heritage::{Context, Heritage};
 use crate::input::{Source, TemplateInput};
 use crate::{CompileError, MsgValidEscapers, CRATE};
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum EvaluatedResult {
+    AlwaysTrue,
+    AlwaysFalse,
+    Unknown,
+}
+
 pub(crate) struct Generator<'a> {
     // The template input state: original struct AST and attributes
     input: &'a TemplateInput<'a>,
@@ -353,30 +360,173 @@ impl<'a> Generator<'a> {
         Ok(size_hint)
     }
 
+    fn is_var_defined(&self, expr: &Expr<'_>) -> bool {
+        match expr {
+            Expr::Var(s) => {
+                self.locals.get(&(*s).into()).is_some() || self.input.fields.iter().any(|f| f == s)
+            }
+            _ => false,
+        }
+    }
+
+    fn evaluate_condition(
+        &self,
+        expr: &WithSpan<'_, Expr<'_>>,
+        only_contains_is_defined: &mut bool,
+    ) -> EvaluatedResult {
+        match **expr {
+            Expr::BoolLit(_)
+            | Expr::NumLit(_)
+            | Expr::StrLit(_)
+            | Expr::CharLit(_)
+            | Expr::Var(_)
+            | Expr::Path(_)
+            | Expr::Array(_)
+            | Expr::Attr(_, _)
+            | Expr::Index(_, _)
+            | Expr::Filter(_)
+            | Expr::Range(_, _, _)
+            | Expr::Call(_, _)
+            | Expr::RustMacro(_, _)
+            | Expr::Try(_)
+            | Expr::Tuple(_)
+            | Expr::NamedArgument(_, _)
+            | Expr::FilterSource => {
+                *only_contains_is_defined = false;
+                EvaluatedResult::Unknown
+            }
+            Expr::Unary("!", ref inner) => {
+                match self.evaluate_condition(inner, only_contains_is_defined) {
+                    EvaluatedResult::AlwaysTrue => EvaluatedResult::AlwaysFalse,
+                    EvaluatedResult::AlwaysFalse => EvaluatedResult::AlwaysTrue,
+                    EvaluatedResult::Unknown => EvaluatedResult::Unknown,
+                }
+            }
+            Expr::Unary(_, _) => EvaluatedResult::Unknown,
+            Expr::BinOp("&&", ref left, ref right) => {
+                match (
+                    self.evaluate_condition(left, only_contains_is_defined),
+                    self.evaluate_condition(right, only_contains_is_defined),
+                ) {
+                    (EvaluatedResult::AlwaysTrue, EvaluatedResult::AlwaysTrue) => {
+                        EvaluatedResult::AlwaysTrue
+                    }
+                    (EvaluatedResult::AlwaysFalse, _) | (_, EvaluatedResult::AlwaysFalse) => {
+                        EvaluatedResult::AlwaysFalse
+                    }
+                    _ => EvaluatedResult::Unknown,
+                }
+            }
+            Expr::BinOp("||", ref left, ref right) => {
+                match (
+                    self.evaluate_condition(left, only_contains_is_defined),
+                    self.evaluate_condition(right, only_contains_is_defined),
+                ) {
+                    (EvaluatedResult::AlwaysTrue, _) | (_, EvaluatedResult::AlwaysTrue) => {
+                        EvaluatedResult::AlwaysTrue
+                    }
+                    (EvaluatedResult::AlwaysFalse, EvaluatedResult::AlwaysFalse) => {
+                        EvaluatedResult::AlwaysFalse
+                    }
+                    _ => EvaluatedResult::Unknown,
+                }
+            }
+            Expr::BinOp(_, _, _) => {
+                *only_contains_is_defined = false;
+                EvaluatedResult::Unknown
+            }
+            Expr::Group(ref inner) => self.evaluate_condition(inner, only_contains_is_defined),
+            Expr::IsDefined(ref left) => {
+                // Variable is defined so we want to keep the condition.
+                if self.is_var_defined(left) {
+                    EvaluatedResult::AlwaysTrue
+                } else {
+                    EvaluatedResult::AlwaysFalse
+                }
+            }
+            Expr::IsNotDefined(ref left) => {
+                // Variable is defined so we don't want to keep the condition.
+                if self.is_var_defined(left) {
+                    EvaluatedResult::AlwaysFalse
+                } else {
+                    EvaluatedResult::AlwaysTrue
+                }
+            }
+        }
+    }
+
     fn write_if(
         &mut self,
         ctx: &Context<'a>,
         buf: &mut Buffer,
         i: &'a If<'_>,
     ) -> Result<usize, CompileError> {
+        fn write_if_cond(buf: &mut Buffer, nb_written_branches: &mut usize) {
+            if *nb_written_branches == 0 {
+                buf.write("if ");
+            } else {
+                buf.write("} else if ");
+            }
+            *nb_written_branches += 1;
+        }
+
         let mut flushed = 0;
         let mut arm_sizes = Vec::new();
         let mut has_else = false;
-        for (i, cond) in i.branches.iter().enumerate() {
+
+        let mut nb_written_branches = 0;
+        let mut prev_was_generated = false;
+        let mut stop_loop = false;
+
+        for cond in i.branches.iter() {
             self.handle_ws(cond.ws);
             flushed += self.write_buf_writable(ctx, buf)?;
-            if i > 0 {
+            if stop_loop {
+                break;
+            }
+            if prev_was_generated {
                 self.locals.pop();
             }
+            prev_was_generated = false;
+            let mut generate_content = true;
 
-            self.locals.push();
             let mut arm_size = 0;
             if let Some(CondTest { target, expr }) = &cond.cond {
-                if i == 0 {
-                    buf.write("if ");
-                } else {
-                    buf.write("} else if ");
+                let mut only_contains_is_defined = true;
+                let mut generate_condition = true;
+
+                match self.evaluate_condition(expr, &mut only_contains_is_defined) {
+                    // We generate the condition in case some calls are changing a variable, but
+                    // no need to generate the condition body since it will never be called.
+                    //
+                    // However, if the condition only contains "is (not) defined" checks, then we
+                    // can completely skip it.
+                    EvaluatedResult::AlwaysFalse => {
+                        if only_contains_is_defined {
+                            continue;
+                        }
+                        generate_content = false;
+                        write_if_cond(buf, &mut nb_written_branches);
+                    }
+                    // This case is more interesting: it means that we will always enter this
+                    // condition, meaning that any following should not be generated. Another
+                    // thing to take into account: if there are no if branches before this one,
+                    // no need to generate an `else`.
+                    EvaluatedResult::AlwaysTrue => {
+                        stop_loop = true;
+                        if only_contains_is_defined {
+                            generate_condition = false;
+                            if nb_written_branches != 0 {
+                                buf.writeln("} else {");
+                                has_else = true;
+                            }
+                        } else {
+                            write_if_cond(buf, &mut nb_written_branches);
+                        }
+                    }
+                    EvaluatedResult::Unknown => write_if_cond(buf, &mut nb_written_branches),
                 }
+                self.locals.push();
 
                 if let Some(target) = target {
                     let mut expr_buf = Buffer::new();
@@ -398,7 +548,8 @@ impl<'a> Generator<'a> {
                     }
                     buf.write(" = &");
                     buf.write(expr_buf.buf);
-                } else {
+                    buf.writeln(" {");
+                } else if generate_condition {
                     // The following syntax `*(&(...) as &bool)` is used to
                     // trigger Rust's automatic dereferencing, to coerce
                     // e.g. `&&&&&bool` to `bool`. First `&(...) as &bool`
@@ -406,25 +557,32 @@ impl<'a> Generator<'a> {
                     // finally dereferences it to `bool`.
                     buf.write("*(&(");
                     buf.write(self.visit_expr_root(ctx, expr)?);
-                    buf.write(") as &bool)");
+                    buf.writeln(") as &bool) {");
                 }
             } else {
-                buf.write("} else");
+                self.locals.push();
+                if nb_written_branches > 0 {
+                    buf.writeln("} else {");
+                }
                 has_else = true;
             }
 
-            buf.writeln(" {");
-
-            arm_size += self.handle(ctx, &cond.nodes, buf, AstLevel::Nested)?;
+            prev_was_generated = true;
+            if generate_content {
+                arm_size += self.handle(ctx, &cond.nodes, buf, AstLevel::Nested)?;
+            }
             arm_sizes.push(arm_size);
         }
         self.handle_ws(i.ws);
         flushed += self.write_buf_writable(ctx, buf)?;
-        buf.writeln("}");
+        if nb_written_branches > 0 {
+            buf.writeln("}");
+        }
+        if prev_was_generated {
+            self.locals.pop();
+        }
 
-        self.locals.pop();
-
-        if !has_else {
+        if !has_else && nb_written_branches > 0 {
             arm_sizes.push(0);
         }
         Ok(flushed + median(&mut arm_sizes))
@@ -1251,7 +1409,22 @@ impl<'a> Generator<'a> {
             Expr::Tuple(ref exprs) => self.visit_tuple(ctx, buf, exprs)?,
             Expr::NamedArgument(_, ref expr) => self.visit_named_argument(ctx, buf, expr)?,
             Expr::FilterSource => self.visit_filter_source(buf),
+            Expr::IsDefined(ref left) => self.visit_is_defined(buf, true, left)?,
+            Expr::IsNotDefined(ref left) => self.visit_is_defined(buf, false, left)?,
         })
+    }
+
+    fn visit_is_defined(
+        &mut self,
+        buf: &mut Buffer,
+        is_defined: bool,
+        left: &WithSpan<'_, Expr<'_>>,
+    ) -> Result<DisplayWrap, CompileError> {
+        match (is_defined, self.is_var_defined(left)) {
+            (true, true) | (false, false) => buf.write("true"),
+            _ => buf.write("false"),
+        }
+        Ok(DisplayWrap::Unwrapped)
     }
 
     fn visit_try(
@@ -2184,6 +2357,7 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::Filter(Filter { arguments, .. }) => arguments.iter().all(is_cacheable),
         Expr::Unary(_, arg) => is_cacheable(arg),
         Expr::BinOp(_, lhs, rhs) => is_cacheable(lhs) && is_cacheable(rhs),
+        Expr::IsDefined(lhs) | Expr::IsNotDefined(lhs) => is_cacheable(lhs),
         Expr::Range(_, lhs, rhs) => {
             lhs.as_ref().map_or(true, |v| is_cacheable(v))
                 && rhs.as_ref().map_or(true, |v| is_cacheable(v))
@@ -2203,6 +2377,9 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
 const FILTER_SOURCE: &str = "__rinja_filter_block";
 
 fn median(sizes: &mut [usize]) -> usize {
+    if sizes.is_empty() {
+        return 0;
+    }
     sizes.sort_unstable();
     if sizes.len() % 2 == 1 {
         sizes[sizes.len() / 2]
