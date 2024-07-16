@@ -8,7 +8,7 @@
 //! [README](https://github.com/rinja-rs/rinja/blob/master/README.md).
 //!
 //! You can find the documentation about our syntax, features, configuration in our book:
-//! [rinja.readthedocs.io](https://rinja.readthedocs.io/en/latest/).
+//! [rinja.readthedocs.io](https://rinja.readthedocs.io/).
 //!
 //! # Creating Rinja templates
 //!

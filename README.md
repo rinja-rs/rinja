@@ -10,7 +10,7 @@ All feedback welcome. Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
 
 You can find the documentation about our syntax, features, configuration in our book:
-[rinja.readthedocs.io](https://rinja.readthedocs.io/en/latest/).
+[rinja.readthedocs.io](https://rinja.readthedocs.io/).
 
 ### Feature highlights
 
