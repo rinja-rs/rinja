@@ -3,7 +3,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::complete::{tag, take_till};
-use winnow::character::complete::{anychar, char};
+use winnow::character::complete::anychar;
 use winnow::combinator::{
     complete, consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
@@ -328,7 +328,7 @@ impl<'a> When<'a> {
             cut_node(
                 Some("match-when"),
                 tuple((
-                    separated_list1(char('|'), ws(|i| Target::parse(i, s))),
+                    separated_list1('|', ws(|i| Target::parse(i, s))),
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
                     cut_node(Some("match-when"), |i| Node::many(i, s)),
@@ -414,7 +414,7 @@ impl<'a> CondTest<'a> {
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
                 ws(|i| Target::parse(i, s)),
-                ws(char('=')),
+                ws('='),
             )),
             ws(|i| Expr::parse(i, s.level.get())),
         )
@@ -590,9 +590,9 @@ impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         fn parameters(i: &str) -> ParseResult<'_, Vec<&str>> {
             delimited(
-                ws(char('(')),
-                separated_list0(char(','), ws(identifier)),
-                tuple((opt(ws(char(','))), char(')'))),
+                ws('('),
+                separated_list0(',', ws(identifier)),
+                tuple((opt(ws(',')), ')')),
             )
             .parse_next(i)
         }
@@ -1084,10 +1084,7 @@ impl<'a> Let<'a> {
                 Some("let"),
                 tuple((
                     ws(|i| Target::parse(i, s)),
-                    opt(preceded(
-                        ws(char('=')),
-                        ws(|i| Expr::parse(i, s.level.get())),
-                    )),
+                    opt(preceded(ws('='), ws(|i| Expr::parse(i, s.level.get())))),
                     opt(Whitespace::parse),
                 )),
             ),

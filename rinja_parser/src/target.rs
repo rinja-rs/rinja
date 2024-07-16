@@ -42,9 +42,9 @@ impl<'a> Target<'a> {
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
     fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let mut opt_opening_paren = map(opt(ws(char('('))), |o| o.is_some());
-        let mut opt_opening_brace = map(opt(ws(char('{'))), |o| o.is_some());
-        let mut opt_opening_bracket = map(opt(ws(char('['))), |o| o.is_some());
+        let mut opt_opening_paren = map(opt(ws('(')), |o| o.is_some());
+        let mut opt_opening_brace = map(opt(ws('{')), |o| o.is_some());
+        let mut opt_opening_bracket = map(opt(ws('[')), |o| o.is_some());
 
         let (i, lit) = opt(Self::lit).parse_next(i)?;
         if let Some(lit) = lit {
@@ -154,10 +154,8 @@ impl<'a> Target<'a> {
             return Ok((i, rest));
         }
 
-        let (i, (src, target)) = pair(
-            identifier,
-            opt(preceded(ws(char(':')), |i| Self::parse(i, s))),
-        )(init_i)?;
+        let (i, (src, target)) =
+            pair(identifier, opt(preceded(ws(':'), |i| Self::parse(i, s))))(init_i)?;
 
         if src == "_" {
             return Err(winnow::Err::Cut(ErrorContext::new(
@@ -174,8 +172,7 @@ impl<'a> Target<'a> {
     }
 
     fn rest(start: &'a str) -> ParseResult<'a, Self> {
-        let (i, (ident, _)) =
-            tuple((opt(tuple((identifier, ws(char('@'))))), "..")).parse_next(start)?;
+        let (i, (ident, _)) = tuple((opt(tuple((identifier, ws('@')))), "..")).parse_next(start)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
@@ -202,7 +199,7 @@ fn collect_targets<'a, T>(
     delim: char,
     mut one: impl FnMut(&'a str, &State<'_>) -> ParseResult<'a, T>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
-    let opt_comma = |i| map(ws(opt(char(','))), |o| o.is_some()).parse_next(i);
+    let opt_comma = |i| map(ws(opt(',')), |o| o.is_some()).parse_next(i);
     let mut opt_end = |i| map(ws(opt(char(delim))), |o| o.is_some()).parse_next(i);
 
     let (i, has_end) = opt_end.parse_next(i)?;
@@ -211,7 +208,7 @@ fn collect_targets<'a, T>(
     }
 
     let (i, targets) =
-        opt(separated_list1(ws(char(',')), |i| one(i, s)).map(|v: Vec<_>| v)).parse_next(i)?;
+        opt(separated_list1(ws(','), |i| one(i, s)).map(|v: Vec<_>| v)).parse_next(i)?;
     let Some(targets) = targets else {
         return Err(winnow::Err::Cut(ErrorContext::new(
             "expected comma separated list of members",

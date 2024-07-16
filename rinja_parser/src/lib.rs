@@ -13,7 +13,7 @@ use std::{fmt, str};
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n, take_while1};
-use winnow::character::complete::{anychar, char, one_of, satisfy};
+use winnow::character::complete::{anychar, one_of, satisfy};
 use winnow::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0_count, many1};
@@ -370,14 +370,10 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     }
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
-    let int_with_base = pair(opt(char('-')), |i| {
+    let int_with_base = pair(opt('-'), |i| {
         let (i, (kind, base)) = consumed(preceded(
-            char('0'),
-            alt((
-                value(2, char('b')),
-                value(8, char('o')),
-                value(16, char('x')),
-            )),
+            '0',
+            alt((value(2, 'b'), value(8, 'o'), value(16, 'x'))),
         ))
         .parse_next(i)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
@@ -392,7 +388,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> ParseResult<'a, ()> {
-        let (i, has_dot) = opt(pair(char('.'), separated_digits(10, true))).parse_next(i)?;
+        let (i, has_dot) = opt(pair('.', separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
             let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
             match opt(separated_digits(10, op.is_none())).parse_next(i)? {
@@ -416,7 +412,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         (i, Num::Int(num, suffix))
     } else {
         let (i, (num, float)) = consumed(preceded(
-            pair(opt(char('-')), separated_digits(10, true)),
+            pair(opt('-'), separated_digits(10, true)),
             opt(float),
         ))
         .parse_next(start)?;
@@ -444,7 +440,7 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
         recognize(tuple((
             |i| match start {
                 true => Ok((i, 0)),
-                false => many0_count(char('_')).parse_next(i),
+                false => many0_count('_').parse_next(i),
             },
             satisfy(|ch| ch.is_digit(radix)),
             many0_count(satisfy(|ch| ch == '_' || ch.is_digit(radix))),
@@ -484,18 +480,13 @@ pub struct StrLit<'a> {
 }
 
 fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
-    let (i, s) = delimited(
-        char('"'),
-        opt(escaped(is_not("\\\""), '\\', anychar)),
-        char('"'),
-    )
-    .parse_next(i)?;
+    let (i, s) = delimited('"', opt(escaped(is_not("\\\""), '\\', anychar)), '"').parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
 fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
     let (i, (prefix, content)) =
-        tuple((opt(alt((char('b'), char('c')))), str_lit_without_prefix)).parse_next(i)?;
+        tuple((opt(alt(('b', 'c'))), str_lit_without_prefix)).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
@@ -520,12 +511,8 @@ pub struct CharLit<'a> {
 fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = tuple((
-        opt(char('b')),
-        delimited(
-            char('\''),
-            opt(escaped(is_not("\\\'"), '\\', anychar)),
-            char('\''),
-        ),
+        opt('b'),
+        delimited('\'', opt(escaped(is_not("\\\'"), '\\', anychar)), '\''),
     ))
     .parse_next(i)?;
 
@@ -597,28 +584,25 @@ impl<'a> Char<'a> {
         }
         map(
             tuple((
-                char('\\'),
+                '\\',
                 alt((
-                    map(char('n'), |_| Self::Escaped),
-                    map(char('r'), |_| Self::Escaped),
-                    map(char('t'), |_| Self::Escaped),
-                    map(char('\\'), |_| Self::Escaped),
-                    map(char('0'), |_| Self::Escaped),
-                    map(char('\''), |_| Self::Escaped),
+                    map('n', |_| Self::Escaped),
+                    map('r', |_| Self::Escaped),
+                    map('t', |_| Self::Escaped),
+                    map('\\', |_| Self::Escaped),
+                    map('0', |_| Self::Escaped),
+                    map('\'', |_| Self::Escaped),
                     // Not useful but supported by rust.
-                    map(char('"'), |_| Self::Escaped),
+                    map('"', |_| Self::Escaped),
                     map(
-                        tuple((
-                            char('x'),
-                            take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()),
-                        )),
+                        tuple(('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()))),
                         |(_, s)| Self::AsciiEscape(s),
                     ),
                     map(
                         tuple((
                             "u{",
                             take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-                            char('}'),
+                            '}',
                         )),
                         |(_, s, _)| Self::UnicodeEscape(s),
                     ),
@@ -900,7 +884,7 @@ fn filter<'a>(
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
     let (j, _) = take_till(not_ws).parse_next(i)?;
     let had_spaces = i.len() != j.len();
-    let (j, _) = pair(char('|'), not(char('|'))).parse_next(j)?;
+    let (j, _) = pair('|', not('|')).parse_next(j)?;
 
     if !had_spaces {
         *level = level.nest(i)?.1;
