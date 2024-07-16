@@ -3,7 +3,7 @@ use winnow::branch::alt;
 use winnow::character::complete::{char, one_of};
 use winnow::combinator::{consumed, map, map_res, opt};
 use winnow::multi::separated_list1;
-use winnow::sequence::{pair, preceded, tuple};
+use winnow::sequence::{pair, preceded};
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
@@ -172,7 +172,7 @@ impl<'a> Target<'a> {
     }
 
     fn rest(start: &'a str) -> ParseResult<'a, Self> {
-        let (i, (ident, _)) = tuple((opt(tuple((identifier, ws('@')))), "..")).parse_next(start)?;
+        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(start)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),

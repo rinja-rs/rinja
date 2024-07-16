@@ -17,7 +17,7 @@ use winnow::character::complete::{anychar, one_of, satisfy};
 use winnow::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0_count, many1};
-use winnow::sequence::{delimited, pair, preceded, tuple};
+use winnow::sequence::{delimited, pair, preceded};
 use winnow::stream::AsChar;
 
 pub mod expr;
@@ -437,14 +437,14 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 /// with an underscore.
 fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_> {
     move |i| {
-        recognize(tuple((
+        recognize((
             |i| match start {
                 true => Ok((i, 0)),
                 false => many0_count('_').parse_next(i),
             },
             satisfy(|ch| ch.is_digit(radix)),
             many0_count(satisfy(|ch| ch == '_' || ch.is_digit(radix))),
-        )))
+        ))
         .parse_next(i)
     }
 }
@@ -485,8 +485,7 @@ fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
 }
 
 fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
-    let (i, (prefix, content)) =
-        tuple((opt(alt(('b', 'c'))), str_lit_without_prefix)).parse_next(i)?;
+    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
@@ -510,11 +509,11 @@ pub struct CharLit<'a> {
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
 fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
-    let (i, (b_prefix, s)) = tuple((
+    let (i, (b_prefix, s)) = (
         opt('b'),
         delimited('\'', opt(escaped(is_not("\\\'"), '\\', anychar)), '\''),
-    ))
-    .parse_next(i)?;
+    )
+        .parse_next(i)?;
 
     let Some(s) = s else {
         return Err(winnow::Err::Cut(ErrorContext::new(
@@ -583,7 +582,7 @@ impl<'a> Char<'a> {
             return Ok(("", Self::Literal));
         }
         map(
-            tuple((
+            (
                 '\\',
                 alt((
                     map('n', |_| Self::Escaped),
@@ -595,19 +594,19 @@ impl<'a> Char<'a> {
                     // Not useful but supported by rust.
                     map('"', |_| Self::Escaped),
                     map(
-                        tuple(('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()))),
+                        ('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit())),
                         |(_, s)| Self::AsciiEscape(s),
                     ),
                     map(
-                        tuple((
+                        (
                             "u{",
                             take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
                             '}',
-                        )),
+                        ),
                         |(_, s, _)| Self::UnicodeEscape(s),
                     ),
                 )),
-            )),
+            ),
             |(_, ch)| ch,
         )
         .parse_next(i)
@@ -623,7 +622,7 @@ fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
     let tail = opt(many1(preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = tuple((root, identifier, tail)).parse_next(i)?;
+    let (i, (root, start, rest)) = (root, identifier, tail).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:

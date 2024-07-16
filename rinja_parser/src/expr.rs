@@ -7,7 +7,7 @@ use winnow::character::complete::digit1;
 use winnow::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
 use winnow::error::ErrorKind;
 use winnow::multi::{fold_many0, many0, separated_list0, separated_list1};
-use winnow::sequence::{pair, preceded, terminated, tuple};
+use winnow::sequence::{pair, preceded, terminated};
 use winnow::{Parser, error_position};
 
 use crate::{
@@ -114,7 +114,7 @@ impl<'a> Expr<'a> {
                         }
                     }),
                 ),
-                tuple((opt(ws(',')), ')')),
+                (opt(ws(',')), ')'),
             )),
         )
         .parse_next(i)
@@ -135,7 +135,7 @@ impl<'a> Expr<'a> {
 
         let (_, level) = level.nest(i)?;
         let (i, (argument, _, value)) =
-            tuple((identifier, ws('='), move |i| Self::parse(i, level))).parse_next(i)?;
+            (identifier, ws('='), move |i| Self::parse(i, level)).parse_next(i)?;
         if named_arguments.insert(argument) {
             Ok((
                 i,
