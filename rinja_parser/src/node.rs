@@ -39,19 +39,19 @@ pub enum Node<'a> {
 
 impl<'a> Node<'a> {
     pub(super) fn parse_template(i: &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
-        let (i, result) = match complete(|i| Self::many(i, s))(i) {
+        let (i, result) = match complete(|i| Self::many(i, s)).parse_next(i) {
             Ok((i, result)) => (i, result),
             Err(err) => {
                 if let winnow::Err::Backtrack(err) | winnow::Err::Cut(err) = &err {
                     if err.message.is_none() {
-                        opt(|i| unexpected_tag(i, s))(err.input)?;
+                        opt(|i| unexpected_tag(i, s)).parse_next(err.input)?;
                     }
                 }
                 return Err(err);
             }
         };
-        let (i, _) = opt(|i| unexpected_tag(i, s))(i)?;
-        let (i, is_eof) = opt(eof)(i)?;
+        let (i, _) = opt(|i| unexpected_tag(i, s)).parse_next(i)?;
+        let (i, is_eof) = opt(eof).parse_next(i)?;
         if is_eof.is_none() {
             return Err(winnow::Err::Cut(ErrorContext::new(
                 "cannot parse entire template\n\
@@ -90,7 +90,8 @@ impl<'a> Node<'a> {
                 pair(opt(Whitespace::parse), take_till(not_ws)),
                 identifier,
             )),
-        )(i)?;
+        )
+        .parse_next(i)?;
 
         let func = match tag {
             "call" => |i, s| wrap(Self::Call, Call::parse(i, s)),
@@ -115,7 +116,8 @@ impl<'a> Node<'a> {
         let (i, closed) = cut_node(
             None,
             alt((value(true, |i| s.tag_block_end(i)), value(false, ws(eof)))),
-        )(i)?;
+        )
+        .parse_next(i)?;
         match closed {
             true => Ok((i, node)),
             false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).into()),
@@ -128,7 +130,7 @@ impl<'a> Node<'a> {
             ws(keyword("break")),
             opt(Whitespace::parse),
         ));
-        let (j, (pws, _, nws)) = p(i)?;
+        let (j, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
             return Err(winnow::Err::Cut(ErrorContext::new(
                 "you can only `break` inside a `for` loop",
@@ -144,7 +146,7 @@ impl<'a> Node<'a> {
             ws(keyword("continue")),
             opt(Whitespace::parse),
         ));
-        let (j, (pws, _, nws)) = p(i)?;
+        let (j, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
             return Err(winnow::Err::Cut(ErrorContext::new(
                 "you can only `continue` inside a `for` loop",
@@ -165,7 +167,8 @@ impl<'a> Node<'a> {
                     ws(|i| Expr::parse(i, s.level.get())),
                 ),
             ),
-        )(i)?;
+        )
+        .parse_next(i)?;
 
         let (i, (nws, closed)) = cut_node(
             None,
@@ -173,7 +176,8 @@ impl<'a> Node<'a> {
                 opt(Whitespace::parse),
                 alt((value(true, |i| s.tag_expr_end(i)), value(false, ws(eof)))),
             ),
-        )(i)?;
+        )
+        .parse_next(i)?;
         match closed {
             true => Ok((i, Self::Expr(Ws(pws, nws), expr))),
             false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).into()),
@@ -210,10 +214,10 @@ fn cut_node<'a, O>(
 ) -> impl FnMut(&'a str) -> ParseResult<'a, O> {
     let mut inner = cut(inner);
     move |i: &'a str| {
-        let result = inner(i);
+        let result = inner.parse_next(i);
         if let Err(winnow::Err::Cut(err) | winnow::Err::Backtrack(err)) = &result {
             if err.message.is_none() {
-                opt(|i| unexpected_raw_tag(kind, i))(err.input)?;
+                opt(|i| unexpected_raw_tag(kind, i)).parse_next(err.input)?;
             }
         }
         result
@@ -228,11 +232,12 @@ fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> ParseResult<'a, ()> {
             opt(Whitespace::parse),
             |i| unexpected_raw_tag(None, i),
         )),
-    )(i)
+    )
+    .parse_next(i)
 }
 
 fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> ParseResult<'a, ()> {
-    let (_, tag) = ws(identifier)(i)?;
+    let (_, tag) = ws(identifier).parse_next(i)?;
     let msg = match tag {
         "end" | "elif" | "else" | "when" => match kind {
             Some(kind) => {
@@ -269,7 +274,7 @@ impl<'a> When<'a> {
                 )),
             ),
         ));
-        let (i, (_, pws, _, (nws, _, nodes))) = p(i)?;
+        let (i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
         Ok((
             i,
             WithSpan::new(
@@ -331,7 +336,7 @@ impl<'a> When<'a> {
                 )),
             ),
         ));
-        let (i, (_, pws, _, (target, nws, _, mut nodes, endwhen))) = p(i)?;
+        let (i, (_, pws, _, (target, nws, _, mut nodes, endwhen))) = p.parse_next(i)?;
         if let Some(endwhen) = endwhen {
             nodes.push(endwhen);
         }
@@ -372,7 +377,8 @@ impl<'a> Cond<'a> {
             opt(Whitespace::parse),
             cut_node(Some("if"), |i| s.tag_block_end(i)),
             cut_node(Some("if"), |i| Node::many(i, s)),
-        ))(i)?;
+        ))
+        .parse_next(i)?;
         Ok((
             i,
             WithSpan::new(
@@ -399,7 +405,8 @@ impl<'a> CondTest<'a> {
         preceded(
             ws(keyword("if")),
             cut_node(Some("if"), |i| Self::parse_cond(i, s)),
-        )(i)
+        )
+        .parse_next(i)
     }
 
     fn parse_cond(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
@@ -410,7 +417,8 @@ impl<'a> CondTest<'a> {
                 ws(char('=')),
             )),
             ws(|i| Expr::parse(i, s.level.get())),
-        )(i)?;
+        )
+        .parse_next(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
         Ok((i, Self {
             target,
@@ -429,7 +437,7 @@ pub enum Whitespace {
 
 impl Whitespace {
     fn parse(i: &str) -> ParseResult<'_, Self> {
-        map_opt(anychar, Self::parse_char)(i)
+        map_opt(anychar, Self::parse_char).parse_next(i)
     }
 
     fn parse_char(c: char) -> Option<Self> {
@@ -501,7 +509,7 @@ impl<'a> Loop<'a> {
                     )),
                 ),
             );
-            let (i, (pws, nodes, nws)) = p(i)?;
+            let (i, (pws, nodes, nws)) = p.parse_next(i)?;
             Ok((i, (pws, nodes, nws)))
         };
 
@@ -521,7 +529,8 @@ impl<'a> Loop<'a> {
                         )),
                     ),
                 )),
-            )(i)?;
+            )
+            .parse_next(i)?;
             Ok((i, (body, pws, else_block, nws)))
         };
 
@@ -546,7 +555,8 @@ impl<'a> Loop<'a> {
                 )),
             ),
         ));
-        let (i, (pws1, _, (var, _, (iter, cond, nws1, _, (body, pws2, else_block, nws2))))) = p(i)?;
+        let (i, (pws1, _, (var, _, (iter, cond, nws1, _, (body, pws2, else_block, nws2))))) =
+            p.parse_next(i)?;
         let (nws3, else_nodes, pws3) = else_block.unwrap_or_default();
         Ok((
             i,
@@ -583,7 +593,8 @@ impl<'a> Macro<'a> {
                 ws(char('(')),
                 separated_list0(char(','), ws(identifier)),
                 tuple((opt(ws(char(','))), char(')'))),
-            )(i)
+            )
+            .parse_next(i)
         }
 
         let start_s = i;
@@ -600,7 +611,7 @@ impl<'a> Macro<'a> {
                 )),
             ),
         ));
-        let (j, (pws1, _, (name, params, nws1, _))) = start(i)?;
+        let (j, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
         if is_rust_keyword(name) {
             return Err(winnow::Err::Cut(ErrorContext::new(
                 format!("'{name}' is not a valid name for a macro"),
@@ -622,7 +633,7 @@ impl<'a> Macro<'a> {
                             Some("macro"),
                             preceded(
                                 opt(|before| {
-                                    let (after, end_name) = ws(identifier)(before)?;
+                                    let (after, end_name) = ws(identifier).parse_next(before)?;
                                     check_end_name(before, after, name, end_name, "macro")
                                 }),
                                 opt(Whitespace::parse),
@@ -632,7 +643,7 @@ impl<'a> Macro<'a> {
                 ),
             )),
         );
-        let (i, (contents, (_, pws2, _, nws2))) = end(j)?;
+        let (i, (contents, (_, pws2, _, nws2))) = end.parse_next(j)?;
 
         Ok((
             i,
@@ -680,7 +691,8 @@ impl<'a> FilterBlock<'a> {
                 )),
             ),
         ));
-        let (i, (pws1, _, (filter_name, params, extra_filters, (), nws1, _))) = start(i)?;
+        let (i, (pws1, _, (filter_name, params, extra_filters, (), nws1, _))) =
+            start.parse_next(i)?;
 
         let mut arguments = params.unwrap_or_default();
         arguments.insert(0, WithSpan::new(Expr::FilterSource, start_s));
@@ -714,7 +726,7 @@ impl<'a> FilterBlock<'a> {
                 ),
             )),
         );
-        let (i, (nodes, (_, pws2, _, nws2))) = end(i)?;
+        let (i, (nodes, (_, pws2, _, nws2))) = end.parse_next(i)?;
 
         Ok((
             i,
@@ -753,7 +765,7 @@ impl<'a> Import<'a> {
                 )),
             ),
         ));
-        let (i, (pws, _, (path, _, (scope, nws)))) = p(i)?;
+        let (i, (pws, _, (path, _, (scope, nws)))) = p.parse_next(i)?;
         Ok((
             i,
             WithSpan::new(
@@ -792,7 +804,7 @@ impl<'a> Call<'a> {
                 )),
             ),
         ));
-        let (i, (pws, _, (scope, name, args, nws))) = p(i)?;
+        let (i, (pws, _, (scope, name, args, nws))) = p.parse_next(i)?;
         let scope = scope.map(|(scope, _)| scope);
         let args = args.unwrap_or_default();
         Ok((
@@ -857,7 +869,8 @@ impl<'a> Match<'a> {
                 )),
             ),
         ));
-        let (i, (pws1, _, (expr, nws1, _, (_, mut arms, (else_arm, (_, pws2, _, nws2)))))) = p(i)?;
+        let (i, (pws1, _, (expr, nws1, _, (_, mut arms, (else_arm, (_, pws2, _, nws2)))))) =
+            p.parse_next(i)?;
 
         if let Some(arm) = else_arm {
             arms.push(arm);
@@ -905,7 +918,7 @@ impl<'a> BlockDef<'a> {
                 })),
             ),
         ));
-        let (i, (pws1, _, (name, nws1, _))) = start(i)?;
+        let (i, (pws1, _, (name, nws1, _))) = start.parse_next(i)?;
 
         let mut end = cut_node(
             Some("block"),
@@ -921,7 +934,7 @@ impl<'a> BlockDef<'a> {
                             Some("block"),
                             tuple((
                                 opt(|before| {
-                                    let (after, end_name) = ws(identifier)(before)?;
+                                    let (after, end_name) = ws(identifier).parse_next(before)?;
                                     check_end_name(before, after, name, end_name, "block")
                                 }),
                                 opt(Whitespace::parse),
@@ -931,7 +944,7 @@ impl<'a> BlockDef<'a> {
                 ),
             )),
         );
-        let (i, (nodes, (_, pws2, _, (_, nws2)))) = end(i)?;
+        let (i, (nodes, (_, pws2, _, (_, nws2)))) = end.parse_next(i)?;
 
         Ok((
             i,
@@ -978,7 +991,7 @@ pub struct Lit<'a> {
 impl<'a> Lit<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, ()) = not(eof)(i)?;
+        let (i, ()) = not(eof).parse_next(i)?;
 
         let candidate_finder = Splitter3::new(
             s.syntax.block_start,
@@ -991,7 +1004,7 @@ impl<'a> Lit<'a> {
             tag(s.syntax.expr_start),
         ));
 
-        let (i, content) = opt(recognize(skip_till(candidate_finder, p_start)))(i)?;
+        let (i, content) = opt(recognize(skip_till(candidate_finder, p_start))).parse_next(i)?;
         let (i, content) = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
@@ -1046,7 +1059,7 @@ impl<'a> Raw<'a> {
             ),
         ));
 
-        let (_, (pws1, _, (nws1, _, (contents, (i, (_, pws2, _, nws2, _)))))) = p(i)?;
+        let (_, (pws1, _, (nws1, _, (contents, (i, (_, pws2, _, nws2, _)))))) = p.parse_next(i)?;
         let lit = Lit::split_ws_parts(contents);
         let ws1 = Ws(pws1, nws1);
         let ws2 = Ws(pws2, nws2);
@@ -1079,7 +1092,7 @@ impl<'a> Let<'a> {
                 )),
             ),
         ));
-        let (i, (pws, _, (var, val, nws))) = p(i)?;
+        let (i, (pws, _, (var, val, nws))) = p.parse_next(i)?;
 
         Ok((
             i,
@@ -1132,7 +1145,7 @@ impl<'a> If<'a> {
             ),
         ));
 
-        let (i, (pws1, cond, (nws1, _, (nodes, elifs, (_, pws2, _, nws2))))) = p(i)?;
+        let (i, (pws1, cond, (nws1, _, (nodes, elifs, (_, pws2, _, nws2))))) = p.parse_next(i)?;
         let mut branches = vec![WithSpan::new(
             Cond {
                 ws: Ws(pws1, nws1),
@@ -1173,7 +1186,7 @@ impl<'a> Include<'a> {
                 pair(ws(str_lit_without_prefix), opt(Whitespace::parse)),
             ),
         ));
-        let (i, (pws, _, (path, nws))) = p(i)?;
+        let (i, (pws, _, (path, nws))) = p.parse_next(i)?;
         Ok((
             i,
             WithSpan::new(
@@ -1203,7 +1216,8 @@ impl<'a> Extends<'a> {
                 Some("extends"),
                 pair(ws(str_lit_without_prefix), opt(Whitespace::parse)),
             ),
-        ))(i)?;
+        ))
+        .parse_next(i)?;
         match (pws, nws) {
             (None, None) => Ok((i, WithSpan::new(Self { path }, start))),
             (_, _) => Err(winnow::Err::Cut(ErrorContext::new(
@@ -1232,7 +1246,8 @@ impl<'a> Comment<'a> {
             alt((
                 value(Tag::Open, |i| s.tag_comment_start(i)),
                 value(Tag::Close, |i| s.tag_comment_end(i)),
-            ))(i)
+            ))
+            .parse_next(i)
         }
 
         fn content<'a>(mut i: &'a str, s: &State<'_>) -> ParseResult<'a> {
@@ -1240,7 +1255,7 @@ impl<'a> Comment<'a> {
             let start = i;
             loop {
                 let splitter = Splitter2::new(s.syntax.comment_start, s.syntax.comment_end);
-                let (k, tag) = opt(skip_till(splitter, |i| tag(i, s)))(i)?;
+                let (k, tag) = opt(skip_till(splitter, |i| tag(i, s))).parse_next(i)?;
                 let Some((j, tag)) = tag else {
                     return Err(
                         ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),
@@ -1269,7 +1284,8 @@ impl<'a> Comment<'a> {
         let (i, content) = preceded(
             |i| s.tag_comment_start(i),
             cut_node(Some("comment"), |i| content(i, s)),
-        )(i)?;
+        )
+        .parse_next(i)?;
 
         let mut ws = Ws(None, None);
         if content.len() == 1 && matches!(content, "-" | "+" | "~") {
@@ -1302,7 +1318,7 @@ fn end_node<'a, 'g: 'a>(
     expected: &'g str,
 ) -> impl Fn(&'a str) -> ParseResult<'a> + 'g {
     move |start| {
-        let (i, actual) = ws(identifier)(start)?;
+        let (i, actual) = ws(identifier).parse_next(start)?;
         if actual == expected {
             Ok((i, actual))
         } else if actual.starts_with("end") {

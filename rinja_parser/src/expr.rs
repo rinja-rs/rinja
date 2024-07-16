@@ -102,7 +102,8 @@ impl<'a> Expr<'a> {
                                 )
                             },
                             move |i| Self::parse(i, level),
-                        ))(i)?;
+                        ))
+                        .parse_next(i)?;
                         if has_named_arguments && !matches!(*expr, Self::NamedArgument(_, _)) {
                             Err(winnow::Err::Cut(ErrorContext::new(
                                 "named arguments must always be passed last",
@@ -115,7 +116,8 @@ impl<'a> Expr<'a> {
                 ),
                 tuple((opt(ws(char(','))), char(')'))),
             )),
-        )(i)
+        )
+        .parse_next(i)
     }
 
     fn named_argument(
@@ -133,7 +135,7 @@ impl<'a> Expr<'a> {
 
         let (_, level) = level.nest(i)?;
         let (i, (argument, _, value)) =
-            tuple((identifier, ws(char('=')), move |i| Self::parse(i, level)))(i)?;
+            tuple((identifier, ws(char('=')), move |i| Self::parse(i, level))).parse_next(i)?;
         if named_arguments.insert(argument) {
             Ok((
                 i,
@@ -154,7 +156,8 @@ impl<'a> Expr<'a> {
             pair(
                 ws(alt((tag("..="), tag("..")))),
                 opt(move |i| Self::or(i, level)),
-            )(i)
+            )
+            .parse_next(i)
         };
         alt((
             map(range_right, |(op, right)| {
@@ -170,7 +173,8 @@ impl<'a> Expr<'a> {
                     None => left,
                 },
             ),
-        ))(i)
+        ))
+        .parse_next(i)
     }
 
     expr_prec_layer!(or, and, tag("||"));
@@ -197,11 +201,11 @@ impl<'a> Expr<'a> {
     fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let (before_keyword, lhs) = Self::filtered(i, level)?;
-        let (j, rhs) = opt(ws(identifier))(before_keyword)?;
+        let (j, rhs) = opt(ws(identifier)).parse_next(before_keyword)?;
         let i = match rhs {
             Some("is") => j,
             Some("as") => {
-                let (i, target) = opt(identifier)(j)?;
+                let (i, target) = opt(identifier).parse_next(j)?;
                 let target = target.unwrap_or_default();
                 if crate::PRIMITIVE_TYPES.contains(&target) {
                     return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
@@ -223,7 +227,8 @@ impl<'a> Expr<'a> {
             _ => return Ok((before_keyword, lhs)),
         };
 
-        let (i, rhs) = opt(terminated(opt(keyword("not")), ws(keyword("defined"))))(i)?;
+        let (i, rhs) =
+            opt(terminated(opt(keyword("not")), ws(keyword("defined")))).parse_next(i)?;
         let ctor = match rhs {
             None => {
                 return Err(winnow::Err::Cut(ErrorContext::new(
@@ -256,7 +261,7 @@ impl<'a> Expr<'a> {
     fn filtered(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let (mut i, mut res) = Self::prefix(i, level)?;
-        while let (j, Some((name, args))) = opt(|i| filter(i, &mut level))(i)? {
+        while let (j, Some((name, args))) = opt(|i| filter(i, &mut level)).parse_next(i)? {
             i = j;
 
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
@@ -273,7 +278,8 @@ impl<'a> Expr<'a> {
         let (i, (ops, mut expr)) = pair(
             many0(ws(alt((tag("!"), tag("-"), tag("*"), tag("&"))))).map(|v: Vec<_>| v),
             |i| Suffix::parse(i, nested),
-        )(i)?;
+        )
+        .parse_next(i)?;
 
         for op in ops.iter().rev() {
             // This is a rare place where we create recursion in the parsed AST
@@ -295,21 +301,22 @@ impl<'a> Expr<'a> {
             Self::path_var_bool,
             move |i| Self::array(i, level),
             move |i| Self::group(i, level),
-        ))(i)
+        ))
+        .parse_next(i)
     }
 
     fn group(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let (_, level) = level.nest(i)?;
         let start = i;
-        let (i, expr) = preceded(ws(char('(')), opt(|i| Self::parse(i, level)))(i)?;
+        let (i, expr) = preceded(ws(char('(')), opt(|i| Self::parse(i, level))).parse_next(i)?;
         let Some(expr) = expr else {
-            let (i, _) = char(')')(i)?;
+            let (i, _) = char(')').parse_next(i)?;
             return Ok((i, WithSpan::new(Self::Tuple(vec![]), start)));
         };
 
-        let (i, comma) = ws(opt(peek(char(','))))(i)?;
+        let (i, comma) = ws(opt(peek(char(',')))).parse_next(i)?;
         if comma.is_none() {
-            let (i, _) = char(')')(i)?;
+            let (i, _) = char(')').parse_next(i)?;
             return Ok((i, WithSpan::new(Self::Group(Box::new(expr)), start)));
         }
 
@@ -320,8 +327,9 @@ impl<'a> Expr<'a> {
             |(), expr| {
                 exprs.push(expr);
             },
-        )(i)?;
-        let (i, _) = pair(ws(opt(char(','))), char(')'))(i)?;
+        )
+        .parse_next(i)?;
+        let (i, _) = pair(ws(opt(char(','))), char(')')).parse_next(i)?;
         Ok((i, WithSpan::new(Self::Tuple(exprs), start)))
     }
 
@@ -337,7 +345,8 @@ impl<'a> Expr<'a> {
                 )),
                 char(']'),
             )),
-        )(i)?;
+        )
+        .parse_next(i)?;
         Ok((
             i,
             WithSpan::new(Self::Array(array.unwrap_or_default()), start),
@@ -351,24 +360,25 @@ impl<'a> Expr<'a> {
             PathOrIdentifier::Identifier("true") => Self::BoolLit(true),
             PathOrIdentifier::Identifier("false") => Self::BoolLit(false),
             PathOrIdentifier::Identifier(v) => Self::Var(v),
-        })(i)
+        })
+        .parse_next(i)
         .map(|(i, expr)| (i, WithSpan::new(expr, start)))
     }
 
     fn str(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        map(str_lit, |i| WithSpan::new(Self::StrLit(i), start))(i)
+        map(str_lit, |i| WithSpan::new(Self::StrLit(i), start)).parse_next(i)
     }
 
     fn num(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, (full, num)) = consumed(num_lit)(i)?;
+        let (i, (full, num)) = consumed(num_lit).parse_next(i)?;
         Ok((i, WithSpan::new(Expr::NumLit(full, num), start)))
     }
 
     fn char(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        map(char_lit, |i| WithSpan::new(Self::CharLit(i), start))(i)
+        map(char_lit, |i| WithSpan::new(Self::CharLit(i), start)).parse_next(i)
     }
 
     #[must_use]
@@ -402,7 +412,7 @@ impl<'a> Expr<'a> {
 }
 
 fn token_xor(i: &str) -> ParseResult<'_> {
-    let (i, good) = alt((value(true, keyword("xor")), value(false, char('^'))))(i)?;
+    let (i, good) = alt((value(true, keyword("xor")), value(false, char('^')))).parse_next(i)?;
     if good {
         Ok((i, "^"))
     } else {
@@ -417,7 +427,8 @@ fn token_bitand(i: &str) -> ParseResult<'_> {
     let (i, good) = alt((
         value(true, keyword("bitand")),
         value(false, pair(char('&'), not(char('&')))),
-    ))(i)?;
+    ))
+    .parse_next(i)?;
     if good {
         Ok((i, "&"))
     } else {
@@ -454,7 +465,8 @@ impl<'a> Suffix<'a> {
                 |i| Self::call(i, level),
                 Self::r#try,
                 Self::r#macro,
-            )))(i)?;
+            )))
+            .parse_next(i)?;
 
             match suffix {
                 Some(Self::Attr(attr)) => expr = WithSpan::new(Expr::Attr(expr.into(), attr), i),
@@ -528,7 +540,8 @@ impl<'a> Suffix<'a> {
                 map(recognize(nested_parenthesis), Self::MacroCall),
                 char(')'),
             )),
-        )(i)
+        )
+        .parse_next(i)
     }
 
     fn attr(i: &'a str) -> ParseResult<'a, Self> {
@@ -538,7 +551,8 @@ impl<'a> Suffix<'a> {
                 cut(alt((digit1, identifier))),
             ),
             Self::Attr,
-        )(i)
+        )
+        .parse_next(i)
     }
 
     fn index(i: &'a str, level: Level) -> ParseResult<'a, Self> {
@@ -549,15 +563,16 @@ impl<'a> Suffix<'a> {
                 cut(terminated(ws(move |i| Expr::parse(i, level)), char(']'))),
             ),
             Self::Index,
-        )(i)
+        )
+        .parse_next(i)
     }
 
     fn call(i: &'a str, level: Level) -> ParseResult<'a, Self> {
         let (_, level) = level.nest(i)?;
-        map(move |i| Expr::arguments(i, level, false), Self::Call)(i)
+        map(move |i| Expr::arguments(i, level, false), Self::Call).parse_next(i)
     }
 
     fn r#try(i: &'a str) -> ParseResult<'a, Self> {
-        map(preceded(take_till(not_ws), char('?')), |_| Self::Try)(i)
+        map(preceded(take_till(not_ws), char('?')), |_| Self::Try).parse_next(i)
     }
 }

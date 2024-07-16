@@ -310,7 +310,7 @@ fn skip_till<'a, 'b, O>(
                     )));
                 }
             };
-            i = match next(i)? {
+            i = match next.parse_next(i)? {
                 (j, Some(lookahead)) => return Ok((i, (j, lookahead))),
                 (j, None) => j,
             };
@@ -320,7 +320,7 @@ fn skip_till<'a, 'b, O>(
 
 fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'a> {
     move |i: &'a str| -> ParseResult<'a> {
-        let (j, v) = identifier(i)?;
+        let (j, v) = identifier.parse_next(i)?;
         if k == v { Ok((j, v)) } else { fail(i) }
     }
 }
@@ -334,11 +334,11 @@ fn identifier(input: &str) -> ParseResult<'_> {
         take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
-    recognize(pair(start, opt(tail)))(input)
+    recognize(pair(start, opt(tail))).parse_next(input)
 }
 
 fn bool_lit(i: &str) -> ParseResult<'_> {
-    alt((keyword("false"), keyword("true")))(i)
+    alt((keyword("false"), keyword("true"))).parse_next(i)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -378,8 +378,9 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
                 value(8, char('o')),
                 value(16, char('x')),
             )),
-        ))(i)?;
-        match opt(separated_digits(base, false))(i)? {
+        ))
+        .parse_next(i)?;
+        match opt(separated_digits(base, false)).parse_next(i)? {
             (i, Some(_)) => Ok((i, ())),
             (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
                 format!("expected digits after `{kind}`"),
@@ -391,36 +392,41 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> ParseResult<'a, ()> {
-        let (i, has_dot) = opt(pair(char('.'), separated_digits(10, true)))(i)?;
+        let (i, has_dot) = opt(pair(char('.'), separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
-            let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-")))(i)?;
-            match opt(separated_digits(10, op.is_none()))(i)? {
+            let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
+            match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 (i, Some(_)) => Ok((i, ())),
                 (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
                     format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
                     start,
                 ))),
             }
-        })(i)?;
+        })
+        .parse_next(i)?;
         match (has_dot, has_exp) {
             (Some(_), _) | (_, Some(())) => Ok((i, ())),
             _ => fail(start),
         }
     };
 
-    let (i, num) = if let Ok((i, Some(num))) = opt(recognize(int_with_base))(start) {
-        let (i, suffix) = opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i))(i)?;
+    let (i, num) = if let Ok((i, Some(num))) = opt(recognize(int_with_base)).parse_next(start) {
+        let (i, suffix) =
+            opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
         (i, Num::Int(num, suffix))
     } else {
         let (i, (num, float)) = consumed(preceded(
             pair(opt(char('-')), separated_digits(10, true)),
             opt(float),
-        ))(start)?;
+        ))
+        .parse_next(start)?;
         if float.is_some() {
-            let (i, suffix) = opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i))(i)?;
+            let (i, suffix) =
+                opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_next(i)?;
             (i, Num::Float(num, suffix))
         } else {
-            let (i, suffix) = opt(|i| num_lit_suffix("number", NUM_TYPES, start, i))(i)?;
+            let (i, suffix) =
+                opt(|i| num_lit_suffix("number", NUM_TYPES, start, i)).parse_next(i)?;
             match suffix {
                 Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
                 Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
@@ -438,11 +444,12 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
         recognize(tuple((
             |i| match start {
                 true => Ok((i, 0)),
-                false => many0_count(char('_'))(i),
+                false => many0_count(char('_')).parse_next(i),
             },
             satisfy(|ch| ch.is_digit(radix)),
             many0_count(satisfy(|ch| ch == '_' || ch.is_digit(radix))),
-        )))(i)
+        )))
+        .parse_next(i)
     }
 }
 
@@ -481,13 +488,14 @@ fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
         char('"'),
         opt(escaped(is_not("\\\""), '\\', anychar)),
         char('"'),
-    )(i)?;
+    )
+    .parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
 fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
     let (i, (prefix, content)) =
-        tuple((opt(alt((char('b'), char('c')))), str_lit_without_prefix))(i)?;
+        tuple((opt(alt((char('b'), char('c')))), str_lit_without_prefix)).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
@@ -518,7 +526,8 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
             opt(escaped(is_not("\\\'"), '\\', anychar)),
             char('\''),
         ),
-    ))(i)?;
+    ))
+    .parse_next(i)?;
 
     let Some(s) = s else {
         return Err(winnow::Err::Cut(ErrorContext::new(
@@ -616,7 +625,8 @@ impl<'a> Char<'a> {
                 )),
             )),
             |(_, ch)| ch,
-        )(i)
+        )
+        .parse_next(i)
     }
 }
 
@@ -629,7 +639,7 @@ fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt(tag("::")));
     let tail = opt(many1(preceded(ws(tag("::")), identifier)).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = tuple((root, identifier, tail))(i)?;
+    let (i, (root, start, rest)) = tuple((root, identifier, tail)).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:
@@ -685,27 +695,27 @@ impl<'a> State<'a> {
     }
 
     fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_start)(i)
+        tag(self.syntax.block_start).parse_next(i)
     }
 
     fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_end)(i)
+        tag(self.syntax.block_end).parse_next(i)
     }
 
     fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_start)(i)
+        tag(self.syntax.comment_start).parse_next(i)
     }
 
     fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_end)(i)
+        tag(self.syntax.comment_end).parse_next(i)
     }
 
     fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_start)(i)
+        tag(self.syntax.expr_start).parse_next(i)
     }
 
     fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_end)(i)
+        tag(self.syntax.expr_end).parse_next(i)
     }
 
     fn enter_loop(&self) {
@@ -888,16 +898,17 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = take_till(not_ws)(i)?;
+    let (j, _) = take_till(not_ws).parse_next(i)?;
     let had_spaces = i.len() != j.len();
-    let (j, _) = pair(char('|'), not(char('|')))(j)?;
+    let (j, _) = pair(char('|'), not(char('|'))).parse_next(j)?;
 
     if !had_spaces {
         *level = level.nest(i)?.1;
         cut(pair(
             ws(identifier),
             opt(|i| Expr::arguments(i, *level, false)),
-        ))(j)
+        ))
+        .parse_next(j)
     } else {
         Err(winnow::Err::Cut(ErrorContext::new(
             "the filter operator `|` must not be preceded by any whitespace characters\n\
