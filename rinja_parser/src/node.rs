@@ -1,13 +1,14 @@
 use std::str;
 
-use nom::branch::alt;
-use nom::bytes::complete::{tag, take_till};
-use nom::character::complete::{anychar, char};
-use nom::combinator::{
+use winnow::Parser;
+use winnow::branch::alt;
+use winnow::bytes::complete::{tag, take_till};
+use winnow::character::complete::{anychar, char};
+use winnow::combinator::{
     complete, consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
-use nom::multi::{many0, separated_list0, separated_list1};
-use nom::sequence::{delimited, pair, preceded, tuple};
+use winnow::multi::{many0, separated_list0, separated_list1};
+use winnow::sequence::{delimited, pair, preceded, tuple};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -41,7 +42,7 @@ impl<'a> Node<'a> {
         let (i, result) = match complete(|i| Self::many(i, s))(i) {
             Ok((i, result)) => (i, result),
             Err(err) => {
-                if let nom::Err::Error(err) | nom::Err::Failure(err) = &err {
+                if let winnow::Err::Backtrack(err) | winnow::Err::Cut(err) = &err {
                     if err.message.is_none() {
                         opt(|i| unexpected_tag(i, s))(err.input)?;
                     }
@@ -52,7 +53,7 @@ impl<'a> Node<'a> {
         let (i, _) = opt(|i| unexpected_tag(i, s))(i)?;
         let (i, is_eof) = opt(eof)(i)?;
         if is_eof.is_none() {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 "cannot parse entire template\n\
                  you should never encounter this error\n\
                  please report this error to <https://github.com/rinja-rs/rinja/issues>",
@@ -68,7 +69,9 @@ impl<'a> Node<'a> {
             map(|i| Comment::parse(i, s), Self::Comment),
             |i| Self::expr(i, s),
             |i| Self::parse(i, s),
-        )))(i)
+        )))
+        .map(|v: Vec<_>| v)
+        .parse_next(i)
     }
 
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
@@ -127,7 +130,7 @@ impl<'a> Node<'a> {
         ));
         let (j, (pws, _, nws)) = p(i)?;
         if !s.is_in_loop() {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 "you can only `break` inside a `for` loop",
                 i,
             )));
@@ -143,7 +146,7 @@ impl<'a> Node<'a> {
         ));
         let (j, (pws, _, nws)) = p(i)?;
         if !s.is_in_loop() {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 "you can only `continue` inside a `for` loop",
                 i,
             )));
@@ -208,7 +211,7 @@ fn cut_node<'a, O>(
     let mut inner = cut(inner);
     move |i: &'a str| {
         let result = inner(i);
-        if let Err(nom::Err::Failure(err) | nom::Err::Error(err)) = &result {
+        if let Err(winnow::Err::Cut(err) | winnow::Err::Backtrack(err)) = &result {
             if err.message.is_none() {
                 opt(|i| unexpected_raw_tag(kind, i))(err.input)?;
             }
@@ -240,7 +243,7 @@ fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> ParseResult
         tag if tag.starts_with("end") => format!("unexpected closing tag `{tag}`"),
         tag => format!("unknown node `{tag}`"),
     };
-    Err(nom::Err::Failure(ErrorContext::new(msg, i)))
+    Err(winnow::Err::Cut(ErrorContext::new(msg, i)))
 }
 
 #[derive(Debug, PartialEq)]
@@ -295,7 +298,7 @@ impl<'a> When<'a> {
                     tuple((
                         opt(Whitespace::parse),
                         |i| s.tag_block_end(i),
-                        many0(value((), ws(|i| Comment::parse(i, s)))),
+                        many0(value((), ws(|i| Comment::parse(i, s)))).map(|()| ()),
                     )),
                 ),
             ))),
@@ -447,7 +450,7 @@ fn check_block_start<'a>(
     expected: &str,
 ) -> ParseResult<'a> {
     if i.is_empty() {
-        return Err(nom::Err::Failure(ErrorContext::new(
+        return Err(winnow::Err::Cut(ErrorContext::new(
             format!("expected `{expected}` to terminate `{node}` node, found nothing"),
             start,
         )));
@@ -599,7 +602,7 @@ impl<'a> Macro<'a> {
         ));
         let (j, (pws1, _, (name, params, nws1, _))) = start(i)?;
         if is_rust_keyword(name) {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 format!("'{name}' is not a valid name for a macro"),
                 i,
             )));
@@ -669,7 +672,8 @@ impl<'a> FilterBlock<'a> {
                     opt(|i| Expr::arguments(i, s.level.get(), false)),
                     many0(|i| {
                         filter(i, &mut level).map(|(j, (name, params))| (j, (name, params, i)))
-                    }),
+                    })
+                    .map(|v: Vec<_>| v),
                     ws(|i| Ok((i, ()))),
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
@@ -829,8 +833,8 @@ impl<'a> Match<'a> {
                     cut_node(
                         Some("match"),
                         tuple((
-                            ws(many0(ws(value((), |i| Comment::parse(i, s))))),
-                            many0(|i| When::when(i, s)),
+                            ws(many0(ws(value((), |i| Comment::parse(i, s))))).map(|()| ()),
+                            many0(|i| When::when(i, s)).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("match"),
                                 tuple((
@@ -859,7 +863,7 @@ impl<'a> Match<'a> {
             arms.push(arm);
         }
         if arms.is_empty() {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 "`match` nodes must contain at least one `when` node and/or an `else` case",
                 start,
             )));
@@ -955,7 +959,7 @@ fn check_end_name<'a>(
         return Ok((after, end_name));
     }
 
-    Err(nom::Err::Failure(ErrorContext::new(
+    Err(winnow::Err::Cut(ErrorContext::new(
         match name.is_empty() && !end_name.is_empty() {
             true => format!("unexpected name `{end_name}` in `end{kind}` tag for unnamed `{kind}`"),
             false => format!("expected name `{name}` in `end{kind}` tag, found `{end_name}`"),
@@ -1112,7 +1116,7 @@ impl<'a> If<'a> {
                         Some("if"),
                         tuple((
                             |i| Node::many(i, s),
-                            many0(|i| Cond::parse(i, s)),
+                            many0(|i| Cond::parse(i, s)).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("if"),
                                 tuple((
@@ -1202,7 +1206,7 @@ impl<'a> Extends<'a> {
         ))(i)?;
         match (pws, nws) {
             (None, None) => Ok((i, WithSpan::new(Self { path }, start))),
-            (_, _) => Err(nom::Err::Failure(ErrorContext::new(
+            (_, _) => Err(winnow::Err::Cut(ErrorContext::new(
                 "whitespace control is not allowed on `extends`",
                 start,
             ))),
@@ -1246,7 +1250,7 @@ impl<'a> Comment<'a> {
                     Tag::Open => match depth.checked_add(1) {
                         Some(new_depth) => depth = new_depth,
                         None => {
-                            return Err(nom::Err::Failure(ErrorContext::new(
+                            return Err(winnow::Err::Cut(ErrorContext::new(
                                 "too deeply nested comments",
                                 start,
                             )));
@@ -1269,7 +1273,7 @@ impl<'a> Comment<'a> {
 
         let mut ws = Ws(None, None);
         if content.len() == 1 && matches!(content, "-" | "+" | "~") {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 format!(
                     "ambiguous whitespace stripping\n\
                      use `{}{content} {content}{}` to apply the same whitespace stripping on both \
@@ -1302,7 +1306,7 @@ fn end_node<'a, 'g: 'a>(
         if actual == expected {
             Ok((i, actual))
         } else if actual.starts_with("end") {
-            Err(nom::Err::Failure(ErrorContext::new(
+            Err(winnow::Err::Cut(ErrorContext::new(
                 format!("expected `{expected}` to terminate `{node}` node, found `{actual}`"),
                 start,
             )))

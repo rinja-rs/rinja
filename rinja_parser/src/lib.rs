@@ -10,14 +10,15 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, str};
 
-use nom::branch::alt;
-use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
-use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
-use nom::error::{ErrorKind, FromExternalError};
-use nom::multi::{many0_count, many1};
-use nom::sequence::{delimited, pair, preceded, tuple};
-use nom::{AsChar, InputTakeAtPosition};
+use winnow::Parser;
+use winnow::branch::alt;
+use winnow::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n, take_while1};
+use winnow::character::complete::{anychar, char, one_of, satisfy};
+use winnow::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
+use winnow::error::{ErrorKind, FromExternalError};
+use winnow::multi::{many0_count, many1};
+use winnow::sequence::{delimited, pair, preceded, tuple};
+use winnow::stream::AsChar;
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -114,10 +115,10 @@ impl<'a> Ast<'a> {
     ) -> Result<Self, ParseError> {
         match Node::parse_template(src, &State::new(syntax)) {
             Ok(("", nodes)) => Ok(Self { nodes }),
-            Ok(_) | Err(nom::Err::Incomplete(_)) => unreachable!(),
+            Ok(_) | Err(winnow::Err::Incomplete(_)) => unreachable!(),
             Err(
-                nom::Err::Error(ErrorContext { input, message, .. })
-                | nom::Err::Failure(ErrorContext { input, message, .. }),
+                winnow::Err::Backtrack(ErrorContext { input, message, .. })
+                | winnow::Err::Cut(ErrorContext { input, message, .. }),
             ) => Err(ParseError {
                 message,
                 offset: src.len() - input.len(),
@@ -221,7 +222,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-pub(crate) type ParseErr<'a> = nom::Err<ErrorContext<'a>>;
+pub(crate) type ParseErr<'a> = winnow::Err<ErrorContext<'a>>;
 pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
@@ -248,7 +249,7 @@ impl<'a> ErrorContext<'a> {
     }
 }
 
-impl<'a> nom::error::ParseError<&'a str> for ErrorContext<'a> {
+impl<'a> winnow::error::ParseError<&'a str> for ErrorContext<'a> {
     fn from_error_kind(input: &'a str, _code: ErrorKind) -> Self {
         Self {
             input,
@@ -256,8 +257,8 @@ impl<'a> nom::error::ParseError<&'a str> for ErrorContext<'a> {
         }
     }
 
-    fn append(_: &'a str, _: ErrorKind, other: Self) -> Self {
-        other
+    fn append(self, _: &'a str, _: ErrorKind) -> Self {
+        self
     }
 }
 
@@ -270,9 +271,9 @@ impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a
     }
 }
 
-impl<'a> From<ErrorContext<'a>> for nom::Err<ErrorContext<'a>> {
+impl<'a> From<ErrorContext<'a>> for winnow::Err<ErrorContext<'a>> {
     fn from(cx: ErrorContext<'a>) -> Self {
-        Self::Failure(cx)
+        Self::Cut(cx)
     }
 }
 
@@ -302,7 +303,12 @@ fn skip_till<'a, 'b, O>(
         loop {
             i = match candidate_finder.split(i) {
                 Some((_, j)) => j,
-                None => return Err(nom::Err::Error(ErrorContext::new("`end` not found`", i))),
+                None => {
+                    return Err(winnow::Err::Backtrack(ErrorContext::new(
+                        "`end` not found`",
+                        i,
+                    )));
+                }
             };
             i = match next(i)? {
                 (j, Some(lookahead)) => return Ok((i, (j, lookahead))),
@@ -321,17 +327,11 @@ fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'a> {
 
 fn identifier(input: &str) -> ParseResult<'_> {
     fn start(s: &str) -> ParseResult<'_> {
-        s.split_at_position1_complete(
-            |c| !(c.is_alpha() || c == '_' || c >= '\u{0080}'),
-            nom::error::ErrorKind::Alpha,
-        )
+        take_while1(|c: char| c.is_alpha() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
     fn tail(s: &str) -> ParseResult<'_> {
-        s.split_at_position1_complete(
-            |c| !(c.is_alphanum() || c == '_' || c >= '\u{0080}'),
-            nom::error::ErrorKind::Alpha,
-        )
+        take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
     recognize(pair(start, opt(tail)))(input)
@@ -362,7 +362,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         {
             Ok((i, value))
         } else {
-            Err(nom::Err::Failure(ErrorContext::new(
+            Err(winnow::Err::Cut(ErrorContext::new(
                 format!("unknown {kind} suffix `{suffix}`"),
                 start,
             )))
@@ -381,7 +381,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         ))(i)?;
         match opt(separated_digits(base, false))(i)? {
             (i, Some(_)) => Ok((i, ())),
-            (_, None) => Err(nom::Err::Failure(ErrorContext::new(
+            (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
                 format!("expected digits after `{kind}`"),
                 start,
             ))),
@@ -396,7 +396,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
             let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-")))(i)?;
             match opt(separated_digits(10, op.is_none()))(i)? {
                 (i, Some(_)) => Ok((i, ())),
-                (_, None) => Err(nom::Err::Failure(ErrorContext::new(
+                (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
                     format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
                     start,
                 ))),
@@ -521,13 +521,13 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     ))(i)?;
 
     let Some(s) = s else {
-        return Err(nom::Err::Failure(ErrorContext::new(
+        return Err(winnow::Err::Cut(ErrorContext::new(
             "empty character literal",
             start,
         )));
     };
     let Ok(("", c)) = Char::parse(s) else {
-        return Err(nom::Err::Failure(ErrorContext::new(
+        return Err(winnow::Err::Cut(ErrorContext::new(
             "invalid character",
             start,
         )));
@@ -557,10 +557,10 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     };
 
     let Ok(nb) = u32::from_str_radix(nb, 16) else {
-        return Err(nom::Err::Failure(ErrorContext::new(err1, start)));
+        return Err(winnow::Err::Cut(ErrorContext::new(err1, start)));
     };
     if nb > max_value {
-        return Err(nom::Err::Failure(ErrorContext::new(err2, start)));
+        return Err(winnow::Err::Cut(ErrorContext::new(err2, start)));
     }
 
     Ok((i, CharLit {
@@ -627,7 +627,7 @@ enum PathOrIdentifier<'a> {
 
 fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt(tag("::")));
-    let tail = opt(many1(preceded(ws(tag("::")), identifier)));
+    let tail = opt(many1(preceded(ws(tag("::")), identifier)).map(|v: Vec<_>| v));
 
     let (i, (root, start, rest)) = tuple((root, identifier, tail))(i)?;
     let rest = rest.as_deref().unwrap_or_default();
@@ -872,7 +872,7 @@ pub(crate) struct Level(u8);
 impl Level {
     fn nest(self, i: &str) -> ParseResult<'_, Level> {
         if self.0 >= Self::MAX_DEPTH {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::Err::Cut(ErrorContext::new(
                 "your template code is too deeply nested, or last expression is too complex",
                 i,
             )));
@@ -899,7 +899,7 @@ fn filter<'a>(
             opt(|i| Expr::arguments(i, *level, false)),
         ))(j)
     } else {
-        Err(nom::Err::Failure(ErrorContext::new(
+        Err(winnow::Err::Cut(ErrorContext::new(
             "the filter operator `|` must not be preceded by any whitespace characters\n\
             the binary OR operator is called `bitor` in rinja",
             i,

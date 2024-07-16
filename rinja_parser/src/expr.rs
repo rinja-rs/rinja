@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::str;
 
-use nom::branch::alt;
-use nom::bytes::complete::{tag, take_till};
-use nom::character::complete::{char, digit1};
-use nom::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
-use nom::error::ErrorKind;
-use nom::error_position;
-use nom::multi::{fold_many0, many0, separated_list0, separated_list1};
-use nom::sequence::{pair, preceded, terminated, tuple};
+use winnow::branch::alt;
+use winnow::bytes::complete::{tag, take_till};
+use winnow::character::complete::{char, digit1};
+use winnow::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
+use winnow::error::ErrorKind;
+use winnow::multi::{fold_many0, many0, separated_list0, separated_list1};
+use winnow::sequence::{pair, preceded, terminated, tuple};
+use winnow::{Parser, error_position};
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
@@ -21,7 +21,9 @@ macro_rules! expr_prec_layer {
             let (_, level) = level.nest(i)?;
             let start = i;
             let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0(pair(ws($op), |i| Self::$inner(i, level)))(i)?;
+            let (i, right) = many0(pair(ws($op), |i| Self::$inner(i, level)))
+                .map(|v: Vec<_>| v)
+                .parse_next(i)?;
             Ok((
                 i,
                 right.into_iter().fold(left, |left, (op, right)| {
@@ -102,7 +104,7 @@ impl<'a> Expr<'a> {
                             move |i| Self::parse(i, level),
                         ))(i)?;
                         if has_named_arguments && !matches!(*expr, Self::NamedArgument(_, _)) {
-                            Err(nom::Err::Failure(ErrorContext::new(
+                            Err(winnow::Err::Cut(ErrorContext::new(
                                 "named arguments must always be passed last",
                                 start,
                             )))
@@ -138,7 +140,7 @@ impl<'a> Expr<'a> {
                 WithSpan::new(Self::NamedArgument(argument, Box::new(value)), start),
             ))
         } else {
-            Err(nom::Err::Failure(ErrorContext::new(
+            Err(winnow::Err::Cut(ErrorContext::new(
                 format!("named argument `{argument}` was passed more than once"),
                 start,
             )))
@@ -204,12 +206,12 @@ impl<'a> Expr<'a> {
                 if crate::PRIMITIVE_TYPES.contains(&target) {
                     return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
                 } else if target.is_empty() {
-                    return Err(nom::Err::Failure(ErrorContext::new(
+                    return Err(winnow::Err::Cut(ErrorContext::new(
                         "`as` operator expects the name of a primitive type on its right-hand side",
                         before_keyword.trim_start(),
                     )));
                 } else {
-                    return Err(nom::Err::Failure(ErrorContext::new(
+                    return Err(winnow::Err::Cut(ErrorContext::new(
                         format!(
                             "`as` operator expects the name of a primitive type on its right-hand \
                               side, found `{target}`"
@@ -224,7 +226,7 @@ impl<'a> Expr<'a> {
         let (i, rhs) = opt(terminated(opt(keyword("not")), ws(keyword("defined"))))(i)?;
         let ctor = match rhs {
             None => {
-                return Err(nom::Err::Failure(ErrorContext::new(
+                return Err(winnow::Err::Cut(ErrorContext::new(
                     "expected `defined` or `not defined` after `is`",
                     // We use `start` to show the whole `var is` thing instead of the current token.
                     start,
@@ -236,13 +238,13 @@ impl<'a> Expr<'a> {
         let var_name = match *lhs {
             Self::Var(var_name) => var_name,
             Self::Attr(_, _) => {
-                return Err(nom::Err::Failure(ErrorContext::new(
+                return Err(winnow::Err::Cut(ErrorContext::new(
                     "`is defined` operator can only be used on variables, not on their fields",
                     start,
                 )));
             }
             _ => {
-                return Err(nom::Err::Failure(ErrorContext::new(
+                return Err(winnow::Err::Cut(ErrorContext::new(
                     "`is defined` operator can only be used on variables",
                     start,
                 )));
@@ -269,7 +271,7 @@ impl<'a> Expr<'a> {
         let (_, nested) = level.nest(i)?;
         let start = i;
         let (i, (ops, mut expr)) = pair(
-            many0(ws(alt((tag("!"), tag("-"), tag("*"), tag("&"))))),
+            many0(ws(alt((tag("!"), tag("-"), tag("*"), tag("&"))))).map(|v: Vec<_>| v),
             |i| Suffix::parse(i, nested),
         )(i)?;
 
@@ -404,7 +406,7 @@ fn token_xor(i: &str) -> ParseResult<'_> {
     if good {
         Ok((i, "^"))
     } else {
-        Err(nom::Err::Failure(ErrorContext::new(
+        Err(winnow::Err::Cut(ErrorContext::new(
             "the binary XOR operator is called `xor` in rinja",
             i,
         )))
@@ -419,7 +421,7 @@ fn token_bitand(i: &str) -> ParseResult<'_> {
     if good {
         Ok((i, "&"))
     } else {
-        Err(nom::Err::Failure(ErrorContext::new(
+        Err(winnow::Err::Cut(ErrorContext::new(
             "the binary AND operator is called `bitand` in rinja",
             i,
         )))
@@ -464,7 +466,7 @@ impl<'a> Suffix<'a> {
                 Some(Self::MacroCall(args)) => match expr.inner {
                     Expr::Path(path) => expr = WithSpan::new(Expr::RustMacro(path, args), i),
                     Expr::Var(name) => expr = WithSpan::new(Expr::RustMacro(vec![name], args), i),
-                    _ => return Err(nom::Err::Failure(error_position!(i, ErrorKind::Tag))),
+                    _ => return Err(winnow::Err::Cut(error_position!(i, ErrorKind::Tag))),
                 },
                 None => break,
             }

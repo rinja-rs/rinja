@@ -22,8 +22,8 @@ config = ["dep:serde"]
 
 [dependencies]
 memchr = "2"
-nom = { version = "7", default-features = false, features = ["alloc"] }
 serde = { version = "1.0", optional = true, features = ["derive"] }
+winnow = "0.3"
 
 [dev-dependencies]
 criterion = "0.5"
