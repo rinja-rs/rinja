@@ -616,7 +616,7 @@ impl<'a> Char<'a> {
                     ),
                     map(
                         tuple((
-                            tag("u{"),
+                            "u{",
                             take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
                             char('}'),
                         )),
@@ -636,8 +636,8 @@ enum PathOrIdentifier<'a> {
 }
 
 fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
-    let root = ws(opt(tag("::")));
-    let tail = opt(many1(preceded(ws(tag("::")), identifier)).map(|v: Vec<_>| v));
+    let root = ws(opt("::"));
+    let tail = opt(many1(preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
     let (i, (root, start, rest)) = tuple((root, identifier, tail)).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();

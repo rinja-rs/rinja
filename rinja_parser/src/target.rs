@@ -1,6 +1,5 @@
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::complete::tag;
 use winnow::character::complete::{char, one_of};
 use winnow::combinator::{consumed, map, map_res, opt};
 use winnow::multi::separated_list1;
@@ -32,8 +31,7 @@ impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         map(
-            separated_list1(ws(tag("or")), |i| s.nest(i, |i| Self::parse_one(i, s)))
-                .map(|v: Vec<_>| v),
+            separated_list1(ws("or"), |i| s.nest(i, |i| Self::parse_one(i, s))).map(|v: Vec<_>| v),
             |mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
@@ -177,7 +175,7 @@ impl<'a> Target<'a> {
 
     fn rest(start: &'a str) -> ParseResult<'a, Self> {
         let (i, (ident, _)) =
-            tuple((opt(tuple((identifier, ws(char('@'))))), tag(".."))).parse_next(start)?;
+            tuple((opt(tuple((identifier, ws(char('@'))))), "..")).parse_next(start)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),

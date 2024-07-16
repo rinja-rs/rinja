@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::str;
 
 use winnow::branch::alt;
-use winnow::bytes::complete::{tag, take_till};
+use winnow::bytes::complete::take_till;
 use winnow::character::complete::{char, digit1};
 use winnow::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
 use winnow::error::ErrorKind;
@@ -152,13 +152,8 @@ impl<'a> Expr<'a> {
     pub(super) fn parse(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let (_, level) = level.nest(i)?;
         let start = i;
-        let range_right = move |i| {
-            pair(
-                ws(alt((tag("..="), tag("..")))),
-                opt(move |i| Self::or(i, level)),
-            )
-            .parse_next(i)
-        };
+        let range_right =
+            move |i| pair(ws(alt(("..=", ".."))), opt(move |i| Self::or(i, level))).parse_next(i);
         alt((
             map(range_right, |(op, right)| {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
@@ -177,26 +172,15 @@ impl<'a> Expr<'a> {
         .parse_next(i)
     }
 
-    expr_prec_layer!(or, and, tag("||"));
-    expr_prec_layer!(and, compare, tag("&&"));
-    expr_prec_layer!(
-        compare,
-        bor,
-        alt((
-            tag("=="),
-            tag("!="),
-            tag(">="),
-            tag(">"),
-            tag("<="),
-            tag("<"),
-        ))
-    );
-    expr_prec_layer!(bor, bxor, value("|", tag("bitor")));
+    expr_prec_layer!(or, and, "||");
+    expr_prec_layer!(and, compare, "&&");
+    expr_prec_layer!(compare, bor, alt(("==", "!=", ">=", ">", "<=", "<",)));
+    expr_prec_layer!(bor, bxor, value("|", "bitor"));
     expr_prec_layer!(bxor, band, token_xor);
     expr_prec_layer!(band, shifts, token_bitand);
-    expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));
-    expr_prec_layer!(addsub, muldivmod, alt((tag("+"), tag("-"))));
-    expr_prec_layer!(muldivmod, is_as, alt((tag("*"), tag("/"), tag("%"))));
+    expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
+    expr_prec_layer!(addsub, muldivmod, alt(("+", "-")));
+    expr_prec_layer!(muldivmod, is_as, alt(("*", "/", "%")));
 
     fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
@@ -276,7 +260,7 @@ impl<'a> Expr<'a> {
         let (_, nested) = level.nest(i)?;
         let start = i;
         let (i, (ops, mut expr)) = pair(
-            many0(ws(alt((tag("!"), tag("-"), tag("*"), tag("&"))))).map(|v: Vec<_>| v),
+            many0(ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
             |i| Suffix::parse(i, nested),
         )
         .parse_next(i)?;
