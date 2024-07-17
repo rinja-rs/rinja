@@ -12,9 +12,8 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::complete::{escaped, tag, take_while_m_n, take_while1};
-use winnow::bytes::{any, take_till0, take_till1};
-use winnow::character::complete::one_of;
+use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
+use winnow::character::escaped;
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};

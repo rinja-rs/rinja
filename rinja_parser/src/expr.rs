@@ -4,7 +4,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::take_till0;
-use winnow::character::complete::digit1;
+use winnow::character::digit1;
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, recognize, value};
 use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated0, separated1};

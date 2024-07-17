@@ -2,8 +2,7 @@ use std::str;
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::complete::tag;
-use winnow::bytes::{any, take_till0};
+use winnow::bytes::{any, tag, take_till0};
 use winnow::combinator::{
     consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };

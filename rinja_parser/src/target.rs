@@ -1,6 +1,6 @@
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::character::complete::one_of;
+use winnow::bytes::one_of;
 use winnow::combinator::{consumed, map, map_res, opt};
 use winnow::multi::separated1;
 use winnow::sequence::preceded;
