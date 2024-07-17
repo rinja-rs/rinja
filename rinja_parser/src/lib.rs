@@ -12,8 +12,9 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::branch::alt;
+use winnow::bytes::any;
 use winnow::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n, take_while1};
-use winnow::character::complete::{anychar, one_of, satisfy};
+use winnow::character::complete::{one_of, satisfy};
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};
@@ -297,7 +298,7 @@ fn skip_till<'a, 'b, O>(
     candidate_finder: impl crate::memchr_splitter::Splitter,
     end: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
-    let mut next = alt((map(end, Some), map(anychar, |_| None)));
+    let mut next = alt((map(end, Some), map(any, |_| None)));
     move |start: &'a str| {
         let mut i = start;
         loop {
@@ -478,7 +479,7 @@ pub struct StrLit<'a> {
 }
 
 fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
-    let (i, s) = delimited('"', opt(escaped(is_not("\\\""), '\\', anychar)), '"').parse_next(i)?;
+    let (i, s) = delimited('"', opt(escaped(is_not("\\\""), '\\', any)), '"').parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
@@ -509,7 +510,7 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = (
         opt('b'),
-        delimited('\'', opt(escaped(is_not("\\\'"), '\\', anychar)), '\''),
+        delimited('\'', opt(escaped(is_not("\\\'"), '\\', any)), '\''),
     )
         .parse_next(i)?;
 

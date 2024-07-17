@@ -2,8 +2,8 @@ use std::str;
 
 use winnow::Parser;
 use winnow::branch::alt;
+use winnow::bytes::any;
 use winnow::bytes::complete::{tag, take_till};
-use winnow::character::complete::anychar;
 use winnow::combinator::{
     consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
@@ -441,7 +441,7 @@ pub enum Whitespace {
 
 impl Whitespace {
     fn parse(i: &str) -> ParseResult<'_, Self> {
-        map_opt(anychar, Self::parse_char).parse_next(i)
+        map_opt(any, Self::parse_char).parse_next(i)
     }
 
     fn parse_char(c: char) -> Option<Self> {
