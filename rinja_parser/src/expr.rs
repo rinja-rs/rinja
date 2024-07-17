@@ -7,7 +7,7 @@ use winnow::character::complete::digit1;
 use winnow::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
 use winnow::error::ErrorKind;
 use winnow::multi::{fold_many0, many0, separated_list0, separated_list1};
-use winnow::sequence::{pair, preceded, terminated};
+use winnow::sequence::{preceded, terminated};
 use winnow::{Parser, error_position};
 
 use crate::{
@@ -21,7 +21,7 @@ macro_rules! expr_prec_layer {
             let (_, level) = level.nest(i)?;
             let start = i;
             let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0(pair(ws($op), |i| Self::$inner(i, level)))
+            let (i, right) = many0((ws($op), |i| Self::$inner(i, level)))
                 .map(|v: Vec<_>| v)
                 .parse_next(i)?;
             Ok((
@@ -153,13 +153,13 @@ impl<'a> Expr<'a> {
         let (_, level) = level.nest(i)?;
         let start = i;
         let range_right =
-            move |i| pair(ws(alt(("..=", ".."))), opt(move |i| Self::or(i, level))).parse_next(i);
+            move |i| (ws(alt(("..=", ".."))), opt(move |i| Self::or(i, level))).parse_next(i);
         alt((
             map(range_right, |(op, right)| {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
             }),
             map(
-                pair(move |i| Self::or(i, level), opt(range_right)),
+                (move |i| Self::or(i, level), opt(range_right)),
                 |(left, right)| match right {
                     Some((op, right)) => WithSpan::new(
                         Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
@@ -259,11 +259,11 @@ impl<'a> Expr<'a> {
     fn prefix(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let (_, nested) = level.nest(i)?;
         let start = i;
-        let (i, (ops, mut expr)) = pair(
+        let (i, (ops, mut expr)) = (
             many0(ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
             |i| Suffix::parse(i, nested),
         )
-        .parse_next(i)?;
+            .parse_next(i)?;
 
         for op in ops.iter().rev() {
             // This is a rare place where we create recursion in the parsed AST
@@ -313,7 +313,7 @@ impl<'a> Expr<'a> {
             },
         )
         .parse_next(i)?;
-        let (i, _) = pair(ws(opt(',')), ')').parse_next(i)?;
+        let (i, _) = (ws(opt(',')), ')').parse_next(i)?;
         Ok((i, WithSpan::new(Self::Tuple(exprs), start)))
     }
 
@@ -410,7 +410,7 @@ fn token_xor(i: &str) -> ParseResult<'_> {
 fn token_bitand(i: &str) -> ParseResult<'_> {
     let (i, good) = alt((
         value(true, keyword("bitand")),
-        value(false, pair('&', not('&'))),
+        value(false, ('&', not('&'))),
     ))
     .parse_next(i)?;
     if good {
@@ -519,7 +519,7 @@ impl<'a> Suffix<'a> {
         }
 
         preceded(
-            pair(ws('!'), '('),
+            (ws('!'), '('),
             cut(terminated(
                 map(recognize(nested_parenthesis), Self::MacroCall),
                 ')',
@@ -530,7 +530,7 @@ impl<'a> Suffix<'a> {
 
     fn attr(i: &'a str) -> ParseResult<'a, Self> {
         map(
-            preceded(ws(pair('.', not('.'))), cut(alt((digit1, identifier)))),
+            preceded(ws(('.', not('.'))), cut(alt((digit1, identifier)))),
             Self::Attr,
         )
         .parse_next(i)

@@ -3,7 +3,7 @@ use winnow::branch::alt;
 use winnow::character::complete::{char, one_of};
 use winnow::combinator::{consumed, map, map_res, opt};
 use winnow::multi::separated_list1;
-use winnow::sequence::{pair, preceded};
+use winnow::sequence::preceded;
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
@@ -155,7 +155,7 @@ impl<'a> Target<'a> {
         }
 
         let (i, (src, target)) =
-            pair(identifier, opt(preceded(ws(':'), |i| Self::parse(i, s))))(init_i)?;
+            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(init_i)?;
 
         if src == "_" {
             return Err(winnow::Err::Cut(ErrorContext::new(
@@ -216,7 +216,7 @@ fn collect_targets<'a, T>(
         )));
     };
 
-    let (i, (has_comma, has_end)) = pair(opt_comma, opt_end).parse_next(i)?;
+    let (i, (has_comma, has_end)) = (opt_comma, opt_end).parse_next(i)?;
     if !has_end {
         let msg = match has_comma {
             true => format!("expected member, or `{delim}` as terminator"),

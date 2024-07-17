@@ -17,7 +17,7 @@ use winnow::character::complete::{anychar, one_of, satisfy};
 use winnow::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0_count, many1};
-use winnow::sequence::{delimited, pair, preceded};
+use winnow::sequence::{delimited, preceded};
 use winnow::stream::AsChar;
 
 pub mod expr;
@@ -334,7 +334,7 @@ fn identifier(input: &str) -> ParseResult<'_> {
         take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
-    recognize(pair(start, opt(tail))).parse_next(input)
+    recognize((start, opt(tail))).parse_next(input)
 }
 
 fn bool_lit(i: &str) -> ParseResult<'_> {
@@ -370,7 +370,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     }
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
-    let int_with_base = pair(opt('-'), |i| {
+    let int_with_base = (opt('-'), |i| {
         let (i, (kind, base)) = consumed(preceded(
             '0',
             alt((value(2, 'b'), value(8, 'o'), value(16, 'x'))),
@@ -388,9 +388,9 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> ParseResult<'a, ()> {
-        let (i, has_dot) = opt(pair('.', separated_digits(10, true))).parse_next(i)?;
+        let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
-            let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
+            let (i, (kind, op)) = (one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
             match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 (i, Some(_)) => Ok((i, ())),
                 (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
@@ -411,11 +411,9 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
             opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
         (i, Num::Int(num, suffix))
     } else {
-        let (i, (num, float)) = consumed(preceded(
-            pair(opt('-'), separated_digits(10, true)),
-            opt(float),
-        ))
-        .parse_next(start)?;
+        let (i, (num, float)) =
+            consumed(preceded((opt('-'), separated_digits(10, true)), opt(float)))
+                .parse_next(start)?;
         if float.is_some() {
             let (i, suffix) =
                 opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_next(i)?;
@@ -883,15 +881,11 @@ fn filter<'a>(
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
     let (j, _) = take_till(not_ws).parse_next(i)?;
     let had_spaces = i.len() != j.len();
-    let (j, _) = pair('|', not('|')).parse_next(j)?;
+    let (j, _) = ('|', not('|')).parse_next(j)?;
 
     if !had_spaces {
         *level = level.nest(i)?.1;
-        cut(pair(
-            ws(identifier),
-            opt(|i| Expr::arguments(i, *level, false)),
-        ))
-        .parse_next(j)
+        cut((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
     } else {
         Err(winnow::Err::Cut(ErrorContext::new(
             "the filter operator `|` must not be preceded by any whitespace characters\n\

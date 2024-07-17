@@ -8,7 +8,7 @@ use winnow::combinator::{
     complete, consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
 use winnow::multi::{many0, separated_list0, separated_list1};
-use winnow::sequence::{delimited, pair, preceded};
+use winnow::sequence::{delimited, preceded};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -87,7 +87,7 @@ impl<'a> Node<'a> {
         let (j, tag) = preceded(
             |i| s.tag_block_start(i),
             peek(preceded(
-                pair(opt(Whitespace::parse), take_till(not_ws)),
+                (opt(Whitespace::parse), take_till(not_ws)),
                 identifier,
             )),
         )
@@ -162,7 +162,7 @@ impl<'a> Node<'a> {
             |i| s.tag_expr_start(i),
             cut_node(
                 None,
-                pair(
+                (
                     opt(Whitespace::parse),
                     ws(|i| Expr::parse(i, s.level.get())),
                 ),
@@ -172,7 +172,7 @@ impl<'a> Node<'a> {
 
         let (i, (nws, closed)) = cut_node(
             None,
-            pair(
+            (
                 opt(Whitespace::parse),
                 alt((value(true, |i| s.tag_expr_end(i)), value(false, ws(eof)))),
             ),
@@ -292,7 +292,7 @@ impl<'a> When<'a> {
     fn when(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let endwhen = map(
-            consumed(ws(pair(
+            consumed(ws((
                 delimited(
                     |i| s.tag_block_start(i),
                     opt(Whitespace::parse),
@@ -410,7 +410,7 @@ impl<'a> CondTest<'a> {
     }
 
     fn parse_cond(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let (i, (target, expr)) = pair(
+        let (i, (target, expr)) = (
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
                 ws(|i| Target::parse(i, s)),
@@ -418,7 +418,7 @@ impl<'a> CondTest<'a> {
             )),
             ws(|i| Expr::parse(i, s.level.get())),
         )
-        .parse_next(i)?;
+            .parse_next(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
         Ok((i, Self {
             target,
@@ -761,7 +761,7 @@ impl<'a> Import<'a> {
                 (
                     ws(str_lit_without_prefix),
                     ws(keyword("as")),
-                    cut_node(Some("import"), pair(ws(identifier), opt(Whitespace::parse))),
+                    cut_node(Some("import"), (ws(identifier), opt(Whitespace::parse))),
                 ),
             ),
         );
@@ -1180,7 +1180,7 @@ impl<'a> Include<'a> {
             ws(keyword("include")),
             cut_node(
                 Some("include"),
-                pair(ws(str_lit_without_prefix), opt(Whitespace::parse)),
+                (ws(str_lit_without_prefix), opt(Whitespace::parse)),
             ),
         );
         let (i, (pws, _, (path, nws))) = p.parse_next(i)?;
@@ -1211,7 +1211,7 @@ impl<'a> Extends<'a> {
             ws(keyword("extends")),
             cut_node(
                 Some("extends"),
-                pair(ws(str_lit_without_prefix), opt(Whitespace::parse)),
+                (ws(str_lit_without_prefix), opt(Whitespace::parse)),
             ),
         )
             .parse_next(i)?;
