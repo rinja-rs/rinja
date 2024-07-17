@@ -7,7 +7,7 @@ use winnow::character::complete::anychar;
 use winnow::combinator::{
     consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
-use winnow::multi::{many0, separated_list0, separated_list1};
+use winnow::multi::{many0, separated0, separated1};
 use winnow::sequence::{delimited, preceded};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
@@ -332,7 +332,7 @@ impl<'a> When<'a> {
             cut_node(
                 Some("match-when"),
                 (
-                    separated_list1('|', ws(|i| Target::parse(i, s))),
+                    separated1(ws(|i| Target::parse(i, s)), '|'),
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
                     cut_node(Some("match-when"), |i| Node::many(i, s)),
@@ -595,7 +595,7 @@ impl<'a> Macro<'a> {
         fn parameters(i: &str) -> ParseResult<'_, Vec<&str>> {
             delimited(
                 ws('('),
-                separated_list0(',', ws(identifier)),
+                separated0(ws(identifier), ','),
                 (opt(ws(',')), ')'),
             )
             .parse_next(i)

@@ -2,7 +2,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::character::complete::{char, one_of};
 use winnow::combinator::{consumed, map, map_res, opt};
-use winnow::multi::separated_list1;
+use winnow::multi::separated1;
 use winnow::sequence::preceded;
 
 use crate::{
@@ -31,7 +31,7 @@ impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         map(
-            separated_list1(ws("or"), |i| s.nest(i, |i| Self::parse_one(i, s))).map(|v: Vec<_>| v),
+            separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or")).map(|v: Vec<_>| v),
             |mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
@@ -207,8 +207,7 @@ fn collect_targets<'a, T>(
         return Ok((i, (false, Vec::new())));
     }
 
-    let (i, targets) =
-        opt(separated_list1(ws(','), |i| one(i, s)).map(|v: Vec<_>| v)).parse_next(i)?;
+    let (i, targets) = opt(separated1(|i| one(i, s), ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
     let Some(targets) = targets else {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "expected comma separated list of members",

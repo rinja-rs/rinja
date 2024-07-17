@@ -7,7 +7,7 @@ use winnow::bytes::complete::take_till;
 use winnow::character::complete::digit1;
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, recognize, value};
 use winnow::error::{ErrorKind, ParseError as _};
-use winnow::multi::{fold_many0, many0, separated_list0, separated_list1};
+use winnow::multi::{fold_many0, many0, separated0, separated1};
 use winnow::sequence::{preceded, terminated};
 
 use crate::{
@@ -83,8 +83,7 @@ impl<'a> Expr<'a> {
         preceded(
             ws('('),
             cut_err(terminated(
-                separated_list0(
-                    ',',
+                separated0(
                     ws(move |i| {
                         // Needed to prevent borrowing it twice between this closure and the one
                         // calling `Self::named_arguments`.
@@ -113,6 +112,7 @@ impl<'a> Expr<'a> {
                             Ok((i, expr))
                         }
                     }),
+                    ',',
                 ),
                 (opt(ws(',')), ')'),
             )),
@@ -324,7 +324,7 @@ impl<'a> Expr<'a> {
             ws('['),
             cut_err(terminated(
                 opt(terminated(
-                    separated_list1(',', ws(move |i| Self::parse(i, level))),
+                    separated1(ws(move |i| Self::parse(i, level)), ','),
                     ws(opt(',')),
                 )),
                 ']',
