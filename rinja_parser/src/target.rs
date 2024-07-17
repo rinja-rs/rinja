@@ -1,9 +1,9 @@
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::one_of;
 use winnow::combinator::opt;
 use winnow::multi::separated1;
 use winnow::sequence::preceded;
+use winnow::token::one_of;
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,

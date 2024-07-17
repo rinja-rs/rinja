@@ -4,11 +4,11 @@ use std::str;
 use winnow::Parser;
 use winnow::ascii::digit1;
 use winnow::branch::alt;
-use winnow::bytes::{one_of, tag, take_till0};
 use winnow::combinator::{cut_err, fail, fold_repeat, not, opt, peek, repeat};
 use winnow::error::{ErrorKind, ParserError as _};
 use winnow::multi::{separated0, separated1};
 use winnow::sequence::{preceded, terminated};
+use winnow::token::{one_of, tag, take_till0};
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
