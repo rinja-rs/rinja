@@ -14,7 +14,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::complete::{escaped, tag, take_while_m_n, take_while1};
 use winnow::bytes::{any, take_till0, take_till1};
-use winnow::character::complete::{one_of, satisfy};
+use winnow::character::complete::one_of;
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};
@@ -441,8 +441,8 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
                 true => Ok((i, ())),
                 false => many0('_').parse_next(i),
             },
-            satisfy(|ch| ch.is_digit(radix)),
-            many0(satisfy(|ch| ch == '_' || ch.is_digit(radix))).map(|()| ()),
+            one_of(|ch: char| ch.is_digit(radix)),
+            many0(one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
         ))
         .parse_next(i)
     }
