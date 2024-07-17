@@ -320,16 +320,11 @@ fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
 }
 
 fn identifier(input: &str) -> ParseResult<'_> {
-    fn start(s: &str) -> ParseResult<'_> {
-        take_while(1.., |c: char| c.is_alpha() || c == '_' || c >= '\u{0080}').parse_next(s)
-    }
+    let start = take_while(1.., |c: char| c.is_alpha() || c == '_' || c >= '\u{0080}');
 
-    fn tail(s: &str) -> ParseResult<'_> {
-        take_while(1.., |c: char| {
-            c.is_alphanum() || c == '_' || c >= '\u{0080}'
-        })
-        .parse_next(s)
-    }
+    let tail = take_while(1.., |c: char| {
+        c.is_alphanum() || c == '_' || c >= '\u{0080}'
+    });
 
     (start, opt(tail)).recognize().parse_next(input)
 }
