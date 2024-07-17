@@ -248,7 +248,7 @@ impl<'a> ErrorContext<'a> {
     }
 }
 
-impl<'a> winnow::error::ParseError<&'a str> for ErrorContext<'a> {
+impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
     fn from_error_kind(input: &'a str, _code: ErrorKind) -> Self {
         Self {
             input,

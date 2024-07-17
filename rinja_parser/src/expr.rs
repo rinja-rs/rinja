@@ -6,7 +6,7 @@ use winnow::branch::alt;
 use winnow::bytes::{one_of, tag, take_till0};
 use winnow::character::digit1;
 use winnow::combinator::{cut_err, fail, fold_repeat, not, opt, peek, repeat};
-use winnow::error::{ErrorKind, ParseError as _};
+use winnow::error::{ErrorKind, ParserError as _};
 use winnow::multi::{separated0, separated1};
 use winnow::sequence::{preceded, terminated};
 
