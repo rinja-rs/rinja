@@ -12,7 +12,7 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
+use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while};
 use winnow::character::escaped;
 use winnow::combinator::{cut_err, fail, not, opt};
 use winnow::error::{ErrorKind, FromExternalError};
@@ -327,11 +327,14 @@ fn keyword<'a>(k: &'a str) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
 
 fn identifier(input: &str) -> ParseResult<'_> {
     fn start(s: &str) -> ParseResult<'_> {
-        take_while1(|c: char| c.is_alpha() || c == '_' || c >= '\u{0080}').parse_next(s)
+        take_while(1.., |c: char| c.is_alpha() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
     fn tail(s: &str) -> ParseResult<'_> {
-        take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
+        take_while(1.., |c: char| {
+            c.is_alphanum() || c == '_' || c >= '\u{0080}'
+        })
+        .parse_next(s)
     }
 
     (start, opt(tail)).recognize().parse_next(input)
@@ -597,11 +600,11 @@ impl<'a> Char<'a> {
                 one_of('\'').value(Self::Escaped),
                 // Not useful but supported by rust.
                 one_of('"').value(Self::Escaped),
-                ('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()))
+                ('x', take_while(2, |c: char| c.is_ascii_hexdigit()))
                     .map(|(_, s)| Self::AsciiEscape(s)),
                 (
                     "u{",
-                    take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
+                    take_while(1..=6, |c: char| c.is_ascii_hexdigit()),
                     '}',
                 )
                     .map(|(_, s, _)| Self::UnicodeEscape(s)),
