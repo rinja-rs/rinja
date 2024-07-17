@@ -5,7 +5,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::complete::take_till;
 use winnow::character::complete::digit1;
-use winnow::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
+use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, recognize, value};
 use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated_list0, separated_list1};
 use winnow::sequence::{preceded, terminated};
@@ -82,7 +82,7 @@ impl<'a> Expr<'a> {
 
         preceded(
             ws('('),
-            cut(terminated(
+            cut_err(terminated(
                 separated_list0(
                     ',',
                     ws(move |i| {
@@ -322,7 +322,7 @@ impl<'a> Expr<'a> {
         let (i, level) = level.nest(i)?;
         let (i, array) = preceded(
             ws('['),
-            cut(terminated(
+            cut_err(terminated(
                 opt(terminated(
                     separated_list1(',', ws(move |i| Self::parse(i, level))),
                     ws(opt(',')),
@@ -463,7 +463,9 @@ impl<'a> Suffix<'a> {
                     Expr::Path(path) => expr = WithSpan::new(Expr::RustMacro(path, args), i),
                     Expr::Var(name) => expr = WithSpan::new(Expr::RustMacro(vec![name], args), i),
                     _ => {
-                        return Err(winnow::error::ErrMode::from_error_kind(i, ErrorKind::Tag).cut());
+                        return Err(
+                            winnow::error::ErrMode::from_error_kind(i, ErrorKind::Tag).cut()
+                        );
                     }
                 },
                 None => break,
@@ -522,7 +524,7 @@ impl<'a> Suffix<'a> {
 
         preceded(
             (ws('!'), '('),
-            cut(terminated(
+            cut_err(terminated(
                 map(recognize(nested_parenthesis), Self::MacroCall),
                 ')',
             )),
@@ -532,7 +534,7 @@ impl<'a> Suffix<'a> {
 
     fn attr(i: &'a str) -> ParseResult<'a, Self> {
         map(
-            preceded(ws(('.', not('.'))), cut(alt((digit1, identifier)))),
+            preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier)))),
             Self::Attr,
         )
         .parse_next(i)
@@ -543,7 +545,7 @@ impl<'a> Suffix<'a> {
         map(
             preceded(
                 ws('['),
-                cut(terminated(ws(move |i| Expr::parse(i, level)), ']')),
+                cut_err(terminated(ws(move |i| Expr::parse(i, level)), ']')),
             ),
             Self::Index,
         )

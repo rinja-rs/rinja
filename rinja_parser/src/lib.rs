@@ -14,7 +14,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n, take_while1};
 use winnow::character::complete::{anychar, one_of, satisfy};
-use winnow::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
+use winnow::combinator::{consumed, cut_err, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};
 use winnow::sequence::{delimited, preceded};
@@ -885,7 +885,7 @@ fn filter<'a>(
 
     if !had_spaces {
         *level = level.nest(i)?.1;
-        cut((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
+        cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
     } else {
         Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the filter operator `|` must not be preceded by any whitespace characters\n\

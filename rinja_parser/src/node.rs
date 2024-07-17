@@ -5,7 +5,7 @@ use winnow::branch::alt;
 use winnow::bytes::complete::{tag, take_till};
 use winnow::character::complete::anychar;
 use winnow::combinator::{
-    consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
+    consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
 use winnow::multi::{many0, separated_list0, separated_list1};
 use winnow::sequence::{delimited, preceded};
@@ -214,7 +214,7 @@ fn cut_node<'a, O>(
     kind: Option<&'static str>,
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
-    let mut inner = cut(inner);
+    let mut inner = cut_err(inner);
     move |i: &'a str| {
         let result = inner.parse_next(i);
         if let Err(winnow::error::ErrMode::Cut(err) | winnow::error::ErrMode::Backtrack(err)) =
