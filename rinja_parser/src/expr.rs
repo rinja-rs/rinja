@@ -3,11 +3,11 @@ use std::str;
 
 use winnow::Parser;
 use winnow::ascii::digit1;
-use winnow::branch::alt;
-use winnow::combinator::{cut_err, fail, fold_repeat, not, opt, peek, repeat};
+use winnow::combinator::{
+    alt, cut_err, fail, fold_repeat, not, opt, peek, preceded, repeat, separated0, separated1,
+    terminated,
+};
 use winnow::error::{ErrorKind, ParserError as _};
-use winnow::multi::{separated0, separated1};
-use winnow::sequence::{preceded, terminated};
 use winnow::token::{one_of, tag, take_till0};
 
 use crate::{

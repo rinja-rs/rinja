@@ -1,8 +1,5 @@
 use winnow::Parser;
-use winnow::branch::alt;
-use winnow::combinator::opt;
-use winnow::multi::separated1;
-use winnow::sequence::preceded;
+use winnow::combinator::{alt, opt, preceded, separated1};
 use winnow::token::one_of;
 
 use crate::{

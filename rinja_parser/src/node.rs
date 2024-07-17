@@ -1,10 +1,9 @@
 use std::str;
 
 use winnow::Parser;
-use winnow::branch::alt;
-use winnow::combinator::{cut_err, eof, fail, not, opt, peek, repeat};
-use winnow::multi::{separated0, separated1};
-use winnow::sequence::{delimited, preceded};
+use winnow::combinator::{
+    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated0, separated1,
+};
 use winnow::token::{any, tag, take_till0};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};

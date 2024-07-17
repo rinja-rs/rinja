@@ -12,10 +12,8 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::ascii::escaped;
-use winnow::branch::alt;
-use winnow::combinator::{cut_err, fail, not, opt, repeat};
+use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
-use winnow::sequence::{delimited, preceded};
 use winnow::stream::AsChar;
 use winnow::token::{any, one_of, tag, take_till0, take_till1, take_while};
 
