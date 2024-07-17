@@ -3,7 +3,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, tag, take_till0};
-use winnow::combinator::{cut_err, eof, fail, map_opt, not, opt, peek, value};
+use winnow::combinator::{cut_err, eof, fail, map_opt, not, opt, peek};
 use winnow::multi::{many0, separated0, separated1};
 use winnow::sequence::{delimited, preceded};
 
@@ -114,7 +114,7 @@ impl<'a> Node<'a> {
 
         let (i, closed) = cut_node(
             None,
-            alt((value(true, |i| s.tag_block_end(i)), value(false, ws(eof)))),
+            alt(((|i| s.tag_block_end(i)).value(true), ws(eof).value(false))),
         )
         .parse_next(i)?;
         match closed {
@@ -173,7 +173,7 @@ impl<'a> Node<'a> {
             None,
             (
                 opt(Whitespace::parse),
-                alt((value(true, |i| s.tag_expr_end(i)), value(false, ws(eof)))),
+                alt(((|i| s.tag_expr_end(i)).value(true), ws(eof).value(false))),
             ),
         )
         .parse_next(i)?;
@@ -226,15 +226,13 @@ fn cut_node<'a, O>(
 }
 
 fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> ParseResult<'a, ()> {
-    value(
-        (),
-        (
-            |i| s.tag_block_start(i),
-            opt(Whitespace::parse),
-            |i| unexpected_raw_tag(None, i),
-        ),
+    (
+        |i| s.tag_block_start(i),
+        opt(Whitespace::parse),
+        |i| unexpected_raw_tag(None, i),
     )
-    .parse_next(i)
+        .void()
+        .parse_next(i)
 }
 
 fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> ParseResult<'a, ()> {
@@ -303,7 +301,7 @@ impl<'a> When<'a> {
                 (
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
-                    many0(value((), ws(|i| Comment::parse(i, s)))).map(|()| ()),
+                    many0(ws(|i| Comment::parse(i, s))).map(|()| ()),
                 ),
             ),
         ))
@@ -845,7 +843,7 @@ impl<'a> Match<'a> {
                     cut_node(
                         Some("match"),
                         (
-                            ws(many0(ws(value((), |i| Comment::parse(i, s))))).map(|()| ()),
+                            ws(many0(ws(|i| Comment::parse(i, s)))).map(|()| ()),
                             many0(|i| When::when(i, s)).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("match"),
@@ -1241,8 +1239,8 @@ impl<'a> Comment<'a> {
 
         fn tag<'a>(i: &'a str, s: &State<'_>) -> ParseResult<'a, Tag> {
             alt((
-                value(Tag::Open, |i| s.tag_comment_start(i)),
-                value(Tag::Close, |i| s.tag_comment_end(i)),
+                (|i| s.tag_comment_start(i)).value(Tag::Open),
+                (|i| s.tag_comment_end(i)).value(Tag::Close),
             ))
             .parse_next(i)
         }

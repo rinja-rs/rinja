@@ -14,7 +14,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
 use winnow::character::escaped;
-use winnow::combinator::{cut_err, fail, not, opt, value};
+use winnow::combinator::{cut_err, fail, not, opt};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};
 use winnow::sequence::{delimited, preceded};
@@ -371,9 +371,16 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
     let int_with_base = (opt('-'), |i| {
-        let (i, (base, kind)) = preceded('0', alt((value(2, 'b'), value(8, 'o'), value(16, 'x'))))
-            .with_recognized()
-            .parse_next(i)?;
+        let (i, (base, kind)) = preceded(
+            '0',
+            alt((
+                one_of('b').value(2),
+                one_of('o').value(8),
+                one_of('x').value(16),
+            )),
+        )
+        .with_recognized()
+        .parse_next(i)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
             (i, Some(_)) => Ok((i, ())),
             (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(

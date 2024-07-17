@@ -3,9 +3,9 @@ use std::str;
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::take_till0;
+use winnow::bytes::{one_of, tag, take_till0};
 use winnow::character::digit1;
-use winnow::combinator::{cut_err, fail, not, opt, peek, value};
+use winnow::combinator::{cut_err, fail, not, opt, peek};
 use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated0, separated1};
 use winnow::sequence::{preceded, terminated};
@@ -172,7 +172,7 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(or, and, "||");
     expr_prec_layer!(and, compare, "&&");
     expr_prec_layer!(compare, bor, alt(("==", "!=", ">=", ">", "<=", "<",)));
-    expr_prec_layer!(bor, bxor, value("|", "bitor"));
+    expr_prec_layer!(bor, bxor, tag("bitor").value("|"));
     expr_prec_layer!(bxor, band, token_xor);
     expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
@@ -398,7 +398,7 @@ impl<'a> Expr<'a> {
 }
 
 fn token_xor(i: &str) -> ParseResult<'_> {
-    let (i, good) = alt((value(true, keyword("xor")), value(false, '^'))).parse_next(i)?;
+    let (i, good) = alt((keyword("xor").value(true), one_of('^').value(false))).parse_next(i)?;
     if good {
         Ok((i, "^"))
     } else {
@@ -410,11 +410,8 @@ fn token_xor(i: &str) -> ParseResult<'_> {
 }
 
 fn token_bitand(i: &str) -> ParseResult<'_> {
-    let (i, good) = alt((
-        value(true, keyword("bitand")),
-        value(false, ('&', not('&'))),
-    ))
-    .parse_next(i)?;
+    let (i, good) =
+        alt((keyword("bitand").value(true), ('&', not('&')).value(false))).parse_next(i)?;
     if good {
         Ok((i, "&"))
     } else {
