@@ -5,7 +5,7 @@ use winnow::branch::alt;
 use winnow::bytes::complete::{tag, take_till};
 use winnow::character::complete::anychar;
 use winnow::combinator::{
-    complete, consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
+    consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
 use winnow::multi::{many0, separated_list0, separated_list1};
 use winnow::sequence::{delimited, preceded};
@@ -39,7 +39,7 @@ pub enum Node<'a> {
 
 impl<'a> Node<'a> {
     pub(super) fn parse_template(i: &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
-        let (i, result) = match complete(|i| Self::many(i, s)).parse_next(i) {
+        let (i, result) = match (|i| Self::many(i, s)).parse_next(i) {
             Ok((i, result)) => (i, result),
             Err(err) => {
                 if let winnow::Err::Backtrack(err) | winnow::Err::Cut(err) = &err {
