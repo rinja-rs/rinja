@@ -2,8 +2,8 @@ use std::str;
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::any;
-use winnow::bytes::complete::{tag, take_till};
+use winnow::bytes::complete::tag;
+use winnow::bytes::{any, take_till0};
 use winnow::combinator::{
     consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, recognize, value,
 };
@@ -89,7 +89,7 @@ impl<'a> Node<'a> {
         let (j, tag) = preceded(
             |i| s.tag_block_start(i),
             peek(preceded(
-                (opt(Whitespace::parse), take_till(not_ws)),
+                (opt(Whitespace::parse), take_till0(not_ws)),
                 identifier,
             )),
         )

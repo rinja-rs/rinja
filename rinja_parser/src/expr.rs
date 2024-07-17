@@ -3,7 +3,7 @@ use std::str;
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::complete::take_till;
+use winnow::bytes::take_till0;
 use winnow::character::complete::digit1;
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, recognize, value};
 use winnow::error::{ErrorKind, ParseError as _};
@@ -558,6 +558,6 @@ impl<'a> Suffix<'a> {
     }
 
     fn r#try(i: &'a str) -> ParseResult<'a, Self> {
-        map(preceded(take_till(not_ws), '?'), |_| Self::Try).parse_next(i)
+        map(preceded(take_till0(not_ws), '?'), |_| Self::Try).parse_next(i)
     }
 }

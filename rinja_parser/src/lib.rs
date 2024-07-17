@@ -12,8 +12,8 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::bytes::complete::{escaped, tag, take_till, take_while_m_n, take_while1};
-use winnow::bytes::{any, take_till1};
+use winnow::bytes::complete::{escaped, tag, take_while_m_n, take_while1};
+use winnow::bytes::{any, take_till0, take_till1};
 use winnow::character::complete::{one_of, satisfy};
 use winnow::combinator::{consumed, cut_err, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
@@ -289,7 +289,7 @@ fn not_ws(c: char) -> bool {
 fn ws<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
-    delimited(take_till(not_ws), inner, take_till(not_ws))
+    delimited(take_till0(not_ws), inner, take_till0(not_ws))
 }
 
 /// Skips input until `end` was found, but does not consume it.
@@ -880,7 +880,7 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = take_till(not_ws).parse_next(i)?;
+    let (j, _) = take_till0(not_ws).parse_next(i)?;
     let had_spaces = i.len() != j.len();
     let (j, _) = ('|', not('|')).parse_next(j)?;
 
