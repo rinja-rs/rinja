@@ -431,19 +431,19 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 
 /// Underscore separated digits of the given base, unless `start` is true this may start
 /// with an underscore.
-fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_> {
-    move |i| {
-        (
-            |i| match start {
-                true => Ok((i, ())),
-                false => repeat(0.., '_').parse_next(i),
-            },
-            one_of(|ch: char| ch.is_digit(radix)),
-            repeat(0.., one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
-        )
-            .recognize()
-            .parse_next(i)
-    }
+fn separated_digits<'a>(
+    radix: u32,
+    start: bool,
+) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
+    (
+        move |i: &'a _| match start {
+            true => Ok((i, ())),
+            false => repeat(0.., '_').parse_next(i),
+        },
+        one_of(move |ch: char| ch.is_digit(radix)),
+        repeat(0.., one_of(move |ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
+    )
+        .recognize()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
