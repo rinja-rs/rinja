@@ -11,9 +11,9 @@ use std::sync::Arc;
 use std::{fmt, str};
 
 use winnow::Parser;
+use winnow::ascii::escaped;
 use winnow::branch::alt;
 use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while};
-use winnow::character::escaped;
 use winnow::combinator::{cut_err, fail, not, opt, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::sequence::{delimited, preceded};
