@@ -8,7 +8,7 @@ use winnow::combinator::{
     terminated,
 };
 use winnow::error::{ErrorKind, ParserError as _};
-use winnow::token::{one_of, tag, take_till0};
+use winnow::token::take_till0;
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
@@ -172,7 +172,7 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(or, and, "||");
     expr_prec_layer!(and, compare, "&&");
     expr_prec_layer!(compare, bor, alt(("==", "!=", ">=", ">", "<=", "<",)));
-    expr_prec_layer!(bor, bxor, tag("bitor").value("|"));
+    expr_prec_layer!(bor, bxor, "bitor".value("|"));
     expr_prec_layer!(bxor, band, token_xor);
     expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
@@ -399,7 +399,7 @@ impl<'a> Expr<'a> {
 }
 
 fn token_xor(i: &str) -> ParseResult<'_> {
-    let (i, good) = alt((keyword("xor").value(true), one_of('^').value(false))).parse_next(i)?;
+    let (i, good) = alt((keyword("xor").value(true), '^'.value(false))).parse_next(i)?;
     if good {
         Ok((i, "^"))
     } else {

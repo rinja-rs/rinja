@@ -371,16 +371,9 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
     let int_with_base = (opt('-'), |i| {
-        let (i, (base, kind)) = preceded(
-            '0',
-            alt((
-                one_of('b').value(2),
-                one_of('o').value(8),
-                one_of('x').value(16),
-            )),
-        )
-        .with_recognized()
-        .parse_next(i)?;
+        let (i, (base, kind)) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
+            .with_recognized()
+            .parse_next(i)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
             (i, Some(_)) => Ok((i, ())),
             (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -589,14 +582,14 @@ impl<'a> Char<'a> {
         (
             '\\',
             alt((
-                one_of('n').value(Self::Escaped),
-                one_of('r').value(Self::Escaped),
-                one_of('t').value(Self::Escaped),
-                one_of('\\').value(Self::Escaped),
-                one_of('0').value(Self::Escaped),
-                one_of('\'').value(Self::Escaped),
+                'n'.value(Self::Escaped),
+                'r'.value(Self::Escaped),
+                't'.value(Self::Escaped),
+                '\\'.value(Self::Escaped),
+                '0'.value(Self::Escaped),
+                '\''.value(Self::Escaped),
                 // Not useful but supported by rust.
-                one_of('"').value(Self::Escaped),
+                '"'.value(Self::Escaped),
                 ('x', take_while(2, |c: char| c.is_ascii_hexdigit()))
                     .map(|(_, s)| Self::AsciiEscape(s)),
                 (
