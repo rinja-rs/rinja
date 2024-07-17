@@ -16,7 +16,7 @@ use winnow::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n, t
 use winnow::character::complete::{anychar, one_of, satisfy};
 use winnow::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
 use winnow::error::{ErrorKind, FromExternalError};
-use winnow::multi::{many0_count, many1};
+use winnow::multi::{many0, many1};
 use winnow::sequence::{delimited, preceded};
 use winnow::stream::AsChar;
 
@@ -437,11 +437,11 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
     move |i| {
         recognize((
             |i| match start {
-                true => Ok((i, 0)),
-                false => many0_count('_').parse_next(i),
+                true => Ok((i, ())),
+                false => many0('_').parse_next(i),
             },
             satisfy(|ch| ch.is_digit(radix)),
-            many0_count(satisfy(|ch| ch == '_' || ch.is_digit(radix))),
+            many0(satisfy(|ch| ch == '_' || ch.is_digit(radix))).map(|()| ()),
         ))
         .parse_next(i)
     }
