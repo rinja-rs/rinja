@@ -76,7 +76,7 @@ impl<'a> Target<'a> {
 
         let path = |i| {
             path_or_identifier
-                .map_res(|v| match v {
+                .try_map(|v| match v {
                     PathOrIdentifier::Path(v) => Ok(v),
                     PathOrIdentifier::Identifier(v) => Err(v),
                 })
