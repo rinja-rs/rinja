@@ -1,7 +1,7 @@
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::one_of;
-use winnow::combinator::{map_res, opt};
+use winnow::combinator::opt;
 use winnow::multi::separated1;
 use winnow::sequence::preceded;
 
@@ -75,11 +75,12 @@ impl<'a> Target<'a> {
         }
 
         let path = |i| {
-            map_res(path_or_identifier, |v| match v {
-                PathOrIdentifier::Path(v) => Ok(v),
-                PathOrIdentifier::Identifier(v) => Err(v),
-            })
-            .parse_next(i)
+            path_or_identifier
+                .map_res(|v| match v {
+                    PathOrIdentifier::Path(v) => Ok(v),
+                    PathOrIdentifier::Identifier(v) => Err(v),
+                })
+                .parse_next(i)
         };
 
         // match structs
