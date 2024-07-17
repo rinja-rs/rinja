@@ -42,7 +42,9 @@ impl<'a> Node<'a> {
         let (i, result) = match (|i| Self::many(i, s)).parse_next(i) {
             Ok((i, result)) => (i, result),
             Err(err) => {
-                if let winnow::Err::Backtrack(err) | winnow::Err::Cut(err) = &err {
+                if let winnow::error::ErrMode::Backtrack(err) | winnow::error::ErrMode::Cut(err) =
+                    &err
+                {
                     if err.message.is_none() {
                         opt(|i| unexpected_tag(i, s)).parse_next(err.input)?;
                     }
@@ -53,7 +55,7 @@ impl<'a> Node<'a> {
         let (i, _) = opt(|i| unexpected_tag(i, s)).parse_next(i)?;
         let (i, is_eof) = opt(eof).parse_next(i)?;
         if is_eof.is_none() {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot parse entire template\n\
                  you should never encounter this error\n\
                  please report this error to <https://github.com/rinja-rs/rinja/issues>",
@@ -132,7 +134,7 @@ impl<'a> Node<'a> {
         );
         let (j, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "you can only `break` inside a `for` loop",
                 i,
             )));
@@ -148,7 +150,7 @@ impl<'a> Node<'a> {
         );
         let (j, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "you can only `continue` inside a `for` loop",
                 i,
             )));
@@ -215,7 +217,9 @@ fn cut_node<'a, O>(
     let mut inner = cut(inner);
     move |i: &'a str| {
         let result = inner.parse_next(i);
-        if let Err(winnow::Err::Cut(err) | winnow::Err::Backtrack(err)) = &result {
+        if let Err(winnow::error::ErrMode::Cut(err) | winnow::error::ErrMode::Backtrack(err)) =
+            &result
+        {
             if err.message.is_none() {
                 opt(|i| unexpected_raw_tag(kind, i)).parse_next(err.input)?;
             }
@@ -248,7 +252,7 @@ fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> ParseResult
         tag if tag.starts_with("end") => format!("unexpected closing tag `{tag}`"),
         tag => format!("unknown node `{tag}`"),
     };
-    Err(winnow::Err::Cut(ErrorContext::new(msg, i)))
+    Err(winnow::error::ErrMode::Cut(ErrorContext::new(msg, i)))
 }
 
 #[derive(Debug, PartialEq)]
@@ -458,7 +462,7 @@ fn check_block_start<'a>(
     expected: &str,
 ) -> ParseResult<'a> {
     if i.is_empty() {
-        return Err(winnow::Err::Cut(ErrorContext::new(
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             format!("expected `{expected}` to terminate `{node}` node, found nothing"),
             start,
         )));
@@ -613,7 +617,7 @@ impl<'a> Macro<'a> {
         );
         let (j, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
         if is_rust_keyword(name) {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("'{name}' is not a valid name for a macro"),
                 i,
             )));
@@ -876,7 +880,7 @@ impl<'a> Match<'a> {
             arms.push(arm);
         }
         if arms.is_empty() {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "`match` nodes must contain at least one `when` node and/or an `else` case",
                 start,
             )));
@@ -972,7 +976,7 @@ fn check_end_name<'a>(
         return Ok((after, end_name));
     }
 
-    Err(winnow::Err::Cut(ErrorContext::new(
+    Err(winnow::error::ErrMode::Cut(ErrorContext::new(
         match name.is_empty() && !end_name.is_empty() {
             true => format!("unexpected name `{end_name}` in `end{kind}` tag for unnamed `{kind}`"),
             false => format!("expected name `{name}` in `end{kind}` tag, found `{end_name}`"),
@@ -1217,7 +1221,7 @@ impl<'a> Extends<'a> {
             .parse_next(i)?;
         match (pws, nws) {
             (None, None) => Ok((i, WithSpan::new(Self { path }, start))),
-            (_, _) => Err(winnow::Err::Cut(ErrorContext::new(
+            (_, _) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "whitespace control is not allowed on `extends`",
                 start,
             ))),
@@ -1262,7 +1266,7 @@ impl<'a> Comment<'a> {
                     Tag::Open => match depth.checked_add(1) {
                         Some(new_depth) => depth = new_depth,
                         None => {
-                            return Err(winnow::Err::Cut(ErrorContext::new(
+                            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 "too deeply nested comments",
                                 start,
                             )));
@@ -1286,7 +1290,7 @@ impl<'a> Comment<'a> {
 
         let mut ws = Ws(None, None);
         if content.len() == 1 && matches!(content, "-" | "+" | "~") {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!(
                     "ambiguous whitespace stripping\n\
                      use `{}{content} {content}{}` to apply the same whitespace stripping on both \
@@ -1319,7 +1323,7 @@ fn end_node<'a, 'g: 'a>(
         if actual == expected {
             Ok((i, actual))
         } else if actual.starts_with("end") {
-            Err(winnow::Err::Cut(ErrorContext::new(
+            Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("expected `{expected}` to terminate `{node}` node, found `{actual}`"),
                 start,
             )))

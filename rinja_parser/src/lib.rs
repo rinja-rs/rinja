@@ -115,10 +115,10 @@ impl<'a> Ast<'a> {
     ) -> Result<Self, ParseError> {
         match Node::parse_template(src, &State::new(syntax)) {
             Ok(("", nodes)) => Ok(Self { nodes }),
-            Ok(_) | Err(winnow::Err::Incomplete(_)) => unreachable!(),
+            Ok(_) | Err(winnow::error::ErrMode::Incomplete(_)) => unreachable!(),
             Err(
-                winnow::Err::Backtrack(ErrorContext { input, message, .. })
-                | winnow::Err::Cut(ErrorContext { input, message, .. }),
+                winnow::error::ErrMode::Backtrack(ErrorContext { input, message, .. })
+                | winnow::error::ErrMode::Cut(ErrorContext { input, message, .. }),
             ) => Err(ParseError {
                 message,
                 offset: src.len() - input.len(),
@@ -222,7 +222,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-pub(crate) type ParseErr<'a> = winnow::Err<ErrorContext<'a>>;
+pub(crate) type ParseErr<'a> = winnow::error::ErrMode<ErrorContext<'a>>;
 pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
@@ -271,7 +271,7 @@ impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a
     }
 }
 
-impl<'a> From<ErrorContext<'a>> for winnow::Err<ErrorContext<'a>> {
+impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
     fn from(cx: ErrorContext<'a>) -> Self {
         Self::Cut(cx)
     }
@@ -304,7 +304,7 @@ fn skip_till<'a, 'b, O>(
             i = match candidate_finder.split(i) {
                 Some((_, j)) => j,
                 None => {
-                    return Err(winnow::Err::Backtrack(ErrorContext::new(
+                    return Err(winnow::error::ErrMode::Backtrack(ErrorContext::new(
                         "`end` not found`",
                         i,
                     )));
@@ -362,7 +362,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         {
             Ok((i, value))
         } else {
-            Err(winnow::Err::Cut(ErrorContext::new(
+            Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("unknown {kind} suffix `{suffix}`"),
                 start,
             )))
@@ -378,7 +378,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         .parse_next(i)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
             (i, Some(_)) => Ok((i, ())),
-            (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
+            (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("expected digits after `{kind}`"),
                 start,
             ))),
@@ -393,7 +393,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
             let (i, (kind, op)) = (one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
             match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 (i, Some(_)) => Ok((i, ())),
-                (_, None) => Err(winnow::Err::Cut(ErrorContext::new(
+                (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
                     start,
                 ))),
@@ -514,13 +514,13 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
         .parse_next(i)?;
 
     let Some(s) = s else {
-        return Err(winnow::Err::Cut(ErrorContext::new(
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "empty character literal",
             start,
         )));
     };
     let Ok(("", c)) = Char::parse(s) else {
-        return Err(winnow::Err::Cut(ErrorContext::new(
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "invalid character",
             start,
         )));
@@ -550,10 +550,10 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     };
 
     let Ok(nb) = u32::from_str_radix(nb, 16) else {
-        return Err(winnow::Err::Cut(ErrorContext::new(err1, start)));
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err1, start)));
     };
     if nb > max_value {
-        return Err(winnow::Err::Cut(ErrorContext::new(err2, start)));
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err2, start)));
     }
 
     Ok((i, CharLit {
@@ -863,7 +863,7 @@ pub(crate) struct Level(u8);
 impl Level {
     fn nest(self, i: &str) -> ParseResult<'_, Level> {
         if self.0 >= Self::MAX_DEPTH {
-            return Err(winnow::Err::Cut(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "your template code is too deeply nested, or last expression is too complex",
                 i,
             )));
@@ -887,7 +887,7 @@ fn filter<'a>(
         *level = level.nest(i)?.1;
         cut((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
     } else {
-        Err(winnow::Err::Cut(ErrorContext::new(
+        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the filter operator `|` must not be preceded by any whitespace characters\n\
             the binary OR operator is called `bitor` in rinja",
             i,

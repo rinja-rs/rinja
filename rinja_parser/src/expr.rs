@@ -105,7 +105,7 @@ impl<'a> Expr<'a> {
                         ))
                         .parse_next(i)?;
                         if has_named_arguments && !matches!(*expr, Self::NamedArgument(_, _)) {
-                            Err(winnow::Err::Cut(ErrorContext::new(
+                            Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 "named arguments must always be passed last",
                                 start,
                             )))
@@ -142,7 +142,7 @@ impl<'a> Expr<'a> {
                 WithSpan::new(Self::NamedArgument(argument, Box::new(value)), start),
             ))
         } else {
-            Err(winnow::Err::Cut(ErrorContext::new(
+            Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("named argument `{argument}` was passed more than once"),
                 start,
             )))
@@ -194,12 +194,12 @@ impl<'a> Expr<'a> {
                 if crate::PRIMITIVE_TYPES.contains(&target) {
                     return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
                 } else if target.is_empty() {
-                    return Err(winnow::Err::Cut(ErrorContext::new(
+                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         "`as` operator expects the name of a primitive type on its right-hand side",
                         before_keyword.trim_start(),
                     )));
                 } else {
-                    return Err(winnow::Err::Cut(ErrorContext::new(
+                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         format!(
                             "`as` operator expects the name of a primitive type on its right-hand \
                               side, found `{target}`"
@@ -215,7 +215,7 @@ impl<'a> Expr<'a> {
             opt(terminated(opt(keyword("not")), ws(keyword("defined")))).parse_next(i)?;
         let ctor = match rhs {
             None => {
-                return Err(winnow::Err::Cut(ErrorContext::new(
+                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     "expected `defined` or `not defined` after `is`",
                     // We use `start` to show the whole `var is` thing instead of the current token.
                     start,
@@ -227,13 +227,13 @@ impl<'a> Expr<'a> {
         let var_name = match *lhs {
             Self::Var(var_name) => var_name,
             Self::Attr(_, _) => {
-                return Err(winnow::Err::Cut(ErrorContext::new(
+                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     "`is defined` operator can only be used on variables, not on their fields",
                     start,
                 )));
             }
             _ => {
-                return Err(winnow::Err::Cut(ErrorContext::new(
+                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     "`is defined` operator can only be used on variables",
                     start,
                 )));
@@ -400,7 +400,7 @@ fn token_xor(i: &str) -> ParseResult<'_> {
     if good {
         Ok((i, "^"))
     } else {
-        Err(winnow::Err::Cut(ErrorContext::new(
+        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the binary XOR operator is called `xor` in rinja",
             i,
         )))
@@ -416,7 +416,7 @@ fn token_bitand(i: &str) -> ParseResult<'_> {
     if good {
         Ok((i, "&"))
     } else {
-        Err(winnow::Err::Cut(ErrorContext::new(
+        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the binary AND operator is called `bitand` in rinja",
             i,
         )))
@@ -462,7 +462,9 @@ impl<'a> Suffix<'a> {
                 Some(Self::MacroCall(args)) => match expr.inner {
                     Expr::Path(path) => expr = WithSpan::new(Expr::RustMacro(path, args), i),
                     Expr::Var(name) => expr = WithSpan::new(Expr::RustMacro(vec![name], args), i),
-                    _ => return Err(winnow::Err::from_error_kind(i, ErrorKind::Tag).cut()),
+                    _ => {
+                        return Err(winnow::error::ErrMode::from_error_kind(i, ErrorKind::Tag).cut());
+                    }
                 },
                 None => break,
             }
