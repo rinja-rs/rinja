@@ -315,11 +315,8 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword<'a>(k: &'a str) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
-    move |i: &'a str| -> ParseResult<'a> {
-        let (j, v) = identifier.parse_next(i)?;
-        if k == v { Ok((j, v)) } else { fail(i) }
-    }
+fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
+    identifier.verify(move |v: &str| v == k)
 }
 
 fn identifier(input: &str) -> ParseResult<'_> {
