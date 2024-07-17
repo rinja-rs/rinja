@@ -5,9 +5,9 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{one_of, tag, take_till0};
 use winnow::character::digit1;
-use winnow::combinator::{cut_err, fail, not, opt, peek};
+use winnow::combinator::{cut_err, fail, not, opt, peek, repeat};
 use winnow::error::{ErrorKind, ParseError as _};
-use winnow::multi::{fold_many0, many0, separated0, separated1};
+use winnow::multi::{fold_many0, separated0, separated1};
 use winnow::sequence::{preceded, terminated};
 
 use crate::{
@@ -21,7 +21,7 @@ macro_rules! expr_prec_layer {
             let (_, level) = level.nest(i)?;
             let start = i;
             let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = many0((ws($op), |i| Self::$inner(i, level)))
+            let (i, right) = repeat(0.., (ws($op), |i| Self::$inner(i, level)))
                 .map(|v: Vec<_>| v)
                 .parse_next(i)?;
             Ok((
@@ -257,7 +257,7 @@ impl<'a> Expr<'a> {
         let (_, nested) = level.nest(i)?;
         let start = i;
         let (i, (ops, mut expr)) = (
-            many0(ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
+            repeat(0.., ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
             |i| Suffix::parse(i, nested),
         )
             .parse_next(i)?;

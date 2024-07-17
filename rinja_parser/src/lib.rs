@@ -14,9 +14,8 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while};
 use winnow::character::escaped;
-use winnow::combinator::{cut_err, fail, not, opt};
+use winnow::combinator::{cut_err, fail, not, opt, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
-use winnow::multi::{many0, many1};
 use winnow::sequence::{delimited, preceded};
 use winnow::stream::AsChar;
 
@@ -446,10 +445,10 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
         (
             |i| match start {
                 true => Ok((i, ())),
-                false => many0('_').parse_next(i),
+                false => repeat(0.., '_').parse_next(i),
             },
             one_of(|ch: char| ch.is_digit(radix)),
-            many0(one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
+            repeat(0.., one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
         )
             .recognize()
             .parse_next(i)
@@ -622,7 +621,7 @@ enum PathOrIdentifier<'a> {
 
 fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
-    let tail = opt(many1(preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
+    let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
     let (i, (root, start, rest)) = (root, identifier, tail).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();
