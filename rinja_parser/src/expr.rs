@@ -5,7 +5,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::take_till0;
 use winnow::character::digit1;
-use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, recognize, value};
+use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, value};
 use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated0, separated1};
 use winnow::sequence::{preceded, terminated};
@@ -525,7 +525,7 @@ impl<'a> Suffix<'a> {
         preceded(
             (ws('!'), '('),
             cut_err(terminated(
-                map(recognize(nested_parenthesis), Self::MacroCall),
+                map(nested_parenthesis.recognize(), Self::MacroCall),
                 ')',
             )),
         )

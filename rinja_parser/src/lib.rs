@@ -14,7 +14,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
 use winnow::character::escaped;
-use winnow::combinator::{consumed, cut_err, fail, map, not, opt, recognize, value};
+use winnow::combinator::{consumed, cut_err, fail, map, not, opt, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};
 use winnow::sequence::{delimited, preceded};
@@ -334,7 +334,7 @@ fn identifier(input: &str) -> ParseResult<'_> {
         take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
-    recognize((start, opt(tail))).parse_next(input)
+    (start, opt(tail)).recognize().parse_next(input)
 }
 
 fn bool_lit(i: &str) -> ParseResult<'_> {
@@ -406,7 +406,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         }
     };
 
-    let (i, num) = if let Ok((i, Some(num))) = opt(recognize(int_with_base)).parse_next(start) {
+    let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_next(start) {
         let (i, suffix) =
             opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
         (i, Num::Int(num, suffix))
@@ -435,15 +435,16 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 /// with an underscore.
 fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_> {
     move |i| {
-        recognize((
+        (
             |i| match start {
                 true => Ok((i, ())),
                 false => many0('_').parse_next(i),
             },
             one_of(|ch: char| ch.is_digit(radix)),
             many0(one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
-        ))
-        .parse_next(i)
+        )
+            .recognize()
+            .parse_next(i)
     }
 }
 

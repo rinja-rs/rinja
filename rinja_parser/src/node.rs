@@ -3,9 +3,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, tag, take_till0};
-use winnow::combinator::{
-    consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, recognize, value,
-};
+use winnow::combinator::{consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, value};
 use winnow::multi::{many0, separated0, separated1};
 use winnow::sequence::{delimited, preceded};
 
@@ -1007,7 +1005,7 @@ impl<'a> Lit<'a> {
             tag(s.syntax.expr_start),
         ));
 
-        let (i, content) = opt(recognize(skip_till(candidate_finder, p_start))).parse_next(i)?;
+        let (i, content) = opt(skip_till(candidate_finder, p_start).recognize()).parse_next(i)?;
         let (i, content) = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
