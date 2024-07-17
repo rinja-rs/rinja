@@ -1,6 +1,6 @@
 use winnow::Parser;
 use winnow::branch::alt;
-use winnow::character::complete::{char, one_of};
+use winnow::character::complete::one_of;
 use winnow::combinator::{consumed, map, map_res, opt};
 use winnow::multi::separated1;
 use winnow::sequence::preceded;
@@ -200,7 +200,7 @@ fn collect_targets<'a, T>(
     mut one: impl FnMut(&'a str, &State<'_>) -> ParseResult<'a, T>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
     let opt_comma = |i| map(ws(opt(',')), |o| o.is_some()).parse_next(i);
-    let mut opt_end = |i| map(ws(opt(char(delim))), |o| o.is_some()).parse_next(i);
+    let mut opt_end = |i| map(ws(opt(one_of(delim))), |o| o.is_some()).parse_next(i);
 
     let (i, has_end) = opt_end.parse_next(i)?;
     if has_end {
