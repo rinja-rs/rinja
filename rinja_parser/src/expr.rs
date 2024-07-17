@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::str;
 
+use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::complete::take_till;
 use winnow::character::complete::digit1;
 use winnow::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
-use winnow::error::ErrorKind;
+use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated_list0, separated_list1};
 use winnow::sequence::{preceded, terminated};
-use winnow::{Parser, error_position};
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
@@ -462,7 +462,7 @@ impl<'a> Suffix<'a> {
                 Some(Self::MacroCall(args)) => match expr.inner {
                     Expr::Path(path) => expr = WithSpan::new(Expr::RustMacro(path, args), i),
                     Expr::Var(name) => expr = WithSpan::new(Expr::RustMacro(vec![name], args), i),
-                    _ => return Err(winnow::Err::Cut(error_position!(i, ErrorKind::Tag))),
+                    _ => return Err(winnow::Err::from_error_kind(i, ErrorKind::Tag).cut()),
                 },
                 None => break,
             }
