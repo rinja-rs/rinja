@@ -3,7 +3,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, tag, take_till0};
-use winnow::combinator::{cut_err, eof, fail, map, map_opt, not, opt, peek, value};
+use winnow::combinator::{cut_err, eof, fail, map_opt, not, opt, peek, value};
 use winnow::multi::{many0, separated0, separated1};
 use winnow::sequence::{delimited, preceded};
 
@@ -64,8 +64,8 @@ impl<'a> Node<'a> {
 
     fn many(i: &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
         many0(alt((
-            map(|i| Lit::parse(i, s), Self::Lit),
-            map(|i| Comment::parse(i, s), Self::Comment),
+            (|i| Lit::parse(i, s)).map(Self::Lit),
+            (|i| Comment::parse(i, s)).map(Self::Comment),
             |i| Self::expr(i, s),
             |i| Self::parse(i, s),
         )))
@@ -292,37 +292,35 @@ impl<'a> When<'a> {
     #[allow(clippy::self_named_constructors)]
     fn when(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let endwhen = map(
-            ws((
-                delimited(
-                    |i| s.tag_block_start(i),
+        let endwhen = ws((
+            delimited(
+                |i| s.tag_block_start(i),
+                opt(Whitespace::parse),
+                ws(keyword("endwhen")),
+            ),
+            cut_node(
+                Some("match-endwhen"),
+                (
                     opt(Whitespace::parse),
-                    ws(keyword("endwhen")),
+                    |i| s.tag_block_end(i),
+                    many0(value((), ws(|i| Comment::parse(i, s)))).map(|()| ()),
                 ),
-                cut_node(
-                    Some("match-endwhen"),
-                    (
-                        opt(Whitespace::parse),
-                        |i| s.tag_block_end(i),
-                        many0(value((), ws(|i| Comment::parse(i, s)))).map(|()| ()),
-                    ),
-                ),
+            ),
+        ))
+        .with_recognized()
+        .map(|((pws, _), span)| {
+            // A comment node is used to pass the whitespace suppressing information to the
+            // generator. This way we don't have to fix up the next `when` node or the closing
+            // `endmatch`. Any whitespaces after `endwhen` are to be suppressed. Actually, they
+            // don't wind up in the AST anyway.
+            Node::Comment(WithSpan::new(
+                Comment {
+                    ws: Ws(pws, Some(Whitespace::Suppress)),
+                    content: "",
+                },
+                span,
             ))
-            .with_recognized(),
-            |((pws, _), span)| {
-                // A comment node is used to pass the whitespace suppressing information to the
-                // generator. This way we don't have to fix up the next `when` node or the closing
-                // `endmatch`. Any whitespaces after `endwhen` are to be suppressed. Actually, they
-                // don't wind up in the AST anyway.
-                Node::Comment(WithSpan::new(
-                    Comment {
-                        ws: Ws(pws, Some(Whitespace::Suppress)),
-                        content: "",
-                    },
-                    span,
-                ))
-            },
-        );
+        });
         let mut p = (
             |i| s.tag_block_start(i),
             opt(Whitespace::parse),
@@ -373,7 +371,7 @@ impl<'a> Cond<'a> {
                 preceded(ws(keyword("else")), opt(|i| CondTest::parse(i, s))),
                 preceded(
                     ws(keyword("elif")),
-                    cut_node(Some("if-elif"), map(|i| CondTest::parse_cond(i, s), Some)),
+                    cut_node(Some("if-elif"), (|i| CondTest::parse_cond(i, s)).map(Some)),
                 ),
             )),
             opt(Whitespace::parse),

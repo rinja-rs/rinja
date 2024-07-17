@@ -1,7 +1,7 @@
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::one_of;
-use winnow::combinator::{map, map_res, opt};
+use winnow::combinator::{map_res, opt};
 use winnow::multi::separated1;
 use winnow::sequence::preceded;
 
@@ -30,21 +30,20 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        map(
-            separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or")).map(|v: Vec<_>| v),
-            |mut opts| match opts.len() {
+        separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
+            .map(|v: Vec<_>| v)
+            .map(|mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
-            },
-        )
-        .parse_next(i)
+            })
+            .parse_next(i)
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
     fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let mut opt_opening_paren = map(opt(ws('(')), |o| o.is_some());
-        let mut opt_opening_brace = map(opt(ws('{')), |o| o.is_some());
-        let mut opt_opening_bracket = map(opt(ws('[')), |o| o.is_some());
+        let mut opt_opening_paren = opt(ws('(')).map(|o| o.is_some());
+        let mut opt_opening_brace = opt(ws('{')).map(|o| o.is_some());
+        let mut opt_opening_bracket = opt(ws('[')).map(|o| o.is_some());
 
         let (i, lit) = opt(Self::lit).parse_next(i)?;
         if let Some(lit) = lit {
@@ -118,12 +117,12 @@ impl<'a> Target<'a> {
 
     fn lit(i: &'a str) -> ParseResult<'a, Self> {
         alt((
-            map(str_lit, Self::StrLit),
-            map(char_lit, Self::CharLit),
-            map(num_lit.with_recognized(), |(num, full)| {
-                Target::NumLit(full, num)
-            }),
-            map(bool_lit, Self::BoolLit),
+            str_lit.map(Self::StrLit),
+            char_lit.map(Self::CharLit),
+            num_lit
+                .with_recognized()
+                .map(|(num, full)| Target::NumLit(full, num)),
+            bool_lit.map(Self::BoolLit),
         ))
         .parse_next(i)
     }
@@ -201,8 +200,8 @@ fn collect_targets<'a, T>(
     delim: char,
     mut one: impl FnMut(&'a str, &State<'_>) -> ParseResult<'a, T>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
-    let opt_comma = |i| map(ws(opt(',')), |o| o.is_some()).parse_next(i);
-    let mut opt_end = |i| map(ws(opt(one_of(delim))), |o| o.is_some()).parse_next(i);
+    let opt_comma = |i| ws(opt(',')).map(|o| o.is_some()).parse_next(i);
+    let mut opt_end = |i| ws(opt(one_of(delim))).map(|o| o.is_some()).parse_next(i);
 
     let (i, has_end) = opt_end.parse_next(i)?;
     if has_end {

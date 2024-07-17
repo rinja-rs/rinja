@@ -5,7 +5,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::take_till0;
 use winnow::character::digit1;
-use winnow::combinator::{cut_err, fail, map, not, opt, peek, value};
+use winnow::combinator::{cut_err, fail, not, opt, peek, value};
 use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated0, separated1};
 use winnow::sequence::{preceded, terminated};
@@ -155,19 +155,16 @@ impl<'a> Expr<'a> {
         let range_right =
             move |i| (ws(alt(("..=", ".."))), opt(move |i| Self::or(i, level))).parse_next(i);
         alt((
-            map(range_right, |(op, right)| {
+            range_right.map(|(op, right)| {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
             }),
-            map(
-                (move |i| Self::or(i, level), opt(range_right)),
-                |(left, right)| match right {
-                    Some((op, right)) => WithSpan::new(
-                        Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
-                        start,
-                    ),
-                    None => left,
-                },
-            ),
+            (move |i| Self::or(i, level), opt(range_right)).map(|(left, right)| match right {
+                Some((op, right)) => WithSpan::new(
+                    Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
+                    start,
+                ),
+                None => left,
+            }),
         ))
         .parse_next(i)
     }
@@ -339,19 +336,22 @@ impl<'a> Expr<'a> {
 
     fn path_var_bool(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        map(path_or_identifier, |v| match v {
-            PathOrIdentifier::Path(v) => Self::Path(v),
-            PathOrIdentifier::Identifier("true") => Self::BoolLit(true),
-            PathOrIdentifier::Identifier("false") => Self::BoolLit(false),
-            PathOrIdentifier::Identifier(v) => Self::Var(v),
-        })
-        .parse_next(i)
-        .map(|(i, expr)| (i, WithSpan::new(expr, start)))
+        path_or_identifier
+            .map(|v| match v {
+                PathOrIdentifier::Path(v) => Self::Path(v),
+                PathOrIdentifier::Identifier("true") => Self::BoolLit(true),
+                PathOrIdentifier::Identifier("false") => Self::BoolLit(false),
+                PathOrIdentifier::Identifier(v) => Self::Var(v),
+            })
+            .parse_next(i)
+            .map(|(i, expr)| (i, WithSpan::new(expr, start)))
     }
 
     fn str(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        map(str_lit, |i| WithSpan::new(Self::StrLit(i), start)).parse_next(i)
+        str_lit
+            .map(|i| WithSpan::new(Self::StrLit(i), start))
+            .parse_next(i)
     }
 
     fn num(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
@@ -362,7 +362,9 @@ impl<'a> Expr<'a> {
 
     fn char(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        map(char_lit, |i| WithSpan::new(Self::CharLit(i), start)).parse_next(i)
+        char_lit
+            .map(|i| WithSpan::new(Self::CharLit(i), start))
+            .parse_next(i)
     }
 
     #[must_use]
@@ -525,7 +527,7 @@ impl<'a> Suffix<'a> {
         preceded(
             (ws('!'), '('),
             cut_err(terminated(
-                map(nested_parenthesis.recognize(), Self::MacroCall),
+                nested_parenthesis.recognize().map(Self::MacroCall),
                 ')',
             )),
         )
@@ -533,31 +535,31 @@ impl<'a> Suffix<'a> {
     }
 
     fn attr(i: &'a str) -> ParseResult<'a, Self> {
-        map(
-            preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier)))),
-            Self::Attr,
-        )
-        .parse_next(i)
+        preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier))))
+            .map(Self::Attr)
+            .parse_next(i)
     }
 
     fn index(i: &'a str, level: Level) -> ParseResult<'a, Self> {
         let (_, level) = level.nest(i)?;
-        map(
-            preceded(
-                ws('['),
-                cut_err(terminated(ws(move |i| Expr::parse(i, level)), ']')),
-            ),
-            Self::Index,
+        preceded(
+            ws('['),
+            cut_err(terminated(ws(move |i| Expr::parse(i, level)), ']')),
         )
+        .map(Self::Index)
         .parse_next(i)
     }
 
     fn call(i: &'a str, level: Level) -> ParseResult<'a, Self> {
         let (_, level) = level.nest(i)?;
-        map(move |i| Expr::arguments(i, level, false), Self::Call).parse_next(i)
+        (move |i| Expr::arguments(i, level, false))
+            .map(Self::Call)
+            .parse_next(i)
     }
 
     fn r#try(i: &'a str) -> ParseResult<'a, Self> {
-        map(preceded(take_till0(not_ws), '?'), |_| Self::Try).parse_next(i)
+        preceded(take_till0(not_ws), '?')
+            .map(|_| Self::Try)
+            .parse_next(i)
     }
 }

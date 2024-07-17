@@ -14,7 +14,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
 use winnow::character::escaped;
-use winnow::combinator::{cut_err, fail, map, not, opt, value};
+use winnow::combinator::{cut_err, fail, not, opt, value};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::multi::{many0, many1};
 use winnow::sequence::{delimited, preceded};
@@ -297,7 +297,7 @@ fn skip_till<'a, 'b, O>(
     candidate_finder: impl crate::memchr_splitter::Splitter,
     end: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
-    let mut next = alt((map(end, Some), map(any, |_| None)));
+    let mut next = alt((end.map(Some), any.map(|_| None)));
     move |start: &'a str| {
         let mut i = start;
         loop {
@@ -562,6 +562,7 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
 }
 
 /// Represents the different kinds of char declarations:
+#[derive(Copy, Clone)]
 enum Char<'a> {
     /// Any character that is not escaped.
     Literal,
@@ -578,35 +579,29 @@ impl<'a> Char<'a> {
         if i.chars().count() == 1 {
             return Ok(("", Self::Literal));
         }
-        map(
-            (
-                '\\',
-                alt((
-                    map('n', |_| Self::Escaped),
-                    map('r', |_| Self::Escaped),
-                    map('t', |_| Self::Escaped),
-                    map('\\', |_| Self::Escaped),
-                    map('0', |_| Self::Escaped),
-                    map('\'', |_| Self::Escaped),
-                    // Not useful but supported by rust.
-                    map('"', |_| Self::Escaped),
-                    map(
-                        ('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit())),
-                        |(_, s)| Self::AsciiEscape(s),
-                    ),
-                    map(
-                        (
-                            "u{",
-                            take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-                            '}',
-                        ),
-                        |(_, s, _)| Self::UnicodeEscape(s),
-                    ),
-                )),
-            ),
-            |(_, ch)| ch,
+        (
+            '\\',
+            alt((
+                one_of('n').value(Self::Escaped),
+                one_of('r').value(Self::Escaped),
+                one_of('t').value(Self::Escaped),
+                one_of('\\').value(Self::Escaped),
+                one_of('0').value(Self::Escaped),
+                one_of('\'').value(Self::Escaped),
+                // Not useful but supported by rust.
+                one_of('"').value(Self::Escaped),
+                ('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()))
+                    .map(|(_, s)| Self::AsciiEscape(s)),
+                (
+                    "u{",
+                    take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
+                    '}',
+                )
+                    .map(|(_, s, _)| Self::UnicodeEscape(s)),
+            )),
         )
-        .parse_next(i)
+            .map(|(_, ch)| ch)
+            .parse_next(i)
     }
 }
 
