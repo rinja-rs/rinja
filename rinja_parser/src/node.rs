@@ -3,7 +3,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, tag, take_till0};
-use winnow::combinator::{consumed, cut_err, eof, fail, map, map_opt, not, opt, peek, value};
+use winnow::combinator::{cut_err, eof, fail, map, map_opt, not, opt, peek, value};
 use winnow::multi::{many0, separated0, separated1};
 use winnow::sequence::{delimited, preceded};
 
@@ -293,7 +293,7 @@ impl<'a> When<'a> {
     fn when(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let endwhen = map(
-            consumed(ws((
+            ws((
                 delimited(
                     |i| s.tag_block_start(i),
                     opt(Whitespace::parse),
@@ -307,8 +307,9 @@ impl<'a> When<'a> {
                         many0(value((), ws(|i| Comment::parse(i, s)))).map(|()| ()),
                     ),
                 ),
-            ))),
-            |(span, (pws, _))| {
+            ))
+            .with_recognized(),
+            |((pws, _), span)| {
                 // A comment node is used to pass the whitespace suppressing information to the
                 // generator. This way we don't have to fix up the next `when` node or the closing
                 // `endmatch`. Any whitespaces after `endwhen` are to be suppressed. Actually, they
@@ -1055,12 +1056,12 @@ impl<'a> Raw<'a> {
                 (
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
-                    consumed(skip_till(Splitter1::new(s.syntax.block_start), endraw)),
+                    skip_till(Splitter1::new(s.syntax.block_start), endraw).with_recognized(),
                 ),
             ),
         );
 
-        let (_, (pws1, _, (nws1, _, (contents, (i, (_, pws2, _, nws2, _)))))) = p.parse_next(i)?;
+        let (_, (pws1, _, (nws1, _, ((i, (_, pws2, _, nws2, _)), contents)))) = p.parse_next(i)?;
         let lit = Lit::split_ws_parts(contents);
         let ws1 = Ws(pws1, nws1);
         let ws2 = Ws(pws2, nws2);

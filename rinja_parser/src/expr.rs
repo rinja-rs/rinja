@@ -5,7 +5,7 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::take_till0;
 use winnow::character::digit1;
-use winnow::combinator::{consumed, cut_err, fail, map, not, opt, peek, value};
+use winnow::combinator::{cut_err, fail, map, not, opt, peek, value};
 use winnow::error::{ErrorKind, ParseError as _};
 use winnow::multi::{fold_many0, many0, separated0, separated1};
 use winnow::sequence::{preceded, terminated};
@@ -356,7 +356,7 @@ impl<'a> Expr<'a> {
 
     fn num(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, (full, num)) = consumed(num_lit).parse_next(i)?;
+        let (i, (num, full)) = num_lit.with_recognized().parse_next(i)?;
         Ok((i, WithSpan::new(Expr::NumLit(full, num), start)))
     }
 

@@ -1,7 +1,7 @@
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::one_of;
-use winnow::combinator::{consumed, map, map_res, opt};
+use winnow::combinator::{map, map_res, opt};
 use winnow::multi::separated1;
 use winnow::sequence::preceded;
 
@@ -120,7 +120,9 @@ impl<'a> Target<'a> {
         alt((
             map(str_lit, Self::StrLit),
             map(char_lit, Self::CharLit),
-            map(consumed(num_lit), |(full, num)| Target::NumLit(full, num)),
+            map(num_lit.with_recognized(), |(num, full)| {
+                Target::NumLit(full, num)
+            }),
             map(bool_lit, Self::BoolLit),
         ))
         .parse_next(i)
@@ -131,7 +133,7 @@ impl<'a> Target<'a> {
     }
 
     fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
-        let (i, rest) = opt(consumed(Self::rest)).parse_next(init_i)?;
+        let (i, rest) = opt(Self::rest.with_recognized()).parse_next(init_i)?;
         if let Some(rest) = rest {
             let (_, chr) = ws(opt(one_of(",:"))).parse_next(i)?;
             if let Some(chr) = chr {
@@ -143,7 +145,7 @@ impl<'a> Target<'a> {
                     i,
                 )));
             }
-            if let Target::Rest(ref s) = rest.1 {
+            if let Target::Rest(ref s) = rest.0 {
                 if s.inner.is_some() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         "`@ ..` cannot be used in struct",
@@ -151,7 +153,7 @@ impl<'a> Target<'a> {
                     )));
                 }
             }
-            return Ok((i, rest));
+            return Ok((i, (rest.1, rest.0)));
         }
 
         let (i, (src, target)) =
