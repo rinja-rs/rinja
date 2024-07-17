@@ -5,9 +5,9 @@ use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{one_of, tag, take_till0};
 use winnow::character::digit1;
-use winnow::combinator::{cut_err, fail, not, opt, peek, repeat};
+use winnow::combinator::{cut_err, fail, fold_repeat, not, opt, peek, repeat};
 use winnow::error::{ErrorKind, ParseError as _};
-use winnow::multi::{fold_many0, separated0, separated1};
+use winnow::multi::{separated0, separated1};
 use winnow::sequence::{preceded, terminated};
 
 use crate::{
@@ -302,7 +302,8 @@ impl<'a> Expr<'a> {
         }
 
         let mut exprs = vec![expr];
-        let (i, ()) = fold_many0(
+        let (i, ()) = fold_repeat(
+            0..,
             preceded(',', ws(|i| Self::parse(i, level))),
             || (),
             |(), expr| {
