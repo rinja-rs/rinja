@@ -432,7 +432,7 @@ fn num_lit(i: &str) -> ParseResult<'_> {
             tag("usize"),
         ))(i)
     };
-    let float_suffix = |i| alt((tag("f32"), tag("f64")))(i);
+    let float_suffix = |i| alt((tag("f16"), tag("f32"), tag("f64"), tag("f128")))(i);
 
     recognize(tuple((
         opt(char('-')),
