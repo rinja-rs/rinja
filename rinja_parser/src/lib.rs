@@ -569,7 +569,7 @@ enum Char<'a> {
 impl<'a> Char<'a> {
     fn parse(i: &'a str) -> ParseResult<'a, Self> {
         if i.chars().count() == 1 {
-            return Ok(("", Self::Literal));
+            return any.value(Self::Literal).parse_next(i);
         }
         (
             '\\',
