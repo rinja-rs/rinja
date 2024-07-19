@@ -132,7 +132,7 @@ impl<'a> Target<'a> {
     fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
         let (i, rest) = opt(Self::rest.with_recognized()).parse_next(init_i)?;
         if let Some(rest) = rest {
-            let (_, chr) = ws(opt(one_of(",:"))).parse_next(i)?;
+            let (_, chr) = ws(opt(one_of([',', ':']))).parse_next(i)?;
             if let Some(chr) = chr {
                 return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!(

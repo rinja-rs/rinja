@@ -380,7 +380,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     let float = |i: &'a str| -> ParseResult<'a, ()> {
         let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
-            let (i, (kind, op)) = (one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
+            let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_next(i)?;
             match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 (i, Some(_)) => Ok((i, ())),
                 (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
