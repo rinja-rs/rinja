@@ -469,7 +469,8 @@ pub struct StrLit<'a> {
 }
 
 fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
-    let (i, s) = delimited('"', opt(escaped(take_till1("\\\""), '\\', any)), '"').parse_next(i)?;
+    let (i, s) =
+        delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
@@ -500,7 +501,11 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = (
         opt('b'),
-        delimited('\'', opt(escaped(take_till1("\\\'"), '\\', any)), '\''),
+        delimited(
+            '\'',
+            opt(escaped(take_till1(['\\', '\'']), '\\', any)),
+            '\'',
+        ),
     )
         .parse_next(i)?;
 
