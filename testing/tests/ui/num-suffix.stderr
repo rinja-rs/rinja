@@ -1,0 +1,29 @@
+error: unknown integer suffix `x`
+       failed to parse template source at row 1, column 3 near:
+       "0x0x }}"
+ --> tests/ui/num-suffix.rs:4:10
+  |
+4 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unknown float suffix `f127`
+       failed to parse template source at row 1, column 3 near:
+       "0.0_f127 }}"
+  --> tests/ui/num-suffix.rs:11:10
+   |
+11 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unknown number suffix `u321`
+       failed to parse template source at row 1, column 3 near:
+       "654u321 }}"
+  --> tests/ui/num-suffix.rs:18:10
+   |
+18 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)

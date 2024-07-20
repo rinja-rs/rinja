@@ -416,23 +416,36 @@ fn bool_lit(i: &str) -> ParseResult<'_> {
 }
 
 fn num_lit(i: &str) -> ParseResult<'_> {
-    let integer_suffix = |i| {
-        alt((
-            tag("i8"),
-            tag("i16"),
-            tag("i32"),
-            tag("i64"),
-            tag("i128"),
-            tag("isize"),
-            tag("u8"),
-            tag("u16"),
-            tag("u32"),
-            tag("u64"),
-            tag("u128"),
-            tag("usize"),
-        ))(i)
-    };
-    let float_suffix = |i| alt((tag("f16"), tag("f32"), tag("f64"), tag("f128")))(i);
+    const INTEGER_SUFFIX: &[&str] = &[
+        "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize",
+    ];
+    const FLOAT_SUFFIX: &[&str] = &["f16", "f32", "f64", "f128"];
+
+    fn suffix<'a>(
+        start: &'a str,
+        kind: &'a str,
+        list: &'a [&[&str]],
+        ignore: &'a [&str],
+    ) -> impl Fn(&'a str) -> ParseResult<'a> + Copy + 'a {
+        move |i| {
+            let (i, suffix) = identifier(i)?;
+            if list.iter().flat_map(|&i| i).any(|&item| item == suffix) {
+                Ok((i, suffix))
+            } else if ignore.contains(&suffix) {
+                // no need for a message, this case only occures in an `opt(…)`
+                Err(nom::Err::Error(ErrorContext::new("", i)))
+            } else {
+                Err(nom::Err::Failure(ErrorContext::new(
+                    format!("unknown {kind} suffix `{suffix}`"),
+                    start,
+                )))
+            }
+        }
+    }
+
+    let integer_suffix = suffix(i, "integer", &[INTEGER_SUFFIX], &[]);
+    let float_suffix = suffix(i, "float", &[FLOAT_SUFFIX], &["e"]);
+    let either_suffix = suffix(i, "number", &[INTEGER_SUFFIX, FLOAT_SUFFIX], &["e"]);
 
     recognize(tuple((
         opt(char('-')),
@@ -449,8 +462,7 @@ fn num_lit(i: &str) -> ParseResult<'_> {
             recognize(tuple((
                 separated_digits(10, true),
                 opt(alt((
-                    integer_suffix,
-                    float_suffix,
+                    either_suffix,
                     recognize(tuple((
                         opt(tuple((char('.'), separated_digits(10, true)))),
                         one_of("eE"),
