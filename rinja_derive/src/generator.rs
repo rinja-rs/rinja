@@ -360,13 +360,9 @@ impl<'a> Generator<'a> {
         Ok(size_hint)
     }
 
-    fn is_var_defined(&self, expr: &Expr<'_>) -> bool {
-        match expr {
-            Expr::Var(s) => {
-                self.locals.get(&(*s).into()).is_some() || self.input.fields.iter().any(|f| f == s)
-            }
-            _ => false,
-        }
+    fn is_var_defined(&self, var_name: &str) -> bool {
+        self.locals.get(&var_name.into()).is_some()
+            || self.input.fields.iter().any(|f| f == var_name)
     }
 
     fn evaluate_condition(
@@ -436,7 +432,7 @@ impl<'a> Generator<'a> {
                 EvaluatedResult::Unknown
             }
             Expr::Group(ref inner) => self.evaluate_condition(inner, only_contains_is_defined),
-            Expr::IsDefined(ref left) => {
+            Expr::IsDefined(left) => {
                 // Variable is defined so we want to keep the condition.
                 if self.is_var_defined(left) {
                     EvaluatedResult::AlwaysTrue
@@ -444,7 +440,7 @@ impl<'a> Generator<'a> {
                     EvaluatedResult::AlwaysFalse
                 }
             }
-            Expr::IsNotDefined(ref left) => {
+            Expr::IsNotDefined(left) => {
                 // Variable is defined so we don't want to keep the condition.
                 if self.is_var_defined(left) {
                     EvaluatedResult::AlwaysFalse
@@ -459,74 +455,44 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'a>,
         buf: &mut Buffer,
-        i: &'a If<'_>,
+        if_: &'a If<'_>,
     ) -> Result<usize, CompileError> {
-        fn write_if_cond(buf: &mut Buffer, nb_written_branches: &mut usize) {
-            if *nb_written_branches == 0 {
-                buf.write("if ");
-            } else {
-                buf.write("} else if ");
-            }
-            *nb_written_branches += 1;
-        }
-
         let mut flushed = 0;
         let mut arm_sizes = Vec::new();
         let mut has_else = false;
 
-        let mut nb_written_branches = 0;
-        let mut prev_was_generated = false;
-        let mut stop_loop = false;
+        let conds = Conds::compute_branches(self, if_);
 
-        for cond in i.branches.iter() {
+        if let Some(ws_before) = conds.ws_before {
+            self.handle_ws(ws_before);
+        }
+
+        for (pos, cond_info) in conds.conds.iter().enumerate() {
+            // It's completely fine here since we got these indexes by iterator `if_.branches`.
+            let cond = unsafe { if_.branches.get_unchecked(cond_info.cond_index) };
+
             self.handle_ws(cond.ws);
             flushed += self.write_buf_writable(ctx, buf)?;
-            if stop_loop {
-                break;
-            }
-            if prev_was_generated {
+            if pos > 0 {
                 self.locals.pop();
             }
-            prev_was_generated = false;
-            let mut generate_content = true;
 
+            self.locals.push();
             let mut arm_size = 0;
-            if let Some(CondTest { target, expr }) = &cond.cond {
-                let mut only_contains_is_defined = true;
-                let mut generate_condition = true;
 
-                match self.evaluate_condition(expr, &mut only_contains_is_defined) {
-                    // We generate the condition in case some calls are changing a variable, but
-                    // no need to generate the condition body since it will never be called.
-                    //
-                    // However, if the condition only contains "is (not) defined" checks, then we
-                    // can completely skip it.
-                    EvaluatedResult::AlwaysFalse => {
-                        if only_contains_is_defined {
-                            continue;
-                        }
-                        generate_content = false;
-                        write_if_cond(buf, &mut nb_written_branches);
+            if let Some(CondTest { target, expr }) = &cond.cond {
+                if pos == 0 {
+                    if cond_info.generate_condition {
+                        buf.write("if ");
                     }
-                    // This case is more interesting: it means that we will always enter this
-                    // condition, meaning that any following should not be generated. Another
-                    // thing to take into account: if there are no if branches before this one,
-                    // no need to generate an `else`.
-                    EvaluatedResult::AlwaysTrue => {
-                        stop_loop = true;
-                        if only_contains_is_defined {
-                            generate_condition = false;
-                            if nb_written_branches != 0 {
-                                buf.writeln("} else {");
-                                has_else = true;
-                            }
-                        } else {
-                            write_if_cond(buf, &mut nb_written_branches);
-                        }
-                    }
-                    EvaluatedResult::Unknown => write_if_cond(buf, &mut nb_written_branches),
+                    // Otherwise it means it will be the only condition generated,
+                    // so nothing to be added here.
+                } else if cond_info.generate_condition {
+                    buf.write("} else if ");
+                } else {
+                    buf.write("} else {");
+                    has_else = true;
                 }
-                self.locals.push();
 
                 if let Some(target) = target {
                     let mut expr_buf = Buffer::new();
@@ -549,7 +515,7 @@ impl<'a> Generator<'a> {
                     buf.write(" = &");
                     buf.write(expr_buf.buf);
                     buf.writeln(" {");
-                } else if generate_condition {
+                } else if cond_info.generate_condition {
                     // The following syntax `*(&(...) as &bool)` is used to
                     // trigger Rust's automatic dereferencing, to coerce
                     // e.g. `&&&&&bool` to `bool`. First `&(...) as &bool`
@@ -559,30 +525,30 @@ impl<'a> Generator<'a> {
                     buf.write(self.visit_expr_root(ctx, expr)?);
                     buf.writeln(") as &bool) {");
                 }
-            } else {
-                self.locals.push();
-                if nb_written_branches > 0 {
-                    buf.writeln("} else {");
-                }
+            } else if pos != 0 {
+                buf.writeln("} else {");
                 has_else = true;
             }
 
-            prev_was_generated = true;
-            if generate_content {
+            if cond_info.generate_content {
                 arm_size += self.handle(ctx, &cond.nodes, buf, AstLevel::Nested)?;
             }
             arm_sizes.push(arm_size);
         }
-        self.handle_ws(i.ws);
+
+        if let Some(ws_after) = conds.ws_after {
+            self.handle_ws(ws_after);
+        }
+        self.handle_ws(if_.ws);
         flushed += self.write_buf_writable(ctx, buf)?;
-        if nb_written_branches > 0 {
+        if conds.nb_conds > 0 {
             buf.writeln("}");
         }
-        if prev_was_generated {
+        if !conds.conds.is_empty() {
             self.locals.pop();
         }
 
-        if !has_else && nb_written_branches > 0 {
+        if !has_else && !conds.conds.is_empty() {
             arm_sizes.push(0);
         }
         Ok(flushed + median(&mut arm_sizes))
@@ -1409,8 +1375,8 @@ impl<'a> Generator<'a> {
             Expr::Tuple(ref exprs) => self.visit_tuple(ctx, buf, exprs)?,
             Expr::NamedArgument(_, ref expr) => self.visit_named_argument(ctx, buf, expr)?,
             Expr::FilterSource => self.visit_filter_source(buf),
-            Expr::IsDefined(ref left) => self.visit_is_defined(buf, true, left)?,
-            Expr::IsNotDefined(ref left) => self.visit_is_defined(buf, false, left)?,
+            Expr::IsDefined(var_name) => self.visit_is_defined(buf, true, var_name)?,
+            Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
         })
     }
 
@@ -1418,7 +1384,7 @@ impl<'a> Generator<'a> {
         &mut self,
         buf: &mut Buffer,
         is_defined: bool,
-        left: &WithSpan<'_, Expr<'_>>,
+        left: &str,
     ) -> Result<DisplayWrap, CompileError> {
         match (is_defined, self.is_var_defined(left)) {
             (true, true) | (false, false) => buf.write("true"),
@@ -2179,6 +2145,104 @@ impl BufferFmt for Arguments<'_> {
     }
 }
 
+struct CondInfo {
+    cond_index: usize,
+    generate_condition: bool,
+    generate_content: bool,
+}
+
+struct Conds {
+    conds: Vec<CondInfo>,
+    ws_before: Option<Ws>,
+    ws_after: Option<Ws>,
+    nb_conds: usize,
+}
+
+impl Conds {
+    fn compute_branches(generator: &Generator<'_>, i: &If<'_>) -> Self {
+        let mut conds = Vec::with_capacity(i.branches.len());
+        let mut ws_before = None;
+        let mut ws_after = None;
+        let mut nb_conds = 0;
+        let mut stop_loop = false;
+
+        for (i, cond) in i.branches.iter().enumerate() {
+            if stop_loop {
+                ws_after = Some(cond.ws);
+                break;
+            }
+            if let Some(CondTest { expr, .. }) = &cond.cond {
+                let mut only_contains_is_defined = true;
+
+                match generator.evaluate_condition(expr, &mut only_contains_is_defined) {
+                    // We generate the condition in case some calls are changing a variable, but
+                    // no need to generate the condition body since it will never be called.
+                    //
+                    // However, if the condition only contains "is (not) defined" checks, then we
+                    // can completely skip it.
+                    EvaluatedResult::AlwaysFalse => {
+                        if only_contains_is_defined {
+                            if conds.is_empty() && ws_before.is_none() {
+                                // If this is the first `if` and it's skipped, we definitely don't
+                                // want its whitespace control to be lost.
+                                ws_before = Some(cond.ws);
+                            }
+                            continue;
+                        }
+                        nb_conds += 1;
+                        conds.push(CondInfo {
+                            cond_index: i,
+                            generate_condition: true,
+                            generate_content: false,
+                        });
+                    }
+                    // This case is more interesting: it means that we will always enter this
+                    // condition, meaning that any following should not be generated. Another
+                    // thing to take into account: if there are no if branches before this one,
+                    // no need to generate an `else`.
+                    EvaluatedResult::AlwaysTrue => {
+                        let generate_condition = !only_contains_is_defined;
+                        if generate_condition {
+                            nb_conds += 1;
+                        }
+                        conds.push(CondInfo {
+                            cond_index: i,
+                            generate_condition,
+                            generate_content: true,
+                        });
+                        // Since it's always true, we can stop here.
+                        stop_loop = true;
+                    }
+                    EvaluatedResult::Unknown => {
+                        nb_conds += 1;
+                        conds.push(CondInfo {
+                            cond_index: i,
+                            generate_condition: true,
+                            generate_content: true,
+                        });
+                    }
+                }
+            } else {
+                let generate_condition = !conds.is_empty();
+                if generate_condition {
+                    nb_conds += 1;
+                }
+                conds.push(CondInfo {
+                    cond_index: i,
+                    generate_condition,
+                    generate_content: true,
+                });
+            }
+        }
+        Self {
+            conds,
+            ws_before,
+            ws_after,
+            nb_conds,
+        }
+    }
+}
+
 struct SeparatedPath<I>(I);
 
 impl<I: IntoIterator<Item = E> + Copy, E: BufferFmt> BufferFmt for SeparatedPath<I> {
@@ -2357,7 +2421,7 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::Filter(Filter { arguments, .. }) => arguments.iter().all(is_cacheable),
         Expr::Unary(_, arg) => is_cacheable(arg),
         Expr::BinOp(_, lhs, rhs) => is_cacheable(lhs) && is_cacheable(rhs),
-        Expr::IsDefined(lhs) | Expr::IsNotDefined(lhs) => is_cacheable(lhs),
+        Expr::IsDefined(_) | Expr::IsNotDefined(_) => true,
         Expr::Range(_, lhs, rhs) => {
             lhs.as_ref().map_or(true, |v| is_cacheable(v))
                 && rhs.as_ref().map_or(true, |v| is_cacheable(v))
