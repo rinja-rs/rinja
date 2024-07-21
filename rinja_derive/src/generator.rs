@@ -3,9 +3,10 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::fmt::{Arguments, Display, Write};
 use std::ops::Deref;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{cmp, hash, mem, str};
 
+use once_map::OnceMap;
 use parser::node::{
     Call, Comment, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
@@ -88,6 +89,23 @@ impl<'a> Generator<'a> {
         Ok(buf.buf)
     }
 
+    fn generate_include_bytes<S: AsRef<str>>(&mut self, buf: &mut Buffer, path: S) {
+        static CACHE: OnceLock<OnceMap<String, &'static ()>> = OnceLock::new();
+
+        let path = path.as_ref();
+        let cache = CACHE.get_or_init(OnceMap::new);
+        if cache.contains_key(path) {
+            return;
+        }
+        buf.writeln(
+            quote! {
+                const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
+            }
+            .to_string(),
+        );
+        cache.insert(path.to_string(), |_| &());
+    }
+
     // Implement `Template` for the given context struct.
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
         self.write_header(buf, format_args!("{CRATE}::Template"), None);
@@ -109,13 +127,7 @@ impl<'a> Generator<'a> {
                 Source::Source(_) => **path != self.input.path,
             };
             if path_is_valid {
-                let path = path.to_str().unwrap();
-                buf.writeln(
-                    quote! {
-                        const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
-                    }
-                    .to_string(),
-                );
+                self.generate_include_bytes(buf, path.to_str().unwrap());
             }
         }
 
@@ -789,15 +801,7 @@ impl<'a> Generator<'a> {
             .find_template(i.path, Some(&self.input.path))?;
 
         // Make sure the compiler understands that the generated code depends on the template file.
-        {
-            let path = path.to_str().unwrap();
-            buf.writeln(
-                quote! {
-                    const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
-                }
-                .to_string(),
-            );
-        }
+        self.generate_include_bytes(buf, path.to_str().unwrap());
 
         // We clone the context of the child in order to preserve their macros and imports.
         // But also add all the imports and macros from this template that don't override the
