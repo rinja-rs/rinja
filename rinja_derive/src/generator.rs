@@ -44,8 +44,6 @@ pub(crate) struct Generator<'a> {
     super_block: Option<(&'a str, usize)>,
     // Buffer for writable
     buf_writable: WritableBuffer<'a>,
-    // Counter for write! hash named arguments
-    named: usize,
     // Used in blocks to check if we are inside a filter block.
     is_in_filter_block: usize,
 }
@@ -71,7 +69,6 @@ impl<'a> Generator<'a> {
                 discard: buf_writable_discard,
                 ..Default::default()
             },
-            named: 0,
             is_in_filter_block,
         }
     }
@@ -102,10 +99,10 @@ impl<'a> Generator<'a> {
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> {CRATE}::Result<()>\n\
             where\n\
                 RinjaW: ::core::fmt::Write + ?::core::marker::Sized,\n\
-            {{",
+            {{\n\
+                use {CRATE}::filters::{{AutoEscape as _, WriteWritable as _}};\n\
+                use ::core::fmt::Write as _;",
         ));
-        buf.writeln(format_args!("use {CRATE}::filters::AutoEscape as _;"));
-        buf.writeln(format_args!("use ::core::fmt::Write as _;"));
 
         buf.discard = self.buf_writable.discard;
         // Make sure the compiler understands that the generated code depends on the template files.
@@ -1171,36 +1168,8 @@ impl<'a> Generator<'a> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
     ) -> Result<usize, CompileError> {
-        let WriteParts { size_hint, buffers } = self.prepare_format(ctx)?;
-        match buffers {
-            None => Ok(size_hint),
-            Some(WritePartsBuffers { format, expr: None }) => {
-                buf.writeln(format_args!("writer.write_str({:#?})?;", &format.buf));
-                Ok(size_hint)
-            }
-            Some(WritePartsBuffers {
-                format,
-                expr: Some(expr),
-            }) => {
-                buf.writeln("::std::write!(");
-                buf.writeln("writer,");
-                buf.writeln(format_args!("{:#?},", &format.buf));
-                buf.writeln(expr.buf.trim());
-                buf.writeln(")?;");
-                Ok(size_hint)
-            }
-        }
-    }
-
-    /// This is the common code to generate an expression. It is used for filter blocks and for
-    /// expressions more generally. It stores the size it represents and the buffers. Take a look
-    /// at `WriteParts` for more details.
-    fn prepare_format(&mut self, ctx: &Context<'_>) -> Result<WriteParts, CompileError> {
         if self.buf_writable.is_empty() {
-            return Ok(WriteParts {
-                size_hint: 0,
-                buffers: None,
-            });
+            return Ok(0);
         }
 
         if self
@@ -1208,91 +1177,80 @@ impl<'a> Generator<'a> {
             .iter()
             .all(|w| matches!(w, Writable::Lit(_)))
         {
-            let mut buf_lit = Buffer::new();
+            let mut buf_lit = String::new();
             for s in mem::take(&mut self.buf_writable.buf) {
                 if let Writable::Lit(s) = s {
-                    buf_lit.write(s);
+                    buf_lit.push_str(s);
                 };
             }
-            return Ok(WriteParts {
-                size_hint: buf_lit.buf.len(),
-                buffers: Some(WritePartsBuffers {
-                    format: buf_lit,
-                    expr: None,
-                }),
-            });
+            buf.writeln(format_args!("writer.write_str({buf_lit:#?})?;"));
+            return Ok(buf_lit.len());
         }
 
+        buf.writeln("match (");
+        let mut targets = Buffer::new();
+        let mut lines = Buffer::new();
         let mut expr_cache = HashMap::with_capacity(self.buf_writable.len());
-
         let mut size_hint = 0;
-        let mut buf_format = Buffer::new();
-        let mut buf_expr = Buffer::new();
 
-        for s in mem::take(&mut self.buf_writable.buf) {
+        let items = mem::take(&mut self.buf_writable.buf);
+        let mut it = items.into_iter().enumerate().peekable();
+        while let Some((idx, s)) = it.next() {
             match s {
                 Writable::Lit(s) => {
-                    buf_format.write(s.replace('{', "{{").replace('}', "}}"));
                     size_hint += s.len();
+                    let mut items = vec![s];
+                    while let Some((_, Writable::Lit(s))) = it.peek() {
+                        size_hint += s.len();
+                        items.push(s);
+                        it.next();
+                    }
+                    lines.writeln(format_args!(
+                        "writer.write_str({:#?})?;",
+                        items.as_slice().join(""),
+                    ));
                 }
                 Writable::Expr(s) => {
+                    size_hint += 3;
+
                     let mut expr_buf = Buffer::new();
-                    let wrapped = self.visit_expr(ctx, &mut expr_buf, s)?;
-                    let cacheable = is_cacheable(s);
-                    size_hint += self.named_expression(
-                        &mut buf_expr,
-                        &mut buf_format,
-                        expr_buf.buf,
-                        wrapped,
-                        cacheable,
-                        &mut expr_cache,
-                    );
+                    let expr = match self.visit_expr(ctx, &mut expr_buf, s)? {
+                        DisplayWrap::Wrapped => expr_buf.buf,
+                        DisplayWrap::Unwrapped => format!(
+                            "(&&{CRATE}::filters::AutoEscaper::new(&({}), {})).\
+                                rinja_auto_escape()?",
+                            expr_buf.buf, self.input.escaper,
+                        ),
+                    };
+                    let idx = if is_cacheable(s) {
+                        match expr_cache.entry(expr) {
+                            Entry::Occupied(e) => *e.get(),
+                            Entry::Vacant(e) => {
+                                buf.writeln(format_args!("&({}),", e.key()));
+                                targets.writeln(format_args!("expr{idx},"));
+                                e.insert(idx);
+                                idx
+                            }
+                        }
+                    } else {
+                        buf.writeln(format_args!("&({expr}),"));
+                        targets.write(format_args!("expr{idx}, "));
+                        idx
+                    };
+                    lines.writeln(format_args!(
+                        "(&&{CRATE}::filters::Writable(expr{idx})).rinja_write(writer)?;",
+                    ));
                 }
             }
         }
-        Ok(WriteParts {
-            size_hint,
-            buffers: Some(WritePartsBuffers {
-                format: buf_format,
-                expr: Some(buf_expr),
-            }),
-        })
-    }
+        buf.writeln(") {");
+        targets.buf.pop();
+        buf.writeln(format_args!("({}) => {{", targets.buf));
+        buf.write(lines.buf);
+        buf.writeln("}");
+        buf.writeln("}");
 
-    fn named_expression(
-        &mut self,
-        buf_expr: &mut Buffer,
-        buf_format: &mut Buffer,
-        expr: String,
-        wrapped: DisplayWrap,
-        cacheable: bool,
-        expr_cache: &mut HashMap<String, usize>,
-    ) -> usize {
-        let expression = match wrapped {
-            DisplayWrap::Wrapped => expr,
-            DisplayWrap::Unwrapped => format!(
-                "(&&{CRATE}::filters::AutoEscaper::new(&({expr}), {})).rinja_auto_escape()?",
-                self.input.escaper,
-            ),
-        };
-        let id = match expr_cache.entry(expression) {
-            Entry::Occupied(e) if cacheable => *e.get(),
-            entry => {
-                let id = self.named;
-                self.named += 1;
-
-                buf_expr.write(format_args!("expr{id} = &{},", entry.key()));
-
-                if let Entry::Vacant(e) = entry {
-                    e.insert(id);
-                }
-
-                id
-            }
-        };
-
-        buf_format.write(format_args!("{{expr{id}}}"));
-        3
+        Ok(size_hint)
     }
 
     fn visit_lit(&mut self, lit: &'a Lit<'_>) {
@@ -2490,28 +2448,6 @@ impl<'a> Deref for WritableBuffer<'a> {
 enum Writable<'a> {
     Lit(&'a str),
     Expr(&'a WithSpan<'a, Expr<'a>>),
-}
-
-struct WriteParts {
-    size_hint: usize,
-    buffers: Option<WritePartsBuffers>,
-}
-
-/// If "expr" is `None`, it means we can generate code like this:
-///
-/// ```ignore
-/// let var = format;
-/// ```
-///
-/// Otherwise we need to format "expr" using "format":
-///
-/// ```ignore
-/// let var = format!(format, expr);
-/// ```
-#[derive(Debug)]
-struct WritePartsBuffers {
-    format: Buffer,
-    expr: Option<Buffer>,
 }
 
 /// Identifiers to be replaced with raw identifiers, so as to avoid
