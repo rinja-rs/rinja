@@ -37,6 +37,11 @@ syn = "2"
 [dev-dependencies]
 criterion = "0.5"
 
+console = "0.15.8"
+similar = "2.6.0"
+prettyplease = "0.2.20"
+syn = { version = "2.0.3", features = ["extra-traits", "full"] }
+
 [[bench]]
 name = "derive-template"
 harness = false
