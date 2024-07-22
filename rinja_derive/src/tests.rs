@@ -148,21 +148,13 @@ fn check_if_let() {
     let path3 = path.join("include3.html");
     compare(
         r#"{% include "include1.html" %}"#,
-        // The order of the first 3 lines is non-deterministic!
         &format!(
-            r#"const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path1:#?});
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path2:#?});
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path1:#?});
+            r#"const _: &[::core::primitive::u8] = ::core::include_bytes!({path1:#?});
             const _: &[::core::primitive::u8] = ::core::include_bytes!({path2:#?});
             const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
             writer.write_str("3")?;
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
             writer.write_str("3")?;
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path2:#?});
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
             writer.write_str("3")?;
-            const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
             writer.write_str("3")?;"#
         ),
         4,
