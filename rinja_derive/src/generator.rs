@@ -104,7 +104,7 @@ impl<'a> Generator<'a> {
                 use ::core::fmt::Write as _;",
         ));
 
-        buf.discard = self.buf_writable.discard;
+        buf.set_discard(self.buf_writable.discard);
         // Make sure the compiler understands that the generated code depends on the template files.
         let mut paths = self
             .contexts
@@ -131,7 +131,7 @@ impl<'a> Generator<'a> {
         } else {
             self.handle(ctx, ctx.nodes, buf, AstLevel::Top)
         }?;
-        buf.discard = false;
+        buf.set_discard(false);
 
         self.flush_ws(Ws(None, None));
         buf.write(CRATE);
@@ -1082,7 +1082,8 @@ impl<'a> Generator<'a> {
         if block_fragment_write {
             self.buf_writable.discard = false;
         }
-        let prev_buf_discard = mem::replace(&mut buf.discard, self.buf_writable.discard);
+        let prev_buf_discard = buf.is_discard();
+        buf.set_discard(self.buf_writable.discard);
 
         // Get the block definition from the heritage chain
         let heritage = self
@@ -1145,14 +1146,14 @@ impl<'a> Generator<'a> {
         // with the block we want to render and that from this point, everything will be discarded.
         //
         // To get this block content rendered as well, we need to write to the buffer before then.
-        if buf.discard != prev_buf_discard {
+        if buf.is_discard() != prev_buf_discard {
             self.write_buf_writable(ctx, buf)?;
         }
         // Restore the original buffer discarding state
         if block_fragment_write {
             self.buf_writable.discard = true;
         }
-        buf.discard = prev_buf_discard;
+        buf.set_discard(prev_buf_discard);
 
         Ok(size_hint)
     }
@@ -1168,47 +1169,41 @@ impl<'a> Generator<'a> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
     ) -> Result<usize, CompileError> {
-        if self.buf_writable.is_empty() {
-            return Ok(0);
-        }
+        let mut size_hint = 0;
+        let items = mem::take(&mut self.buf_writable.buf);
+        let mut it = items.into_iter().enumerate().peekable();
 
-        if self
-            .buf_writable
-            .iter()
-            .all(|w| matches!(w, Writable::Lit(_)))
-        {
-            let mut buf_lit = String::new();
-            for s in mem::take(&mut self.buf_writable.buf) {
-                if let Writable::Lit(s) = s {
-                    buf_lit.push_str(s);
-                };
-            }
-            buf.writeln(format_args!("writer.write_str({buf_lit:#?})?;"));
-            return Ok(buf_lit.len());
+        while let Some((_, Writable::Lit(s))) = it.peek() {
+            size_hint += buf.write_writer(s);
+            it.next();
+        }
+        if it.peek().is_none() {
+            return Ok(size_hint);
         }
 
         buf.writeln("match (");
         let mut targets = Buffer::new();
         let mut lines = Buffer::new();
         let mut expr_cache = HashMap::with_capacity(self.buf_writable.len());
-        let mut size_hint = 0;
+        // the `last_line` contains any sequence of trailing simple `writer.write_str()` calls
+        let mut trailing_simple_lines = Vec::new();
 
-        let items = mem::take(&mut self.buf_writable.buf);
-        let mut it = items.into_iter().enumerate().peekable();
         while let Some((idx, s)) = it.next() {
             match s {
                 Writable::Lit(s) => {
-                    size_hint += s.len();
                     let mut items = vec![s];
                     while let Some((_, Writable::Lit(s))) = it.peek() {
-                        size_hint += s.len();
                         items.push(s);
                         it.next();
                     }
-                    lines.writeln(format_args!(
-                        "writer.write_str({:#?})?;",
-                        items.as_slice().join(""),
-                    ));
+                    if it.peek().is_some() {
+                        for s in items {
+                            size_hint += lines.write_writer(s);
+                        }
+                    } else {
+                        trailing_simple_lines = items;
+                        break;
+                    }
                 }
                 Writable::Expr(s) => {
                     size_hint += 3;
@@ -1249,6 +1244,10 @@ impl<'a> Generator<'a> {
         buf.write(lines.buf);
         buf.writeln("}");
         buf.writeln("}");
+
+        for s in trailing_simple_lines {
+            size_hint += buf.write_writer(s);
+        }
 
         Ok(size_hint)
     }
@@ -2050,6 +2049,7 @@ struct Buffer {
     // The buffer to generate the code into
     buf: String,
     discard: bool,
+    last_was_write_str: bool,
 }
 
 impl Buffer {
@@ -2057,20 +2057,50 @@ impl Buffer {
         Self {
             buf: String::new(),
             discard: false,
+            last_was_write_str: false,
         }
+    }
+
+    fn is_discard(&self) -> bool {
+        self.discard
+    }
+
+    fn set_discard(&mut self, discard: bool) {
+        self.discard = discard;
+        self.last_was_write_str = false;
     }
 
     fn writeln(&mut self, src: impl BufferFmt) {
         if !self.discard {
             src.append_to(&mut self.buf);
             self.buf.push('\n');
+            self.last_was_write_str = false;
         }
     }
 
     fn write(&mut self, src: impl BufferFmt) {
         if !self.discard {
             src.append_to(&mut self.buf);
+            self.last_was_write_str = false;
         }
+    }
+
+    fn write_writer(&mut self, s: &str) -> usize {
+        if self.discard {
+            // nothing to do
+        } else if !self.last_was_write_str {
+            writeln!(self.buf, "writer.write_str({s:#?})?;").unwrap();
+            self.last_was_write_str = true;
+        } else {
+            // strip trailing `")?\n`, leaving an unterminated string
+            let len = self.buf.strip_suffix("\")?;\n").unwrap().len();
+            self.buf.truncate(len);
+            // append the new string, adding a stray `"` in the mid of the string
+            writeln!(self.buf, "{s:#?})?;").unwrap();
+            // left shift new string by one to overwrite the stray `"`
+            self.buf.replace_range(len..=len, "");
+        }
+        s.len()
     }
 }
 

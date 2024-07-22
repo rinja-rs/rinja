@@ -168,10 +168,7 @@ fn check_if_let() {
             r#"const _: &[::core::primitive::u8] = ::core::include_bytes!({path1:#?});
             const _: &[::core::primitive::u8] = ::core::include_bytes!({path2:#?});
             const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
-            writer.write_str("3")?;
-            writer.write_str("3")?;
-            writer.write_str("3")?;
-            writer.write_str("3")?;"#
+            writer.write_str("3333")?;"#
         ),
         &[],
         4,
@@ -249,8 +246,7 @@ writer.write_str("bla")?;"#,
     compare(
         "{% if x is defined %}bli
          {%- else if x == 12 %}12{% endif %}bla",
-        r#"writer.write_str("bli")?;
-writer.write_str("bla")?;"#,
+        r#"writer.write_str("blibla")?;"#,
         &[("x", "u32")],
         6,
     );
@@ -258,8 +254,7 @@ writer.write_str("bla")?;"#,
         "{% if x is defined %}bli
          {%- else if x == 12 %}12
          {%- else %}nope{% endif %}bla",
-        r#"writer.write_str("bli")?;
-writer.write_str("bla")?;"#,
+        r#"writer.write_str("blibla")?;"#,
         &[("x", "u32")],
         6,
     );
