@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::{cmp, hash, mem, str};
 
 use parser::node::{
-    Call, Comment, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
+    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
 use parser::{Expr, Filter, Node, Target, WithSpan};
 use quote::quote;
@@ -468,8 +468,7 @@ impl<'a> Generator<'a> {
         }
 
         for (pos, cond_info) in conds.conds.iter().enumerate() {
-            // It's completely fine here since we got these indexes by iterator `if_.branches`.
-            let cond = unsafe { if_.branches.get_unchecked(cond_info.cond_index) };
+            let cond = cond_info.cond;
 
             self.handle_ws(cond.ws);
             flushed += self.write_buf_writable(ctx, buf)?;
@@ -2145,28 +2144,28 @@ impl BufferFmt for Arguments<'_> {
     }
 }
 
-struct CondInfo {
-    cond_index: usize,
+struct CondInfo<'a> {
+    cond: &'a WithSpan<'a, Cond<'a>>,
     generate_condition: bool,
     generate_content: bool,
 }
 
-struct Conds {
-    conds: Vec<CondInfo>,
+struct Conds<'a> {
+    conds: Vec<CondInfo<'a>>,
     ws_before: Option<Ws>,
     ws_after: Option<Ws>,
     nb_conds: usize,
 }
 
-impl Conds {
-    fn compute_branches(generator: &Generator<'_>, i: &If<'_>) -> Self {
+impl<'a> Conds<'a> {
+    fn compute_branches(generator: &Generator<'_>, i: &'a If<'a>) -> Self {
         let mut conds = Vec::with_capacity(i.branches.len());
         let mut ws_before = None;
         let mut ws_after = None;
         let mut nb_conds = 0;
         let mut stop_loop = false;
 
-        for (i, cond) in i.branches.iter().enumerate() {
+        for cond in &i.branches {
             if stop_loop {
                 ws_after = Some(cond.ws);
                 break;
@@ -2191,7 +2190,7 @@ impl Conds {
                         }
                         nb_conds += 1;
                         conds.push(CondInfo {
-                            cond_index: i,
+                            cond,
                             generate_condition: true,
                             generate_content: false,
                         });
@@ -2206,7 +2205,7 @@ impl Conds {
                             nb_conds += 1;
                         }
                         conds.push(CondInfo {
-                            cond_index: i,
+                            cond,
                             generate_condition,
                             generate_content: true,
                         });
@@ -2216,7 +2215,7 @@ impl Conds {
                     EvaluatedResult::Unknown => {
                         nb_conds += 1;
                         conds.push(CondInfo {
-                            cond_index: i,
+                            cond,
                             generate_condition: true,
                             generate_content: true,
                         });
@@ -2228,7 +2227,7 @@ impl Conds {
                     nb_conds += 1;
                 }
                 conds.push(CondInfo {
-                    cond_index: i,
+                    cond,
                     generate_condition,
                     generate_content: true,
                 });
