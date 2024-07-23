@@ -552,19 +552,6 @@ const _: () = {
         NonZeroI8 NonZeroI16 NonZeroI32 NonZeroI64 NonZeroI128 NonZeroIsize
     );
 
-    macro_rules! specialize_float {
-        ($($ty:ty)*) => { $(
-            impl FastWritable for $ty {
-                #[inline]
-                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-                    dest.write_str(ryu::Buffer::new().format(*self))
-                }
-            }
-        )* };
-    }
-
-    specialize_float!(f32 f64);
-
     impl FastWritable for str {
         #[inline]
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {

@@ -35,7 +35,6 @@ with-warp = ["rinja_derive/with-warp"]
 rinja_derive = { version = "0.2.0", path = "../rinja_derive" }
 
 itoa = "1.0.11"
-ryu = "1.0.18"
 
 humansize = { version = "2", optional = true }
 num-traits = { version = "0.2.6", optional = true }
