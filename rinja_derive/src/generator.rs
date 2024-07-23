@@ -102,20 +102,23 @@ impl<'a> Generator<'a> {
 
         buf.discard = self.buf_writable.discard;
         // Make sure the compiler understands that the generated code depends on the template files.
-        for path in self.contexts.keys() {
+        let mut paths = self
+            .contexts
+            .keys()
+            .map(|path| -> &Path { path })
+            .collect::<Vec<_>>();
+        paths.sort();
+        for path in paths {
             // Skip the fake path of templates defined in rust source.
             let path_is_valid = match self.input.source {
                 Source::Path(_) => true,
-                Source::Source(_) => **path != self.input.path,
+                Source::Source(_) => path != &*self.input.path,
             };
             if path_is_valid {
                 let path = path.to_str().unwrap();
-                buf.writeln(
-                    quote! {
-                        const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
-                    }
-                    .to_string(),
-                );
+                buf.writeln(format_args!(
+                    "const _: &[::core::primitive::u8] = ::core::include_bytes!({path:#?});",
+                ));
             }
         }
 
@@ -787,17 +790,6 @@ impl<'a> Generator<'a> {
             .input
             .config
             .find_template(i.path, Some(&self.input.path))?;
-
-        // Make sure the compiler understands that the generated code depends on the template file.
-        {
-            let path = path.to_str().unwrap();
-            buf.writeln(
-                quote! {
-                    const _: &[::core::primitive::u8] = ::core::include_bytes!(#path);
-                }
-                .to_string(),
-            );
-        }
 
         // We clone the context of the child in order to preserve their macros and imports.
         // But also add all the imports and macros from this template that don't override the
