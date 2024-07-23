@@ -188,12 +188,12 @@ pub trait AutoEscape {
 
 /// Used internally by rinja to select the appropriate escaper
 #[derive(Debug, Clone)]
-pub struct AutoEscaper<'a, T: fmt::Display + ?Sized, E: Escaper> {
+pub struct AutoEscaper<'a, T: ?Sized, E> {
     text: &'a T,
     escaper: E,
 }
 
-impl<'a, T: fmt::Display + ?Sized, E: Escaper> AutoEscaper<'a, T, E> {
+impl<'a, T: ?Sized, E> AutoEscaper<'a, T, E> {
     #[inline]
     pub fn new(text: &'a T, escaper: E) -> Self {
         Self { text, escaper }
@@ -275,7 +275,7 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 ///     "<div class='<script>'></div>",
 /// );
 /// ```
-pub enum MaybeSafe<T: fmt::Display> {
+pub enum MaybeSafe<T> {
     Safe(T),
     NeedsEscaping(T),
 }
@@ -313,16 +313,12 @@ const _: () = {
 
     add_ref!([] [&] [&&] [&&&]);
 
-    pub enum Wrapped<'a, T: fmt::Display + ?Sized, E: Escaper> {
+    pub enum Wrapped<'a, T: ?Sized, E> {
         Safe(&'a T),
         NeedsEscaping(&'a T, E),
     }
 
-    impl<T, E> FastWritable for Wrapped<'_, T, E>
-    where
-        T: AsRef<str> + fmt::Display + ?Sized,
-        E: Escaper,
-    {
+    impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
         #[inline]
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
             match self {
@@ -381,7 +377,7 @@ const _: () = {
 ///     "<div class=''lifetime X'></div>",
 /// );
 /// ```
-pub struct Safe<T: fmt::Display>(pub T);
+pub struct Safe<T>(pub T);
 
 const _: () = {
     // This is the fallback. The filter is not the last element of the filter chain.
@@ -394,8 +390,7 @@ const _: () = {
 
     macro_rules! add_ref {
         ($([$($tt:tt)*])*) => { $(
-            impl<'a, T: fmt::Display, E: Escaper> AutoEscape
-            for &AutoEscaper<'a, $($tt)* Safe<T>, E> {
+            impl<'a, T: fmt::Display, E> AutoEscape for &AutoEscaper<'a, $($tt)* Safe<T>, E> {
                 type Escaped = &'a T;
                 type Error = Infallible;
 
@@ -411,7 +406,7 @@ const _: () = {
 };
 
 /// There is not need to mark the output of a custom filter as "unsafe"; this is simply the default
-pub struct Unsafe<T: fmt::Display>(pub T);
+pub struct Unsafe<T>(pub T);
 
 impl<T: fmt::Display> fmt::Display for Unsafe<T> {
     #[inline]
@@ -421,7 +416,7 @@ impl<T: fmt::Display> fmt::Display for Unsafe<T> {
 }
 
 /// Like [`Safe`], but only for HTML output
-pub struct HtmlSafeOutput<T: fmt::Display>(pub T);
+pub struct HtmlSafeOutput<T>(pub T);
 
 impl<T: fmt::Display> fmt::Display for HtmlSafeOutput<T> {
     #[inline]
