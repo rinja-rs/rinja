@@ -193,7 +193,6 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(muldivmod, is_defined, alt((tag("*"), tag("/"), tag("%"))));
 
     fn is_defined(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let (_, level) = level.nest(i)?;
         let start = i;
         let (i, lhs) = Self::filtered(i, level)?;
         let (i, rhs) = opt(preceded(
