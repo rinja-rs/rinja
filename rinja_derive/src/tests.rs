@@ -35,7 +35,7 @@ struct Foo {{ {} }}"##,
             where
                 RinjaW: ::core::fmt::Write + ?::core::marker::Sized,
             {
-                use ::rinja::filters::AutoEscape as _;
+                use ::rinja::filters::{AutoEscape as _, WriteWritable as _};
                 use ::core::fmt::Write as _;
                 #expected
                 ::rinja::Result::Ok(())
@@ -52,10 +52,9 @@ struct Foo {{ {} }}"##,
         }
     };
 
+    let expected = prettyplease::unparse(&expected);
+    let generated = prettyplease::unparse(&generated);
     if expected != generated {
-        let expected = prettyplease::unparse(&expected);
-        let generated = prettyplease::unparse(&generated);
-
         struct Diff<'a>(&'a str, &'a str);
 
         impl fmt::Display for Diff<'_> {
@@ -112,11 +111,13 @@ fn check_if_let() {
     compare(
         "{% if let Some(query) = s && !query.is_empty() %}{{query}}{% endif %}",
         r#"if let Some(query,) = &self.s && !query.is_empty() {
-    ::std::write!(
-        writer,
-        "{expr0}",
-        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(query), ::rinja::filters::Text)).rinja_auto_escape()?,
-    )?;
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(&(query), ::rinja::filters::Text)).rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
 }"#,
         &[],
         3,
@@ -127,11 +128,13 @@ fn check_if_let() {
     compare(
         "{% if let Some(s) = s %}{{ s }}{% endif %}",
         r#"if let Some(s,) = &self.s {
-    ::std::write!(
-        writer,
-        "{expr0}",
-        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?,
-    )?;
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
 }"#,
         &[],
         3,
@@ -142,11 +145,13 @@ fn check_if_let() {
     compare(
         "{% if let Some(s) = s && !s.is_empty() %}{{s}}{% endif %}",
         r#"if let Some(s,) = &self.s && !s.is_empty() {
-    ::std::write!(
-        writer,
-        "{expr0}",
-        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?,
-    )?;
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
 }"#,
         &[],
         3,
@@ -163,10 +168,7 @@ fn check_if_let() {
             r#"const _: &[::core::primitive::u8] = ::core::include_bytes!({path1:#?});
             const _: &[::core::primitive::u8] = ::core::include_bytes!({path2:#?});
             const _: &[::core::primitive::u8] = ::core::include_bytes!({path3:#?});
-            writer.write_str("3")?;
-            writer.write_str("3")?;
-            writer.write_str("3")?;
-            writer.write_str("3")?;"#
+            writer.write_str("3333")?;"#
         ),
         &[],
         4,
@@ -244,8 +246,7 @@ writer.write_str("bla")?;"#,
     compare(
         "{% if x is defined %}bli
          {%- else if x == 12 %}12{% endif %}bla",
-        r#"writer.write_str("bli")?;
-writer.write_str("bla")?;"#,
+        r#"writer.write_str("blibla")?;"#,
         &[("x", "u32")],
         6,
     );
@@ -253,8 +254,7 @@ writer.write_str("bla")?;"#,
         "{% if x is defined %}bli
          {%- else if x == 12 %}12
          {%- else %}nope{% endif %}bla",
-        r#"writer.write_str("bli")?;
-writer.write_str("bla")?;"#,
+        r#"writer.write_str("blibla")?;"#,
         &[("x", "u32")],
         6,
     );
@@ -277,9 +277,13 @@ writer.write_str("12")?;
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
         r#"if *(&(false || self.x == 12) as &bool) {
-    ::std::write!(writer, "{expr0}",
-        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?,
-    )?;
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
 }
 "#,
         &[("x", "u32")],
@@ -288,9 +292,13 @@ writer.write_str("12")?;
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
         r#"if *(&(true || self.x == 12) as &bool) {
-    ::std::write!(writer, "{expr0}",
-        expr0 = &(&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?,
-    )?;
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
 }
 "#,
         &[("y", "u32"), ("x", "u32")],

@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::fmt::{self, Display, Formatter, Write};
 use std::num::NonZeroU8;
-use std::str;
+use std::{borrow, str};
 
 /// Marks a string (or other `Display` type) as safe
 ///
@@ -56,6 +56,13 @@ impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
         }
 
         write!(EscapeWriter(fmt, self.1), "{}", &self.0)
+    }
+}
+
+impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for EscapeDisplay<&T, E> {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        self.1.write_escaped_str(dest, self.0.as_ref())
     }
 }
 
@@ -158,6 +165,10 @@ impl Escaper for Text {
     }
 }
 
+/// Escapers are used to make generated text safe for printing in some context.
+///
+/// E.g. in an [`Html`] context, any and all generated text can be used in HTML/XML text nodes and
+/// attributes, without for for maliciously injected data.
 pub trait Escaper: Copy {
     fn write_escaped_str<W: Write>(&self, fmt: W, string: &str) -> fmt::Result;
 
@@ -177,12 +188,12 @@ pub trait AutoEscape {
 
 /// Used internally by rinja to select the appropriate escaper
 #[derive(Debug, Clone)]
-pub struct AutoEscaper<'a, T: fmt::Display + ?Sized, E: Escaper> {
+pub struct AutoEscaper<'a, T: ?Sized, E> {
     text: &'a T,
     escaper: E,
 }
 
-impl<'a, T: fmt::Display + ?Sized, E: Escaper> AutoEscaper<'a, T, E> {
+impl<'a, T: ?Sized, E> AutoEscaper<'a, T, E> {
     #[inline]
     pub fn new(text: &'a T, escaper: E) -> Self {
         Self { text, escaper }
@@ -209,8 +220,6 @@ impl<'a, T: fmt::Display + ?Sized, E: Escaper> AutoEscape for &&AutoEscaper<'a, 
 /// If you are unsure if your type generates HTML safe output in all cases, then DON'T mark it.
 /// Better safe than sorry!
 pub trait HtmlSafe: fmt::Display {}
-
-impl<T: HtmlSafe + ?Sized> HtmlSafe for &T {}
 
 /// Don't escape HTML safe types
 impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
@@ -266,7 +275,7 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 ///     "<div class='<script>'></div>",
 /// );
 /// ```
-pub enum MaybeSafe<T: fmt::Display> {
+pub enum MaybeSafe<T> {
     Safe(T),
     NeedsEscaping(T),
 }
@@ -304,9 +313,19 @@ const _: () = {
 
     add_ref!([] [&] [&&] [&&&]);
 
-    pub enum Wrapped<'a, T: fmt::Display + ?Sized, E: Escaper> {
+    pub enum Wrapped<'a, T: ?Sized, E> {
         Safe(&'a T),
         NeedsEscaping(&'a T, E),
+    }
+
+    impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            match self {
+                Wrapped::Safe(t) => dest.write_str(t.as_ref()),
+                Wrapped::NeedsEscaping(t, e) => e.write_escaped_str(dest, t.as_ref()),
+            }
+        }
     }
 
     impl<T: fmt::Display + ?Sized, E: Escaper> fmt::Display for Wrapped<'_, T, E> {
@@ -358,7 +377,7 @@ const _: () = {
 ///     "<div class=''lifetime X'></div>",
 /// );
 /// ```
-pub struct Safe<T: fmt::Display>(pub T);
+pub struct Safe<T>(pub T);
 
 const _: () = {
     // This is the fallback. The filter is not the last element of the filter chain.
@@ -371,8 +390,7 @@ const _: () = {
 
     macro_rules! add_ref {
         ($([$($tt:tt)*])*) => { $(
-            impl<'a, T: fmt::Display, E: Escaper> AutoEscape
-            for &AutoEscaper<'a, $($tt)* Safe<T>, E> {
+            impl<'a, T: fmt::Display, E> AutoEscape for &AutoEscaper<'a, $($tt)* Safe<T>, E> {
                 type Escaped = &'a T;
                 type Error = Infallible;
 
@@ -388,7 +406,7 @@ const _: () = {
 };
 
 /// There is not need to mark the output of a custom filter as "unsafe"; this is simply the default
-pub struct Unsafe<T: fmt::Display>(pub T);
+pub struct Unsafe<T>(pub T);
 
 impl<T: fmt::Display> fmt::Display for Unsafe<T> {
     #[inline]
@@ -398,7 +416,7 @@ impl<T: fmt::Display> fmt::Display for Unsafe<T> {
 }
 
 /// Like [`Safe`], but only for HTML output
-pub struct HtmlSafeOutput<T: fmt::Display>(pub T);
+pub struct HtmlSafeOutput<T>(pub T);
 
 impl<T: fmt::Display> fmt::Display for HtmlSafeOutput<T> {
     #[inline]
@@ -424,6 +442,7 @@ mark_html_safe! {
     std::num::NonZeroU64, std::num::NonZeroU128, std::num::NonZeroUsize,
 }
 
+impl<T: HtmlSafe + ?Sized> HtmlSafe for &T {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for Box<T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::Ref<'_, T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::RefMut<'_, T> {}
@@ -435,12 +454,158 @@ impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockWriteGuard<'_, T> {}
 impl<T: HtmlSafe> HtmlSafe for std::num::Wrapping<T> {}
 impl<T: fmt::Display> HtmlSafe for HtmlSafeOutput<T> {}
 
-impl<T> HtmlSafe for std::borrow::Cow<'_, T>
+impl<T> HtmlSafe for borrow::Cow<'_, T>
 where
-    T: HtmlSafe + std::borrow::ToOwned + ?Sized,
+    T: HtmlSafe + borrow::ToOwned + ?Sized,
     T::Owned: HtmlSafe,
 {
 }
+
+impl<T: HtmlSafe> HtmlSafe for std::pin::Pin<&T> {}
+
+/// Used internally by rinja to select the appropriate [`write!()`] mechanism
+pub struct Writable<'a, S: ?Sized>(pub &'a S);
+
+/// Used internally by rinja to select the appropriate [`write!()`] mechanism
+pub trait WriteWritable {
+    fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result;
+}
+
+/// Used internally by rinja to speed up writing some types.
+///
+/// Types implementing this trait can be written without needing to employ an [`fmt::Formatter`].
+pub trait FastWritable {
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result;
+}
+
+const _: () = {
+    // implement FastWritable for a list of reference wrapper types to FastWritable+?Sized
+    macro_rules! impl_for_ref {
+        ($T:ident => $($ty:ty)*) => { $(
+            impl<$T: FastWritable + ?Sized> FastWritable for $ty {
+                #[inline]
+                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+                    <$T>::write_into(self, dest)
+                }
+            }
+        )* };
+    }
+
+    impl_for_ref! {
+        T =>
+        &T
+        Box<T>
+        std::cell::Ref<'_, T>
+        std::cell::RefMut<'_, T>
+        std::rc::Rc<T>
+        std::sync::Arc<T>
+        std::sync::MutexGuard<'_, T>
+        std::sync::RwLockReadGuard<'_, T>
+        std::sync::RwLockWriteGuard<'_, T>
+    }
+
+    impl<T: FastWritable + ToOwned> FastWritable for borrow::Cow<'_, T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            T::write_into(self.as_ref(), dest)
+        }
+    }
+
+    impl<T: FastWritable> FastWritable for std::pin::Pin<&T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            T::write_into(self, dest)
+        }
+    }
+
+    // implement FastWritable for a list of types
+    macro_rules! impl_for_int {
+        ($($ty:ty)*) => { $(
+            impl FastWritable for $ty {
+                #[inline]
+                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+                    dest.write_str(itoa::Buffer::new().format(*self))
+                }
+            }
+        )* };
+    }
+
+    impl_for_int!(
+        u8 u16 u32 u64 u128 usize
+        i8 i16 i32 i64 i128 isize
+    );
+
+    // implement FastWritable for a list of non-zero integral types
+    macro_rules! impl_for_nz_int {
+        ($($id:ident)*) => { $(
+            impl FastWritable for core::num::$id {
+                #[inline]
+                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+                    dest.write_str(itoa::Buffer::new().format(self.get()))
+                }
+            }
+        )* };
+    }
+
+    impl_for_nz_int!(
+        NonZeroU8 NonZeroU16 NonZeroU32 NonZeroU64 NonZeroU128 NonZeroUsize
+        NonZeroI8 NonZeroI16 NonZeroI32 NonZeroI64 NonZeroI128 NonZeroIsize
+    );
+
+    impl FastWritable for str {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            dest.write_str(self)
+        }
+    }
+
+    impl FastWritable for String {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            dest.write_str(self)
+        }
+    }
+
+    impl FastWritable for bool {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            dest.write_str(match self {
+                true => "true",
+                false => "false",
+            })
+        }
+    }
+
+    impl FastWritable for char {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            dest.write_char(*self)
+        }
+    }
+
+    impl FastWritable for fmt::Arguments<'_> {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            match self.as_str() {
+                Some(s) => dest.write_str(s),
+                None => dest.write_fmt(*self),
+            }
+        }
+    }
+
+    impl<'a, S: FastWritable + ?Sized> WriteWritable for &Writable<'a, S> {
+        #[inline]
+        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            self.0.write_into(dest)
+        }
+    }
+
+    impl<'a, S: fmt::Display + ?Sized> WriteWritable for &&Writable<'a, S> {
+        #[inline]
+        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            write!(dest, "{}", self.0)
+        }
+    }
+};
 
 #[test]
 fn test_escape() {
@@ -563,5 +728,20 @@ fn test_html_safe_marker() {
             .unwrap()
             .to_string(),
         "&#60;script&#62;",
+    );
+
+    assert_eq!(
+        (&&AutoEscaper::new(&Safe(std::pin::Pin::new(&Script1)), Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
+    );
+    assert_eq!(
+        (&&AutoEscaper::new(&Safe(std::pin::Pin::new(&Script2)), Html))
+            .rinja_auto_escape()
+            .unwrap()
+            .to_string(),
+        "<script>",
     );
 }

@@ -2,6 +2,13 @@
 //!
 //! Contains all the built-in filter functions for use in templates.
 //! You can define your own filters, as well.
+//!
+//! ## Note
+//!
+//! All **result types of any filter function** in this module is **subject to change** at any
+//! point, and is **not indicated by as semver breaking** version bump.
+//! The traits [`AutoEscape`] and [`WriteWritable`] are used by [`rinja_derive`]'s generated code
+//! to work with all compatible types.
 
 mod escape;
 #[cfg(feature = "serde_json")]
@@ -12,8 +19,8 @@ use std::convert::Infallible;
 use std::fmt::{self, Write};
 
 pub use escape::{
-    e, escape, safe, AutoEscape, AutoEscaper, Escaper, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
-    Safe, Text, Unsafe,
+    e, escape, safe, AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe,
+    HtmlSafeOutput, MaybeSafe, Safe, Text, Unsafe, Writable, WriteWritable,
 };
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
