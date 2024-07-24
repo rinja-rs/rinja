@@ -1,0 +1,59 @@
+error: `is defined` operator can only be used on variables, not on their fields
+       failed to parse template source at row 1, column 6 near:
+       "x.y is defined %}{% endif %}"
+ --> tests/ui/is_defined.rs:3:10
+  |
+3 | #[derive(Template)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `is defined` operator can only be used on variables
+       failed to parse template source at row 1, column 6 near:
+       "true is defined %}{% endif %}"
+  --> tests/ui/is_defined.rs:10:10
+   |
+10 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: expected `defined` or `not defined` after `is`
+       failed to parse template source at row 1, column 6 near:
+       "true is %}{% endif %}"
+  --> tests/ui/is_defined.rs:17:10
+   |
+17 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: expected `defined` or `not defined` after `is`
+       failed to parse template source at row 1, column 6 near:
+       "x is %}{% endif %}"
+  --> tests/ui/is_defined.rs:24:10
+   |
+24 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: expected `defined` or `not defined` after `is`
+       failed to parse template source at row 1, column 6 near:
+       "x is blue %}{% endif %}"
+  --> tests/ui/is_defined.rs:31:10
+   |
+31 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: expected `defined` or `not defined` after `is`
+       failed to parse template source at row 1, column 6 near:
+       "x is blue.red %}{% endif %}"
+  --> tests/ui/is_defined.rs:38:10
+   |
+38 | #[derive(Template)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)

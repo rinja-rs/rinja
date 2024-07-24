@@ -506,6 +506,43 @@ mirror Rust's [`if let` expressions]:
 
 [`if let` expressions]: https://doc.rust-lang.org/reference/expressions/if-expr.html#if-let-expressions
 
+### `is (not) defined`
+
+You can use `is (not) defined` to ensure a variable exists (or not):
+
+```jinja
+{% if x is defined %}
+  x is defined!
+{% endif %}
+{% if y is not defined %}
+  y is not defined
+{% else %}
+  y is defined
+{% endif %}
+```
+
+You can combine conditions with this feature and even use it in expressions:
+
+```jinja
+{% if x is defined && x == "12" && y == Some(true) %}
+...
+{% endif %}
+
+<script>
+// It will generate `const x = true;` (or false is `x` is not defined).
+const x = {{ x is defined }};
+</script>
+```
+
+Due to proc-macro limitations, rinja can only see the fields of your current type and the variables
+declared in the templates. Because of this, you can not check if a field or a function is defined:
+
+```jinja
+{% if x.y is defined %}
+  This code will not compile
+{% endif %}
+```
+
 ### Match
 
 In order to deal with Rust `enum`s in a type-safe way, templates support

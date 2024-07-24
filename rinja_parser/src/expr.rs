@@ -64,6 +64,8 @@ pub enum Expr<'a> {
     Try(Box<WithSpan<'a, Expr<'a>>>),
     /// This variant should never be used directly. It is created when generating filter blocks.
     FilterSource,
+    IsDefined(&'a str),
+    IsNotDefined(&'a str),
 }
 
 impl<'a> Expr<'a> {
@@ -188,7 +190,55 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((tag(">>"), tag("<<"))));
     expr_prec_layer!(addsub, muldivmod, alt((tag("+"), tag("-"))));
-    expr_prec_layer!(muldivmod, filtered, alt((tag("*"), tag("/"), tag("%"))));
+    expr_prec_layer!(muldivmod, is_defined, alt((tag("*"), tag("/"), tag("%"))));
+
+    fn is_defined(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = i;
+        let (i, lhs) = Self::filtered(i, level)?;
+        let (i, rhs) = opt(preceded(
+            ws(keyword("is")),
+            opt(terminated(opt(keyword("not")), ws(keyword("defined")))),
+        ))(i)?;
+        let is_neg = match rhs {
+            None => return Ok((i, lhs)),
+            Some(None) => {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    "expected `defined` or `not defined` after `is`",
+                    // We use `start` to show the whole `var is` thing instead of the current token.
+                    start,
+                )));
+            }
+            Some(Some(None)) => false,
+            Some(Some(Some(_))) => true,
+        };
+        let var_name = match *lhs {
+            Self::Var(var_name) => var_name,
+            Self::Attr(_, _) => {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    "`is defined` operator can only be used on variables, not on their fields",
+                    start,
+                )));
+            }
+            _ => {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    "`is defined` operator can only be used on variables",
+                    start,
+                )));
+            }
+        };
+
+        Ok((
+            i,
+            WithSpan::new(
+                if is_neg {
+                    Self::IsNotDefined(var_name)
+                } else {
+                    Self::IsDefined(var_name)
+                },
+                start,
+            ),
+        ))
+    }
 
     fn filtered(i: &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
