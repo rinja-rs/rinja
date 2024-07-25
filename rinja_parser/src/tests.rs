@@ -371,8 +371,34 @@ fn change_delimiters_parse_filter() {
         expr_end: "=}",
         ..Syntax::default()
     };
-
     Ast::from_str("{= strvar|e =}", None, &syntax).unwrap();
+}
+
+#[test]
+fn unicode_delimiters_in_syntax() {
+    let syntax = Syntax {
+        expr_start: "🖎", // U+1F58E == b"\xf0\x9f\x96\x8e"
+        expr_end: "✍",   // U+270D = b'\xe2\x9c\x8d'
+        ..Syntax::default()
+    };
+    assert_eq!(
+        Ast::from_str("Here comes the expression: 🖎 e ✍.", None, &syntax)
+            .unwrap()
+            .nodes(),
+        [
+            Node::Lit(WithSpan::no_span(Lit {
+                lws: "",
+                val: "Here comes the expression:",
+                rws: " ",
+            })),
+            Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("e")),),
+            Node::Lit(WithSpan::no_span(Lit {
+                lws: "",
+                val: ".",
+                rws: "",
+            })),
+        ],
+    );
 }
 
 #[test]
