@@ -41,3 +41,7 @@ console = "0.15.8"
 similar = "2.6.0"
 prettyplease = "0.2.20"
 syn = { version = "2.0.3", features = ["full"] }
+
+[lints.rust]
+# Used in `rinja_derive_standalone` which uses the same source folder, but is not a proc-macro.
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("__standalone"))'] }
