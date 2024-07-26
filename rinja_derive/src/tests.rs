@@ -334,3 +334,95 @@ writer.write_str("12")?;
         3,
     );
 }
+
+#[test]
+fn check_bool_conditions() {
+    // Checks that it removes conditions if we know at compile-time that they always return false.
+    //
+    // We're forced to add `bla` otherwise `compare` assert fails in weird ways...
+    compare(
+        "{% if false %}{{query}}{% endif %}bla",
+        r#"writer.write_str("bla")?;"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if false && false %}{{query}}{% endif %}bla",
+        r#"writer.write_str("bla")?;"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if false && true %}{{query}}{% endif %}bla",
+        r#"writer.write_str("bla")?;"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if true && false %}{{query}}{% endif %}bla",
+        r#"writer.write_str("bla")?;"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if false || true %}bli{% endif %}bla",
+        r#"writer.write_str("blibla")?;"#,
+        &[],
+        6,
+    );
+    compare(
+        "{% if true || false %}bli{% endif %}bla",
+        r#"writer.write_str("blibla")?;"#,
+        &[],
+        6,
+    );
+
+    compare(
+        "{% if true || x == 12 %}{{x}}{% endif %}",
+        r#"if *(&(true || self.x == 12) as &bool) {
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
+}
+"#,
+        &[("x", "u32")],
+        3,
+    );
+    compare(
+        "{% if false || x == 12 %}{{x}}{% endif %}",
+        r#"if *(&(false || self.x == 12) as &bool) {
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(
+            &(self.x),
+            ::rinja::filters::Text,
+        ))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
+}
+"#,
+        &[("x", "u32")],
+        3,
+    );
+
+    // Some funny cases.
+    compare(
+        "{% if !(false) %}bla{% endif %}",
+        r#"writer.write_str("bla")?;"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if !(true) %}{{query}}{% endif %}bla",
+        r#"writer.write_str("bla")?;"#,
+        &[],
+        3,
+    );
+}
