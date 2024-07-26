@@ -1174,7 +1174,7 @@ impl<'a> Generator<'a> {
     ) -> Result<usize, CompileError> {
         let mut size_hint = 0;
         let items = mem::take(&mut self.buf_writable.buf);
-        let mut it = items.into_iter().enumerate().peekable();
+        let mut it = items.iter().enumerate().peekable();
 
         while let Some((_, Writable::Lit(s))) = it.peek() {
             size_hint += buf.write_writer(s);
@@ -1267,20 +1267,23 @@ impl<'a> Generator<'a> {
                     assert!(rws.is_empty());
                     self.next_ws = Some(lws);
                 }
-                WhitespaceHandling::Preserve => self.buf_writable.push(Writable::Lit(lws)),
+                WhitespaceHandling::Preserve => {
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(lws)))
+                }
                 WhitespaceHandling::Minimize => {
-                    self.buf_writable
-                        .push(Writable::Lit(match lws.contains('\n') {
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(
+                        match lws.contains('\n') {
                             true => "\n",
                             false => " ",
-                        }));
+                        },
+                    )));
                 }
             }
         }
 
         if !val.is_empty() {
             self.skip_ws = WhitespaceHandling::Preserve;
-            self.buf_writable.push(Writable::Lit(val));
+            self.buf_writable.push(Writable::Lit(Cow::Borrowed(val)));
         }
 
         if !rws.is_empty() {
@@ -2031,17 +2034,18 @@ impl<'a> Generator<'a> {
             WhitespaceHandling::Preserve => {
                 let val = self.next_ws.unwrap();
                 if !val.is_empty() {
-                    self.buf_writable.push(Writable::Lit(val));
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(val)));
                 }
             }
             WhitespaceHandling::Minimize => {
                 let val = self.next_ws.unwrap();
                 if !val.is_empty() {
-                    self.buf_writable
-                        .push(Writable::Lit(match val.contains('\n') {
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(
+                        match val.contains('\n') {
                             true => "\n",
                             false => " ",
-                        }));
+                        },
+                    )));
                 }
             }
             WhitespaceHandling::Suppress => {}
@@ -2481,7 +2485,7 @@ impl<'a> Deref for WritableBuffer<'a> {
 
 #[derive(Debug)]
 enum Writable<'a> {
-    Lit(&'a str),
+    Lit(Cow<'a, str>),
     Expr(&'a WithSpan<'a, Expr<'a>>),
 }
 
