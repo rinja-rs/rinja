@@ -1888,8 +1888,12 @@ impl<'a> Generator<'a> {
         DisplayWrap::Wrapped
     }
 
-    fn visit_bool_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(s);
+    fn visit_bool_lit(&mut self, buf: &mut Buffer, s: bool) -> DisplayWrap {
+        if s {
+            buf.write("true");
+        } else {
+            buf.write("false");
+        }
         DisplayWrap::Unwrapped
     }
 
