@@ -57,6 +57,7 @@
 mod error;
 pub mod filters;
 pub mod helpers;
+mod html;
 
 use std::{fmt, io};
 

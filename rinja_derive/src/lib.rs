@@ -4,6 +4,7 @@
 mod config;
 mod generator;
 mod heritage;
+mod html;
 mod input;
 #[cfg(test)]
 mod tests;
