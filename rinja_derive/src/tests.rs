@@ -426,3 +426,91 @@ fn check_bool_conditions() {
         3,
     );
 }
+
+#[test]
+fn check_escaping_at_compile_time() {
+    compare(
+        r#"The card is
+        {%- match suit %}
+            {%- when Suit::Clubs or Suit::Spades -%}
+                {{ " black" }}
+            {%- when Suit::Diamonds or Suit::Hearts -%}
+                {{ " red" }}
+        {%- endmatch %}"#,
+        r#"writer.write_str("The card is")?;
+        match &self.suit {
+            Suit::Clubs | Suit::Spades => {
+                match (
+                    &((&&::rinja::filters::AutoEscaper::new(&(" black"), ::rinja::filters::Text)).rinja_auto_escape()?),
+                ) {
+                    (expr0,) => {
+                        (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                    }
+                }
+             }
+             Suit::Diamonds | Suit::Hearts => {
+                match (
+                    &((&&::rinja::filters::AutoEscaper::new(&(" red"), ::rinja::filters::Text)).rinja_auto_escape()?),
+                ) {
+                    (expr0,) => {
+                        (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                    }
+                }
+            }
+        }"#,
+        &[("suit", "Suit")],
+        14,
+    );
+
+    compare(
+        r#"{{ '\x41' }}{{ '\n' }}{{ '\r' }}{{ '\t' }}{{ '\\' }}{{ '\u{2665}' }}{{ '\'' }}{{ '\"' }}{{ '"' }}
+{{ "\x41\n\r\t\\\u{2665}\'\"'" }}"#,
+        r#"
+            match (
+            &((&&::rinja::filters::AutoEscaper::new(&('\x41'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('\n'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('\r'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('\t'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('\\'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(
+                &('\u{2665}'),
+                ::rinja::filters::Text,
+            ))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('\''), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('\"'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&('"'), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(
+                &("\x41\n\r\t\\\u{2665}\'\"'"),
+                ::rinja::filters::Text,
+            ))
+                .rinja_auto_escape()?),
+        ) {
+            (expr0, expr1, expr2, expr3, expr4, expr5, expr6, expr7, expr8, expr10) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr1)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr2)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr3)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr4)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr5)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr6)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr7)).rinja_write(writer)?;
+                (&&::rinja::filters::Writable(expr8)).rinja_write(writer)?;
+                writer.write_str("
+")?;
+                (&&::rinja::filters::Writable(expr10)).rinja_write(writer)?;
+            }
+        }
+"#,
+        &[],
+        31,
+    );
+}
