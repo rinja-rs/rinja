@@ -372,8 +372,7 @@ impl<'a> Generator<'a> {
         only_contains_is_defined: &mut bool,
     ) -> EvaluatedResult {
         match **expr {
-            Expr::BoolLit(_)
-            | Expr::NumLit(_)
+            Expr::NumLit(_)
             | Expr::StrLit(_)
             | Expr::CharLit(_)
             | Expr::Var(_)
@@ -392,6 +391,8 @@ impl<'a> Generator<'a> {
                 *only_contains_is_defined = false;
                 EvaluatedResult::Unknown
             }
+            Expr::BoolLit(true) => EvaluatedResult::AlwaysTrue,
+            Expr::BoolLit(false) => EvaluatedResult::AlwaysFalse,
             Expr::Unary("!", ref inner) => {
                 match self.evaluate_condition(inner, only_contains_is_defined) {
                     EvaluatedResult::AlwaysTrue => EvaluatedResult::AlwaysFalse,
@@ -1888,8 +1889,12 @@ impl<'a> Generator<'a> {
         DisplayWrap::Wrapped
     }
 
-    fn visit_bool_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(s);
+    fn visit_bool_lit(&mut self, buf: &mut Buffer, s: bool) -> DisplayWrap {
+        if s {
+            buf.write("true");
+        } else {
+            buf.write("false");
+        }
         DisplayWrap::Unwrapped
     }
 

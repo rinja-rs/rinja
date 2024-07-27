@@ -35,7 +35,7 @@ macro_rules! expr_prec_layer {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<'a> {
-    BoolLit(&'a str),
+    BoolLit(bool),
     NumLit(&'a str),
     StrLit(&'a str),
     CharLit(&'a str),
@@ -334,8 +334,8 @@ impl<'a> Expr<'a> {
         let start = i;
         map(path_or_identifier, |v| match v {
             PathOrIdentifier::Path(v) => Self::Path(v),
-            PathOrIdentifier::Identifier(v @ "true") => Self::BoolLit(v),
-            PathOrIdentifier::Identifier(v @ "false") => Self::BoolLit(v),
+            PathOrIdentifier::Identifier("true") => Self::BoolLit(true),
+            PathOrIdentifier::Identifier("false") => Self::BoolLit(false),
             PathOrIdentifier::Identifier(v) => Self::Var(v),
         })(i)
         .map(|(i, expr)| (i, WithSpan::new(expr, start)))
