@@ -9,4 +9,3 @@
 - [Filters](./filters.md)
 - [Integrations](./integrations.md)
 - [Performance](./performance.md)
-- [Template expansion](./template_expansion.md)
