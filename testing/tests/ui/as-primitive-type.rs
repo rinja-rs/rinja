@@ -20,5 +20,9 @@ struct D;
 #[template(source = r#"{{ 1234 as int32_t }}"#, ext = "html")]
 struct E;
 
+#[derive(Template)]
+#[template(source = r#"{{ (1234 + 4 * 12 / 45675445 - 13) as int32_t }}"#, ext = "html")]
+struct F;
+
 fn main() {
 }
