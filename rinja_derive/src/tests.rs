@@ -426,3 +426,38 @@ fn check_bool_conditions() {
         3,
     );
 }
+
+#[test]
+fn check_escaping_at_compile_time() {
+    compare(
+        r#"The card is
+        {%- match suit %}
+            {%- when Suit::Clubs or Suit::Spades -%}
+                {{ " black" }}
+            {%- when Suit::Diamonds or Suit::Hearts -%}
+                {{ " red" }}
+        {%- endmatch %}"#,
+        r#"writer.write_str("The card is")?;
+        match &self.suit {
+            Suit::Clubs | Suit::Spades => {
+                writer.write_str(" black")?;
+            }
+            Suit::Diamonds | Suit::Hearts => {
+                writer.write_str(" red")?;
+            }
+        }"#,
+        &[("suit", "Suit")],
+        16,
+    );
+
+    compare(
+        r#"{{ '\x41' }}{{ '\n' }}{{ '\r' }}{{ '\t' }}{{ '\\' }}{{ '\u{2665}' }}{{ '\'' }}{{ '\"' }}{{ '"' }}
+{{ "\x41\n\r\t\\\u{2665}\'\"'" }}"#,
+        r#"writer.write_str("A
+\r	\\♥'\"\"
+A
+\r	\\♥'\"'")?;"#,
+        &[],
+        23,
+    );
+}

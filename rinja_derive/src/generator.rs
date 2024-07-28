@@ -14,6 +14,7 @@ use quote::quote;
 
 use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
+use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
 use crate::{CompileError, MsgValidEscapers, CRATE};
 
@@ -1162,8 +1163,76 @@ impl<'a> Generator<'a> {
     }
 
     fn write_expr(&mut self, ws: Ws, s: &'a WithSpan<'a, Expr<'a>>) {
+        // In here, we inspect in the expression if it is a literal, and if it is, whether it
+        // can be escaped at compile time. We use an IIFE to make the code more readable
+        // (immediate returns, try expressions).
+        let writable = (|| -> Option<Writable<'a>> {
+            enum InputKind<'a> {
+                StrLit(&'a str),
+                CharLit(&'a str),
+            }
+            enum OutputKind {
+                Html,
+                Text,
+            }
+
+            // for now, we only escape strings and chars at compile time
+            let lit = match &**s {
+                Expr::StrLit(input) => InputKind::StrLit(input),
+                Expr::CharLit(input) => InputKind::CharLit(input),
+                _ => return None,
+            };
+
+            // we only optimize for known escapers
+            let output = match self.input.escaper.strip_prefix(CRATE)? {
+                "::filters::Html" => OutputKind::Html,
+                "::filters::Text" => OutputKind::Text,
+                _ => return None,
+            };
+
+            // the input could be string escaped if it contains any backslashes
+            let escaped = match lit {
+                InputKind::StrLit(s) => s,
+                InputKind::CharLit(s) => s,
+            };
+            let unescaped = if escaped.find('\\').is_none() {
+                // if the literal does not contain any backslashes, then it does not need unescaping
+                Cow::Borrowed(escaped)
+            } else {
+                // convert the input into a TokenStream and extract the first token
+                Cow::Owned(match lit {
+                    InputKind::StrLit(escaped) => {
+                        let input = format!(r#""{escaped}""#);
+                        let input = input.parse().ok()?;
+                        let input = syn::parse2::<syn::LitStr>(input).ok()?;
+                        input.value()
+                    }
+                    InputKind::CharLit(escaped) => {
+                        let input = format!(r#"'{escaped}'"#);
+                        let input = input.parse().ok()?;
+                        let input = syn::parse2::<syn::LitChar>(input).ok()?;
+                        input.value().to_string()
+                    }
+                })
+            };
+
+            // escape the un-string-escaped input using the selected escaper
+            Some(Writable::Lit(match output {
+                OutputKind::Text => unescaped,
+                OutputKind::Html => {
+                    let mut escaped = String::with_capacity(unescaped.len() + 20);
+                    write_escaped_str(&mut escaped, &unescaped).ok()?;
+                    match escaped == unescaped {
+                        true => unescaped,
+                        false => Cow::Owned(escaped),
+                    }
+                }
+            }))
+        })()
+        .unwrap_or(Writable::Expr(s));
+
         self.handle_ws(ws);
-        self.buf_writable.push(Writable::Expr(s));
+        self.buf_writable.push(writable);
     }
 
     // Write expression buffer and empty
@@ -1174,7 +1243,7 @@ impl<'a> Generator<'a> {
     ) -> Result<usize, CompileError> {
         let mut size_hint = 0;
         let items = mem::take(&mut self.buf_writable.buf);
-        let mut it = items.into_iter().enumerate().peekable();
+        let mut it = items.iter().enumerate().peekable();
 
         while let Some((_, Writable::Lit(s))) = it.peek() {
             size_hint += buf.write_writer(s);
@@ -1267,20 +1336,23 @@ impl<'a> Generator<'a> {
                     assert!(rws.is_empty());
                     self.next_ws = Some(lws);
                 }
-                WhitespaceHandling::Preserve => self.buf_writable.push(Writable::Lit(lws)),
+                WhitespaceHandling::Preserve => {
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(lws)))
+                }
                 WhitespaceHandling::Minimize => {
-                    self.buf_writable
-                        .push(Writable::Lit(match lws.contains('\n') {
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(
+                        match lws.contains('\n') {
                             true => "\n",
                             false => " ",
-                        }));
+                        },
+                    )));
                 }
             }
         }
 
         if !val.is_empty() {
             self.skip_ws = WhitespaceHandling::Preserve;
-            self.buf_writable.push(Writable::Lit(val));
+            self.buf_writable.push(Writable::Lit(Cow::Borrowed(val)));
         }
 
         if !rws.is_empty() {
@@ -2031,17 +2103,18 @@ impl<'a> Generator<'a> {
             WhitespaceHandling::Preserve => {
                 let val = self.next_ws.unwrap();
                 if !val.is_empty() {
-                    self.buf_writable.push(Writable::Lit(val));
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(val)));
                 }
             }
             WhitespaceHandling::Minimize => {
                 let val = self.next_ws.unwrap();
                 if !val.is_empty() {
-                    self.buf_writable
-                        .push(Writable::Lit(match val.contains('\n') {
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(
+                        match val.contains('\n') {
                             true => "\n",
                             false => " ",
-                        }));
+                        },
+                    )));
                 }
             }
             WhitespaceHandling::Suppress => {}
@@ -2481,7 +2554,7 @@ impl<'a> Deref for WritableBuffer<'a> {
 
 #[derive(Debug)]
 enum Writable<'a> {
-    Lit(&'a str),
+    Lit(Cow<'a, str>),
     Expr(&'a WithSpan<'a, Expr<'a>>),
 }
 
