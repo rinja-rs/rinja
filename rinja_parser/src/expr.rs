@@ -195,8 +195,8 @@ impl<'a> Expr<'a> {
 
     fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, lhs) = Self::filtered(i, level)?;
-        let (j, rhs) = opt(ws(identifier))(i)?;
+        let (before_keyword, lhs) = Self::filtered(i, level)?;
+        let (j, rhs) = opt(ws(identifier))(before_keyword)?;
         let i = match rhs {
             Some("is") => j,
             Some("as") => {
@@ -207,7 +207,7 @@ impl<'a> Expr<'a> {
                 } else if target.is_empty() {
                     return Err(nom::Err::Failure(ErrorContext::new(
                         "`as` operator expects the name of a primitive type on its right-hand side",
-                        start,
+                        before_keyword.trim_start(),
                     )));
                 } else {
                     return Err(nom::Err::Failure(ErrorContext::new(
@@ -215,11 +215,11 @@ impl<'a> Expr<'a> {
                             "`as` operator expects the name of a primitive type on its right-hand \
                               side, found `{target}`"
                         ),
-                        start,
+                        before_keyword.trim_start(),
                     )));
                 }
             }
-            _ => return Ok((i, lhs)),
+            _ => return Ok((before_keyword, lhs)),
         };
 
         let (i, rhs) = opt(terminated(opt(keyword("not")), ws(keyword("defined"))))(i)?;
