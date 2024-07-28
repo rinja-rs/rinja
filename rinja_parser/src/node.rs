@@ -9,6 +9,7 @@ use nom::error_position;
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, tuple};
 
+use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
     filter, identifier, is_ws, keyword, not_ws, skip_till, str_lit, ws, ErrorContext, Expr, Filter,
     ParseResult, State, Target, WithSpan,
@@ -755,14 +756,20 @@ pub struct Lit<'a> {
 impl<'a> Lit<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
+        let (i, _) = not(eof)(i)?;
+
+        let candidate_finder = Splitter3::new(
+            s.syntax.block_start,
+            s.syntax.comment_start,
+            s.syntax.expr_start,
+        );
         let p_start = alt((
             tag(s.syntax.block_start),
             tag(s.syntax.comment_start),
             tag(s.syntax.expr_start),
         ));
 
-        let (i, _) = not(eof)(i)?;
-        let (i, content) = opt(recognize(skip_till(p_start)))(i)?;
+        let (i, content) = opt(recognize(skip_till(candidate_finder, p_start)))(i)?;
         let (i, content) = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
@@ -810,7 +817,7 @@ impl<'a> Raw<'a> {
             cut(tuple((
                 opt(Whitespace::parse),
                 |i| s.tag_block_end(i),
-                consumed(skip_till(endraw)),
+                consumed(skip_till(Splitter1::new(s.syntax.block_start), endraw)),
             ))),
         ));
 
@@ -989,7 +996,8 @@ impl<'a> Comment<'a> {
             let mut depth = 0usize;
             loop {
                 let start = i;
-                let (_, tag) = opt(skip_till(|i| tag(i, s)))(i)?;
+                let splitter = Splitter2::new(s.syntax.comment_start, s.syntax.comment_end);
+                let (_, tag) = opt(skip_till(splitter, |i| tag(i, s)))(i)?;
                 let Some((j, tag)) = tag else {
                     return Err(
                         ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),

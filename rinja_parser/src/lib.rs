@@ -20,6 +20,7 @@ use nom::{error_position, AsChar, InputTakeAtPosition};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
+mod memchr_splitter;
 pub mod node;
 pub use node::Node;
 
@@ -362,22 +363,22 @@ fn ws<'a, O>(
 
 /// Skips input until `end` was found, but does not consume it.
 /// Returns tuple that would be returned when parsing `end`.
-fn skip_till<'a, O>(
+fn skip_till<'a, 'b, O>(
+    candidate_finder: impl crate::memchr_splitter::Splitter,
     end: impl FnMut(&'a str) -> ParseResult<'a, O>,
 ) -> impl FnMut(&'a str) -> ParseResult<'a, (&'a str, O)> {
-    enum Next<O> {
-        IsEnd(O),
-        NotEnd,
-    }
-    let mut next = alt((map(end, Next::IsEnd), map(anychar, |_| Next::NotEnd)));
+    let mut next = alt((map(end, Some), map(anychar, |_| None)));
     move |start: &'a str| {
         let mut i = start;
         loop {
-            let (j, is_end) = next(i)?;
-            match is_end {
-                Next::IsEnd(lookahead) => return Ok((i, (j, lookahead))),
-                Next::NotEnd => i = j,
-            }
+            i = match candidate_finder.split(i) {
+                Some((_, j)) => j,
+                None => return Err(nom::Err::Error(ErrorContext::new("`end` not found`", i))),
+            };
+            i = match next(i)? {
+                (j, Some(lookahead)) => return Ok((i, (j, lookahead))),
+                (j, None) => j,
+            };
         }
     }
 }
