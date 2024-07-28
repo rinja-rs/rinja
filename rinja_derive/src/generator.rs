@@ -388,7 +388,8 @@ impl<'a> Generator<'a> {
             | Expr::Try(_)
             | Expr::Tuple(_)
             | Expr::NamedArgument(_, _)
-            | Expr::FilterSource => {
+            | Expr::FilterSource
+            | Expr::As(_, _) => {
                 *only_contains_is_defined = false;
                 EvaluatedResult::Unknown
             }
@@ -523,7 +524,7 @@ impl<'a> Generator<'a> {
                     // finally dereferences it to `bool`.
                     buf.write("*(&(");
                     buf.write(self.visit_expr_root(ctx, expr)?);
-                    buf.write(") as &bool) {");
+                    buf.write(") as &::core::primitive::bool) {");
                 }
             } else if pos != 0 {
                 buf.write("} else {");
@@ -1410,6 +1411,7 @@ impl<'a> Generator<'a> {
             Expr::FilterSource => self.visit_filter_source(buf),
             Expr::IsDefined(var_name) => self.visit_is_defined(buf, true, var_name)?,
             Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
+            Expr::As(ref expr, target) => self.visit_as(ctx, buf, expr, target)?,
         })
     }
 
@@ -1423,6 +1425,19 @@ impl<'a> Generator<'a> {
             (true, true) | (false, false) => buf.write("true"),
             _ => buf.write("false"),
         }
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn visit_as(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        expr: &WithSpan<'_, Expr<'_>>,
+        target: &str,
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(format_args!("{CRATE}::helpers::get_primitive_value(&("));
+        self.visit_expr(ctx, buf, expr)?;
+        buf.write(format_args!(")) as ::core::primitive::{target}"));
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -2494,10 +2509,11 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::Group(arg) => is_cacheable(arg),
         Expr::Tuple(args) => args.iter().all(is_cacheable),
         Expr::NamedArgument(_, expr) => is_cacheable(expr),
+        Expr::As(expr, _) => is_cacheable(expr),
+        Expr::Try(expr) => is_cacheable(expr),
         // We have too little information to tell if the expression is pure:
         Expr::Call(_, _) => false,
         Expr::RustMacro(_, _) => false,
-        Expr::Try(_) => false,
         // Should never be encountered:
         Expr::FilterSource => unreachable!("FilterSource in expression?"),
     }
