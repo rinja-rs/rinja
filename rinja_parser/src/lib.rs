@@ -416,20 +416,15 @@ fn bool_lit(i: &str) -> ParseResult<'_> {
 }
 
 fn num_lit(i: &str) -> ParseResult<'_> {
-    const INTEGER_SUFFIX: &[&str] = &[
-        "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize",
-    ];
-    const FLOAT_SUFFIX: &[&str] = &["f16", "f32", "f64", "f128"];
-
     fn suffix<'a>(
         start: &'a str,
         kind: &'a str,
-        list: &'a [&[&str]],
+        list: &'a [&str],
         ignore: &'a [&str],
     ) -> impl Fn(&'a str) -> ParseResult<'a> + Copy + 'a {
         move |i| {
             let (i, suffix) = identifier(i)?;
-            if list.iter().flat_map(|&i| i).any(|&item| item == suffix) {
+            if list.contains(&suffix) {
                 Ok((i, suffix))
             } else if ignore.contains(&suffix) {
                 // no need for a message, this case only occures in an `opt(…)`
@@ -443,9 +438,9 @@ fn num_lit(i: &str) -> ParseResult<'_> {
         }
     }
 
-    let integer_suffix = suffix(i, "integer", &[INTEGER_SUFFIX], &[]);
-    let float_suffix = suffix(i, "float", &[FLOAT_SUFFIX], &["e"]);
-    let either_suffix = suffix(i, "number", &[INTEGER_SUFFIX, FLOAT_SUFFIX], &["e"]);
+    let integer_suffix = suffix(i, "integer", INTEGER_TYPES, &[]);
+    let float_suffix = suffix(i, "float", FLOAT_TYPES, &["e"]);
+    let either_suffix = suffix(i, "number", NUM_TYPES, &["e"]);
 
     recognize(tuple((
         opt(char('-')),
@@ -808,6 +803,47 @@ pub fn strip_common(base: &Path, path: &Path) -> String {
         path_parts.join("/")
     }
 }
+
+/// Primitive integer types. Also used as number suffixes.
+const INTEGER_TYPES: &[&str] = &[
+    "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize",
+];
+
+/// Primitive floating point types. Also used as number suffixes.
+const FLOAT_TYPES: &[&str] = &["f16", "f32", "f64", "f128"];
+
+/// Primitive numeric types. Also used as number suffixes.
+const NUM_TYPES: &[&str] = &{
+    let mut list = [""; INTEGER_TYPES.len() + FLOAT_TYPES.len()];
+    let mut i = 0;
+    let mut o = 0;
+    while i < INTEGER_TYPES.len() {
+        list[o] = INTEGER_TYPES[i];
+        i += 1;
+        o += 1;
+    }
+    let mut i = 0;
+    while i < FLOAT_TYPES.len() {
+        list[o] = FLOAT_TYPES[i];
+        i += 1;
+        o += 1;
+    }
+    list
+};
+
+/// Complete list of named primitive types.
+const PRIMITIVE_TYPES: &[&str] = &{
+    let mut list = [""; NUM_TYPES.len() + 1];
+    let mut i = 0;
+    let mut o = 0;
+    while i < NUM_TYPES.len() {
+        list[o] = NUM_TYPES[i];
+        i += 1;
+        o += 1;
+    }
+    list[o] = "bool";
+    list
+};
 
 #[cfg(not(windows))]
 #[cfg(test)]

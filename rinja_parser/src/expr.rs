@@ -202,23 +202,22 @@ impl<'a> Expr<'a> {
             Some("as") => {
                 let (i, target) = opt(identifier)(j)?;
                 let target = target.unwrap_or_default();
-                return match target {
-                    "bool" | "f16" | "f32" | "f64" | "f128" | "i8" | "i16" | "i32" | "i64"
-                    | "i128" | "isize" | "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
-                        Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)))
-                    }
-                    "" => Err(nom::Err::Failure(ErrorContext::new(
+                if crate::PRIMITIVE_TYPES.contains(&target) {
+                    return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
+                } else if target.is_empty() {
+                    return Err(nom::Err::Failure(ErrorContext::new(
                         "`as` operator expects the name of a primitive type on its right-hand side",
                         start,
-                    ))),
-                    _ => Err(nom::Err::Failure(ErrorContext::new(
+                    )));
+                } else {
+                    return Err(nom::Err::Failure(ErrorContext::new(
                         format!(
                             "`as` operator expects the name of a primitive type on its right-hand \
                               side, found `{target}`"
                         ),
                         start,
-                    ))),
-                };
+                    )));
+                }
             }
             _ => return Ok((i, lhs)),
         };
