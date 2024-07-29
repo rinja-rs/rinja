@@ -1,7 +1,10 @@
 error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
-       failed to parse template source at row 1, column 3 near:
-       " |lower}}"
+        --> <source attribute>:1:4
+         |
+       1 | {{a |lower}}
+         |    ^ close to this token
+         |
  --> tests/ui/space-pipe.rs:9:10
   |
 9 | #[derive(Template)]
@@ -11,8 +14,11 @@ error: the filter operator `|` must not be preceded by any whitespace characters
 
 error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
-       failed to parse template source at row 1, column 3 near:
-       " | lower}}"
+        --> <source attribute>:1:4
+         |
+       1 | {{a | lower}}
+         |    ^ close to this token
+         |
   --> tests/ui/space-pipe.rs:21:10
    |
 21 | #[derive(Template)]

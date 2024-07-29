@@ -1,6 +1,9 @@
 error: no argument named `param3` in macro "thrice"
- --> InvalidNamedArg.html:5:2
-       "- call thrice(param1=2, param3=3) -%}"
+ --> InvalidNamedArg.html:5:3
+  |
+       5 | {%- call thrice(param1=2, param3=3) -%}
+         |   ^ close to this token
+         |
  --> tests/ui/macro_named_argument.rs:3:10
   |
 3 | #[derive(Template)]
@@ -9,8 +12,11 @@ error: no argument named `param3` in macro "thrice"
   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: named argument `param1` was passed more than once
-       failed to parse template source at row 5, column 15 near:
-       "(param1=2, param1=3) -%}"
+ --> <source attribute>:5:16
+  |
+       5 | {%- call thrice(param1=2, param1=3) -%}
+         |                ^ close to this token
+         |
   --> tests/ui/macro_named_argument.rs:11:10
    |
 11 | #[derive(Template)]
@@ -18,8 +24,12 @@ error: named argument `param1` was passed more than once
    |
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: failed to parse template source at row 5, column 29 near:
-       "| filter(param1=12) -%}"
+error: failed to parse template source
+ --> <source attribute>:5:30
+  |
+       5 | {%- call thrice(3, param1=2) | filter(param1=12) -%}
+         |                              ^ close to this token
+         |
   --> tests/ui/macro_named_argument.rs:20:10
    |
 20 | #[derive(Template)]
@@ -28,8 +38,11 @@ error: failed to parse template source at row 5, column 29 near:
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: named arguments must always be passed last
-       failed to parse template source at row 4, column 15 near:
-       "(param1=2, 3) -%}"
+ --> <source attribute>:4:16
+  |
+       4 | {%- call thrice(param1=2, 3) -%}
+         |                ^ close to this token
+         |
   --> tests/ui/macro_named_argument.rs:29:10
    |
 29 | #[derive(Template)]
@@ -38,8 +51,11 @@ error: named arguments must always be passed last
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: cannot have unnamed argument (`param2`) after named argument in macro "thrice"
- --> InvalidNamedArg5.html:4:2
-       "- call thrice(3, param1=2) -%}"
+ --> InvalidNamedArg5.html:4:3
+  |
+       4 | {%- call thrice(3, param1=2) -%}
+         |   ^ close to this token
+         |
   --> tests/ui/macro_named_argument.rs:37:10
    |
 37 | #[derive(Template)]

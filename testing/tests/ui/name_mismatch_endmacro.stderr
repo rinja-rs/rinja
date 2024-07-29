@@ -1,6 +1,9 @@
 error: expected name `foo` in `endmacro` tag, found `not_foo`
-       failed to parse template source at row 1, column 41 near:
-       "not_foo %}"
+ --> <source attribute>:1:42
+  |
+       1 | {% macro foo(arg) %} {{arg}} {% endmacro not_foo %}
+         |                                          ^ close to this token
+         |
  --> tests/ui/name_mismatch_endmacro.rs:3:10
   |
 3 | #[derive(Template)]

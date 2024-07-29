@@ -1,6 +1,9 @@
 error: 'super' is not a valid name for a macro
-       failed to parse template source at row 1, column 2 near:
-       "- macro super() -%}{%- endmacro -%}"
+ --> <source attribute>:1:3
+  |
+       1 | {%- macro super() -%}{%- endmacro -%}
+         |   ^ close to this token
+         |
  --> tests/ui/macro-super.rs:3:10
   |
 3 | #[derive(Template)]

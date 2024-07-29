@@ -1,7 +1,9 @@
 error: your template code is too deeply nested, or last expression is too complex
-       failed to parse template source
-         --> testing/templates/filter-recursion.html:1:255
-       "|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A"...
+ --> testing/templates/filter-recursion.html:1:256
+  |
+       1 | ...A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A||A|A|AA|A...
+         |                                                          ^ close to this token
+         |
  --> tests/ui/filter-recursion.rs:3:10
   |
 3 | #[derive(Template)]

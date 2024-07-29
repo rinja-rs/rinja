@@ -1,5 +1,9 @@
-error: failed to parse template source at row 1, column 7 near:
-       "*x = 2 %}"
+error: failed to parse template source
+ --> <source attribute>:1:8
+  |
+       1 | {% let *x = 2 %}
+         |        ^ close to this token
+         |
  --> tests/ui/ref_deref.rs:3:10
   |
 3 | #[derive(Template)]

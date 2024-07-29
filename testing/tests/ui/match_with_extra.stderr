@@ -1,5 +1,9 @@
-error: failed to parse template source at row 3, column 4 near:
-       "// Help, I forgot how to write comments!"...
+error: failed to parse template source
+ --> <source attribute>:3:5
+  |
+       3 |     // Help, I forgot how to write comments!
+         |     ^ close to this token
+         |
  --> tests/ui/match_with_extra.rs:3:10
   |
 3 | #[derive(Template)]

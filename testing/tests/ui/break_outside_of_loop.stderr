@@ -1,6 +1,9 @@
 error: you can only `break` inside a `for` loop
-       failed to parse template source at row 1, column 9 near:
-       "break%}, have a parsing error!"
+ --> <source attribute>:1:10
+  |
+       1 | Have a {%break%}, have a parsing error!
+         |          ^ close to this token
+         |
  --> tests/ui/break_outside_of_loop.rs:3:10
   |
 3 | #[derive(Template)]

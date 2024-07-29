@@ -1,6 +1,9 @@
 error: invalid escaper 'latex' for `escape` filter. The available extensions are: "", "htm", "html", "j2", "jinja", "jinja2", "md", "none", "svg", "txt", "xml", "yml"
- --> LocalEscaper.html:1:38
-       "text|escape(\"latex\")}}`."
+ --> LocalEscaper.html:1:39
+  |
+       1 | In LaTeX you write `{{text}}` like `{{text|escape("latex")}}`.
+         |                                       ^ close to this token
+         |
  --> tests/ui/no-such-escaper.rs:3:10
   |
 3 | #[derive(Template)]

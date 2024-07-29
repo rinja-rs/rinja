@@ -1,5 +1,9 @@
-error: failed to parse template source at row 1, column 27 near:
-       " %}\nHELLO\n{{v}}\n{%- endfilter %}"
+error: failed to parse template source
+ --> <source attribute>:1:28
+  |
+       1 | {% filter lower|indent(2) - %}
+         |                            ^ close to this token
+         |
  --> tests/ui/filter_block_ws.rs:3:10
   |
 3 | #[derive(Template)]

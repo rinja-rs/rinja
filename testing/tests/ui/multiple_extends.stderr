@@ -1,6 +1,9 @@
 error: multiple extend blocks found
- --> MyTemplate4.txt:3:2
-       " extends \"foo.html\" %}\n"
+ --> MyTemplate4.txt:3:3
+  |
+       3 | {% extends "foo.html" %}
+         |   ^ close to this token
+         |
  --> tests/ui/multiple_extends.rs:3:10
   |
 3 | #[derive(Template)]

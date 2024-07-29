@@ -149,7 +149,21 @@ impl TemplateInput<'_> {
         let mut dependency_graph = Vec::new();
         let mut check = vec![(Arc::clone(&self.path), source, source_path)];
         while let Some((path, source, source_path)) = check.pop() {
-            let parsed = self.syntax.parse(source, source_path)?;
+            let parsed = match self.syntax.parse(Arc::clone(&source), source_path) {
+                Ok(parsed) => parsed,
+                Err(err) => {
+                    let msg = err
+                        .message
+                        .unwrap_or_else(|| "failed to parse template source".into());
+                    let file_path = err
+                        .file_path
+                        .as_deref()
+                        .unwrap_or(Path::new("<source attribute>"));
+                    let file_info =
+                        FileInfo::new(file_path, Some(&source), Some(&source[err.offset..]));
+                    return Err(CompileError::new(msg, Some(file_info)));
+                }
+            };
 
             let mut top = true;
             let mut nested = vec![parsed.nodes()];

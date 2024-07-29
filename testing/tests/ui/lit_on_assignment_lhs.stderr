@@ -1,6 +1,9 @@
 error: literals are not allowed on the left-hand side of an assignment
- --> MyTemplate.txt:1:2
-       "let 7=x%}"
+ --> MyTemplate.txt:1:3
+  |
+       1 | {%let 7=x%}
+         |   ^ close to this token
+         |
  --> tests/ui/lit_on_assignment_lhs.rs:3:10
   |
 3 | #[derive(Template)]

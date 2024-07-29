@@ -12,7 +12,7 @@ use std::{fmt, str};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
 use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{cut, eof, map, not, opt, recognize};
+use nom::combinator::{complete, cut, eof, map, not, opt, recognize};
 use nom::error::{Error, ErrorKind, FromExternalError};
 use nom::multi::{many0_count, many1};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
@@ -110,31 +110,18 @@ impl<'a> Ast<'a> {
         syntax: &Syntax<'_>,
     ) -> Result<Self, ParseError> {
         let parse = |i: &'a str| Node::many(i, &State::new(syntax));
-        let (input, message) = match terminated(parse, cut(eof))(src) {
+        let (input, message) = match complete(terminated(parse, cut(eof)))(src) {
             Ok(("", nodes)) => return Ok(Self { nodes }),
             Ok(_) => unreachable!("eof() is not eof?"),
+            Err(nom::Err::Incomplete(_)) => unreachable!("complete() is not complete?"),
             Err(
                 nom::Err::Error(ErrorContext { input, message, .. })
                 | nom::Err::Failure(ErrorContext { input, message, .. }),
             ) => (input, message),
-            Err(nom::Err::Incomplete(_)) => return Err(ParseError::Incomplete),
         };
-
-        let offset = src.len() - input.len();
-        let (source_before, source_after) = src.split_at(offset);
-
-        let source_after = match source_after.char_indices().enumerate().take(41).last() {
-            Some((40, (i, _))) => format!("{:?}...", &source_after[..i]),
-            _ => format!("{source_after:?}"),
-        };
-
-        let (row, last_line) = source_before.lines().enumerate().last().unwrap_or_default();
-        let column = last_line.chars().count();
-        Err(ParseError::Details {
+        Err(ParseError {
             message,
-            row,
-            column,
-            source_after,
+            offset: src.len() - input.len(),
             file_path,
         })
     }
@@ -198,88 +185,38 @@ impl<'a, T: PartialEq> PartialEq for WithSpan<'a, T> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseError {
-    Incomplete,
-    Details {
-        message: Option<Cow<'static, str>>,
-        row: usize,
-        column: usize,
-        source_after: String,
-        file_path: Option<Arc<Path>>,
-    },
+pub struct ParseError {
+    pub message: Option<Cow<'static, str>>,
+    pub offset: usize,
+    pub file_path: Option<Arc<Path>>,
 }
 
 impl std::error::Error for ParseError {}
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (message, mut row, column, source, path) = match self {
-            ParseError::Incomplete => return write!(f, "parsing incomplete"),
-            ParseError::Details {
-                message,
-                row,
-                column,
-                source_after,
-                file_path,
-            } => (message, *row, column, source_after, file_path),
-        };
+        let ParseError {
+            message,
+            file_path,
+            offset,
+        } = self;
 
         if let Some(message) = message {
             writeln!(f, "{}", message)?;
         }
 
-        let path = path
+        let path = file_path
             .as_ref()
             .and_then(|path| Some(strip_common(&current_dir().ok()?, path)));
-
-        row += 1;
         match path {
-            Some(path) => f.write_fmt(format_args!(
-                "failed to parse template source\n  --> {path}:{row}:{column}\n{source}",
-            )),
-            None => f.write_fmt(format_args!(
-                "failed to parse template source at row {row}, column {column} near:\n{source}",
-            )),
+            Some(path) => write!(f, "failed to parse template source\n  --> {path}@{offset}"),
+            None => write!(f, "failed to parse template source near offset {offset}"),
         }
     }
 }
 
 pub(crate) type ParseErr<'a> = nom::Err<ErrorContext<'a>>;
 pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
-
-pub struct ErrorInfo {
-    pub row: usize,
-    pub column: usize,
-    pub source_after: String,
-}
-
-pub fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
-    let offset = src.len() - input.len();
-    let (source_before, source_after) = src.split_at(offset);
-
-    let source_after = match source_after.char_indices().enumerate().take(41).last() {
-        Some((40, (i, _))) => format!("{:?}...", &source_after[..i]),
-        _ => format!("{source_after:?}"),
-    };
-
-    let (row, last_line) = source_before.lines().enumerate().last().unwrap_or_default();
-    let column = last_line.chars().count();
-    ErrorInfo {
-        row,
-        column,
-        source_after,
-    }
-}
-
-/// Return the error related information and its display file path.
-pub fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorInfo, String) {
-    let file_path = match std::env::current_dir() {
-        Ok(cwd) => strip_common(&cwd, file_path),
-        Err(_) => file_path.display().to_string(),
-    };
-    let error_info = generate_row_and_column(src, input);
-    (error_info, file_path)
-}
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
 /// It used to generate `ParserError`.
@@ -801,7 +738,7 @@ pub fn strip_common(base: &Path, path: &Path) -> String {
     if path_parts.is_empty() {
         path.display().to_string()
     } else {
-        path_parts.join("/")
+        path_parts.join(std::path::MAIN_SEPARATOR_STR)
     }
 }
 

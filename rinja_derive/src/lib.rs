@@ -14,11 +14,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
+use annotate_snippets::{Level, Renderer, Snippet};
 use config::{read_config_file, Config};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
-use parser::{generate_error_info, strip_common, ErrorInfo, ParseError, Parsed, WithSpan};
+use parser::{strip_common, Parsed, WithSpan};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
@@ -188,14 +189,46 @@ struct CompileError {
 
 impl CompileError {
     fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
+        let span = Span::call_site();
+
+        if let Some(FileInfo {
+            path,
+            source: Some(source),
+            node_source: Some(node_source),
+        }) = file_info
+        {
+            if source
+                .as_bytes()
+                .as_ptr_range()
+                .contains(&node_source.as_ptr())
+            {
+                let label = msg.to_string();
+                let path = match std::env::current_dir() {
+                    Ok(cwd) => strip_common(&cwd, path),
+                    Err(_) => path.display().to_string(),
+                };
+
+                let start = node_source.as_ptr() as usize - source.as_ptr() as usize;
+                let annotation = Level::Error.span(start..start).label("close to this token");
+                let snippet = Snippet::source(source)
+                    .origin(&path)
+                    .fold(true)
+                    .annotation(annotation);
+                let message = Level::Error.title(&label).snippet(snippet);
+
+                let mut msg = Renderer::styled().render(message).to_string();
+                if let Some((prefix, _)) = msg.split_once(' ') {
+                    msg.replace_range(..=prefix.len(), "");
+                }
+                return Self { msg, span };
+            }
+        }
+
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
         };
-        Self {
-            msg,
-            span: Span::call_site(),
-        }
+        Self { msg, span }
     }
 
     fn no_file_info<S: fmt::Display>(msg: S) -> Self {
@@ -219,14 +252,7 @@ impl fmt::Display for CompileError {
     }
 }
 
-impl From<ParseError> for CompileError {
-    #[inline]
-    fn from(e: ParseError) -> Self {
-        // It already has the correct message so no need to do anything.
-        Self::no_file_info(e)
-    }
-}
-
+#[derive(Debug, Clone, Copy)]
 struct FileInfo<'a> {
     path: &'a Path,
     source: Option<&'a str>,
@@ -255,18 +281,13 @@ impl fmt::Display for FileInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.source, self.node_source) {
             (Some(source), Some(node_source)) => {
-                let (
-                    ErrorInfo {
-                        row,
-                        column,
-                        source_after,
-                    },
-                    file_path,
-                ) = generate_error_info(source, node_source, self.path);
+                let (error_info, file_path) = generate_error_info(source, node_source, self.path);
                 write!(
                     f,
                     "\n  --> {file_path}:{row}:{column}\n{source_after}",
-                    row = row + 1
+                    row = error_info.row,
+                    column = error_info.column,
+                    source_after = &error_info.source_after,
                 )
             }
             _ => {
@@ -278,6 +299,40 @@ impl fmt::Display for FileInfo<'_> {
             }
         }
     }
+}
+
+struct ErrorInfo {
+    row: usize,
+    column: usize,
+    source_after: String,
+}
+
+fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
+    let offset = src.len() - input.len();
+    let (source_before, source_after) = src.split_at(offset);
+
+    let source_after = match source_after.char_indices().enumerate().take(41).last() {
+        Some((80, (i, _))) => format!("{:?}...", &source_after[..i]),
+        _ => format!("{source_after:?}"),
+    };
+
+    let (row, last_line) = source_before.lines().enumerate().last().unwrap_or_default();
+    let column = last_line.chars().count();
+    ErrorInfo {
+        row,
+        column,
+        source_after,
+    }
+}
+
+/// Return the error related information and its display file path.
+fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorInfo, String) {
+    let file_path = match std::env::current_dir() {
+        Ok(cwd) => strip_common(&cwd, file_path),
+        Err(_) => file_path.display().to_string(),
+    };
+    let error_info = generate_row_and_column(src, input);
+    (error_info, file_path)
 }
 
 struct MsgValidEscapers<'a>(&'a [(Vec<Cow<'a, str>>, Cow<'a, str>)]);

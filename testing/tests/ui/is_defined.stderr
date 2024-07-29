@@ -1,6 +1,9 @@
 error: `is defined` operator can only be used on variables, not on their fields
-       failed to parse template source at row 1, column 6 near:
-       "x.y is defined %}{% endif %}"
+ --> <source attribute>:1:7
+  |
+       1 | {% if x.y is defined %}{% endif %}
+         |       ^ close to this token
+         |
  --> tests/ui/is_defined.rs:3:10
   |
 3 | #[derive(Template)]
@@ -9,8 +12,11 @@ error: `is defined` operator can only be used on variables, not on their fields
   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: `is defined` operator can only be used on variables
-       failed to parse template source at row 1, column 6 near:
-       "true is defined %}{% endif %}"
+ --> <source attribute>:1:7
+  |
+       1 | {% if true is defined %}{% endif %}
+         |       ^ close to this token
+         |
   --> tests/ui/is_defined.rs:10:10
    |
 10 | #[derive(Template)]
@@ -19,8 +25,11 @@ error: `is defined` operator can only be used on variables
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: expected `defined` or `not defined` after `is`
-       failed to parse template source at row 1, column 6 near:
-       "true is %}{% endif %}"
+ --> <source attribute>:1:7
+  |
+       1 | {% if true is %}{% endif %}
+         |       ^ close to this token
+         |
   --> tests/ui/is_defined.rs:17:10
    |
 17 | #[derive(Template)]
@@ -29,8 +38,11 @@ error: expected `defined` or `not defined` after `is`
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: expected `defined` or `not defined` after `is`
-       failed to parse template source at row 1, column 6 near:
-       "x is %}{% endif %}"
+ --> <source attribute>:1:7
+  |
+       1 | {% if x is %}{% endif %}
+         |       ^ close to this token
+         |
   --> tests/ui/is_defined.rs:24:10
    |
 24 | #[derive(Template)]
@@ -39,8 +51,11 @@ error: expected `defined` or `not defined` after `is`
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: expected `defined` or `not defined` after `is`
-       failed to parse template source at row 1, column 6 near:
-       "x is blue %}{% endif %}"
+ --> <source attribute>:1:7
+  |
+       1 | {% if x is blue %}{% endif %}
+         |       ^ close to this token
+         |
   --> tests/ui/is_defined.rs:31:10
    |
 31 | #[derive(Template)]
@@ -49,8 +64,11 @@ error: expected `defined` or `not defined` after `is`
    = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: expected `defined` or `not defined` after `is`
-       failed to parse template source at row 1, column 6 near:
-       "x is blue.red %}{% endif %}"
+ --> <source attribute>:1:7
+  |
+       1 | {% if x is blue.red %}{% endif %}
+         |       ^ close to this token
+         |
   --> tests/ui/is_defined.rs:38:10
    |
 38 | #[derive(Template)]

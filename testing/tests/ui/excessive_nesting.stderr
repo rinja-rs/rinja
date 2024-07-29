@@ -1,6 +1,9 @@
 error: your template code is too deeply nested, or last expression is too complex
-       failed to parse template source at row 14, column 42 near:
-       "%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1"...
+ --> <source attribute>:14:43
+  |
+       14 |     {%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}
+          |                                           ^ close to this token
+          |
  --> tests/ui/excessive_nesting.rs:3:10
   |
 3 | #[derive(Template)]
