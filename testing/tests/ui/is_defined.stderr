@@ -4,10 +4,10 @@ error: `is defined` operator can only be used on variables, not on their fields
        1 | {% if x.y is defined %}{% endif %}
          |       ^ close to this token
          |
- --> tests/ui/is_defined.rs:4:3
+ --> tests/ui/is_defined.rs:6:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+6 |     source = r#"{% if x.y is defined %}{% endif %}"#,
+  |     ^^^^^^
 
 error: `is defined` operator can only be used on variables
  --> <source attribute>:1:7
@@ -15,10 +15,10 @@ error: `is defined` operator can only be used on variables
        1 | {% if true is defined %}{% endif %}
          |       ^ close to this token
          |
-  --> tests/ui/is_defined.rs:11:3
+  --> tests/ui/is_defined.rs:13:5
    |
-11 | #[template(
-   |   ^^^^^^^^
+13 |     source = r#"{% if true is defined %}{% endif %}"#,
+   |     ^^^^^^
 
 error: expected `defined` or `not defined` after `is`
  --> <source attribute>:1:7
@@ -26,10 +26,10 @@ error: expected `defined` or `not defined` after `is`
        1 | {% if true is %}{% endif %}
          |       ^ close to this token
          |
-  --> tests/ui/is_defined.rs:18:3
+  --> tests/ui/is_defined.rs:20:5
    |
-18 | #[template(
-   |   ^^^^^^^^
+20 |     source = r#"{% if true is %}{% endif %}"#,
+   |     ^^^^^^
 
 error: expected `defined` or `not defined` after `is`
  --> <source attribute>:1:7
@@ -37,10 +37,10 @@ error: expected `defined` or `not defined` after `is`
        1 | {% if x is %}{% endif %}
          |       ^ close to this token
          |
-  --> tests/ui/is_defined.rs:25:3
+  --> tests/ui/is_defined.rs:27:5
    |
-25 | #[template(
-   |   ^^^^^^^^
+27 |     source = r#"{% if x is %}{% endif %}"#,
+   |     ^^^^^^
 
 error: expected `defined` or `not defined` after `is`
  --> <source attribute>:1:7
@@ -48,10 +48,10 @@ error: expected `defined` or `not defined` after `is`
        1 | {% if x is blue %}{% endif %}
          |       ^ close to this token
          |
-  --> tests/ui/is_defined.rs:32:3
+  --> tests/ui/is_defined.rs:34:5
    |
-32 | #[template(
-   |   ^^^^^^^^
+34 |     source = r#"{% if x is blue %}{% endif %}"#,
+   |     ^^^^^^
 
 error: expected `defined` or `not defined` after `is`
  --> <source attribute>:1:7
@@ -59,7 +59,7 @@ error: expected `defined` or `not defined` after `is`
        1 | {% if x is blue.red %}{% endif %}
          |       ^ close to this token
          |
-  --> tests/ui/is_defined.rs:39:3
+  --> tests/ui/is_defined.rs:41:5
    |
-39 | #[template(
-   |   ^^^^^^^^
+41 |     source = r#"{% if x is blue.red %}{% endif %}"#,
+   |     ^^^^^^

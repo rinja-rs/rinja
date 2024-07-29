@@ -4,7 +4,7 @@ error: you can only `break` inside a `for` loop
        1 | Have a {%break%}, have a parsing error!
          |          ^ close to this token
          |
- --> tests/ui/break_outside_of_loop.rs:4:3
+ --> tests/ui/break_outside_of_loop.rs:5:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+5 |     source = "Have a {%break%}, have a parsing error!",
+  |     ^^^^^^

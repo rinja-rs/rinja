@@ -198,6 +198,7 @@ impl Config {
         &self,
         path: &str,
         start_at: Option<&Path>,
+        file_info: Option<FileInfo<'_>>,
     ) -> Result<Arc<Path>, CompileError> {
         if let Some(root) = start_at {
             let relative = root.with_file_name(path);
@@ -213,12 +214,12 @@ impl Config {
             }
         }
 
-        Err(CompileError::no_file_info(
+        Err(CompileError::new(
             format!(
                 "template {:?} not found in directories {:?}",
                 path, self.dirs
             ),
-            None,
+            file_info,
         ))
     }
 }
@@ -500,8 +501,10 @@ mod tests {
     #[test]
     fn find_absolute() {
         let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("a.html", None).unwrap();
-        let path = config.find_template("sub/b.html", Some(&root)).unwrap();
+        let root = config.find_template("a.html", None, None).unwrap();
+        let path = config
+            .find_template("sub/b.html", Some(&root), None)
+            .unwrap();
         assert_eq_rooted(&path, "sub/b.html");
     }
 
@@ -509,23 +512,25 @@ mod tests {
     #[should_panic]
     fn find_relative_nonexistent() {
         let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("a.html", None).unwrap();
-        config.find_template("c.html", Some(&root)).unwrap();
+        let root = config.find_template("a.html", None, None).unwrap();
+        config.find_template("c.html", Some(&root), None).unwrap();
     }
 
     #[test]
     fn find_relative() {
         let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("sub/b.html", None).unwrap();
-        let path = config.find_template("c.html", Some(&root)).unwrap();
+        let root = config.find_template("sub/b.html", None, None).unwrap();
+        let path = config.find_template("c.html", Some(&root), None).unwrap();
         assert_eq_rooted(&path, "sub/c.html");
     }
 
     #[test]
     fn find_relative_sub() {
         let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("sub/b.html", None).unwrap();
-        let path = config.find_template("sub1/d.html", Some(&root)).unwrap();
+        let root = config.find_template("sub/b.html", None, None).unwrap();
+        let path = config
+            .find_template("sub1/d.html", Some(&root), None)
+            .unwrap();
         assert_eq_rooted(&path, "sub/sub1/d.html");
     }
 

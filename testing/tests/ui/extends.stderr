@@ -4,10 +4,10 @@ error: whitespace control is not allowed on `extends`
        1 | {%- extends "whatever.html" %}
          |   ^ close to this token
          |
- --> tests/ui/extends.rs:4:3
+ --> tests/ui/extends.rs:5:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+5 |     source = r#"{%- extends "whatever.html" %}"#,
+  |     ^^^^^^
 
 error: whitespace control is not allowed on `extends`
  --> <source attribute>:1:3
@@ -15,7 +15,7 @@ error: whitespace control is not allowed on `extends`
        1 | {% extends "whatever.html" -%}
          |   ^ close to this token
          |
-  --> tests/ui/extends.rs:11:3
+  --> tests/ui/extends.rs:12:5
    |
-11 | #[template(
-   |   ^^^^^^^^
+12 |     source = r#"{% extends "whatever.html" -%}"#,
+   |     ^^^^^^

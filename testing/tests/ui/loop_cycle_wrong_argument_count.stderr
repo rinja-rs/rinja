@@ -4,7 +4,7 @@ error: loop.cycle(…) cannot use an empty array
        1 | {% for v in values %}{{ loop.cycle("r", "g", "b") }}{{ v }},{% endfor %}
          |                             ^ close to this token
          |
- --> tests/ui/loop_cycle_wrong_argument_count.rs:4:3
+ --> tests/ui/loop_cycle_wrong_argument_count.rs:5:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+5 |     source = r#"{% for v in values %}{{ loop.cycle("r", "g", "b") }}{{ v }},{% endfor %}"#,
+  |     ^^^^^^

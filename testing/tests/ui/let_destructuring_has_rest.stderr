@@ -5,10 +5,10 @@ error: unexpected `,` character after `..`
        2 | {%- if let X { a, .., } = x -%}hello {{ a }}{%- endif -%}
          |                     ^ close to this token
          |
- --> tests/ui/let_destructuring_has_rest.rs:9:3
+ --> tests/ui/let_destructuring_has_rest.rs:9:12
   |
 9 | #[template(source = "
-  |   ^^^^^^^^
+  |            ^^^^^^
 
 error: expected `,` for more members, or `}` as terminator
  --> <source attribute>:2:18
@@ -16,10 +16,10 @@ error: expected `,` for more members, or `}` as terminator
        2 | {%- if let X { a .. } = x -%}hello {{ a }}{%- endif -%}
          |                  ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:17:3
+  --> tests/ui/let_destructuring_has_rest.rs:17:12
    |
 17 | #[template(source = "
-   |   ^^^^^^^^
+   |            ^^^^^^
 
 error: expected member, or `}` as terminator
  --> <source attribute>:2:19
@@ -27,10 +27,10 @@ error: expected member, or `}` as terminator
        2 | {%- if let X { a, 1 } = x -%}hello {{ a }}{%- endif -%}
          |                   ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:25:3
+  --> tests/ui/let_destructuring_has_rest.rs:25:12
    |
 25 | #[template(source = "
-   |   ^^^^^^^^
+   |            ^^^^^^
 
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
@@ -39,10 +39,10 @@ error: unexpected `,` character after `..`
        2 | {%- if let X { a, .., b } = x -%}hello {{ a }}{%- endif -%}
          |                     ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:33:3
+  --> tests/ui/let_destructuring_has_rest.rs:33:12
    |
 33 | #[template(source = "
-   |   ^^^^^^^^
+   |            ^^^^^^
 
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
@@ -51,7 +51,7 @@ error: unexpected `,` character after `..`
        2 | {%- if let X { .., b } = x -%}hello {{ a }}{%- endif -%}
          |                  ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:41:3
+  --> tests/ui/let_destructuring_has_rest.rs:41:12
    |
 41 | #[template(source = "
-   |   ^^^^^^^^
+   |            ^^^^^^

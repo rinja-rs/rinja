@@ -4,7 +4,7 @@ error: unexpected argument(s) in `json` filter
        1 | {{ 1|json(2, 3) }}
          |    ^ close to this token
          |
- --> tests/ui/json-too-many-args.rs:6:3
+ --> tests/ui/json-too-many-args.rs:6:25
   |
 6 | #[template(ext = "txt", source = "{{ 1|json(2, 3) }}")]
-  |   ^^^^^^^^
+  |                         ^^^^^^

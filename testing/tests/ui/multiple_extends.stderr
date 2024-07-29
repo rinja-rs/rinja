@@ -4,7 +4,7 @@ error: multiple extend blocks found
        3 | {% extends "foo.html" %}
          |   ^ close to this token
          |
- --> tests/ui/multiple_extends.rs:4:3
+ --> tests/ui/multiple_extends.rs:4:12
   |
 4 | #[template(source = r#"
-  |   ^^^^^^^^
+  |            ^^^^^^

@@ -4,10 +4,10 @@ error: failed to parse template source
        1 | {% let 12 = 0 }
          |               ^ close to this token
          |
- --> tests/ui/error_file_path.rs:4:3
+ --> tests/ui/error_file_path.rs:4:12
   |
 4 | #[template(path = "invalid_syntax.html")]
-  |   ^^^^^^^^
+  |            ^^^^
 
 error: failed to parse template source
  --> testing/templates/invalid_syntax.html:1:15
@@ -15,10 +15,10 @@ error: failed to parse template source
        1 | {% let 12 = 0 }
          |               ^ close to this token
          |
- --> tests/ui/error_file_path.rs:8:3
+ --> tests/ui/error_file_path.rs:8:12
   |
 8 | #[template(path = "include_invalid_syntax.html")]
-  |   ^^^^^^^^
+  |            ^^^^
 
 error: failed to parse template source
  --> testing/templates/invalid_syntax.html:1:15
@@ -26,7 +26,7 @@ error: failed to parse template source
        1 | {% let 12 = 0 }
          |               ^ close to this token
          |
-  --> tests/ui/error_file_path.rs:12:3
+  --> tests/ui/error_file_path.rs:12:12
    |
 12 | #[template(source = r#"{% extends "include_invalid_syntax.html" %}"#, ext = "txt")]
-   |   ^^^^^^^^
+   |            ^^^^^^

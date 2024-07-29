@@ -5,10 +5,10 @@ error: the filter operator `|` must not be preceded by any whitespace characters
        1 | {{a |lower}}
          |    ^ close to this token
          |
-  --> tests/ui/space-pipe.rs:10:3
+  --> tests/ui/space-pipe.rs:10:25
    |
 10 | #[template(ext = "txt", source = "{{a |lower}}")]
-   |   ^^^^^^^^
+   |                         ^^^^^^
 
 error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
@@ -17,7 +17,7 @@ error: the filter operator `|` must not be preceded by any whitespace characters
        1 | {{a | lower}}
          |    ^ close to this token
          |
-  --> tests/ui/space-pipe.rs:22:3
+  --> tests/ui/space-pipe.rs:22:25
    |
 22 | #[template(ext = "txt", source = "{{a | lower}}")]
-   |   ^^^^^^^^
+   |                         ^^^^^^

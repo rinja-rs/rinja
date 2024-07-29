@@ -4,7 +4,7 @@ error: expected name `foo` in `endblock` tag, found `not_foo`
        1 | {% block foo %}{% endblock not_foo %}
          |                            ^ close to this token
          |
- --> tests/ui/name_mismatch_endblock.rs:4:3
+ --> tests/ui/name_mismatch_endblock.rs:4:12
   |
 4 | #[template(source = "{% block foo %}{% endblock not_foo %}", ext = "html")]
-  |   ^^^^^^^^
+  |            ^^^^^^

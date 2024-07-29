@@ -4,7 +4,7 @@ error: failed to parse template source
        1 | {% let *x = 2 %}
          |        ^ close to this token
          |
- --> tests/ui/ref_deref.rs:4:3
+ --> tests/ui/ref_deref.rs:4:12
   |
 4 | #[template(source = "{% let *x = 2 %}", ext = "html")]
-  |   ^^^^^^^^
+  |            ^^^^^^

@@ -4,7 +4,7 @@ error: literals are not allowed on the left-hand side of an assignment
        1 | {%let 7=x%}
          |   ^ close to this token
          |
- --> tests/ui/lit_on_assignment_lhs.rs:4:3
+ --> tests/ui/lit_on_assignment_lhs.rs:5:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+5 |     source = "{%let 7=x%}",
+  |     ^^^^^^

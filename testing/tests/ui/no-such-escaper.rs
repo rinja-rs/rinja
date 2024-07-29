@@ -18,5 +18,9 @@ struct GlobalEscaper<'a> {
     text: &'a str,
 }
 
+#[derive(Template)]
+#[template(path = "latex-file.tex")]
+struct NoSuchEscaper;
+
 fn main() {
 }

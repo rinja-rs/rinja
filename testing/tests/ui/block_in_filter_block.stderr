@@ -4,7 +4,7 @@ error: cannot have a block inside a filter block
        7 |         {% block title %}New title{% endblock %}
          |           ^ close to this token
          |
- --> tests/ui/block_in_filter_block.rs:4:3
+ --> tests/ui/block_in_filter_block.rs:5:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+5 |     source = r#"{% extends "html-base.html" %}
+  |     ^^^^^^

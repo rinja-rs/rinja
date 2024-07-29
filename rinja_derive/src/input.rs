@@ -7,6 +7,7 @@ use std::sync::{Arc, OnceLock};
 use mime::Mime;
 use once_map::OnceMap;
 use parser::{Node, Parsed};
+use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
@@ -18,6 +19,7 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) config: &'a Config,
     pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
+    pub(crate) source_span: Option<Span>,
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
@@ -42,6 +44,7 @@ impl TemplateInput<'_> {
             print,
             escaping,
             ext,
+            ext_span,
             syntax,
             ..
         } = args;
@@ -49,11 +52,11 @@ impl TemplateInput<'_> {
         // Validate the `source` and `ext` value together, since they are
         // related. In case `source` was used instead of `path`, the value
         // of `ext` is merged into a synthetic `path` value here.
-        let source = source
+        let &(ref source, source_span) = source
             .as_ref()
             .expect("template path or source not found in attributes");
         let path = match (&source, &ext) {
-            (Source::Path(path), _) => config.find_template(path, None)?,
+            (Source::Path(path), _) => config.find_template(path, None, None)?,
             (&Source::Source(_), Some(ext)) => {
                 PathBuf::from(format!("{}.{}", ast.ident, ext)).into()
             }
@@ -95,7 +98,7 @@ impl TemplateInput<'_> {
                         "no escaper defined for extension '{escaping}'. {}",
                         MsgValidEscapers(&config.escapers),
                     ),
-                    None,
+                    *ext_span,
                 )
             })?;
 
@@ -127,6 +130,7 @@ impl TemplateInput<'_> {
             config,
             syntax,
             source,
+            source_span,
             block: block.as_deref(),
             print: *print,
             escaper,
@@ -189,7 +193,11 @@ impl TemplateInput<'_> {
 
                     match n {
                         Node::Extends(extends) if top => {
-                            let extends = self.config.find_template(extends.path, Some(&path))?;
+                            let extends = self.config.find_template(
+                                extends.path,
+                                Some(&path),
+                                Some(FileInfo::of(extends, &path, &parsed)),
+                            )?;
                             let dependency_path = (path.clone(), extends.clone());
                             if path == extends {
                                 // We add the path into the graph to have a better looking error.
@@ -205,14 +213,22 @@ impl TemplateInput<'_> {
                             nested.push(&m.nodes);
                         }
                         Node::Import(import) if top => {
-                            let import = self.config.find_template(import.path, Some(&path))?;
+                            let import = self.config.find_template(
+                                import.path,
+                                Some(&path),
+                                Some(FileInfo::of(import, &path, &parsed)),
+                            )?;
                             add_to_check(import)?;
                         }
                         Node::FilterBlock(f) => {
                             nested.push(&f.nodes);
                         }
                         Node::Include(include) => {
-                            let include = self.config.find_template(include.path, Some(&path))?;
+                            let include = self.config.find_template(
+                                include.path,
+                                Some(&path),
+                                Some(FileInfo::of(include, &path, &parsed)),
+                            )?;
                             add_to_check(include)?;
                         }
                         Node::BlockDef(b) => {
@@ -260,15 +276,16 @@ impl TemplateInput<'_> {
 
 #[derive(Debug, Default)]
 pub(crate) struct TemplateArgs {
-    source: Option<Source>,
+    pub(crate) source: Option<(Source, Option<Span>)>,
     block: Option<String>,
     print: Print,
     escaping: Option<String>,
     ext: Option<String>,
+    ext_span: Option<Span>,
     syntax: Option<String>,
     config: Option<String>,
     pub(crate) whitespace: Option<String>,
-    pub(crate) span: Option<proc_macro2::Span>,
+    pub(crate) template_span: Option<Span>,
 }
 
 impl TemplateArgs {
@@ -305,7 +322,7 @@ impl TemplateArgs {
             .ok_or_else(|| CompileError::no_file_info("no attribute 'template' found", None))?;
 
         let mut args = Self {
-            span,
+            template_span: span,
             ..Self::default()
         };
         // Loop over the meta attributes and find everything that we
@@ -348,6 +365,7 @@ impl TemplateArgs {
 
             if ident == "path" {
                 source_or_path(ident, value, &mut args.source, Source::Path)?;
+                args.ext_span = Some(ident.span());
             } else if ident == "source" {
                 source_or_path(ident, value, &mut args.source, |s| Source::Source(s.into()))?;
             } else if ident == "block" {
@@ -376,6 +394,7 @@ impl TemplateArgs {
                 set_template_str_attr(ident, value, &mut args.escaping)?;
             } else if ident == "ext" {
                 set_template_str_attr(ident, value, &mut args.ext)?;
+                args.ext_span = Some(ident.span());
             } else if ident == "syntax" {
                 set_template_str_attr(ident, value, &mut args.syntax)?;
             } else if ident == "config" {
@@ -395,7 +414,7 @@ impl TemplateArgs {
 
     pub(crate) fn fallback() -> Self {
         Self {
-            source: Some(Source::Source("".into())),
+            source: Some((Source::Source("".into()), None)),
             ext: Some("txt".to_string()),
             ..Self::default()
         }
@@ -409,7 +428,7 @@ impl TemplateArgs {
 fn source_or_path(
     name: &syn::Ident,
     value: &syn::ExprLit,
-    dest: &mut Option<Source>,
+    dest: &mut Option<(Source, Option<Span>)>,
     ctor: fn(String) -> Source,
 ) -> Result<(), CompileError> {
     if dest.is_some() {
@@ -418,7 +437,7 @@ fn source_or_path(
             Some(name.span()),
         ))
     } else if let syn::Lit::Str(s) = &value.lit {
-        *dest = Some(ctor(s.value()));
+        *dest = Some((ctor(s.value()), Some(name.span())));
         Ok(())
     } else {
         Err(CompileError::no_file_info(
@@ -611,7 +630,7 @@ mod tests {
     #[test]
     fn get_source() {
         let path = Config::new("", None, None)
-            .and_then(|config| config.find_template("b.html", None))
+            .and_then(|config| config.find_template("b.html", None, None))
             .unwrap();
         assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
     }

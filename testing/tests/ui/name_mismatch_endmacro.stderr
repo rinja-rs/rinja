@@ -4,7 +4,7 @@ error: expected name `foo` in `endmacro` tag, found `not_foo`
        1 | {% macro foo(arg) %} {{arg}} {% endmacro not_foo %}
          |                                          ^ close to this token
          |
- --> tests/ui/name_mismatch_endmacro.rs:4:3
+ --> tests/ui/name_mismatch_endmacro.rs:4:12
   |
 4 | #[template(source = "{% macro foo(arg) %} {{arg}} {% endmacro not_foo %}", ext = "html")]
-  |   ^^^^^^^^
+  |            ^^^^^^

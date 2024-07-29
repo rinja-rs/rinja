@@ -4,7 +4,7 @@ error: your template code is too deeply nested, or last expression is too comple
        14 |     {%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}
           |                                           ^ close to this token
           |
- --> tests/ui/excessive_nesting.rs:4:3
+ --> tests/ui/excessive_nesting.rs:5:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+5 |     source = "
+  |     ^^^^^^

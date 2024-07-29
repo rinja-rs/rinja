@@ -4,7 +4,7 @@ error: failed to parse template source
        1 | {% filter lower|indent(2) - %}
          |                            ^ close to this token
          |
- --> tests/ui/filter_block_ws.rs:4:3
+ --> tests/ui/filter_block_ws.rs:4:12
   |
 4 | #[template(source = "{% filter lower|indent(2) - %}
-  |   ^^^^^^^^
+  |            ^^^^^^

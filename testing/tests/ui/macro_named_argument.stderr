@@ -4,10 +4,10 @@ error: no argument named `param3` in macro "thrice"
        5 | {%- call thrice(param1=2, param3=3) -%}
          |   ^ close to this token
          |
- --> tests/ui/macro_named_argument.rs:4:3
+ --> tests/ui/macro_named_argument.rs:4:12
   |
 4 | #[template(source = "{%- macro thrice(param1, param2) -%}
-  |   ^^^^^^^^
+  |            ^^^^^^
 
 error: named argument `param1` was passed more than once
  --> <source attribute>:5:16
@@ -15,10 +15,10 @@ error: named argument `param1` was passed more than once
        5 | {%- call thrice(param1=2, param1=3) -%}
          |                ^ close to this token
          |
-  --> tests/ui/macro_named_argument.rs:12:3
+  --> tests/ui/macro_named_argument.rs:12:12
    |
 12 | #[template(source = "{%- macro thrice(param1, param2) -%}
-   |   ^^^^^^^^
+   |            ^^^^^^
 
 error: failed to parse template source
  --> <source attribute>:5:30
@@ -26,10 +26,10 @@ error: failed to parse template source
        5 | {%- call thrice(3, param1=2) | filter(param1=12) -%}
          |                              ^ close to this token
          |
-  --> tests/ui/macro_named_argument.rs:21:3
+  --> tests/ui/macro_named_argument.rs:21:12
    |
 21 | #[template(source = "{%- macro thrice(param1, param2) -%}
-   |   ^^^^^^^^
+   |            ^^^^^^
 
 error: named arguments must always be passed last
  --> <source attribute>:4:16
@@ -37,10 +37,10 @@ error: named arguments must always be passed last
        4 | {%- call thrice(param1=2, 3) -%}
          |                ^ close to this token
          |
-  --> tests/ui/macro_named_argument.rs:30:3
+  --> tests/ui/macro_named_argument.rs:30:12
    |
 30 | #[template(source = "{%- macro thrice(param1, param2) -%}
-   |   ^^^^^^^^
+   |            ^^^^^^
 
 error: cannot have unnamed argument (`param2`) after named argument in macro "thrice"
  --> InvalidNamedArg5.html:4:3
@@ -48,7 +48,7 @@ error: cannot have unnamed argument (`param2`) after named argument in macro "th
        4 | {%- call thrice(3, param1=2) -%}
          |   ^ close to this token
          |
-  --> tests/ui/macro_named_argument.rs:38:3
+  --> tests/ui/macro_named_argument.rs:38:12
    |
 38 | #[template(source = "{%- macro thrice(param1, param2) -%}
-   |   ^^^^^^^^
+   |            ^^^^^^

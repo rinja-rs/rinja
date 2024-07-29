@@ -4,10 +4,10 @@ error: unknown integer suffix `x`
        1 | {{ 0x0x }}
          |    ^ close to this token
          |
- --> tests/ui/num-suffix.rs:5:3
+ --> tests/ui/num-suffix.rs:7:5
   |
-5 | #[template(
-  |   ^^^^^^^^
+7 |     source = "{{ 0x0x }}",
+  |     ^^^^^^
 
 error: unknown float suffix `f127`
  --> <source attribute>:1:4
@@ -15,10 +15,10 @@ error: unknown float suffix `f127`
        1 | {{ 0.0_f127 }}
          |    ^ close to this token
          |
-  --> tests/ui/num-suffix.rs:12:3
+  --> tests/ui/num-suffix.rs:14:5
    |
-12 | #[template(
-   |   ^^^^^^^^
+14 |     source = "{{ 0.0_f127 }}",
+   |     ^^^^^^
 
 error: unknown number suffix `u321`
  --> <source attribute>:1:4
@@ -26,7 +26,7 @@ error: unknown number suffix `u321`
        1 | {{ 654u321 }}
          |    ^ close to this token
          |
-  --> tests/ui/num-suffix.rs:19:3
+  --> tests/ui/num-suffix.rs:21:5
    |
-19 | #[template(
-   |   ^^^^^^^^
+21 |     source = "{{ 654u321 }}",
+   |     ^^^^^^

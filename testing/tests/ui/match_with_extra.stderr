@@ -4,7 +4,7 @@ error: failed to parse template source
        3 |     // Help, I forgot how to write comments!
          |     ^ close to this token
          |
- --> tests/ui/match_with_extra.rs:4:3
+ --> tests/ui/match_with_extra.rs:6:5
   |
-4 | #[template(
-  |   ^^^^^^^^
+6 |     source = r#"
+  |     ^^^^^^
