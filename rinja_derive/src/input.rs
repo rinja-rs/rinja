@@ -286,6 +286,7 @@ pub(crate) struct TemplateArgs {
     config: Option<String>,
     pub(crate) whitespace: Option<String>,
     pub(crate) template_span: Option<Span>,
+    pub(crate) config_span: Option<Span>,
 }
 
 impl TemplateArgs {
@@ -399,6 +400,7 @@ impl TemplateArgs {
                 set_template_str_attr(ident, value, &mut args.syntax)?;
             } else if ident == "config" {
                 set_template_str_attr(ident, value, &mut args.config)?;
+                args.config_span = Some(ident.span())
             } else if ident == "whitespace" {
                 set_template_str_attr(ident, value, &mut args.whitespace)?;
             } else {
@@ -629,7 +631,7 @@ mod tests {
 
     #[test]
     fn get_source() {
-        let path = Config::new("", None, None)
+        let path = Config::new("", None, None, None)
             .and_then(|config| config.find_template("b.html", None, None))
             .unwrap();
         assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());

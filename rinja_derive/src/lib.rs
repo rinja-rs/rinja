@@ -109,7 +109,7 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
 
 fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let template_args = TemplateArgs::fallback();
-    let config = Config::new("", None, None)?;
+    let config = Config::new("", None, None, None)?;
     let input = TemplateInput::new(ast, config, &template_args)?;
     let mut contexts = HashMap::new();
     let parsed = parser::Parsed::default();
@@ -152,8 +152,13 @@ fn build_template_inner(
     template_args: &TemplateArgs,
 ) -> Result<String, CompileError> {
     let config_path = template_args.config_path();
-    let s = read_config_file(config_path)?;
-    let config = Config::new(&s, config_path, template_args.whitespace.as_deref())?;
+    let s = read_config_file(config_path, template_args.config_span)?;
+    let config = Config::new(
+        &s,
+        config_path,
+        template_args.whitespace.as_deref(),
+        template_args.config_span,
+    )?;
     let input = TemplateInput::new(ast, config, template_args)?;
 
     let mut templates = HashMap::new();
@@ -209,8 +214,14 @@ struct CompileError {
 
 impl CompileError {
     fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
-        let span = None;
+        Self::new_with_span(msg, file_info, None)
+    }
 
+    fn new_with_span<S: fmt::Display>(
+        msg: S,
+        file_info: Option<FileInfo<'_>>,
+        span: Option<Span>,
+    ) -> Self {
         if let Some(FileInfo {
             path,
             source: Some(source),
