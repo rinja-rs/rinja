@@ -1,4 +1,6 @@
-error: the previous template error derives from
+error: multiple extend blocks found
+ --> MyTemplate4.txt:3:2
+       " extends \"foo.html\" %}\n"
  --> tests/ui/multiple_extends.rs:4:12
   |
 4 | #[template(source = r#"

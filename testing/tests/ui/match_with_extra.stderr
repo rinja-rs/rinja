@@ -1,4 +1,6 @@
-error: the previous template error derives from
+error: failed to parse template source
+ --> <source attribute>:3:4
+       "// Help, I forgot how to write comments!\n    {%- when true %}\n        good\n    {%- when _ -%}\n        bad\n{%- endmatch -%}"
  --> tests/ui/match_with_extra.rs:6:5
   |
 6 |     source = r#"

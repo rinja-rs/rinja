@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
-use annotate_snippets::{Level, Renderer, Snippet};
 use config::{read_config_file, Config};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
@@ -97,14 +96,8 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
         Err(CompileError {
             msg,
             span,
-            rendered,
+            rendered: _rendered,
         }) => {
-            let msg = if rendered {
-                eprintln!("{msg}");
-                "the previous template error derives from"
-            } else {
-                &msg
-            };
             let mut ts: TokenStream = parse_quote_spanned! {
                 span.unwrap_or(ast.ident.span()) =>
                 ::core::compile_error!(#msg);
@@ -234,38 +227,6 @@ impl CompileError {
         file_info: Option<FileInfo<'_>>,
         span: Option<Span>,
     ) -> Self {
-        if let Some(FileInfo {
-            path,
-            source: Some(source),
-            node_source: Some(node_source),
-        }) = file_info
-        {
-            if source
-                .as_bytes()
-                .as_ptr_range()
-                .contains(&node_source.as_ptr())
-            {
-                let label = msg.to_string();
-                let path = match std::env::current_dir() {
-                    Ok(cwd) => strip_common(&cwd, path),
-                    Err(_) => path.display().to_string(),
-                };
-
-                let start = node_source.as_ptr() as usize - source.as_ptr() as usize;
-                let annotation = Level::Error.span(start..start).label("close to this token");
-                let snippet = Snippet::source(source)
-                    .origin(&path)
-                    .fold(true)
-                    .annotation(annotation);
-                let message = Level::Error.title(&label).snippet(snippet);
-                return Self {
-                    msg: Renderer::styled().render(message).to_string(),
-                    span,
-                    rendered: true,
-                };
-            }
-        }
-
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
@@ -362,7 +323,7 @@ fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
     let (row, last_line) = source_before.lines().enumerate().last().unwrap_or_default();
     let column = last_line.chars().count();
     ErrorInfo {
-        row,
+        row: row + 1,
         column,
         source_after,
     }
@@ -374,7 +335,7 @@ fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorInfo, 
         Ok(cwd) => strip_common(&cwd, file_path),
         Err(_) => file_path.display().to_string(),
     };
-    let error_info = generate_row_and_column(src, input);
+    let error_info: ErrorInfo = generate_row_and_column(src, input);
     (error_info, file_path)
 }
 

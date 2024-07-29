@@ -1,28 +1,41 @@
-error: the previous template error derives from
+error: unexpected `,` character after `..`
+       note that in a named struct, `..` must come last to ignore other members
+         --> <source attribute>:2:20
+       ", } = x -%}hello {{ a }}{%- endif -%}\n"
  --> tests/ui/let_destructuring_has_rest.rs:9:12
   |
 9 | #[template(source = "
   |            ^^^^^^
 
-error: the previous template error derives from
+error: expected `,` for more members, or `}` as terminator
+ --> <source attribute>:2:17
+       ".. } = x -%}hello {{ a }}{%- endif -%}\n"
   --> tests/ui/let_destructuring_has_rest.rs:17:12
    |
 17 | #[template(source = "
    |            ^^^^^^
 
-error: the previous template error derives from
+error: expected member, or `}` as terminator
+ --> <source attribute>:2:18
+       "1 } = x -%}hello {{ a }}{%- endif -%}\n"
   --> tests/ui/let_destructuring_has_rest.rs:25:12
    |
 25 | #[template(source = "
    |            ^^^^^^
 
-error: the previous template error derives from
+error: unexpected `,` character after `..`
+       note that in a named struct, `..` must come last to ignore other members
+         --> <source attribute>:2:20
+       ", b } = x -%}hello {{ a }}{%- endif -%}\n"
   --> tests/ui/let_destructuring_has_rest.rs:33:12
    |
 33 | #[template(source = "
    |            ^^^^^^
 
-error: the previous template error derives from
+error: unexpected `,` character after `..`
+       note that in a named struct, `..` must come last to ignore other members
+         --> <source attribute>:2:17
+       ", b } = x -%}hello {{ a }}{%- endif -%}\n"
   --> tests/ui/let_destructuring_has_rest.rs:41:12
    |
 41 | #[template(source = "
