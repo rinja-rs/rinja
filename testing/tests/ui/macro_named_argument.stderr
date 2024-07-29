@@ -1,53 +1,28 @@
-error: no argument named `param3` in macro "thrice"
- --> InvalidNamedArg.html:5:3
-  |
-       5 | {%- call thrice(param1=2, param3=3) -%}
-         |   ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/macro_named_argument.rs:4:12
   |
 4 | #[template(source = "{%- macro thrice(param1, param2) -%}
   |            ^^^^^^
 
-error: named argument `param1` was passed more than once
- --> <source attribute>:5:16
-  |
-       5 | {%- call thrice(param1=2, param1=3) -%}
-         |                ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:12:12
    |
 12 | #[template(source = "{%- macro thrice(param1, param2) -%}
    |            ^^^^^^
 
-error: failed to parse template source
- --> <source attribute>:5:30
-  |
-       5 | {%- call thrice(3, param1=2) | filter(param1=12) -%}
-         |                              ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:21:12
    |
 21 | #[template(source = "{%- macro thrice(param1, param2) -%}
    |            ^^^^^^
 
-error: named arguments must always be passed last
- --> <source attribute>:4:16
-  |
-       4 | {%- call thrice(param1=2, 3) -%}
-         |                ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:30:12
    |
 30 | #[template(source = "{%- macro thrice(param1, param2) -%}
    |            ^^^^^^
 
-error: cannot have unnamed argument (`param2`) after named argument in macro "thrice"
- --> InvalidNamedArg5.html:4:3
-  |
-       4 | {%- call thrice(3, param1=2) -%}
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:38:12
    |
 38 | #[template(source = "{%- macro thrice(param1, param2) -%}

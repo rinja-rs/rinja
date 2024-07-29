@@ -1,9 +1,4 @@
-error: your template code is too deeply nested, or last expression is too complex
- --> <source attribute>:14:43
-  |
-       14 |     {%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}
-          |                                           ^ close to this token
-          |
+error: the previous template error derives from
  --> tests/ui/excessive_nesting.rs:5:5
   |
 5 |     source = "

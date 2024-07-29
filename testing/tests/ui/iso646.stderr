@@ -1,32 +1,16 @@
-error: the binary AND operator is called `bitand` in rinja
- --> <source attribute>:1:7
-  |
-       1 | {{ a & b }}
-         |       ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/iso646.rs:4:25
   |
 4 | #[template(ext = "txt", source = "{{ a & b }}")]
   |                         ^^^^^^
 
-error: the filter operator `|` must not be preceded by any whitespace characters
-       the binary OR operator is called `bitor` in rinja
-        --> <source attribute>:1:5
-         |
-       1 | {{ a | b }}
-         |     ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/iso646.rs:18:25
    |
 18 | #[template(ext = "txt", source = "{{ a | b }}")]
    |                         ^^^^^^
 
-error: the binary XOR operator is called `xor` in rinja
- --> <source attribute>:1:7
-  |
-       1 | {{ a ^ b }}
-         |       ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/iso646.rs:32:25
    |
 32 | #[template(ext = "txt", source = "{{ a ^ b }}")]

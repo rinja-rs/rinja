@@ -1,31 +1,16 @@
-error: unknown integer suffix `x`
- --> <source attribute>:1:4
-  |
-       1 | {{ 0x0x }}
-         |    ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/num-suffix.rs:7:5
   |
 7 |     source = "{{ 0x0x }}",
   |     ^^^^^^
 
-error: unknown float suffix `f127`
- --> <source attribute>:1:4
-  |
-       1 | {{ 0.0_f127 }}
-         |    ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/num-suffix.rs:14:5
    |
 14 |     source = "{{ 0.0_f127 }}",
    |     ^^^^^^
 
-error: unknown number suffix `u321`
- --> <source attribute>:1:4
-  |
-       1 | {{ 654u321 }}
-         |    ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/num-suffix.rs:21:5
    |
 21 |     source = "{{ 654u321 }}",

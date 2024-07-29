@@ -1,9 +1,4 @@
-error: failed to parse template source
- --> <source attribute>:1:8
-  |
-       1 | {% let *x = 2 %}
-         |        ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/ref_deref.rs:4:12
   |
 4 | #[template(source = "{% let *x = 2 %}", ext = "html")]

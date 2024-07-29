@@ -1,9 +1,4 @@
-error: failed to parse template source
- --> <source attribute>:3:5
-  |
-       3 |     // Help, I forgot how to write comments!
-         |     ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/match_with_extra.rs:6:5
   |
 6 |     source = r#"

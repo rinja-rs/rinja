@@ -1,9 +1,4 @@
-error: you can only `break` inside a `for` loop
- --> <source attribute>:1:10
-  |
-       1 | Have a {%break%}, have a parsing error!
-         |          ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/break_outside_of_loop.rs:5:5
   |
 5 |     source = "Have a {%break%}, have a parsing error!",

@@ -1,9 +1,4 @@
-error: failed to parse template source
- --> <source attribute>:1:28
-  |
-       1 | {% filter lower|indent(2) - %}
-         |                            ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/filter_block_ws.rs:4:12
   |
 4 | #[template(source = "{% filter lower|indent(2) - %}

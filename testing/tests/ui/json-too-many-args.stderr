@@ -1,9 +1,4 @@
-error: unexpected argument(s) in `json` filter
- --> OneTwoThree.txt:1:4
-  |
-       1 | {{ 1|json(2, 3) }}
-         |    ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/json-too-many-args.rs:6:25
   |
 6 | #[template(ext = "txt", source = "{{ 1|json(2, 3) }}")]

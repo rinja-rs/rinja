@@ -1,9 +1,4 @@
-error: loop.cycle(…) cannot use an empty array
- --> ForCycle.txt:1:29
-  |
-       1 | {% for v in values %}{{ loop.cycle("r", "g", "b") }}{{ v }},{% endfor %}
-         |                             ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/loop_cycle_wrong_argument_count.rs:5:5
   |
 5 |     source = r#"{% for v in values %}{{ loop.cycle("r", "g", "b") }}{{ v }},{% endfor %}"#,

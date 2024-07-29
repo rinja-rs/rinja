@@ -1,130 +1,70 @@
-error: unclosed expression, missing "}}"
- --> <source attribute>:1:1
-  |
-       1 | {{ expr
-         | ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/unclosed-nodes.rs:4:12
   |
 4 | #[template(source = "{{ expr", ext = "txt")]
   |            ^^^^^^
 
-error: unclosed expression, missing "}}"
- --> <source attribute>:1:1
-  |
-       1 | {{ expr
-         | ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/unclosed-nodes.rs:8:12
   |
 8 | #[template(source = "{{ expr ", ext = "txt")]
   |            ^^^^^^
 
-error: unclosed expression, missing "}}"
- --> <source attribute>:1:1
-  |
-       1 | {{ expr -
-         | ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:12:12
    |
 12 | #[template(source = "{{ expr -", ext = "txt")]
    |            ^^^^^^
 
-error: failed to parse template source
- --> <source attribute>:1:10
-  |
-       1 | {{ expr -}
-         |          ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:16:12
    |
 16 | #[template(source = "{{ expr -}", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed block, missing "%}"
- --> <source attribute>:1:1
-  |
-       1 | {% let x
-         | ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:20:12
    |
 20 | #[template(source = "{% let x", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed block, missing "%}"
- --> <source attribute>:1:1
-  |
-       1 | {% let x
-         | ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:24:12
    |
 24 | #[template(source = "{% let x ", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed block, missing "%}"
- --> <source attribute>:1:1
-  |
-       1 | {% let x -
-         | ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:28:12
    |
 28 | #[template(source = "{% let x -", ext = "txt")]
    |            ^^^^^^
 
-error: failed to parse template source
- --> <source attribute>:1:11
-  |
-       1 | {% let x -%
-         |           ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:32:12
    |
 32 | #[template(source = "{% let x -%", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed comment, missing "#}"
- --> <source attribute>:1:3
-  |
-       1 | {# comment
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:36:12
    |
 36 | #[template(source = "{# comment", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed comment, missing "#}"
- --> <source attribute>:1:3
-  |
-       1 | {# comment
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:40:12
    |
 40 | #[template(source = "{# comment ", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed comment, missing "#}"
- --> <source attribute>:1:3
-  |
-       1 | {# comment -
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:44:12
    |
 44 | #[template(source = "{# comment -", ext = "txt")]
    |            ^^^^^^
 
-error: unclosed comment, missing "#}"
- --> <source attribute>:1:3
-  |
-       1 | {# comment -#
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/unclosed-nodes.rs:48:12
    |
 48 | #[template(source = "{# comment -#", ext = "txt")]

@@ -1,9 +1,4 @@
-error: expected name `foo` in `endblock` tag, found `not_foo`
- --> <source attribute>:1:28
-  |
-       1 | {% block foo %}{% endblock not_foo %}
-         |                            ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/name_mismatch_endblock.rs:4:12
   |
 4 | #[template(source = "{% block foo %}{% endblock not_foo %}", ext = "html")]

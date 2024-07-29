@@ -1,9 +1,4 @@
-error: 'super' is not a valid name for a macro
- --> <source attribute>:1:3
-  |
-       1 | {%- macro super() -%}{%- endmacro -%}
-         |   ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/macro-super.rs:4:12
   |
 4 | #[template(source = "{%- macro super() -%}{%- endmacro -%}", ext = "html")]

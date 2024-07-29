@@ -1,31 +1,16 @@
-error: macro "thrice" expected 1 argument, found 2
- --> InvalidNumberOfArgs.html:5:3
-  |
-       5 | {%- call thrice(2, 3) -%}
-         |   ^ close to this token
-         |
+error: the previous template error derives from
  --> tests/ui/macro.rs:4:12
   |
 4 | #[template(source = "{%- macro thrice(param) -%}
   |            ^^^^^^
 
-error: macro "thrice" expected 2 arguments, found 0
- --> InvalidNumberOfArgs2.html:5:3
-  |
-       5 | {%- call thrice() -%}
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/macro.rs:12:12
    |
 12 | #[template(source = "{%- macro thrice(param, param2) -%}
    |            ^^^^^^
 
-error: macro "thrice" expected 0 arguments, found 2
- --> InvalidNumberOfArgs3.html:4:3
-  |
-       4 | {%- call thrice(1, 2) -%}
-         |   ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/macro.rs:20:12
    |
 20 | #[template(source = "{%- macro thrice() -%}

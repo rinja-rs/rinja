@@ -25,6 +25,7 @@ use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
 use proc_macro2::TokenStream as TokenStream12;
 use proc_macro2::{Span, TokenStream};
+use syn::parse_quote_spanned;
 
 /// The `Template` derive macro and its `template()` attribute.
 ///
@@ -93,16 +94,26 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     let ast = syn::parse2(input.into()).unwrap();
     match build_template(&ast) {
         Ok(source) => source.parse().unwrap(),
-        Err(mut e) => {
-            if e.span.is_none() {
-                e.span = Some(ast.ident.span());
-            }
-            let mut e = e.into_compile_error();
+        Err(CompileError {
+            msg,
+            span,
+            rendered,
+        }) => {
+            let msg = if rendered {
+                eprintln!("{msg}");
+                "the previous template error derives from"
+            } else {
+                &msg
+            };
+            let mut ts: TokenStream = parse_quote_spanned! {
+                span.unwrap_or(ast.ident.span()) =>
+                ::core::compile_error!(#msg);
+            };
             if let Ok(source) = build_skeleton(&ast) {
                 let source: TokenStream = source.parse().unwrap();
-                e.extend(source);
+                ts.extend(source);
             }
-            e.into()
+            ts.into()
         }
     }
 }
@@ -210,6 +221,7 @@ fn build_template_inner(
 struct CompileError {
     msg: String,
     span: Option<Span>,
+    rendered: bool,
 }
 
 impl CompileError {
@@ -246,12 +258,11 @@ impl CompileError {
                     .fold(true)
                     .annotation(annotation);
                 let message = Level::Error.title(&label).snippet(snippet);
-
-                let mut msg = Renderer::styled().render(message).to_string();
-                if let Some((prefix, _)) = msg.split_once(' ') {
-                    msg.replace_range(..=prefix.len(), "");
-                }
-                return Self { msg, span };
+                return Self {
+                    msg: Renderer::styled().render(message).to_string(),
+                    span,
+                    rendered: true,
+                };
             }
         }
 
@@ -259,18 +270,19 @@ impl CompileError {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
         };
-        Self { msg, span }
+        Self {
+            msg,
+            span,
+            rendered: false,
+        }
     }
 
     fn no_file_info<S: fmt::Display>(msg: S, span: Option<Span>) -> Self {
         Self {
             msg: msg.to_string(),
             span,
+            rendered: false,
         }
-    }
-
-    fn into_compile_error(self) -> TokenStream {
-        syn::Error::new(self.span.unwrap_or_else(Span::call_site), self.msg).to_compile_error()
     }
 }
 

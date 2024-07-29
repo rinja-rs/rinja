@@ -1,22 +1,10 @@
-error: the filter operator `|` must not be preceded by any whitespace characters
-       the binary OR operator is called `bitor` in rinja
-        --> <source attribute>:1:4
-         |
-       1 | {{a |lower}}
-         |    ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/space-pipe.rs:10:25
    |
 10 | #[template(ext = "txt", source = "{{a |lower}}")]
    |                         ^^^^^^
 
-error: the filter operator `|` must not be preceded by any whitespace characters
-       the binary OR operator is called `bitor` in rinja
-        --> <source attribute>:1:4
-         |
-       1 | {{a | lower}}
-         |    ^ close to this token
-         |
+error: the previous template error derives from
   --> tests/ui/space-pipe.rs:22:25
    |
 22 | #[template(ext = "txt", source = "{{a | lower}}")]
