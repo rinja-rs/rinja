@@ -5,12 +5,10 @@ error: the filter operator `|` must not be preceded by any whitespace characters
        1 | {{a |lower}}
          |    ^ close to this token
          |
- --> tests/ui/space-pipe.rs:9:10
-  |
-9 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+  --> tests/ui/space-pipe.rs:10:3
+   |
+10 | #[template(ext = "txt", source = "{{a |lower}}")]
+   |   ^^^^^^^^
 
 error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
@@ -19,9 +17,7 @@ error: the filter operator `|` must not be preceded by any whitespace characters
        1 | {{a | lower}}
          |    ^ close to this token
          |
-  --> tests/ui/space-pipe.rs:21:10
+  --> tests/ui/space-pipe.rs:22:3
    |
-21 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+22 | #[template(ext = "txt", source = "{{a | lower}}")]
+   |   ^^^^^^^^

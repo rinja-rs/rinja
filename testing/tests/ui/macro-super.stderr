@@ -4,9 +4,7 @@ error: 'super' is not a valid name for a macro
        1 | {%- macro super() -%}{%- endmacro -%}
          |   ^ close to this token
          |
- --> tests/ui/macro-super.rs:3:10
+ --> tests/ui/macro-super.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(source = "{%- macro super() -%}{%- endmacro -%}", ext = "html")]
+  |   ^^^^^^^^

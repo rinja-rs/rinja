@@ -213,10 +213,13 @@ impl Config {
             }
         }
 
-        Err(CompileError::no_file_info(format!(
-            "template {:?} not found in directories {:?}",
-            path, self.dirs
-        )))
+        Err(CompileError::no_file_info(
+            format!(
+                "template {:?} not found in directories {:?}",
+                path, self.dirs
+            ),
+            None,
+        ))
     }
 }
 
@@ -319,13 +322,15 @@ impl<'a> TryInto<Syntax<'a>> for RawSyntax<'a> {
             syntax.comment_end,
         ] {
             if s.len() < 2 {
-                return Err(CompileError::no_file_info(format!(
-                    "delimiters must be at least two characters long: {s:?}"
-                )));
+                return Err(CompileError::no_file_info(
+                    format!("delimiters must be at least two characters long: {s:?}"),
+                    None,
+                ));
             } else if s.chars().any(|c| c.is_whitespace()) {
-                return Err(CompileError::no_file_info(format!(
-                    "delimiters may not contain white spaces: {s:?}"
-                )));
+                return Err(CompileError::no_file_info(
+                    format!("delimiters may not contain white spaces: {s:?}"),
+                    None,
+                ));
             }
         }
 
@@ -335,9 +340,12 @@ impl<'a> TryInto<Syntax<'a>> for RawSyntax<'a> {
             (syntax.expr_start, syntax.comment_start),
         ] {
             if s1.starts_with(s2) || s2.starts_with(s1) {
-                return Err(CompileError::no_file_info(format!(
-                    "a delimiter may not be the prefix of another delimiter: {s1:?} vs {s2:?}",
-                )));
+                return Err(CompileError::no_file_info(
+                    format!(
+                        "a delimiter may not be the prefix of another delimiter: {s1:?} vs {s2:?}",
+                    ),
+                    None,
+                ));
             }
         }
 
@@ -358,13 +366,16 @@ impl RawConfig<'_> {
     #[cfg(feature = "config")]
     fn from_toml_str(s: &str) -> Result<RawConfig<'_>, CompileError> {
         basic_toml::from_str(s).map_err(|e| {
-            CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"))
+            CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"), None)
         })
     }
 
     #[cfg(not(feature = "config"))]
     fn from_toml_str(_: &str) -> Result<RawConfig<'_>, CompileError> {
-        Err(CompileError::no_file_info("TOML support not available"))
+        Err(CompileError::no_file_info(
+            "TOML support not available",
+            None,
+        ))
     }
 }
 
@@ -428,13 +439,13 @@ pub(crate) fn read_config_file(config_path: Option<&str>) -> Result<String, Comp
 
     if filename.exists() {
         fs::read_to_string(&filename).map_err(|_| {
-            CompileError::no_file_info(format!("unable to read {:?}", filename.to_str().unwrap()))
+            CompileError::no_file_info(format!("unable to read {}", filename.display()), None)
         })
     } else if config_path.is_some() {
-        Err(CompileError::no_file_info(format!(
-            "`{}` does not exist",
-            root.display()
-        )))
+        Err(CompileError::no_file_info(
+            format!("`{}` does not exist", root.display()),
+            None,
+        ))
     } else {
         Ok("".to_string())
     }

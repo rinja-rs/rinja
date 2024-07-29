@@ -4,9 +4,7 @@ error: your template code is too deeply nested, or last expression is too comple
        1 | ...A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A|A|AA|A|A|A||A|A|AA|A...
          |                                                          ^ close to this token
          |
- --> tests/ui/filter-recursion.rs:3:10
+ --> tests/ui/filter-recursion.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(path = "filter-recursion.html")]
+  |   ^^^^^^^^

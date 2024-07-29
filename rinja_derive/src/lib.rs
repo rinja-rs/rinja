@@ -93,7 +93,10 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     let ast = syn::parse2(input.into()).unwrap();
     match build_template(&ast) {
         Ok(source) => source.parse().unwrap(),
-        Err(e) => {
+        Err(mut e) => {
+            if e.span.is_none() {
+                e.span = Some(ast.ident.span());
+            }
             let mut e = e.into_compile_error();
             if let Ok(source) = build_skeleton(&ast) {
                 let source: TokenStream = source.parse().unwrap();
@@ -131,10 +134,23 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
 /// value as passed to the `template()` attribute.
 pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let template_args = TemplateArgs::new(ast)?;
+    let mut result = build_template_inner(ast, &template_args);
+    if let Err(err) = &mut result {
+        if err.span.is_none() {
+            err.span = template_args.span;
+        }
+    }
+    result
+}
+
+fn build_template_inner(
+    ast: &syn::DeriveInput,
+    template_args: &TemplateArgs,
+) -> Result<String, CompileError> {
     let config_path = template_args.config_path();
     let s = read_config_file(config_path)?;
     let config = Config::new(&s, config_path, template_args.whitespace.as_deref())?;
-    let input = TemplateInput::new(ast, config, &template_args)?;
+    let input = TemplateInput::new(ast, config, template_args)?;
 
     let mut templates = HashMap::new();
     input.find_used_templates(&mut templates)?;
@@ -150,10 +166,10 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
 
         if let Some(block_name) = input.block {
             if !heritage.blocks.contains_key(&block_name) {
-                return Err(CompileError::no_file_info(format!(
-                    "cannot find block {}",
-                    block_name
-                )));
+                return Err(CompileError::no_file_info(
+                    format!("cannot find block {}", block_name),
+                    None,
+                ));
             }
         }
 
@@ -184,12 +200,12 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
 #[derive(Debug, Clone)]
 struct CompileError {
     msg: String,
-    span: Span,
+    span: Option<Span>,
 }
 
 impl CompileError {
     fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
-        let span = Span::call_site();
+        let span = None;
 
         if let Some(FileInfo {
             path,
@@ -231,15 +247,15 @@ impl CompileError {
         Self { msg, span }
     }
 
-    fn no_file_info<S: fmt::Display>(msg: S) -> Self {
+    fn no_file_info<S: fmt::Display>(msg: S, span: Option<Span>) -> Self {
         Self {
             msg: msg.to_string(),
-            span: Span::call_site(),
+            span,
         }
     }
 
     fn into_compile_error(self) -> TokenStream {
-        syn::Error::new(self.span, self.msg).to_compile_error()
+        syn::Error::new(self.span.unwrap_or_else(Span::call_site), self.msg).to_compile_error()
     }
 }
 

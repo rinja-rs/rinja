@@ -4,12 +4,10 @@ error: unclosed expression, missing "}}"
        1 | {{ expr
          | ^ close to this token
          |
- --> tests/ui/unclosed-nodes.rs:3:10
+ --> tests/ui/unclosed-nodes.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(source = "{{ expr", ext = "txt")]
+  |   ^^^^^^^^
 
 error: unclosed expression, missing "}}"
  --> <source attribute>:1:1
@@ -17,12 +15,10 @@ error: unclosed expression, missing "}}"
        1 | {{ expr
          | ^ close to this token
          |
- --> tests/ui/unclosed-nodes.rs:7:10
+ --> tests/ui/unclosed-nodes.rs:8:3
   |
-7 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+8 | #[template(source = "{{ expr ", ext = "txt")]
+  |   ^^^^^^^^
 
 error: unclosed expression, missing "}}"
  --> <source attribute>:1:1
@@ -30,12 +26,10 @@ error: unclosed expression, missing "}}"
        1 | {{ expr -
          | ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:11:10
+  --> tests/ui/unclosed-nodes.rs:12:3
    |
-11 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+12 | #[template(source = "{{ expr -", ext = "txt")]
+   |   ^^^^^^^^
 
 error: failed to parse template source
  --> <source attribute>:1:10
@@ -43,12 +37,10 @@ error: failed to parse template source
        1 | {{ expr -}
          |          ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:15:10
+  --> tests/ui/unclosed-nodes.rs:16:3
    |
-15 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+16 | #[template(source = "{{ expr -}", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed block, missing "%}"
  --> <source attribute>:1:1
@@ -56,12 +48,10 @@ error: unclosed block, missing "%}"
        1 | {% let x
          | ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:19:10
+  --> tests/ui/unclosed-nodes.rs:20:3
    |
-19 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+20 | #[template(source = "{% let x", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed block, missing "%}"
  --> <source attribute>:1:1
@@ -69,12 +59,10 @@ error: unclosed block, missing "%}"
        1 | {% let x
          | ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:23:10
+  --> tests/ui/unclosed-nodes.rs:24:3
    |
-23 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+24 | #[template(source = "{% let x ", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed block, missing "%}"
  --> <source attribute>:1:1
@@ -82,12 +70,10 @@ error: unclosed block, missing "%}"
        1 | {% let x -
          | ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:27:10
+  --> tests/ui/unclosed-nodes.rs:28:3
    |
-27 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+28 | #[template(source = "{% let x -", ext = "txt")]
+   |   ^^^^^^^^
 
 error: failed to parse template source
  --> <source attribute>:1:11
@@ -95,12 +81,10 @@ error: failed to parse template source
        1 | {% let x -%
          |           ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:31:10
+  --> tests/ui/unclosed-nodes.rs:32:3
    |
-31 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+32 | #[template(source = "{% let x -%", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed comment, missing "#}"
  --> <source attribute>:1:3
@@ -108,12 +92,10 @@ error: unclosed comment, missing "#}"
        1 | {# comment
          |   ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:35:10
+  --> tests/ui/unclosed-nodes.rs:36:3
    |
-35 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+36 | #[template(source = "{# comment", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed comment, missing "#}"
  --> <source attribute>:1:3
@@ -121,12 +103,10 @@ error: unclosed comment, missing "#}"
        1 | {# comment
          |   ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:39:10
+  --> tests/ui/unclosed-nodes.rs:40:3
    |
-39 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+40 | #[template(source = "{# comment ", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed comment, missing "#}"
  --> <source attribute>:1:3
@@ -134,12 +114,10 @@ error: unclosed comment, missing "#}"
        1 | {# comment -
          |   ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:43:10
+  --> tests/ui/unclosed-nodes.rs:44:3
    |
-43 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+44 | #[template(source = "{# comment -", ext = "txt")]
+   |   ^^^^^^^^
 
 error: unclosed comment, missing "#}"
  --> <source attribute>:1:3
@@ -147,9 +125,7 @@ error: unclosed comment, missing "#}"
        1 | {# comment -#
          |   ^ close to this token
          |
-  --> tests/ui/unclosed-nodes.rs:47:10
+  --> tests/ui/unclosed-nodes.rs:48:3
    |
-47 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+48 | #[template(source = "{# comment -#", ext = "txt")]
+   |   ^^^^^^^^

@@ -4,9 +4,7 @@ error: cannot have a block inside a filter block
        7 |         {% block title %}New title{% endblock %}
          |           ^ close to this token
          |
- --> tests/ui/block_in_filter_block.rs:3:10
+ --> tests/ui/block_in_filter_block.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(
+  |   ^^^^^^^^

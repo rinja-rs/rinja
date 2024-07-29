@@ -4,9 +4,7 @@ error: your template code is too deeply nested, or last expression is too comple
        14 |     {%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}{%if 1%}
           |                                           ^ close to this token
           |
- --> tests/ui/excessive_nesting.rs:3:10
+ --> tests/ui/excessive_nesting.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(
+  |   ^^^^^^^^

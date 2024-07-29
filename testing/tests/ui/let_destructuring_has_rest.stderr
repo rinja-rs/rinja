@@ -5,12 +5,10 @@ error: unexpected `,` character after `..`
        2 | {%- if let X { a, .., } = x -%}hello {{ a }}{%- endif -%}
          |                     ^ close to this token
          |
- --> tests/ui/let_destructuring_has_rest.rs:8:10
+ --> tests/ui/let_destructuring_has_rest.rs:9:3
   |
-8 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+9 | #[template(source = "
+  |   ^^^^^^^^
 
 error: expected `,` for more members, or `}` as terminator
  --> <source attribute>:2:18
@@ -18,12 +16,10 @@ error: expected `,` for more members, or `}` as terminator
        2 | {%- if let X { a .. } = x -%}hello {{ a }}{%- endif -%}
          |                  ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:16:10
+  --> tests/ui/let_destructuring_has_rest.rs:17:3
    |
-16 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+17 | #[template(source = "
+   |   ^^^^^^^^
 
 error: expected member, or `}` as terminator
  --> <source attribute>:2:19
@@ -31,12 +27,10 @@ error: expected member, or `}` as terminator
        2 | {%- if let X { a, 1 } = x -%}hello {{ a }}{%- endif -%}
          |                   ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:24:10
+  --> tests/ui/let_destructuring_has_rest.rs:25:3
    |
-24 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+25 | #[template(source = "
+   |   ^^^^^^^^
 
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
@@ -45,12 +39,10 @@ error: unexpected `,` character after `..`
        2 | {%- if let X { a, .., b } = x -%}hello {{ a }}{%- endif -%}
          |                     ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:32:10
+  --> tests/ui/let_destructuring_has_rest.rs:33:3
    |
-32 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+33 | #[template(source = "
+   |   ^^^^^^^^
 
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
@@ -59,9 +51,7 @@ error: unexpected `,` character after `..`
        2 | {%- if let X { .., b } = x -%}hello {{ a }}{%- endif -%}
          |                  ^ close to this token
          |
-  --> tests/ui/let_destructuring_has_rest.rs:40:10
+  --> tests/ui/let_destructuring_has_rest.rs:41:3
    |
-40 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+41 | #[template(source = "
+   |   ^^^^^^^^

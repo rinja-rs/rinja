@@ -4,12 +4,10 @@ error: invalid character
        1 | {% let s = '\a' %}
          |            ^ close to this token
          |
- --> tests/ui/char_literal.rs:3:10
+ --> tests/ui/char_literal.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(path = "char-literals/char-literal-1.txt")]
+  |   ^^^^^^^^
 
 error: invalid character
  --> testing/templates/char-literals/char-literal-2.txt:1:12
@@ -17,12 +15,10 @@ error: invalid character
        1 | {% let s = '\x' %}
          |            ^ close to this token
          |
- --> tests/ui/char_literal.rs:7:10
+ --> tests/ui/char_literal.rs:8:3
   |
-7 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+8 | #[template(path = "char-literals/char-literal-2.txt")]
+  |   ^^^^^^^^
 
 error: invalid character
  --> testing/templates/char-literals/char-literal-3.txt:1:12
@@ -30,12 +26,10 @@ error: invalid character
        1 | {% let s = '\x1' %}
          |            ^ close to this token
          |
-  --> tests/ui/char_literal.rs:11:10
+  --> tests/ui/char_literal.rs:12:3
    |
-11 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+12 | #[template(path = "char-literals/char-literal-3.txt")]
+   |   ^^^^^^^^
 
 error: must be a character in the range [\x00-\x7f]
  --> testing/templates/char-literals/char-literal-4.txt:1:12
@@ -43,12 +37,10 @@ error: must be a character in the range [\x00-\x7f]
        1 | {% let s = '\x80' %}
          |            ^ close to this token
          |
-  --> tests/ui/char_literal.rs:15:10
+  --> tests/ui/char_literal.rs:16:3
    |
-15 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+16 | #[template(path = "char-literals/char-literal-4.txt")]
+   |   ^^^^^^^^
 
 error: invalid character
  --> testing/templates/char-literals/char-literal-5.txt:1:12
@@ -56,12 +48,10 @@ error: invalid character
        1 | {% let s = '\u' %}
          |            ^ close to this token
          |
-  --> tests/ui/char_literal.rs:19:10
+  --> tests/ui/char_literal.rs:20:3
    |
-19 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+20 | #[template(path = "char-literals/char-literal-5.txt")]
+   |   ^^^^^^^^
 
 error: invalid character
  --> testing/templates/char-literals/char-literal-6.txt:1:12
@@ -69,12 +59,10 @@ error: invalid character
        1 | {% let s = '\u{}' %}
          |            ^ close to this token
          |
-  --> tests/ui/char_literal.rs:23:10
+  --> tests/ui/char_literal.rs:24:3
    |
-23 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+24 | #[template(path = "char-literals/char-literal-6.txt")]
+   |   ^^^^^^^^
 
 error: unicode escape must be at most 10FFFF
  --> testing/templates/char-literals/char-literal-7.txt:1:12
@@ -82,12 +70,10 @@ error: unicode escape must be at most 10FFFF
        1 | {% let s = '\u{110000}' %}
          |            ^ close to this token
          |
-  --> tests/ui/char_literal.rs:27:10
+  --> tests/ui/char_literal.rs:28:3
    |
-27 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+28 | #[template(path = "char-literals/char-literal-7.txt")]
+   |   ^^^^^^^^
 
 error: invalid character
  --> <source attribute>:1:12
@@ -95,9 +81,7 @@ error: invalid character
        1 | {% let s = 'aaa' %}
          |            ^ close to this token
          |
-  --> tests/ui/char_literal.rs:31:10
+  --> tests/ui/char_literal.rs:32:3
    |
-31 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+32 | #[template(source = "{% let s = 'aaa' %}", ext = "html")]
+   |   ^^^^^^^^

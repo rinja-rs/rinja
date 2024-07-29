@@ -4,12 +4,10 @@ error: failed to parse template source
        1 | {% let 12 = 0 }
          |               ^ close to this token
          |
- --> tests/ui/error_file_path.rs:3:10
+ --> tests/ui/error_file_path.rs:4:3
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(path = "invalid_syntax.html")]
+  |   ^^^^^^^^
 
 error: failed to parse template source
  --> testing/templates/invalid_syntax.html:1:15
@@ -17,12 +15,10 @@ error: failed to parse template source
        1 | {% let 12 = 0 }
          |               ^ close to this token
          |
- --> tests/ui/error_file_path.rs:7:10
+ --> tests/ui/error_file_path.rs:8:3
   |
-7 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+8 | #[template(path = "include_invalid_syntax.html")]
+  |   ^^^^^^^^
 
 error: failed to parse template source
  --> testing/templates/invalid_syntax.html:1:15
@@ -30,9 +26,7 @@ error: failed to parse template source
        1 | {% let 12 = 0 }
          |               ^ close to this token
          |
-  --> tests/ui/error_file_path.rs:11:10
+  --> tests/ui/error_file_path.rs:12:3
    |
-11 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+12 | #[template(source = r#"{% extends "include_invalid_syntax.html" %}"#, ext = "txt")]
+   |   ^^^^^^^^
