@@ -16,7 +16,7 @@ use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
-use crate::{CompileError, MsgValidEscapers, CRATE};
+use crate::{CompileError, FileInfo, MsgValidEscapers, CRATE};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum EvaluatedResult {
@@ -78,7 +78,13 @@ impl<'a> Generator<'a> {
     pub(crate) fn build(mut self, ctx: &Context<'a>) -> Result<String, CompileError> {
         let mut buf = Buffer::new();
 
-        self.impl_template(ctx, &mut buf)?;
+        if let Err(mut err) = self.impl_template(ctx, &mut buf) {
+            if err.span.is_none() {
+                err.span = self.input.source_span;
+            }
+            return Err(err);
+        }
+
         self.impl_display(&mut buf);
 
         #[cfg(feature = "with-actix-web")]
@@ -907,14 +913,15 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'a>,
         buf: &mut Buffer,
-        i: &'a Include<'_>,
+        i: &'a WithSpan<'_, Include<'_>>,
     ) -> Result<usize, CompileError> {
         self.flush_ws(i.ws);
         self.write_buf_writable(ctx, buf)?;
+        let file_info = ctx.path.map(|path| FileInfo::of(i, path, ctx.parsed));
         let path = self
             .input
             .config
-            .find_template(i.path, Some(&self.input.path))?;
+            .find_template(i.path, Some(&self.input.path), file_info)?;
 
         // We clone the context of the child in order to preserve their macros and imports.
         // But also add all the imports and macros from this template that don't override the

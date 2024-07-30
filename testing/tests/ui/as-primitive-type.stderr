@@ -1,59 +1,47 @@
 error: `as` operator expects the name of a primitive type on its right-hand side
-       failed to parse template source at row 1, column 8 near:
+ --> <source attribute>:1:8
        "as 4567 }}"
- --> tests/ui/as-primitive-type.rs:3:10
+ --> tests/ui/as-primitive-type.rs:4:21
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(source = r#"{{ 1234 as 4567 }}"#, ext = "html")]
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `as` operator expects the name of a primitive type on its right-hand side
-       failed to parse template source at row 1, column 8 near:
+ --> <source attribute>:1:8
        "as ? }}"
- --> tests/ui/as-primitive-type.rs:7:10
+ --> tests/ui/as-primitive-type.rs:8:21
   |
-7 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+8 | #[template(source = r#"{{ 1234 as ? }}"#, ext = "html")]
+  |                     ^^^^^^^^^^^^^^^^^^^^
 
 error: `as` operator expects the name of a primitive type on its right-hand side, found `u1234`
-       failed to parse template source at row 1, column 8 near:
+ --> <source attribute>:1:8
        "as u1234 }}"
-  --> tests/ui/as-primitive-type.rs:11:10
+  --> tests/ui/as-primitive-type.rs:12:21
    |
-11 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+12 | #[template(source = r#"{{ 1234 as u1234 }}"#, ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `as` operator expects the name of a primitive type on its right-hand side, found `core`
-       failed to parse template source at row 1, column 8 near:
+ --> <source attribute>:1:8
        "as core::primitive::u32 }}"
-  --> tests/ui/as-primitive-type.rs:15:10
+  --> tests/ui/as-primitive-type.rs:16:21
    |
-15 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+16 | #[template(source = r#"{{ 1234 as core::primitive::u32 }}"#, ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `as` operator expects the name of a primitive type on its right-hand side, found `int32_t`
-       failed to parse template source at row 1, column 8 near:
+ --> <source attribute>:1:8
        "as int32_t }}"
-  --> tests/ui/as-primitive-type.rs:19:10
+  --> tests/ui/as-primitive-type.rs:20:21
    |
-19 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+20 | #[template(source = r#"{{ 1234 as int32_t }}"#, ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `as` operator expects the name of a primitive type on its right-hand side, found `int32_t`
-       failed to parse template source at row 1, column 35 near:
+ --> <source attribute>:1:35
        "as int32_t }}"
-  --> tests/ui/as-primitive-type.rs:23:10
+  --> tests/ui/as-primitive-type.rs:24:21
    |
-23 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+24 | #[template(source = r#"{{ (1234 + 4 * 12 / 45675445 - 13) as int32_t }}"#, ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

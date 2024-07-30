@@ -1,9 +1,7 @@
 error: loop.cycle(…) cannot use an empty array
  --> ForCycle.txt:1:28
-       ".cycle(\"r\", \"g\", \"b\") }}{{ v }},{% endfo"...
- --> tests/ui/loop_cycle_wrong_argument_count.rs:3:10
+       ".cycle(\"r\", \"g\", \"b\") }}{{ v }},{% endfor %}"
+ --> tests/ui/loop_cycle_wrong_argument_count.rs:5:14
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+5 |     source = r#"{% for v in values %}{{ loop.cycle("r", "g", "b") }}{{ v }},{% endfor %}"#,
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -18,12 +18,13 @@ use config::{read_config_file, Config};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
-use parser::{generate_error_info, strip_common, ErrorInfo, ParseError, Parsed, WithSpan};
+use parser::{strip_common, Parsed, WithSpan};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
 use proc_macro2::TokenStream as TokenStream12;
 use proc_macro2::{Span, TokenStream};
+use syn::parse_quote_spanned;
 
 /// The `Template` derive macro and its `template()` attribute.
 ///
@@ -92,20 +93,27 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     let ast = syn::parse2(input.into()).unwrap();
     match build_template(&ast) {
         Ok(source) => source.parse().unwrap(),
-        Err(e) => {
-            let mut e = e.into_compile_error();
+        Err(CompileError {
+            msg,
+            span,
+            rendered: _rendered,
+        }) => {
+            let mut ts: TokenStream = parse_quote_spanned! {
+                span.unwrap_or(ast.ident.span()) =>
+                ::core::compile_error!(#msg);
+            };
             if let Ok(source) = build_skeleton(&ast) {
                 let source: TokenStream = source.parse().unwrap();
-                e.extend(source);
+                ts.extend(source);
             }
-            e.into()
+            ts.into()
         }
     }
 }
 
 fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let template_args = TemplateArgs::fallback();
-    let config = Config::new("", None, None)?;
+    let config = Config::new("", None, None, None)?;
     let input = TemplateInput::new(ast, config, &template_args)?;
     let mut contexts = HashMap::new();
     let parsed = parser::Parsed::default();
@@ -130,10 +138,32 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
 /// value as passed to the `template()` attribute.
 pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let template_args = TemplateArgs::new(ast)?;
+    let mut result = build_template_inner(ast, &template_args);
+    if let Err(err) = &mut result {
+        if err.span.is_none() {
+            err.span = template_args
+                .source
+                .as_ref()
+                .and_then(|(_, span)| *span)
+                .or(template_args.template_span);
+        }
+    }
+    result
+}
+
+fn build_template_inner(
+    ast: &syn::DeriveInput,
+    template_args: &TemplateArgs,
+) -> Result<String, CompileError> {
     let config_path = template_args.config_path();
-    let s = read_config_file(config_path)?;
-    let config = Config::new(&s, config_path, template_args.whitespace.as_deref())?;
-    let input = TemplateInput::new(ast, config, &template_args)?;
+    let s = read_config_file(config_path, template_args.config_span)?;
+    let config = Config::new(
+        &s,
+        config_path,
+        template_args.whitespace.as_deref(),
+        template_args.config_span,
+    )?;
+    let input = TemplateInput::new(ast, config, template_args)?;
 
     let mut templates = HashMap::new();
     input.find_used_templates(&mut templates)?;
@@ -149,10 +179,10 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
 
         if let Some(block_name) = input.block {
             if !heritage.blocks.contains_key(&block_name) {
-                return Err(CompileError::no_file_info(format!(
-                    "cannot find block {}",
-                    block_name
-                )));
+                return Err(CompileError::no_file_info(
+                    format!("cannot find block {}", block_name),
+                    None,
+                ));
             }
         }
 
@@ -183,30 +213,37 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
 #[derive(Debug, Clone)]
 struct CompileError {
     msg: String,
-    span: Span,
+    span: Option<Span>,
+    rendered: bool,
 }
 
 impl CompileError {
     fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
+        Self::new_with_span(msg, file_info, None)
+    }
+
+    fn new_with_span<S: fmt::Display>(
+        msg: S,
+        file_info: Option<FileInfo<'_>>,
+        span: Option<Span>,
+    ) -> Self {
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
         };
         Self {
             msg,
-            span: Span::call_site(),
+            span,
+            rendered: false,
         }
     }
 
-    fn no_file_info<S: fmt::Display>(msg: S) -> Self {
+    fn no_file_info<S: fmt::Display>(msg: S, span: Option<Span>) -> Self {
         Self {
             msg: msg.to_string(),
-            span: Span::call_site(),
+            span,
+            rendered: false,
         }
-    }
-
-    fn into_compile_error(self) -> TokenStream {
-        syn::Error::new(self.span, self.msg).to_compile_error()
     }
 }
 
@@ -219,14 +256,7 @@ impl fmt::Display for CompileError {
     }
 }
 
-impl From<ParseError> for CompileError {
-    #[inline]
-    fn from(e: ParseError) -> Self {
-        // It already has the correct message so no need to do anything.
-        Self::no_file_info(e)
-    }
-}
-
+#[derive(Debug, Clone, Copy)]
 struct FileInfo<'a> {
     path: &'a Path,
     source: Option<&'a str>,
@@ -255,18 +285,13 @@ impl fmt::Display for FileInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.source, self.node_source) {
             (Some(source), Some(node_source)) => {
-                let (
-                    ErrorInfo {
-                        row,
-                        column,
-                        source_after,
-                    },
-                    file_path,
-                ) = generate_error_info(source, node_source, self.path);
+                let (error_info, file_path) = generate_error_info(source, node_source, self.path);
                 write!(
                     f,
                     "\n  --> {file_path}:{row}:{column}\n{source_after}",
-                    row = row + 1
+                    row = error_info.row,
+                    column = error_info.column,
+                    source_after = &error_info.source_after,
                 )
             }
             _ => {
@@ -278,6 +303,40 @@ impl fmt::Display for FileInfo<'_> {
             }
         }
     }
+}
+
+struct ErrorInfo {
+    row: usize,
+    column: usize,
+    source_after: String,
+}
+
+fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
+    let offset = src.len() - input.len();
+    let (source_before, source_after) = src.split_at(offset);
+
+    let source_after = match source_after.char_indices().enumerate().take(41).last() {
+        Some((80, (i, _))) => format!("{:?}...", &source_after[..i]),
+        _ => format!("{source_after:?}"),
+    };
+
+    let (row, last_line) = source_before.lines().enumerate().last().unwrap_or_default();
+    let column = last_line.chars().count();
+    ErrorInfo {
+        row: row + 1,
+        column,
+        source_after,
+    }
+}
+
+/// Return the error related information and its display file path.
+fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorInfo, String) {
+    let file_path = match std::env::current_dir() {
+        Ok(cwd) => strip_common(&cwd, file_path),
+        Err(_) => file_path.display().to_string(),
+    };
+    let error_info: ErrorInfo = generate_row_and_column(src, input);
+    (error_info, file_path)
 }
 
 struct MsgValidEscapers<'a>(&'a [(Vec<Cow<'a, str>>, Cow<'a, str>)]);

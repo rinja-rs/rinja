@@ -1,48 +1,62 @@
 error: no argument named `param3` in macro "thrice"
  --> InvalidNamedArg.html:5:2
        "- call thrice(param1=2, param3=3) -%}"
- --> tests/ui/macro_named_argument.rs:3:10
+ --> tests/ui/macro_named_argument.rs:4:21
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 |   #[template(source = "{%- macro thrice(param1, param2) -%}
+  |  _____________________^
+5 | | {{ param1 }} {{ param2 }}
+6 | | {%- endmacro -%}
+7 | |
+8 | | {%- call thrice(param1=2, param3=3) -%}", ext = "html")]
+  | |________________________________________^
 
 error: named argument `param1` was passed more than once
-       failed to parse template source at row 5, column 15 near:
+ --> <source attribute>:5:15
        "(param1=2, param1=3) -%}"
-  --> tests/ui/macro_named_argument.rs:11:10
+  --> tests/ui/macro_named_argument.rs:12:21
    |
-11 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+12 |   #[template(source = "{%- macro thrice(param1, param2) -%}
+   |  _____________________^
+13 | | {{ param1 }} {{ param2 }}
+14 | | {%- endmacro -%}
+15 | |
+16 | | {%- call thrice(param1=2, param1=3) -%}", ext = "html")]
+   | |________________________________________^
 
-error: failed to parse template source at row 5, column 29 near:
+error: failed to parse template source
+ --> <source attribute>:5:29
        "| filter(param1=12) -%}"
-  --> tests/ui/macro_named_argument.rs:20:10
+  --> tests/ui/macro_named_argument.rs:21:21
    |
-20 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+21 |   #[template(source = "{%- macro thrice(param1, param2) -%}
+   |  _____________________^
+22 | | {{ param1 }} {{ param2 }}
+23 | | {%- endmacro -%}
+24 | |
+25 | | {%- call thrice(3, param1=2) | filter(param1=12) -%}", ext = "html")]
+   | |_____________________________________________________^
 
 error: named arguments must always be passed last
-       failed to parse template source at row 4, column 15 near:
+ --> <source attribute>:4:15
        "(param1=2, 3) -%}"
-  --> tests/ui/macro_named_argument.rs:29:10
+  --> tests/ui/macro_named_argument.rs:30:21
    |
-29 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+30 |   #[template(source = "{%- macro thrice(param1, param2) -%}
+   |  _____________________^
+31 | | {{ param1 }} {{ param2 }}
+32 | | {%- endmacro -%}
+33 | | {%- call thrice(param1=2, 3) -%}", ext = "html")]
+   | |_________________________________^
 
 error: cannot have unnamed argument (`param2`) after named argument in macro "thrice"
  --> InvalidNamedArg5.html:4:2
        "- call thrice(3, param1=2) -%}"
-  --> tests/ui/macro_named_argument.rs:37:10
+  --> tests/ui/macro_named_argument.rs:38:21
    |
-37 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+38 |   #[template(source = "{%- macro thrice(param1, param2) -%}
+   |  _____________________^
+39 | | {{ param1 }} {{ param2 }}
+40 | | {%- endmacro -%}
+41 | | {%- call thrice(3, param1=2) -%}", ext = "html")]
+   | |_________________________________^

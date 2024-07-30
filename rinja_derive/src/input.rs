@@ -2,14 +2,14 @@ use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
 use once_map::OnceMap;
 use parser::{Node, Parsed};
-use quote::ToTokens;
+use proc_macro2::Span;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 
 use crate::config::{Config, SyntaxAndCache};
 use crate::{CompileError, FileInfo, MsgValidEscapers};
@@ -19,6 +19,7 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) config: &'a Config,
     pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
+    pub(crate) source_span: Option<Span>,
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
@@ -43,6 +44,7 @@ impl TemplateInput<'_> {
             print,
             escaping,
             ext,
+            ext_span,
             syntax,
             ..
         } = args;
@@ -50,17 +52,18 @@ impl TemplateInput<'_> {
         // Validate the `source` and `ext` value together, since they are
         // related. In case `source` was used instead of `path`, the value
         // of `ext` is merged into a synthetic `path` value here.
-        let source = source
+        let &(ref source, source_span) = source
             .as_ref()
             .expect("template path or source not found in attributes");
         let path = match (&source, &ext) {
-            (Source::Path(path), _) => config.find_template(path, None)?,
+            (Source::Path(path), _) => config.find_template(path, None, None)?,
             (&Source::Source(_), Some(ext)) => {
                 PathBuf::from(format!("{}.{}", ast.ident, ext)).into()
             }
             (&Source::Source(_), None) => {
                 return Err(CompileError::no_file_info(
                     "must include 'ext' attribute when using 'source' attribute",
+                    None,
                 ));
             }
         };
@@ -70,7 +73,7 @@ impl TemplateInput<'_> {
             || Ok(config.syntaxes.get(config.default_syntax).unwrap()),
             |s| {
                 config.syntaxes.get(s).ok_or_else(|| {
-                    CompileError::no_file_info(format!("attribute syntax {s} not exist"))
+                    CompileError::no_file_info(format!("syntax `{s}` is undefined"), None)
                 })
             },
         )?;
@@ -90,10 +93,13 @@ impl TemplateInput<'_> {
                     .then_some(path.as_ref())
             })
             .ok_or_else(|| {
-                CompileError::no_file_info(format!(
-                    "no escaper defined for extension '{escaping}'. {}",
-                    MsgValidEscapers(&config.escapers),
-                ))
+                CompileError::no_file_info(
+                    format!(
+                        "no escaper defined for extension '{escaping}'. {}",
+                        MsgValidEscapers(&config.escapers),
+                    ),
+                    *ext_span,
+                )
             })?;
 
         let mime_type =
@@ -124,6 +130,7 @@ impl TemplateInput<'_> {
             config,
             syntax,
             source,
+            source_span,
             block: block.as_deref(),
             print: *print,
             escaper,
@@ -149,7 +156,21 @@ impl TemplateInput<'_> {
         let mut dependency_graph = Vec::new();
         let mut check = vec![(Arc::clone(&self.path), source, source_path)];
         while let Some((path, source, source_path)) = check.pop() {
-            let parsed = self.syntax.parse(source, source_path)?;
+            let parsed = match self.syntax.parse(Arc::clone(&source), source_path) {
+                Ok(parsed) => parsed,
+                Err(err) => {
+                    let msg = err
+                        .message
+                        .unwrap_or_else(|| "failed to parse template source".into());
+                    let file_path = err
+                        .file_path
+                        .as_deref()
+                        .unwrap_or(Path::new("<source attribute>"));
+                    let file_info =
+                        FileInfo::new(file_path, Some(&source), Some(&source[err.offset..]));
+                    return Err(CompileError::new(msg, Some(file_info)));
+                }
+            };
 
             let mut top = true;
             let mut nested = vec![parsed.nodes()];
@@ -172,7 +193,11 @@ impl TemplateInput<'_> {
 
                     match n {
                         Node::Extends(extends) if top => {
-                            let extends = self.config.find_template(extends.path, Some(&path))?;
+                            let extends = self.config.find_template(
+                                extends.path,
+                                Some(&path),
+                                Some(FileInfo::of(extends, &path, &parsed)),
+                            )?;
                             let dependency_path = (path.clone(), extends.clone());
                             if path == extends {
                                 // We add the path into the graph to have a better looking error.
@@ -188,14 +213,22 @@ impl TemplateInput<'_> {
                             nested.push(&m.nodes);
                         }
                         Node::Import(import) if top => {
-                            let import = self.config.find_template(import.path, Some(&path))?;
+                            let import = self.config.find_template(
+                                import.path,
+                                Some(&path),
+                                Some(FileInfo::of(import, &path, &parsed)),
+                            )?;
                             add_to_check(import)?;
                         }
                         Node::FilterBlock(f) => {
                             nested.push(&f.nodes);
                         }
                         Node::Include(include) => {
-                            let include = self.config.find_template(include.path, Some(&path))?;
+                            let include = self.config.find_template(
+                                include.path,
+                                Some(&path),
+                                Some(FileInfo::of(include, &path, &parsed)),
+                            )?;
                             add_to_check(include)?;
                         }
                         Node::BlockDef(b) => {
@@ -243,56 +276,67 @@ impl TemplateInput<'_> {
 
 #[derive(Debug, Default)]
 pub(crate) struct TemplateArgs {
-    source: Option<Source>,
+    pub(crate) source: Option<(Source, Option<Span>)>,
     block: Option<String>,
     print: Print,
     escaping: Option<String>,
     ext: Option<String>,
+    ext_span: Option<Span>,
     syntax: Option<String>,
     config: Option<String>,
     pub(crate) whitespace: Option<String>,
+    pub(crate) template_span: Option<Span>,
+    pub(crate) config_span: Option<Span>,
 }
 
 impl TemplateArgs {
     pub(crate) fn new(ast: &'_ syn::DeriveInput) -> Result<Self, CompileError> {
         // Check that an attribute called `template()` exists once and that it is
         // the proper type (list).
+        let mut span = None;
         let mut template_args = None;
         for attr in &ast.attrs {
-            if !attr.path().is_ident("template") {
+            let path = &attr.path();
+            if !path.is_ident("template") {
                 continue;
             }
 
+            span = Some(path.span());
             match attr.parse_args_with(Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated) {
                 Ok(args) if template_args.is_none() => template_args = Some(args),
                 Ok(_) => {
                     return Err(CompileError::no_file_info(
                         "duplicated 'template' attribute",
+                        span,
                     ));
                 }
                 Err(e) => {
-                    return Err(CompileError::no_file_info(format!(
-                        "unable to parse template arguments: {e}"
-                    )));
+                    return Err(CompileError::no_file_info(
+                        format!("unable to parse template arguments: {e}"),
+                        span,
+                    ));
                 }
             };
         }
 
         let template_args = template_args
-            .ok_or_else(|| CompileError::no_file_info("no attribute 'template' found"))?;
+            .ok_or_else(|| CompileError::no_file_info("no attribute 'template' found", None))?;
 
-        let mut args = Self::default();
+        let mut args = Self {
+            template_span: span,
+            ..Self::default()
+        };
         // Loop over the meta attributes and find everything that we
         // understand. Return a CompileError if something is not right.
         // `source` contains an enum that can represent `path` or `source`.
-        for item in template_args {
+        for item in &template_args {
             let pair = match item {
                 syn::Meta::NameValue(pair) => pair,
-                _ => {
-                    return Err(CompileError::no_file_info(format!(
-                        "unsupported attribute argument {:?}",
-                        item.to_token_stream()
-                    )));
+                v => {
+                    return Err(CompileError::no_file_info(
+                        "unsupported attribute argument",
+                        Some(v.span()),
+                    ));
                 }
             };
 
@@ -301,109 +345,69 @@ impl TemplateArgs {
                 None => unreachable!("not possible in syn::Meta::NameValue(…)"),
             };
 
-            let value = match pair.value {
+            let value = match &pair.value {
                 syn::Expr::Lit(lit) => lit,
-                syn::Expr::Group(group) => match *group.expr {
+                syn::Expr::Group(group) => match &*group.expr {
                     syn::Expr::Lit(lit) => lit,
-                    _ => {
-                        return Err(CompileError::no_file_info(format!(
-                            "unsupported argument value type for {ident:?}"
-                        )));
+                    v => {
+                        return Err(CompileError::no_file_info(
+                            format!("unsupported argument value type for `{ident}`"),
+                            Some(v.span()),
+                        ));
                     }
                 },
-                _ => {
-                    return Err(CompileError::no_file_info(format!(
-                        "unsupported argument value type for {ident:?}"
-                    )));
+                v => {
+                    return Err(CompileError::no_file_info(
+                        format!("unsupported argument value type for `{ident}`"),
+                        Some(v.span()),
+                    ));
                 }
             };
 
             if ident == "path" {
-                if let syn::Lit::Str(s) = value.lit {
-                    if args.source.is_some() {
-                        return Err(CompileError::no_file_info(
-                            "must specify 'source' or 'path', not both",
-                        ));
-                    }
-                    args.source = Some(Source::Path(s.value()));
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "template path must be string literal",
-                    ));
-                }
+                source_or_path(ident, value, &mut args.source, Source::Path)?;
+                args.ext_span = Some(value.span());
             } else if ident == "source" {
-                if let syn::Lit::Str(s) = value.lit {
-                    if args.source.is_some() {
-                        return Err(CompileError::no_file_info(
-                            "must specify 'source' or 'path', not both",
-                        ));
-                    }
-                    args.source = Some(Source::Source(s.value().into()));
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "template source must be string literal",
-                    ));
-                }
+                source_or_path(ident, value, &mut args.source, |s| Source::Source(s.into()))?;
             } else if ident == "block" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.block = Some(s.value());
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "block value must be string literal",
-                    ));
-                }
+                set_template_str_attr(ident, value, &mut args.block)?;
             } else if ident == "print" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.print = s.value().parse()?;
+                if let syn::Lit::Str(s) = &value.lit {
+                    args.print = match s.value().as_str() {
+                        "all" => Print::All,
+                        "ast" => Print::Ast,
+                        "code" => Print::Code,
+                        "none" => Print::None,
+                        v => {
+                            return Err(CompileError::no_file_info(
+                                format!("invalid value for `print` option: {v}"),
+                                Some(s.span()),
+                            ));
+                        }
+                    };
                 } else {
                     return Err(CompileError::no_file_info(
-                        "print value must be string literal",
+                        "`print` value must be string literal",
+                        Some(value.lit.span()),
                     ));
                 }
             } else if ident == "escape" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.escaping = Some(s.value());
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "escape value must be string literal",
-                    ));
-                }
+                set_template_str_attr(ident, value, &mut args.escaping)?;
             } else if ident == "ext" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.ext = Some(s.value());
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "ext value must be string literal",
-                    ));
-                }
+                set_template_str_attr(ident, value, &mut args.ext)?;
+                args.ext_span = Some(value.span());
             } else if ident == "syntax" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.syntax = Some(s.value())
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "syntax value must be string literal",
-                    ));
-                }
+                set_template_str_attr(ident, value, &mut args.syntax)?;
             } else if ident == "config" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.config = Some(s.value());
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "config value must be string literal",
-                    ));
-                }
+                set_template_str_attr(ident, value, &mut args.config)?;
+                args.config_span = Some(value.span())
             } else if ident == "whitespace" {
-                if let syn::Lit::Str(s) = value.lit {
-                    args.whitespace = Some(s.value())
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "whitespace value must be string literal",
-                    ));
-                }
+                set_template_str_attr(ident, value, &mut args.whitespace)?;
             } else {
-                return Err(CompileError::no_file_info(format!(
-                    "unsupported attribute key {ident:?} found"
-                )));
+                return Err(CompileError::no_file_info(
+                    format!("unsupported attribute key `{ident}` found"),
+                    Some(ident.span()),
+                ));
             }
         }
 
@@ -412,7 +416,7 @@ impl TemplateArgs {
 
     pub(crate) fn fallback() -> Self {
         Self {
-            source: Some(Source::Source("".into())),
+            source: Some((Source::Source("".into()), None)),
             ext: Some("txt".to_string()),
             ..Self::default()
         }
@@ -420,6 +424,49 @@ impl TemplateArgs {
 
     pub(crate) fn config_path(&self) -> Option<&str> {
         self.config.as_deref()
+    }
+}
+
+fn source_or_path(
+    name: &syn::Ident,
+    value: &syn::ExprLit,
+    dest: &mut Option<(Source, Option<Span>)>,
+    ctor: fn(String) -> Source,
+) -> Result<(), CompileError> {
+    if dest.is_some() {
+        Err(CompileError::no_file_info(
+            "must specify `source` OR `path` exactly once",
+            Some(name.span()),
+        ))
+    } else if let syn::Lit::Str(s) = &value.lit {
+        *dest = Some((ctor(s.value()), Some(value.span())));
+        Ok(())
+    } else {
+        Err(CompileError::no_file_info(
+            format!("`{name}` value must be string literal"),
+            Some(value.lit.span()),
+        ))
+    }
+}
+
+fn set_template_str_attr(
+    name: &syn::Ident,
+    value: &syn::ExprLit,
+    dest: &mut Option<String>,
+) -> Result<(), CompileError> {
+    if dest.is_some() {
+        Err(CompileError::no_file_info(
+            format!("attribute `{name}` already set"),
+            Some(name.span()),
+        ))
+    } else if let syn::Lit::Str(s) = &value.lit {
+        *dest = Some(s.value());
+        Ok(())
+    } else {
+        Err(CompileError::no_file_info(
+            format!("`{name}` value must be string literal"),
+            Some(value.lit.span()),
+        ))
     }
 }
 
@@ -456,24 +503,6 @@ pub(crate) enum Print {
     None,
 }
 
-impl FromStr for Print {
-    type Err = CompileError;
-
-    fn from_str(s: &str) -> Result<Print, Self::Err> {
-        Ok(match s {
-            "all" => Print::All,
-            "ast" => Print::Ast,
-            "code" => Print::Code,
-            "none" => Print::None,
-            v => {
-                return Err(CompileError::no_file_info(format!(
-                    "invalid value for print option: {v}"
-                )));
-            }
-        })
-    }
-}
-
 impl Default for Print {
     fn default() -> Self {
         Self::None
@@ -507,13 +536,16 @@ const TEXT_TYPES: [(Mime, Mime); 7] = [
 ];
 
 fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
-    Err(CompileError::no_file_info(format!(
-        "cyclic dependency in graph {:#?}",
-        dependency_graph
-            .iter()
-            .map(|e| format!("{:#?} --> {:#?}", e.0, e.1))
-            .collect::<Vec<String>>()
-    )))
+    Err(CompileError::no_file_info(
+        format!(
+            "cyclic dependency in graph {:#?}",
+            dependency_graph
+                .iter()
+                .map(|e| format!("{:#?} --> {:#?}", e.0, e.1))
+                .collect::<Vec<String>>()
+        ),
+        None,
+    ))
 }
 
 pub(crate) fn get_template_source(
@@ -599,8 +631,8 @@ mod tests {
 
     #[test]
     fn get_source() {
-        let path = Config::new("", None, None)
-            .and_then(|config| config.find_template("b.html", None))
+        let path = Config::new("", None, None, None)
+            .and_then(|config| config.find_template("b.html", None, None))
             .unwrap();
         assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
     }

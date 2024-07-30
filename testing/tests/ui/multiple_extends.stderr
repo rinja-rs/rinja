@@ -1,9 +1,11 @@
 error: multiple extend blocks found
  --> MyTemplate4.txt:3:2
        " extends \"foo.html\" %}\n"
- --> tests/ui/multiple_extends.rs:3:10
+ --> tests/ui/multiple_extends.rs:4:21
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 |   #[template(source = r#"
+  |  _____________________^
+5 | | {% extends "let.html" %}
+6 | | {% extends "foo.html" %}
+7 | | "#, ext = "txt")]
+  | |__^

@@ -1,52 +1,57 @@
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
-       failed to parse template source at row 2, column 20 near:
+         --> <source attribute>:2:20
        ", } = x -%}hello {{ a }}{%- endif -%}\n"
- --> tests/ui/let_destructuring_has_rest.rs:8:10
-  |
-8 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+  --> tests/ui/let_destructuring_has_rest.rs:9:21
+   |
+9  |   #[template(source = "
+   |  _____________________^
+10 | | {%- if let X { a, .., } = x -%}hello {{ a }}{%- endif -%}
+11 | | ", ext = "html")]
+   | |_^
 
 error: expected `,` for more members, or `}` as terminator
-       failed to parse template source at row 2, column 17 near:
+ --> <source attribute>:2:17
        ".. } = x -%}hello {{ a }}{%- endif -%}\n"
-  --> tests/ui/let_destructuring_has_rest.rs:16:10
+  --> tests/ui/let_destructuring_has_rest.rs:17:21
    |
-16 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+17 |   #[template(source = "
+   |  _____________________^
+18 | | {%- if let X { a .. } = x -%}hello {{ a }}{%- endif -%}
+19 | | ", ext = "html")]
+   | |_^
 
 error: expected member, or `}` as terminator
-       failed to parse template source at row 2, column 18 near:
+ --> <source attribute>:2:18
        "1 } = x -%}hello {{ a }}{%- endif -%}\n"
-  --> tests/ui/let_destructuring_has_rest.rs:24:10
+  --> tests/ui/let_destructuring_has_rest.rs:25:21
    |
-24 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+25 |   #[template(source = "
+   |  _____________________^
+26 | | {%- if let X { a, 1 } = x -%}hello {{ a }}{%- endif -%}
+27 | | ", ext = "html")]
+   | |_^
 
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
-       failed to parse template source at row 2, column 20 near:
+         --> <source attribute>:2:20
        ", b } = x -%}hello {{ a }}{%- endif -%}\n"
-  --> tests/ui/let_destructuring_has_rest.rs:32:10
+  --> tests/ui/let_destructuring_has_rest.rs:33:21
    |
-32 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+33 |   #[template(source = "
+   |  _____________________^
+34 | | {%- if let X { a, .., b } = x -%}hello {{ a }}{%- endif -%}
+35 | | ", ext = "html")]
+   | |_^
 
 error: unexpected `,` character after `..`
        note that in a named struct, `..` must come last to ignore other members
-       failed to parse template source at row 2, column 17 near:
+         --> <source attribute>:2:17
        ", b } = x -%}hello {{ a }}{%- endif -%}\n"
-  --> tests/ui/let_destructuring_has_rest.rs:40:10
+  --> tests/ui/let_destructuring_has_rest.rs:41:21
    |
-40 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+41 |   #[template(source = "
+   |  _____________________^
+42 | | {%- if let X { .., b } = x -%}hello {{ a }}{%- endif -%}
+43 | | ", ext = "html")]
+   | |_^

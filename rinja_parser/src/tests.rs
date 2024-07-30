@@ -360,7 +360,7 @@ fn test_rust_macro() {
         &*Ast::from_str("{{a.b.c!( hello )}}", None, &syntax)
             .unwrap_err()
             .to_string(),
-        "failed to parse template source at row 1, column 7 near:\n\"!( hello )}}\"",
+        "failed to parse template source near offset 7",
     );
 }
 
@@ -908,7 +908,7 @@ fn test_missing_space_after_kw() {
     let err = Ast::from_str("{%leta=b%}", None, &syntax).unwrap_err();
     assert!(matches!(
         &*err.to_string(),
-        "failed to parse template source at row 1, column 0 near:\n\"{%leta=b%}\"",
+        "failed to parse template source near offset 0",
     ));
 }
 

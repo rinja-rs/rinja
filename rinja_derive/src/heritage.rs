@@ -44,8 +44,8 @@ pub(crate) struct Context<'a> {
     pub(crate) blocks: HashMap<&'a str, &'a BlockDef<'a>>,
     pub(crate) macros: HashMap<&'a str, &'a Macro<'a>>,
     pub(crate) imports: HashMap<&'a str, Arc<Path>>,
-    path: Option<&'a Path>,
-    parsed: &'a Parsed,
+    pub(crate) path: Option<&'a Path>,
+    pub(crate) parsed: &'a Parsed,
 }
 
 impl Context<'_> {
@@ -84,7 +84,11 @@ impl Context<'_> {
                                 Some(FileInfo::of(e, path, parsed)),
                             ));
                         }
-                        extends = Some(config.find_template(e.path, Some(path))?);
+                        extends = Some(config.find_template(
+                            e.path,
+                            Some(path),
+                            Some(FileInfo::of(e, path, parsed)),
+                        )?);
                     }
                     Node::Macro(m) => {
                         ensure_top(top, m, path, parsed, "macro")?;
@@ -92,7 +96,11 @@ impl Context<'_> {
                     }
                     Node::Import(import) => {
                         ensure_top(top, import, path, parsed, "import")?;
-                        let path = config.find_template(import.path, Some(path))?;
+                        let path = config.find_template(
+                            import.path,
+                            Some(path),
+                            Some(FileInfo::of(import, path, parsed)),
+                        )?;
                         imports.insert(import.scope, path);
                     }
                     Node::BlockDef(b) => {

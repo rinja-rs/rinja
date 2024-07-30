@@ -9,6 +9,7 @@ use std::{env, fs};
 use once_map::sync::OnceMap;
 use parser::node::Whitespace;
 use parser::{ParseError, Parsed, Syntax};
+use proc_macro2::Span;
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
@@ -71,6 +72,7 @@ impl Config {
         source: &str,
         config_path: Option<&str>,
         template_whitespace: Option<&str>,
+        config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
         static CACHE: OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
 
@@ -80,9 +82,9 @@ impl Config {
                 config_path: config_path.map(Cow::Borrowed),
                 template_whitespace: template_whitespace.map(Cow::Borrowed),
             },
-            (),
+            config_span,
             ConfigKey::to_owned,
-            |_, key| match Config::new_uncached(key.clone()) {
+            |config_span, key| match Config::new_uncached(key.clone(), config_span) {
                 Ok(config) => Ok((Arc::clone(&config), config)),
                 Err(err) => Err(err),
             },
@@ -94,7 +96,10 @@ impl Config {
 }
 
 impl Config {
-    fn new_uncached(key: OwnedConfigKey) -> Result<Arc<Config>, CompileError> {
+    fn new_uncached(
+        key: OwnedConfigKey,
+        config_span: Option<Span>,
+    ) -> Result<Arc<Config>, CompileError> {
         // SAFETY: the resulting `Config` will keep a reference to the `key`
         let eternal_key =
             unsafe { transmute::<&ConfigKey<'_>, &'static ConfigKey<'static>>(key.borrow()) };
@@ -152,7 +157,9 @@ impl Config {
                 let name = raw_s.name;
                 match syntaxes.entry(name.to_string()) {
                     Entry::Vacant(entry) => {
-                        entry.insert(SyntaxAndCache::new(raw_s.try_into()?));
+                        entry.insert(SyntaxAndCache::new(
+                            raw_s.to_syntax(config_span, file_info.as_ref())?,
+                        ));
                     }
                     Entry::Occupied(_) => {
                         return Err(CompileError::new(
@@ -198,6 +205,7 @@ impl Config {
         &self,
         path: &str,
         start_at: Option<&Path>,
+        file_info: Option<FileInfo<'_>>,
     ) -> Result<Arc<Path>, CompileError> {
         if let Some(root) = start_at {
             let relative = root.with_file_name(path);
@@ -213,10 +221,13 @@ impl Config {
             }
         }
 
-        Err(CompileError::no_file_info(format!(
-            "template {:?} not found in directories {:?}",
-            path, self.dirs
-        )))
+        Err(CompileError::new(
+            format!(
+                "template {:?} not found in directories {:?}",
+                path, self.dirs
+            ),
+            file_info,
+        ))
     }
 }
 
@@ -296,10 +307,12 @@ impl<'a> SyntaxAndCache<'a> {
     }
 }
 
-impl<'a> TryInto<Syntax<'a>> for RawSyntax<'a> {
-    type Error = CompileError;
-
-    fn try_into(self) -> Result<Syntax<'a>, Self::Error> {
+impl<'a> RawSyntax<'a> {
+    fn to_syntax(
+        &self,
+        config_span: Option<Span>,
+        file_info: Option<&FileInfo<'_>>,
+    ) -> Result<Syntax<'a>, CompileError> {
         let default = Syntax::default();
         let syntax = Syntax {
             block_start: self.block_start.unwrap_or(default.block_start),
@@ -319,13 +332,17 @@ impl<'a> TryInto<Syntax<'a>> for RawSyntax<'a> {
             syntax.comment_end,
         ] {
             if s.len() < 2 {
-                return Err(CompileError::no_file_info(format!(
-                    "delimiters must be at least two characters long: {s:?}"
-                )));
+                return Err(CompileError::new_with_span(
+                    format!("delimiters must be at least two characters long: {s:?}"),
+                    file_info.copied(),
+                    config_span,
+                ));
             } else if s.chars().any(|c| c.is_whitespace()) {
-                return Err(CompileError::no_file_info(format!(
-                    "delimiters may not contain white spaces: {s:?}"
-                )));
+                return Err(CompileError::new_with_span(
+                    format!("delimiters may not contain white spaces: {s:?}"),
+                    file_info.copied(),
+                    config_span,
+                ));
             }
         }
 
@@ -335,9 +352,13 @@ impl<'a> TryInto<Syntax<'a>> for RawSyntax<'a> {
             (syntax.expr_start, syntax.comment_start),
         ] {
             if s1.starts_with(s2) || s2.starts_with(s1) {
-                return Err(CompileError::no_file_info(format!(
-                    "a delimiter may not be the prefix of another delimiter: {s1:?} vs {s2:?}",
-                )));
+                return Err(CompileError::new_with_span(
+                    format!(
+                        "a delimiter may not be the prefix of another delimiter: {s1:?} vs {s2:?}",
+                    ),
+                    file_info.copied(),
+                    config_span,
+                ));
             }
         }
 
@@ -358,13 +379,16 @@ impl RawConfig<'_> {
     #[cfg(feature = "config")]
     fn from_toml_str(s: &str) -> Result<RawConfig<'_>, CompileError> {
         basic_toml::from_str(s).map_err(|e| {
-            CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"))
+            CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"), None)
         })
     }
 
     #[cfg(not(feature = "config"))]
     fn from_toml_str(_: &str) -> Result<RawConfig<'_>, CompileError> {
-        Err(CompileError::no_file_info("TOML support not available"))
+        Err(CompileError::no_file_info(
+            "TOML support not available",
+            None,
+        ))
     }
 }
 
@@ -419,7 +443,10 @@ struct RawEscaper<'a> {
     extensions: Vec<&'a str>,
 }
 
-pub(crate) fn read_config_file(config_path: Option<&str>) -> Result<String, CompileError> {
+pub(crate) fn read_config_file(
+    config_path: Option<&str>,
+    span: Option<Span>,
+) -> Result<String, CompileError> {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let filename = match config_path {
         Some(config_path) => root.join(config_path),
@@ -427,14 +454,17 @@ pub(crate) fn read_config_file(config_path: Option<&str>) -> Result<String, Comp
     };
 
     if filename.exists() {
-        fs::read_to_string(&filename).map_err(|_| {
-            CompileError::no_file_info(format!("unable to read {:?}", filename.to_str().unwrap()))
+        fs::read_to_string(&filename).map_err(|err| {
+            CompileError::no_file_info(
+                format!("unable to read {}: {err}", filename.display()),
+                span,
+            )
         })
     } else if config_path.is_some() {
-        Err(CompileError::no_file_info(format!(
-            "`{}` does not exist",
-            root.display()
-        )))
+        Err(CompileError::no_file_info(
+            format!("`{}` does not exist", filename.display()),
+            span,
+        ))
     } else {
         Ok("".to_string())
     }
@@ -465,7 +495,7 @@ mod tests {
     fn test_default_config() {
         let mut root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         root.push("templates");
-        let config = Config::new("", None, None).unwrap();
+        let config = Config::new("", None, None, None).unwrap();
         assert_eq!(config.dirs, vec![root]);
     }
 
@@ -474,7 +504,7 @@ mod tests {
     fn test_config_dirs() {
         let mut root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         root.push("tpl");
-        let config = Config::new("[general]\ndirs = [\"tpl\"]", None, None).unwrap();
+        let config = Config::new("[general]\ndirs = [\"tpl\"]", None, None, None).unwrap();
         assert_eq!(config.dirs, vec![root]);
     }
 
@@ -488,33 +518,37 @@ mod tests {
 
     #[test]
     fn find_absolute() {
-        let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("a.html", None).unwrap();
-        let path = config.find_template("sub/b.html", Some(&root)).unwrap();
+        let config = Config::new("", None, None, None).unwrap();
+        let root = config.find_template("a.html", None, None).unwrap();
+        let path = config
+            .find_template("sub/b.html", Some(&root), None)
+            .unwrap();
         assert_eq_rooted(&path, "sub/b.html");
     }
 
     #[test]
     #[should_panic]
     fn find_relative_nonexistent() {
-        let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("a.html", None).unwrap();
-        config.find_template("c.html", Some(&root)).unwrap();
+        let config = Config::new("", None, None, None).unwrap();
+        let root = config.find_template("a.html", None, None).unwrap();
+        config.find_template("c.html", Some(&root), None).unwrap();
     }
 
     #[test]
     fn find_relative() {
-        let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("sub/b.html", None).unwrap();
-        let path = config.find_template("c.html", Some(&root)).unwrap();
+        let config = Config::new("", None, None, None).unwrap();
+        let root = config.find_template("sub/b.html", None, None).unwrap();
+        let path = config.find_template("c.html", Some(&root), None).unwrap();
         assert_eq_rooted(&path, "sub/c.html");
     }
 
     #[test]
     fn find_relative_sub() {
-        let config = Config::new("", None, None).unwrap();
-        let root = config.find_template("sub/b.html", None).unwrap();
-        let path = config.find_template("sub1/d.html", Some(&root)).unwrap();
+        let config = Config::new("", None, None, None).unwrap();
+        let root = config.find_template("sub/b.html", None, None).unwrap();
+        let path = config
+            .find_template("sub1/d.html", Some(&root), None)
+            .unwrap();
         assert_eq_rooted(&path, "sub/sub1/d.html");
     }
 
@@ -535,7 +569,7 @@ mod tests {
         "#;
 
         let default_syntax = Syntax::default();
-        let config = Config::new(raw_config, None, None).unwrap();
+        let config = Config::new(raw_config, None, None, None).unwrap();
         assert_eq!(config.default_syntax, "foo");
 
         let foo = config.syntaxes.get("foo").unwrap();
@@ -567,7 +601,7 @@ mod tests {
         "#;
 
         let default_syntax = Syntax::default();
-        let config = Config::new(raw_config, None, None).unwrap();
+        let config = Config::new(raw_config, None, None, None).unwrap();
         assert_eq!(config.default_syntax, "foo");
 
         let foo = config.syntaxes.get("foo").unwrap();
@@ -604,7 +638,7 @@ mod tests {
         default_syntax = "emoji"
         "#;
 
-        let config = Config::new(raw_config, None, None).unwrap();
+        let config = Config::new(raw_config, None, None, None).unwrap();
         assert_eq!(config.default_syntax, "emoji");
 
         let foo = config.syntaxes.get("emoji").unwrap();
@@ -632,7 +666,7 @@ mod tests {
         name = "too_short"
         block_start = "<"
         "#;
-        let config = Config::new(raw_config, None, None);
+        let config = Config::new(raw_config, None, None, None);
         assert_eq!(
             expect_err(config).msg,
             r#"delimiters must be at least two characters long: "<""#,
@@ -643,7 +677,7 @@ mod tests {
         name = "contains_ws"
         block_start = " {{ "
         "#;
-        let config = Config::new(raw_config, None, None);
+        let config = Config::new(raw_config, None, None, None);
         assert_eq!(
             expect_err(config).msg,
             r#"delimiters may not contain white spaces: " {{ ""#,
@@ -656,7 +690,7 @@ mod tests {
         expr_start = "{{$"
         comment_start = "{{#"
         "#;
-        let config = Config::new(raw_config, None, None);
+        let config = Config::new(raw_config, None, None, None);
         assert_eq!(
             expect_err(config).msg,
             r#"a delimiter may not be the prefix of another delimiter: "{{" vs "{{$""#,
@@ -671,7 +705,7 @@ mod tests {
         syntax = [{ name = "default" }]
         "#;
 
-        let _config = Config::new(raw_config, None, None).unwrap();
+        let _config = Config::new(raw_config, None, None, None).unwrap();
     }
 
     #[cfg(feature = "config")]
@@ -683,7 +717,7 @@ mod tests {
                   { name = "foo", block_start = "%%" } ]
         "#;
 
-        let _config = Config::new(raw_config, None, None).unwrap();
+        let _config = Config::new(raw_config, None, None, None).unwrap();
     }
 
     #[cfg(feature = "config")]
@@ -695,7 +729,7 @@ mod tests {
         default_syntax = "foo"
         "#;
 
-        let _config = Config::new(raw_config, None, None).unwrap();
+        let _config = Config::new(raw_config, None, None, None).unwrap();
     }
 
     #[cfg(feature = "config")]
@@ -707,6 +741,7 @@ mod tests {
             path = "::my_filters::Js"
             extensions = ["js"]
         "#,
+            None,
             None,
             None,
         )
@@ -737,11 +772,12 @@ mod tests {
             "#,
             None,
             None,
+            None,
         )
         .unwrap();
         assert_eq!(config.whitespace, WhitespaceHandling::Suppress);
 
-        let config = Config::new(r#""#, None, None).unwrap();
+        let config = Config::new(r#""#, None, None, None).unwrap();
         assert_eq!(config.whitespace, WhitespaceHandling::Preserve);
 
         let config = Config::new(
@@ -749,6 +785,7 @@ mod tests {
             [general]
             whitespace = "preserve"
             "#,
+            None,
             None,
             None,
         )
@@ -760,6 +797,7 @@ mod tests {
             [general]
             whitespace = "minimize"
             "#,
+            None,
             None,
             None,
         )
@@ -780,17 +818,18 @@ mod tests {
             "#,
             None,
             Some("minimize"),
+            None,
         )
         .unwrap();
         assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
 
-        let config = Config::new(r#""#, None, Some("minimize")).unwrap();
+        let config = Config::new(r#""#, None, Some("minimize"), None).unwrap();
         assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
     }
 
     #[test]
     fn test_config_whitespace_error() {
-        let config = Config::new(r#""#, None, Some("trim"));
+        let config = Config::new(r#""#, None, Some("trim"), None);
         if let Err(err) = config {
             assert_eq!(err.msg, "invalid value for `whitespace`: \"trim\"");
         } else {

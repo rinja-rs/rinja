@@ -1,30 +1,24 @@
 error: the binary AND operator is called `bitand` in rinja
-       failed to parse template source at row 1, column 6 near:
+ --> <source attribute>:1:6
        " b }}"
- --> tests/ui/iso646.rs:3:10
+ --> tests/ui/iso646.rs:4:34
   |
-3 | #[derive(Template)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[template(ext = "txt", source = "{{ a & b }}")]
+  |                                  ^^^^^^^^^^^^^
 
 error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
-       failed to parse template source at row 1, column 4 near:
+         --> <source attribute>:1:4
        " | b }}"
-  --> tests/ui/iso646.rs:17:10
+  --> tests/ui/iso646.rs:18:34
    |
-17 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+18 | #[template(ext = "txt", source = "{{ a | b }}")]
+   |                                  ^^^^^^^^^^^^^
 
 error: the binary XOR operator is called `xor` in rinja
-       failed to parse template source at row 1, column 6 near:
+ --> <source attribute>:1:6
        " b }}"
-  --> tests/ui/iso646.rs:31:10
+  --> tests/ui/iso646.rs:32:34
    |
-31 | #[derive(Template)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
+32 | #[template(ext = "txt", source = "{{ a ^ b }}")]
+   |                                  ^^^^^^^^^^^^^
