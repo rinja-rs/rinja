@@ -3,17 +3,18 @@ use nom::bytes::complete::tag;
 use nom::character::complete::{char, one_of};
 use nom::combinator::{consumed, map, map_res, opt};
 use nom::multi::separated_list1;
-use nom::sequence::{pair, preceded};
+use nom::sequence::{pair, preceded, tuple};
 
 use crate::{
     bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
-    ErrorContext, ParseErr, ParseResult, PathOrIdentifier, State,
+    ErrorContext, ParseErr, ParseResult, PathOrIdentifier, State, WithSpan,
 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Target<'a> {
     Name(&'a str),
     Tuple(Vec<&'a str>, Vec<Target<'a>>),
+    Array(Vec<&'a str>, Vec<Target<'a>>),
     Struct(Vec<&'a str>, Vec<(&'a str, Target<'a>)>),
     NumLit(&'a str),
     StrLit(&'a str),
@@ -22,7 +23,8 @@ pub enum Target<'a> {
     Path(Vec<&'a str>),
     OrChain(Vec<Target<'a>>),
     Placeholder(&'a str),
-    Rest(&'a str),
+    /// The `Option` is the variable name (if any) in `var_name @ ..`.
+    Rest(WithSpan<'a, Option<&'a str>>),
 }
 
 impl<'a> Target<'a> {
@@ -41,6 +43,7 @@ impl<'a> Target<'a> {
     fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         let mut opt_opening_paren = map(opt(ws(char('('))), |o| o.is_some());
         let mut opt_opening_brace = map(opt(ws(char('{'))), |o| o.is_some());
+        let mut opt_opening_bracket = map(opt(ws(char('['))), |o| o.is_some());
 
         let (i, lit) = opt(Self::lit)(i)?;
         if let Some(lit) = lit {
@@ -54,7 +57,21 @@ impl<'a> Target<'a> {
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
-            return Ok((i, Self::Tuple(Vec::new(), only_one_rest_pattern(targets)?)));
+            return Ok((
+                i,
+                Self::Tuple(Vec::new(), only_one_rest_pattern(targets, false, "tuple")?),
+            ));
+        }
+        let (i, target_is_array) = opt_opening_bracket(i)?;
+        if target_is_array {
+            let (i, (singleton, mut targets)) = collect_targets(i, s, ']', Self::unnamed)?;
+            if singleton {
+                return Ok((i, targets.pop().unwrap()));
+            }
+            return Ok((
+                i,
+                Self::Array(Vec::new(), only_one_rest_pattern(targets, true, "array")?),
+            ));
         }
 
         let path = |i| {
@@ -73,7 +90,10 @@ impl<'a> Target<'a> {
             let (i, is_unnamed_struct) = opt_opening_paren(i)?;
             if is_unnamed_struct {
                 let (i, (_, targets)) = collect_targets(i, s, ')', Self::unnamed)?;
-                return Ok((i, Self::Tuple(path, only_one_rest_pattern(targets)?)));
+                return Ok((
+                    i,
+                    Self::Tuple(path, only_one_rest_pattern(targets, false, "struct")?),
+                ));
             }
 
             let (i, is_named_struct) = opt_opening_brace(i)?;
@@ -120,6 +140,14 @@ impl<'a> Target<'a> {
                     i,
                 )));
             }
+            if let Target::Rest(ref s) = rest.1 {
+                if s.inner.is_some() {
+                    return Err(nom::Err::Failure(ErrorContext::new(
+                        "`@ ..` cannot be used in struct",
+                        s.span,
+                    )));
+                }
+            }
             return Ok((i, rest));
         }
 
@@ -142,8 +170,12 @@ impl<'a> Target<'a> {
         Ok((i, (src, target)))
     }
 
-    fn rest(i: &'a str) -> ParseResult<'a, Self> {
-        map(tag(".."), Self::Rest)(i)
+    fn rest(start: &'a str) -> ParseResult<'a, Self> {
+        let (i, (ident, _)) = tuple((opt(tuple((identifier, ws(char('@'))))), tag("..")))(start)?;
+        Ok((
+            i,
+            Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
+        ))
     }
 }
 
@@ -195,19 +227,29 @@ fn collect_targets<'a, T>(
     Ok((i, (singleton, targets)))
 }
 
-fn only_one_rest_pattern(targets: Vec<Target<'_>>) -> Result<Vec<Target<'_>>, ParseErr<'_>> {
-    let snd_wildcard = targets
-        .iter()
-        .filter_map(|t| match t {
-            Target::Rest(s) => Some(s),
-            _ => None,
-        })
-        .nth(1);
-    if let Some(snd_wildcard) = snd_wildcard {
-        return Err(nom::Err::Failure(ErrorContext::new(
-            "`..` can only be used once per tuple pattern",
-            snd_wildcard,
-        )));
+fn only_one_rest_pattern<'a>(
+    targets: Vec<Target<'a>>,
+    allow_named_rest: bool,
+    type_kind: &str,
+) -> Result<Vec<Target<'a>>, ParseErr<'a>> {
+    let mut found_rest = false;
+
+    for target in &targets {
+        if let Target::Rest(s) = target {
+            if !allow_named_rest && s.inner.is_some() {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    format!("`@ ..` cannot be used in {type_kind}"),
+                    s.span,
+                )));
+            }
+            if found_rest {
+                return Err(nom::Err::Failure(ErrorContext::new(
+                    format!("`..` can only be used once per {type_kind} pattern"),
+                    s.span,
+                )));
+            }
+            found_rest = true;
+        }
     }
     Ok(targets)
 }

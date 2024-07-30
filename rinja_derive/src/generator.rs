@@ -2015,8 +2015,15 @@ impl<'a> Generator<'a> {
         target: &Target<'a>,
     ) {
         match target {
-            Target::Placeholder(s) | Target::Rest(s) => {
-                buf.write(s);
+            Target::Placeholder(s) => buf.write(s),
+            Target::Rest(s) => {
+                if let Some(var_name) = s.deref() {
+                    self.locals
+                        .insert(Cow::Borrowed(var_name), LocalMeta::initialized());
+                    buf.write(var_name);
+                    buf.write(" @ ");
+                }
+                buf.write("..");
             }
             Target::Name(name) => {
                 let name = normalize_identifier(name);
@@ -2047,12 +2054,21 @@ impl<'a> Generator<'a> {
                 }
                 buf.write(")");
             }
+            Target::Array(path, targets) => {
+                buf.write(SeparatedPath(path));
+                buf.write("[");
+                for target in targets {
+                    self.visit_target(buf, initialized, false, target);
+                    buf.write(",");
+                }
+                buf.write("]");
+            }
             Target::Struct(path, targets) => {
                 buf.write(SeparatedPath(path));
                 buf.write(" { ");
                 for (name, target) in targets {
-                    if let Target::Rest(s) = target {
-                        buf.write(s);
+                    if let Target::Rest(_) = target {
+                        buf.write("..");
                         continue;
                     }
 
