@@ -366,7 +366,7 @@ impl TemplateArgs {
 
             if ident == "path" {
                 source_or_path(ident, value, &mut args.source, Source::Path)?;
-                args.ext_span = Some(ident.span());
+                args.ext_span = Some(value.span());
             } else if ident == "source" {
                 source_or_path(ident, value, &mut args.source, |s| Source::Source(s.into()))?;
             } else if ident == "block" {
@@ -395,12 +395,12 @@ impl TemplateArgs {
                 set_template_str_attr(ident, value, &mut args.escaping)?;
             } else if ident == "ext" {
                 set_template_str_attr(ident, value, &mut args.ext)?;
-                args.ext_span = Some(ident.span());
+                args.ext_span = Some(value.span());
             } else if ident == "syntax" {
                 set_template_str_attr(ident, value, &mut args.syntax)?;
             } else if ident == "config" {
                 set_template_str_attr(ident, value, &mut args.config)?;
-                args.config_span = Some(ident.span())
+                args.config_span = Some(value.span())
             } else if ident == "whitespace" {
                 set_template_str_attr(ident, value, &mut args.whitespace)?;
             } else {
@@ -439,7 +439,7 @@ fn source_or_path(
             Some(name.span()),
         ))
     } else if let syn::Lit::Str(s) = &value.lit {
-        *dest = Some((ctor(s.value()), Some(name.span())));
+        *dest = Some((ctor(s.value()), Some(value.span())));
         Ok(())
     } else {
         Err(CompileError::no_file_info(

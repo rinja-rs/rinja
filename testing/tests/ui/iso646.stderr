@@ -1,24 +1,24 @@
 error: the binary AND operator is called `bitand` in rinja
  --> <source attribute>:1:6
        " b }}"
- --> tests/ui/iso646.rs:4:25
+ --> tests/ui/iso646.rs:4:34
   |
 4 | #[template(ext = "txt", source = "{{ a & b }}")]
-  |                         ^^^^^^
+  |                                  ^^^^^^^^^^^^^
 
 error: the filter operator `|` must not be preceded by any whitespace characters
        the binary OR operator is called `bitor` in rinja
          --> <source attribute>:1:4
        " | b }}"
-  --> tests/ui/iso646.rs:18:25
+  --> tests/ui/iso646.rs:18:34
    |
 18 | #[template(ext = "txt", source = "{{ a | b }}")]
-   |                         ^^^^^^
+   |                                  ^^^^^^^^^^^^^
 
 error: the binary XOR operator is called `xor` in rinja
  --> <source attribute>:1:6
        " b }}"
-  --> tests/ui/iso646.rs:32:25
+  --> tests/ui/iso646.rs:32:34
    |
 32 | #[template(ext = "txt", source = "{{ a ^ b }}")]
-   |                         ^^^^^^
+   |                                  ^^^^^^^^^^^^^

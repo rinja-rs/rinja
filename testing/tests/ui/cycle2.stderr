@@ -1,7 +1,7 @@
 error: cyclic dependency in graph [
            "\"$WORKSPACE/target/tests/trybuild/rinja_testing/templates/cycle1.html/" --> \"$WORKSPACE/target/tests/trybuild/rinja_testing/templates/cycle1.html/"",
        ]
- --> tests/ui/cycle2.rs:4:12
+ --> tests/ui/cycle2.rs:4:19
   |
 4 | #[template(path = "cycle1.html")]
-  |            ^^^^
+  |                   ^^^^^^^^^^^^^
