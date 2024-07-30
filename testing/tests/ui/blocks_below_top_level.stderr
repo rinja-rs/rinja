@@ -1,6 +1,4 @@
-error: `extends` blocks are not allowed below top level
- --> MyTemplate1.txt:3:2
-       " extends \"bla.txt\" %}\n{% endblock %}\n"
+error: the previous template error derives from
  --> tests/ui/blocks_below_top_level.rs:4:21
   |
 4 |   #[template(source = r#"
@@ -11,9 +9,7 @@ error: `extends` blocks are not allowed below top level
 8 | | "#, ext = "txt")]
   | |__^
 
-error: `macro` blocks are not allowed below top level
- --> MyTemplate2.txt:3:2
-       " macro bla() %}\n{% endmacro %}\n{% endblock %}\n"
+error: the previous template error derives from
   --> tests/ui/blocks_below_top_level.rs:12:21
    |
 12 |   #[template(source = r#"
@@ -25,9 +21,7 @@ error: `macro` blocks are not allowed below top level
 17 | | "#, ext = "txt")]
    | |__^
 
-error: `import` blocks are not allowed below top level
- --> MyTemplate3.txt:3:2
-       " import \"bla.txt\" as blue %}\n{% endblock %}\n"
+error: the previous template error derives from
   --> tests/ui/blocks_below_top_level.rs:21:21
    |
 21 |   #[template(source = r#"

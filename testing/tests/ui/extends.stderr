@@ -1,14 +1,10 @@
-error: whitespace control is not allowed on `extends`
- --> <source attribute>:1:2
-       "- extends \"whatever.html\" %}"
+error: the previous template error derives from
  --> tests/ui/extends.rs:5:14
   |
 5 |     source = r#"{%- extends "whatever.html" %}"#,
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: whitespace control is not allowed on `extends`
- --> <source attribute>:1:2
-       " extends \"whatever.html\" -%}"
+error: the previous template error derives from
   --> tests/ui/extends.rs:12:14
    |
 12 |     source = r#"{% extends "whatever.html" -%}"#,
