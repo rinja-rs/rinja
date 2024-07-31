@@ -35,7 +35,7 @@ error: unexpected `,` character after `..`
 31 | | "#,
    | |__^
 
-error: `@ ..` cannot be used in tuple
+error: `@ ..` is only allowed in slice patterns
  --> <source attribute>:2:18
        "who @ .., 4) = (1, 2, 3, 4) -%}\n{%- endif -%}\n"
   --> tests/ui/rest_pattern.rs:39:14

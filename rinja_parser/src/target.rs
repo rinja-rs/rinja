@@ -238,7 +238,7 @@ fn only_one_rest_pattern<'a>(
         if let Target::Rest(s) = target {
             if !allow_named_rest && s.inner.is_some() {
                 return Err(nom::Err::Failure(ErrorContext::new(
-                    format!("`@ ..` cannot be used in {type_kind}"),
+                    "`@ ..` is only allowed in slice patterns",
                     s.span,
                 )));
             }
