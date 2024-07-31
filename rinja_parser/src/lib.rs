@@ -342,7 +342,7 @@ fn skip_ws1(i: &str) -> InputParseResult<'_, ()> {
     if i.len() != j.len() {
         Ok((j, ()))
     } else {
-        fail.parse_next(i)
+        fail.parse_peek(i)
     }
 }
 
@@ -370,7 +370,7 @@ fn skip_till<'a, 'b, O>(
                     )));
                 }
             };
-            i = match next.parse_next(i)? {
+            i = match next.parse_peek(i)? {
                 (inclusive, Some(lookahead)) => return Ok((i, (inclusive, lookahead))),
                 (inclusive, None) => inclusive,
             };
@@ -389,11 +389,11 @@ fn identifier(input: &str) -> InputParseResult<'_> {
         c.is_alphanum() || c == '_' || c >= '\u{0080}'
     });
 
-    (start, opt(tail)).recognize().parse_next(input)
+    (start, opt(tail)).recognize().parse_peek(input)
 }
 
 fn bool_lit(i: &str) -> InputParseResult<'_> {
-    alt((keyword("false"), keyword("true"))).parse_next(i)
+    alt((keyword("false"), keyword("true"))).parse_peek(i)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -409,7 +409,7 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
         start: &'a str,
         i: &'a str,
     ) -> InputParseResult<'a, T> {
-        let (i, suffix) = identifier.parse_next(i)?;
+        let (i, suffix) = identifier.parse_peek(i)?;
         if let Some(value) = list
             .iter()
             .copied()
@@ -428,8 +428,8 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     let int_with_base = (opt('-'), |i| {
         let (i, (base, kind)) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
             .with_recognized()
-            .parse_next(i)?;
-        match opt(separated_digits(base, false)).parse_next(i)? {
+            .parse_peek(i)?;
+        match opt(separated_digits(base, false)).parse_peek(i)? {
             (i, Some(_)) => Ok((i, ())),
             (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("expected digits after `{kind}`"),
@@ -441,10 +441,10 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> InputParseResult<'a, ()> {
-        let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_next(i)?;
+        let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_peek(i)?;
         let (i, has_exp) = opt(|i| {
-            let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_next(i)?;
-            match opt(separated_digits(10, op.is_none())).parse_next(i)? {
+            let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_peek(i)?;
+            match opt(separated_digits(10, op.is_none())).parse_peek(i)? {
                 (i, Some(_)) => Ok((i, ())),
                 (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
@@ -452,28 +452,28 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
                 ))),
             }
         })
-        .parse_next(i)?;
+        .parse_peek(i)?;
         match (has_dot, has_exp) {
             (Some(_), _) | (_, Some(())) => Ok((i, ())),
-            _ => fail.parse_next(start),
+            _ => fail.parse_peek(start),
         }
     };
 
-    let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_next(start) {
+    let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_peek(start) {
         let (i, suffix) =
-            opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
+            opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_peek(i)?;
         (i, Num::Int(num, suffix))
     } else {
         let (i, (float, num)) = preceded((opt('-'), separated_digits(10, true)), opt(float))
             .with_recognized()
-            .parse_next(start)?;
+            .parse_peek(start)?;
         if float.is_some() {
             let (i, suffix) =
-                opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_next(i)?;
+                opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_peek(i)?;
             (i, Num::Float(num, suffix))
         } else {
             let (i, suffix) =
-                opt(|i| num_lit_suffix("number", NUM_TYPES, start, i)).parse_next(i)?;
+                opt(|i| num_lit_suffix("number", NUM_TYPES, start, i)).parse_peek(i)?;
             match suffix {
                 Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
                 Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
@@ -493,7 +493,7 @@ fn separated_digits<'a>(
     (
         move |i: &'a _| match start {
             true => Ok((i, ())),
-            false => repeat(0.., '_').parse_next(i),
+            false => repeat(0.., '_').parse_peek(i),
         },
         one_of(move |ch: char| ch.is_digit(radix)),
         repeat(0.., one_of(move |ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
@@ -533,12 +533,12 @@ pub struct StrLit<'a> {
 
 fn str_lit_without_prefix(i: &str) -> InputParseResult<'_> {
     let (i, s) =
-        delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_next(i)?;
+        delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_peek(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
 fn str_lit(i: &str) -> InputParseResult<'_, StrLit<'_>> {
-    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
+    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_peek(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
@@ -570,7 +570,7 @@ fn char_lit(i: &str) -> InputParseResult<'_, CharLit<'_>> {
             '\'',
         ),
     )
-        .parse_next(i)?;
+        .parse_peek(i)?;
 
     let Some(s) = s else {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -637,7 +637,7 @@ enum Char<'a> {
 impl<'a> Char<'a> {
     fn parse(i: &'a str) -> InputParseResult<'a, Self> {
         if i.chars().count() == 1 {
-            return any.value(Self::Literal).parse_next(i);
+            return any.value(Self::Literal).parse_peek(i);
         }
         (
             '\\',
@@ -661,7 +661,7 @@ impl<'a> Char<'a> {
             )),
         )
             .map(|(_, ch)| ch)
-            .parse_next(i)
+            .parse_peek(i)
     }
 }
 
@@ -674,7 +674,7 @@ fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
     let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = (root, identifier, tail).parse_next(i)?;
+    let (i, (root, start, rest)) = (root, identifier, tail).parse_peek(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:
@@ -729,13 +729,13 @@ impl<'a> State<'a> {
         let prev_level = self.level.get();
         let (_, level) = prev_level.nest(i)?;
         self.level.set(level);
-        let ret = callback.parse_next(i);
+        let ret = callback.parse_peek(i);
         self.level.set(prev_level);
         ret
     }
 
     fn tag_block_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.block_start.value(()).parse_next(i)
+        self.syntax.block_start.value(()).parse_peek(i)
     }
 
     fn tag_block_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
@@ -744,7 +744,7 @@ impl<'a> State<'a> {
             peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
             fail, // rollback on partial matches in the previous line
         ))
-        .parse_next(i)?;
+        .parse_peek(i)?;
         if let Some(control) = control {
             let message = format!(
                 "unclosed block, you likely meant to apply whitespace control: {:?}",
@@ -757,19 +757,19 @@ impl<'a> State<'a> {
     }
 
     fn tag_comment_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.comment_start.value(()).parse_next(i)
+        self.syntax.comment_start.value(()).parse_peek(i)
     }
 
     fn tag_comment_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.comment_end.value(()).parse_next(i)
+        self.syntax.comment_end.value(()).parse_peek(i)
     }
 
     fn tag_expr_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.expr_start.value(()).parse_next(i)
+        self.syntax.expr_start.value(()).parse_peek(i)
     }
 
     fn tag_expr_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.expr_end.value(()).parse_next(i)
+        self.syntax.expr_end.value(()).parse_peek(i)
     }
 
     fn enter_loop(&self) {
@@ -961,10 +961,10 @@ fn filter<'a>(
     level: &mut Level,
 ) -> InputParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
     let start = i;
-    let (i, _) = ws(('|', not('|'))).parse_next(i)?;
+    let (i, _) = ws(('|', not('|'))).parse_peek(i)?;
 
     *level = level.nest(start)?.1;
-    cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(i)
+    cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_peek(i)
 }
 
 /// Returns the common parts of two paths.
@@ -1130,63 +1130,63 @@ mod test {
     #[test]
     fn test_num_lit() {
         // Should fail.
-        assert!(num_lit.parse_next(".").is_err());
+        assert!(num_lit.parse_peek(".").is_err());
         // Should succeed.
         assert_eq!(
-            num_lit.parse_next("1.2E-02").unwrap(),
+            num_lit.parse_peek("1.2E-02").unwrap(),
             ("", Num::Float("1.2E-02", None))
         );
         assert_eq!(
-            num_lit.parse_next("4e3").unwrap(),
+            num_lit.parse_peek("4e3").unwrap(),
             ("", Num::Float("4e3", None)),
         );
         assert_eq!(
-            num_lit.parse_next("4e+_3").unwrap(),
+            num_lit.parse_peek("4e+_3").unwrap(),
             ("", Num::Float("4e+_3", None)),
         );
         // Not supported because Rust wants a number before the `.`.
-        assert!(num_lit.parse_next(".1").is_err());
-        assert!(num_lit.parse_next(".1E-02").is_err());
+        assert!(num_lit.parse_peek(".1").is_err());
+        assert!(num_lit.parse_peek(".1E-02").is_err());
         // A `_` directly after the `.` denotes a field.
         assert_eq!(
-            num_lit.parse_next("1._0").unwrap(),
+            num_lit.parse_peek("1._0").unwrap(),
             ("._0", Num::Int("1", None))
         );
         assert_eq!(
-            num_lit.parse_next("1_.0").unwrap(),
+            num_lit.parse_peek("1_.0").unwrap(),
             ("", Num::Float("1_.0", None))
         );
         // Not supported (voluntarily because of `1..` syntax).
         assert_eq!(
-            num_lit.parse_next("1.").unwrap(),
+            num_lit.parse_peek("1.").unwrap(),
             (".", Num::Int("1", None))
         );
         assert_eq!(
-            num_lit.parse_next("1_.").unwrap(),
+            num_lit.parse_peek("1_.").unwrap(),
             (".", Num::Int("1_", None))
         );
         assert_eq!(
-            num_lit.parse_next("1_2.").unwrap(),
+            num_lit.parse_peek("1_2.").unwrap(),
             (".", Num::Int("1_2", None))
         );
         // Numbers with suffixes
         assert_eq!(
-            num_lit.parse_next("-1usize").unwrap(),
+            num_lit.parse_peek("-1usize").unwrap(),
             ("", Num::Int("-1", Some(IntKind::Usize)))
         );
         assert_eq!(
-            num_lit.parse_next("123_f32").unwrap(),
+            num_lit.parse_peek("123_f32").unwrap(),
             ("", Num::Float("123_", Some(FloatKind::F32)))
         );
         assert_eq!(
-            num_lit.parse_next("1_.2_e+_3_f64|into_isize").unwrap(),
+            num_lit.parse_peek("1_.2_e+_3_f64|into_isize").unwrap(),
             (
                 "|into_isize",
                 Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
             )
         );
         assert_eq!(
-            num_lit.parse_next("4e3f128").unwrap(),
+            num_lit.parse_peek("4e3f128").unwrap(),
             ("", Num::Float("4e3", Some(FloatKind::F128))),
         );
     }
@@ -1198,42 +1198,42 @@ mod test {
             content: s,
         };
 
-        assert_eq!(char_lit.parse_next("'a'").unwrap(), ("", lit("a")));
-        assert_eq!(char_lit.parse_next("'字'").unwrap(), ("", lit("字")));
+        assert_eq!(char_lit.parse_peek("'a'").unwrap(), ("", lit("a")));
+        assert_eq!(char_lit.parse_peek("'字'").unwrap(), ("", lit("字")));
 
         // Escaped single characters.
-        assert_eq!(char_lit.parse_next("'\\\"'").unwrap(), ("", lit("\\\"")));
-        assert_eq!(char_lit.parse_next("'\\''").unwrap(), ("", lit("\\'")));
-        assert_eq!(char_lit.parse_next("'\\t'").unwrap(), ("", lit("\\t")));
-        assert_eq!(char_lit.parse_next("'\\n'").unwrap(), ("", lit("\\n")));
-        assert_eq!(char_lit.parse_next("'\\r'").unwrap(), ("", lit("\\r")));
-        assert_eq!(char_lit.parse_next("'\\0'").unwrap(), ("", lit("\\0")));
+        assert_eq!(char_lit.parse_peek("'\\\"'").unwrap(), ("", lit("\\\"")));
+        assert_eq!(char_lit.parse_peek("'\\''").unwrap(), ("", lit("\\'")));
+        assert_eq!(char_lit.parse_peek("'\\t'").unwrap(), ("", lit("\\t")));
+        assert_eq!(char_lit.parse_peek("'\\n'").unwrap(), ("", lit("\\n")));
+        assert_eq!(char_lit.parse_peek("'\\r'").unwrap(), ("", lit("\\r")));
+        assert_eq!(char_lit.parse_peek("'\\0'").unwrap(), ("", lit("\\0")));
         // Escaped ascii characters (up to `0x7F`).
-        assert_eq!(char_lit.parse_next("'\\x12'").unwrap(), ("", lit("\\x12")));
-        assert_eq!(char_lit.parse_next("'\\x02'").unwrap(), ("", lit("\\x02")));
-        assert_eq!(char_lit.parse_next("'\\x6a'").unwrap(), ("", lit("\\x6a")));
-        assert_eq!(char_lit.parse_next("'\\x7F'").unwrap(), ("", lit("\\x7F")));
+        assert_eq!(char_lit.parse_peek("'\\x12'").unwrap(), ("", lit("\\x12")));
+        assert_eq!(char_lit.parse_peek("'\\x02'").unwrap(), ("", lit("\\x02")));
+        assert_eq!(char_lit.parse_peek("'\\x6a'").unwrap(), ("", lit("\\x6a")));
+        assert_eq!(char_lit.parse_peek("'\\x7F'").unwrap(), ("", lit("\\x7F")));
         // Escaped unicode characters (up to `0x10FFFF`).
         assert_eq!(
-            char_lit.parse_next("'\\u{A}'").unwrap(),
+            char_lit.parse_peek("'\\u{A}'").unwrap(),
             ("", lit("\\u{A}"))
         );
         assert_eq!(
-            char_lit.parse_next("'\\u{10}'").unwrap(),
+            char_lit.parse_peek("'\\u{10}'").unwrap(),
             ("", lit("\\u{10}"))
         );
         assert_eq!(
-            char_lit.parse_next("'\\u{aa}'").unwrap(),
+            char_lit.parse_peek("'\\u{aa}'").unwrap(),
             ("", lit("\\u{aa}"))
         );
         assert_eq!(
-            char_lit.parse_next("'\\u{10FFFF}'").unwrap(),
+            char_lit.parse_peek("'\\u{10FFFF}'").unwrap(),
             ("", lit("\\u{10FFFF}"))
         );
 
         // Check with `b` prefix.
         assert_eq!(
-            char_lit.parse_next("b'a'").unwrap(),
+            char_lit.parse_peek("b'a'").unwrap(),
             ("", crate::CharLit {
                 prefix: Some(crate::CharPrefix::Binary),
                 content: "a"
@@ -1241,33 +1241,33 @@ mod test {
         );
 
         // Should fail.
-        assert!(char_lit.parse_next("''").is_err());
-        assert!(char_lit.parse_next("'\\o'").is_err());
-        assert!(char_lit.parse_next("'\\x'").is_err());
-        assert!(char_lit.parse_next("'\\x1'").is_err());
-        assert!(char_lit.parse_next("'\\x80'").is_err());
-        assert!(char_lit.parse_next("'\\u'").is_err());
-        assert!(char_lit.parse_next("'\\u{}'").is_err());
-        assert!(char_lit.parse_next("'\\u{110000}'").is_err());
+        assert!(char_lit.parse_peek("''").is_err());
+        assert!(char_lit.parse_peek("'\\o'").is_err());
+        assert!(char_lit.parse_peek("'\\x'").is_err());
+        assert!(char_lit.parse_peek("'\\x1'").is_err());
+        assert!(char_lit.parse_peek("'\\x80'").is_err());
+        assert!(char_lit.parse_peek("'\\u'").is_err());
+        assert!(char_lit.parse_peek("'\\u{}'").is_err());
+        assert!(char_lit.parse_peek("'\\u{110000}'").is_err());
     }
 
     #[test]
     fn test_str_lit() {
         assert_eq!(
-            str_lit.parse_next(r#"b"hello""#).unwrap(),
+            str_lit.parse_peek(r#"b"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::Binary),
                 content: "hello"
             })
         );
         assert_eq!(
-            str_lit.parse_next(r#"c"hello""#).unwrap(),
+            str_lit.parse_peek(r#"c"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::CLike),
                 content: "hello"
             })
         );
-        assert!(str_lit.parse_next(r#"d"hello""#).is_err());
+        assert!(str_lit.parse_peek(r#"d"hello""#).is_err());
     }
 }
 
