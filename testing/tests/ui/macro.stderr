@@ -1,6 +1,4 @@
-error: macro "thrice" expected 1 argument, found 2
- --> InvalidNumberOfArgs.html:5:2
-       "- call thrice(2, 3) -%}"
+error: the previous template error derives from
  --> tests/ui/macro.rs:4:21
   |
 4 |   #[template(source = "{%- macro thrice(param) -%}
@@ -11,9 +9,7 @@ error: macro "thrice" expected 1 argument, found 2
 8 | | {%- call thrice(2, 3) -%}", ext = "html")]
   | |__________________________^
 
-error: macro "thrice" expected 2 arguments, found 0
- --> InvalidNumberOfArgs2.html:5:2
-       "- call thrice() -%}"
+error: the previous template error derives from
   --> tests/ui/macro.rs:12:21
    |
 12 |   #[template(source = "{%- macro thrice(param, param2) -%}
@@ -24,9 +20,7 @@ error: macro "thrice" expected 2 arguments, found 0
 16 | | {%- call thrice() -%}", ext = "html")]
    | |______________________^
 
-error: macro "thrice" expected 0 arguments, found 2
- --> InvalidNumberOfArgs3.html:4:2
-       "- call thrice(1, 2) -%}"
+error: the previous template error derives from
   --> tests/ui/macro.rs:20:21
    |
 20 |   #[template(source = "{%- macro thrice() -%}

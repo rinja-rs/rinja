@@ -1,6 +1,4 @@
-error: no argument named `param3` in macro "thrice"
- --> InvalidNamedArg.html:5:2
-       "- call thrice(param1=2, param3=3) -%}"
+error: the previous template error derives from
  --> tests/ui/macro_named_argument.rs:4:21
   |
 4 |   #[template(source = "{%- macro thrice(param1, param2) -%}
@@ -11,9 +9,7 @@ error: no argument named `param3` in macro "thrice"
 8 | | {%- call thrice(param1=2, param3=3) -%}", ext = "html")]
   | |________________________________________^
 
-error: named argument `param1` was passed more than once
- --> <source attribute>:5:15
-       "(param1=2, param1=3) -%}"
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:12:21
    |
 12 |   #[template(source = "{%- macro thrice(param1, param2) -%}
@@ -24,9 +20,7 @@ error: named argument `param1` was passed more than once
 16 | | {%- call thrice(param1=2, param1=3) -%}", ext = "html")]
    | |________________________________________^
 
-error: failed to parse template source
- --> <source attribute>:5:29
-       "| filter(param1=12) -%}"
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:21:21
    |
 21 |   #[template(source = "{%- macro thrice(param1, param2) -%}
@@ -37,9 +31,7 @@ error: failed to parse template source
 25 | | {%- call thrice(3, param1=2) | filter(param1=12) -%}", ext = "html")]
    | |_____________________________________________________^
 
-error: named arguments must always be passed last
- --> <source attribute>:4:15
-       "(param1=2, 3) -%}"
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:30:21
    |
 30 |   #[template(source = "{%- macro thrice(param1, param2) -%}
@@ -49,9 +41,7 @@ error: named arguments must always be passed last
 33 | | {%- call thrice(param1=2, 3) -%}", ext = "html")]
    | |_________________________________^
 
-error: cannot have unnamed argument (`param2`) after named argument in macro "thrice"
- --> InvalidNamedArg5.html:4:2
-       "- call thrice(3, param1=2) -%}"
+error: the previous template error derives from
   --> tests/ui/macro_named_argument.rs:38:21
    |
 38 |   #[template(source = "{%- macro thrice(param1, param2) -%}
