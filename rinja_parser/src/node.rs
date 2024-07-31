@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::str::{self, FromStr};
 
-use winnow::Parser;
 use winnow::combinator::{
     alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated1, terminated,
 };
 use winnow::token::{any, tag};
+use winnow::{Parser, unpeek};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -36,7 +36,7 @@ pub enum Node<'a> {
 
 impl<'a> Node<'a> {
     pub(super) fn parse_template(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Vec<Self>> {
-        let (i, result) = match (|i| Self::many(i, s)).parse_peek(i) {
+        let (i, result) = match unpeek(|i| Self::many(i, s)).parse_peek(i) {
             Ok((i, result)) => (i, result),
             Err(err) => {
                 if let winnow::error::ErrMode::Backtrack(err) | winnow::error::ErrMode::Cut(err) =
@@ -44,14 +44,14 @@ impl<'a> Node<'a> {
                 {
                     if err.message.is_none() {
                         if let Some(span) = err.span.as_suffix_of(i) {
-                            opt(|i| unexpected_tag(i, s)).parse_peek(span)?;
+                            opt(unpeek(|i| unexpected_tag(i, s))).parse_peek(span)?;
                         }
                     }
                 }
                 return Err(err);
             }
         };
-        let (i, _) = opt(|i| unexpected_tag(i, s)).parse_peek(i)?;
+        let (i, _) = opt(unpeek(|i| unexpected_tag(i, s))).parse_peek(i)?;
         let (i, is_eof) = opt(eof).parse_peek(i)?;
         if is_eof.is_none() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -68,10 +68,10 @@ impl<'a> Node<'a> {
         repeat(
             0..,
             alt((
-                (|i| Lit::parse(i, s)).map(Self::Lit),
-                (|i| Comment::parse(i, s)).map(Self::Comment),
-                |i| Self::expr(i, s),
-                |i| Self::parse(i, s),
+                unpeek(|i| Lit::parse(i, s)).map(Self::Lit),
+                unpeek(|i| Comment::parse(i, s)).map(Self::Comment),
+                unpeek(|i| Self::expr(i, s)),
+                unpeek(|i| Self::parse(i, s)),
             )),
         )
         .map(|v: Vec<_>| v)
@@ -89,8 +89,11 @@ impl<'a> Node<'a> {
 
         let start = i;
         let (i, tag) = preceded(
-            |i| s.tag_block_start(i),
-            peek(preceded((opt(Whitespace::parse), skip_ws0), identifier)),
+            unpeek(|i| s.tag_block_start(i)),
+            peek(preceded(
+                (opt(unpeek(Whitespace::parse)), unpeek(skip_ws0)),
+                unpeek(identifier),
+            )),
         )
         .parse_peek(i)?;
 
@@ -112,11 +115,14 @@ impl<'a> Node<'a> {
             _ => return fail.parse_peek(start),
         };
 
-        let (i, node) = s.nest(i, |i| func(i, s))?;
+        let (i, node) = s.nest(i, unpeek(|i| func(i, s)))?;
 
         let (i, closed) = cut_node(
             None,
-            alt((ws(eof).value(false), (|i| s.tag_block_end(i)).value(true))),
+            alt((
+                ws(eof).value(false),
+                unpeek(|i| s.tag_block_end(i)).value(true),
+            )),
         )
         .parse_peek(i)?;
         match closed {
@@ -127,9 +133,9 @@ impl<'a> Node<'a> {
 
     fn r#break(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("break")),
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
         );
 
         let start = i;
@@ -145,9 +151,9 @@ impl<'a> Node<'a> {
 
     fn r#continue(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("continue")),
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
         );
 
         let start = i;
@@ -164,12 +170,12 @@ impl<'a> Node<'a> {
     fn expr(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         let start = i;
         let (i, (pws, expr)) = preceded(
-            |i| s.tag_expr_start(i),
+            unpeek(|i| s.tag_expr_start(i)),
             cut_node(
                 None,
                 (
-                    opt(Whitespace::parse),
-                    ws(|i| Expr::parse(i, s.level.get(), false)),
+                    opt(unpeek(Whitespace::parse)),
+                    ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
                 ),
             ),
         )
@@ -178,8 +184,11 @@ impl<'a> Node<'a> {
         let (i, (nws, closed)) = cut_node(
             None,
             (
-                opt(Whitespace::parse),
-                alt(((|i| s.tag_expr_end(i)).value(true), ws(eof).value(false))),
+                opt(unpeek(Whitespace::parse)),
+                alt((
+                    (unpeek(|i| s.tag_expr_end(i))).value(true),
+                    ws(eof).value(false),
+                )),
             ),
         )
         .parse_peek(i)?;
@@ -218,33 +227,33 @@ fn cut_node<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
     let mut inner = cut_err(inner);
-    move |i: &'a str| {
+    unpeek(move |i: &'a str| {
         let result = inner.parse_peek(i);
         if let Err(winnow::error::ErrMode::Cut(err) | winnow::error::ErrMode::Backtrack(err)) =
             &result
         {
             if err.message.is_none() {
                 if let Some(span) = err.span.as_suffix_of(i) {
-                    opt(|i| unexpected_raw_tag(kind, i)).parse_peek(span)?;
+                    opt(unpeek(|i| unexpected_raw_tag(kind, i))).parse_peek(span)?;
                 }
             }
         }
         result
-    }
+    })
 }
 
 fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, ()> {
     (
-        |i| s.tag_block_start(i),
-        opt(Whitespace::parse),
-        |i| unexpected_raw_tag(None, i),
+        unpeek(|i| s.tag_block_start(i)),
+        opt(unpeek(Whitespace::parse)),
+        unpeek(|i| unexpected_raw_tag(None, i)),
     )
         .void()
         .parse_peek(i)
 }
 
 fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> InputParseResult<'a, ()> {
-    let (_, tag) = ws(identifier).parse_peek(i)?;
+    let (_, tag) = ws(unpeek(identifier)).parse_peek(i)?;
     let msg = match tag {
         "end" | "elif" | "else" | "when" => match kind {
             Some(kind) => {
@@ -268,15 +277,15 @@ pub struct When<'a> {
 impl<'a> When<'a> {
     fn r#else(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let mut p = (
-            |i| s.tag_block_start(i),
-            opt(Whitespace::parse),
+            unpeek(|i| s.tag_block_start(i)),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("else")),
             cut_node(
                 Some("match-else"),
                 (
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
-                    cut_node(Some("match-else"), |i| Node::many(i, s)),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
+                    cut_node(Some("match-else"), unpeek(|i| Node::many(i, s))),
                 ),
             ),
         );
@@ -301,16 +310,16 @@ impl<'a> When<'a> {
         let start = i;
         let endwhen = ws((
             delimited(
-                |i| s.tag_block_start(i),
-                opt(Whitespace::parse),
+                unpeek(|i| s.tag_block_start(i)),
+                opt(unpeek(Whitespace::parse)),
                 ws(keyword("endwhen")),
             ),
             cut_node(
                 Some("match-endwhen"),
                 (
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
-                    repeat(0.., ws(|i| Comment::parse(i, s))).map(|()| ()),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
+                    repeat(0.., ws(unpeek(|i| Comment::parse(i, s)))).map(|()| ()),
                 ),
             ),
         ))
@@ -329,16 +338,16 @@ impl<'a> When<'a> {
             ))
         });
         let mut p = (
-            |i| s.tag_block_start(i),
-            opt(Whitespace::parse),
+            unpeek(|i| s.tag_block_start(i)),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("when")),
             cut_node(
                 Some("match-when"),
                 (
-                    separated1(ws(|i| Target::parse(i, s)), '|'),
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
-                    cut_node(Some("match-when"), |i| Node::many(i, s)),
+                    separated1(ws(unpeek(|i| Target::parse(i, s))), '|'),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
+                    cut_node(Some("match-when"), unpeek(|i| Node::many(i, s))),
                     opt(endwhen),
                 ),
             ),
@@ -372,18 +381,21 @@ impl<'a> Cond<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let (i, (_, pws, cond, nws, _, nodes)) = (
-            |i| s.tag_block_start(i),
-            opt(Whitespace::parse),
+            unpeek(|i| s.tag_block_start(i)),
+            opt(unpeek(Whitespace::parse)),
             alt((
-                preceded(ws(keyword("else")), opt(|i| CondTest::parse(i, s))),
+                preceded(ws(keyword("else")), opt(unpeek(|i| CondTest::parse(i, s)))),
                 preceded(
                     ws(keyword("elif")),
-                    cut_node(Some("if-elif"), (|i| CondTest::parse_cond(i, s)).map(Some)),
+                    cut_node(
+                        Some("if-elif"),
+                        unpeek(|i| CondTest::parse_cond(i, s)).map(Some),
+                    ),
                 ),
             )),
-            opt(Whitespace::parse),
-            cut_node(Some("if"), |i| s.tag_block_end(i)),
-            cut_node(Some("if"), |i| Node::many(i, s)),
+            opt(unpeek(Whitespace::parse)),
+            cut_node(Some("if"), unpeek(|i| s.tag_block_end(i))),
+            cut_node(Some("if"), unpeek(|i| Node::many(i, s))),
         )
             .parse_peek(i)?;
         Ok((
@@ -411,7 +423,7 @@ impl<'a> CondTest<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         preceded(
             ws(keyword("if")),
-            cut_node(Some("if"), |i| Self::parse_cond(i, s)),
+            cut_node(Some("if"), unpeek(|i| Self::parse_cond(i, s))),
         )
         .parse_peek(i)
     }
@@ -420,10 +432,10 @@ impl<'a> CondTest<'a> {
         let (i, (target, expr)) = (
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
-                ws(|i| Target::parse(i, s)),
+                ws(unpeek(|i| Target::parse(i, s))),
                 ws('='),
             )),
-            ws(|i| Expr::parse(i, s.level.get(), false)),
+            ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
         )
             .parse_peek(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
@@ -513,7 +525,10 @@ impl<'a> Loop<'a> {
         let start = i;
         let if_cond = preceded(
             ws(keyword("if")),
-            cut_node(Some("for-if"), ws(|i| Expr::parse(i, s.level.get(), true))),
+            cut_node(
+                Some("for-if"),
+                ws(unpeek(|i| Expr::parse(i, s.level.get(), true))),
+            ),
         );
 
         let else_block = |i| {
@@ -522,13 +537,13 @@ impl<'a> Loop<'a> {
                 cut_node(
                     Some("for-else"),
                     (
-                        opt(Whitespace::parse),
+                        opt(unpeek(Whitespace::parse)),
                         delimited(
-                            |i| s.tag_block_end(i),
-                            |i| Node::many(i, s),
-                            |i| s.tag_block_start(i),
+                            unpeek(|i| s.tag_block_end(i)),
+                            unpeek(|i| Node::many(i, s)),
+                            unpeek(|i| s.tag_block_start(i)),
                         ),
-                        opt(Whitespace::parse),
+                        opt(unpeek(Whitespace::parse)),
                     ),
                 ),
             );
@@ -540,15 +555,15 @@ impl<'a> Loop<'a> {
             let (i, (body, (_, pws, else_block, _, nws))) = cut_node(
                 Some("for"),
                 (
-                    |i| content(i, s),
+                    unpeek(|i| content(i, s)),
                     cut_node(
                         Some("for"),
                         (
-                            |i| check_block_start(i, start, s, "for", "endfor"),
-                            opt(Whitespace::parse),
-                            opt(else_block),
+                            unpeek(|i| check_block_start(i, start, s, "for", "endfor")),
+                            opt(unpeek(Whitespace::parse)),
+                            opt(unpeek(else_block)),
                             end_node("for", "endfor"),
-                            opt(Whitespace::parse),
+                            opt(unpeek(Whitespace::parse)),
                         ),
                     ),
                 ),
@@ -558,21 +573,21 @@ impl<'a> Loop<'a> {
         };
 
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("for")),
             cut_node(
                 Some("for"),
                 (
-                    ws(|i| Target::parse(i, s)),
+                    ws(unpeek(|i| Target::parse(i, s))),
                     ws(keyword("in")),
                     cut_node(
                         Some("for"),
                         (
-                            ws(|i| Expr::parse(i, s.level.get(), true)),
+                            ws(unpeek(|i| Expr::parse(i, s.level.get(), true))),
                             opt(if_cond),
-                            opt(Whitespace::parse),
-                            |i| s.tag_block_end(i),
-                            body_and_end,
+                            opt(unpeek(Whitespace::parse)),
+                            unpeek(|i| s.tag_block_end(i)),
+                            unpeek(body_and_end),
                         ),
                     ),
                 ),
@@ -627,44 +642,49 @@ impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let level = s.level.get();
         #[allow(clippy::type_complexity)]
-        let parameters =
-            |i| -> InputParseResult<'_, Option<Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>>> {
-                let (i, args) = opt(preceded(
-                    '(',
-                    (
-                        opt(terminated(
-                            separated1(
-                                (
-                                    ws(identifier),
-                                    opt(preceded('=', ws(|i| Expr::parse(i, level, false)))),
-                                ),
-                                ',',
+        let parameters = |i| -> InputParseResult<
+            '_,
+            Option<Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>>,
+        > {
+            let (i, args) = opt(preceded(
+                '(',
+                (
+                    opt(terminated(
+                        separated1(
+                            (
+                                ws(unpeek(identifier)),
+                                opt(preceded('=', ws(unpeek(|i| Expr::parse(i, level, false))))),
                             ),
-                            opt(','),
-                        )),
-                        ws(opt(')')),
-                    ),
-                ))
-                .parse_peek(i)?;
-                match args {
-                    Some((args, Some(_))) => Ok((i, args)),
-                    Some((_, None)) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                        "expected `)` to close macro argument list",
-                        i,
-                    ))),
-                    None => Ok((i, None)),
-                }
-            };
+                            ',',
+                        ),
+                        opt(','),
+                    )),
+                    ws(opt(')')),
+                ),
+            ))
+            .parse_peek(i)?;
+            match args {
+                Some((args, Some(_))) => Ok((i, args)),
+                Some((_, None)) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                    "expected `)` to close macro argument list",
+                    i,
+                ))),
+                None => Ok((i, None)),
+            }
+        };
 
         let start_s = i;
         let mut start = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("macro")),
             cut_node(
                 Some("macro"),
-                (ws(identifier), parameters, opt(Whitespace::parse), |i| {
-                    s.tag_block_end(i)
-                }),
+                (
+                    ws(unpeek(identifier)),
+                    unpeek(parameters),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
+                ),
             ),
         );
         let (i, (pws1, _, (name, params, nws1, _))) = start.parse_peek(i)?;
@@ -701,21 +721,22 @@ impl<'a> Macro<'a> {
         let mut end = cut_node(
             Some("macro"),
             (
-                |i| Node::many(i, s),
+                unpeek(|i| Node::many(i, s)),
                 cut_node(
                     Some("macro"),
                     (
-                        |i| check_block_start(i, start_s, s, "macro", "endmacro"),
-                        opt(Whitespace::parse),
+                        unpeek(|i| check_block_start(i, start_s, s, "macro", "endmacro")),
+                        opt(unpeek(Whitespace::parse)),
                         end_node("macro", "endmacro"),
                         cut_node(
                             Some("macro"),
                             preceded(
-                                opt(|before| {
-                                    let (after, end_name) = ws(identifier).parse_peek(before)?;
+                                opt(unpeek(|before| {
+                                    let (after, end_name) =
+                                        ws(unpeek(identifier)).parse_peek(before)?;
                                     check_end_name(before, after, name, end_name, "macro")
-                                }),
-                                opt(Whitespace::parse),
+                                })),
+                                opt(unpeek(Whitespace::parse)),
                             ),
                         ),
                     ),
@@ -753,20 +774,23 @@ impl<'a> FilterBlock<'a> {
         let mut level = s.level.get();
         let start_s = i;
         let mut start = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("filter")),
             cut_node(
                 Some("filter"),
                 (
-                    ws(identifier),
-                    opt(|i| Expr::arguments(i, s.level.get(), false)),
-                    repeat(0.., |i| {
-                        filter(i, &mut level).map(|(j, (name, params))| (j, (name, params, i)))
-                    })
+                    ws(unpeek(identifier)),
+                    opt(unpeek(|i| Expr::arguments(i, s.level.get(), false))),
+                    repeat(
+                        0..,
+                        unpeek(|i| {
+                            filter(i, &mut level).map(|(j, (name, params))| (j, (name, params, i)))
+                        }),
+                    )
                     .map(|v: Vec<_>| v),
-                    ws(|i| Ok((i, ()))),
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
+                    ws(unpeek(|i| Ok((i, ())))),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
                 ),
             ),
         );
@@ -793,14 +817,14 @@ impl<'a> FilterBlock<'a> {
         let mut end = cut_node(
             Some("filter"),
             (
-                |i| Node::many(i, s),
+                unpeek(|i| Node::many(i, s)),
                 cut_node(
                     Some("filter"),
                     (
-                        |i| check_block_start(i, start_s, s, "filter", "endfilter"),
-                        opt(Whitespace::parse),
+                        unpeek(|i| check_block_start(i, start_s, s, "filter", "endfilter")),
+                        opt(unpeek(Whitespace::parse)),
                         end_node("filter", "endfilter"),
-                        opt(Whitespace::parse),
+                        opt(unpeek(Whitespace::parse)),
                     ),
                 ),
             ),
@@ -833,14 +857,17 @@ impl<'a> Import<'a> {
     fn parse(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("import")),
             cut_node(
                 Some("import"),
                 (
-                    ws(str_lit_without_prefix),
+                    ws(unpeek(str_lit_without_prefix)),
                     ws(keyword("as")),
-                    cut_node(Some("import"), (ws(identifier), opt(Whitespace::parse))),
+                    cut_node(
+                        Some("import"),
+                        (ws(unpeek(identifier)), opt(unpeek(Whitespace::parse))),
+                    ),
                 ),
             ),
         );
@@ -871,15 +898,17 @@ impl<'a> Call<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("call")),
             cut_node(
                 Some("call"),
                 (
-                    opt((ws(identifier), ws("::"))),
-                    ws(identifier),
-                    opt(ws(|nested| Expr::arguments(nested, s.level.get(), true))),
-                    opt(Whitespace::parse),
+                    opt((ws(unpeek(identifier)), ws("::"))),
+                    ws(unpeek(identifier)),
+                    opt(ws(unpeek(|nested| {
+                        Expr::arguments(nested, s.level.get(), true)
+                    }))),
+                    opt(unpeek(Whitespace::parse)),
                 ),
             ),
         );
@@ -913,32 +942,32 @@ impl<'a> Match<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("match")),
             cut_node(
                 Some("match"),
                 (
-                    ws(|i| Expr::parse(i, s.level.get(), false)),
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
+                    ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
                     cut_node(
                         Some("match"),
                         (
-                            ws(repeat(0.., ws(|i| Comment::parse(i, s)))).map(|()| ()),
-                            repeat(0.., |i| When::when(i, s)).map(|v: Vec<_>| v),
+                            ws(repeat(0.., ws(unpeek(|i| Comment::parse(i, s))))).map(|()| ()),
+                            repeat(0.., unpeek(|i| When::when(i, s))).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("match"),
                                 (
-                                    opt(|i| When::r#else(i, s)),
+                                    opt(unpeek(|i| When::r#else(i, s))),
                                     cut_node(
                                         Some("match"),
                                         (
-                                            ws(|i| {
+                                            ws(unpeek(|i| {
                                                 check_block_start(i, start, s, "match", "endmatch")
-                                            }),
-                                            opt(Whitespace::parse),
+                                            })),
+                                            opt(unpeek(Whitespace::parse)),
                                             end_node("match", "endmatch"),
-                                            opt(Whitespace::parse),
+                                            opt(unpeek(Whitespace::parse)),
                                         ),
                                     ),
                                 ),
@@ -988,13 +1017,15 @@ impl<'a> BlockDef<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start_s = i;
         let mut start = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("block")),
             cut_node(
                 Some("block"),
-                (ws(identifier), opt(Whitespace::parse), |i| {
-                    s.tag_block_end(i)
-                }),
+                (
+                    ws(unpeek(identifier)),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
+                ),
             ),
         );
         let (i, (pws1, _, (name, nws1, _))) = start.parse_peek(i)?;
@@ -1002,21 +1033,22 @@ impl<'a> BlockDef<'a> {
         let mut end = cut_node(
             Some("block"),
             (
-                |i| Node::many(i, s),
+                unpeek(|i| Node::many(i, s)),
                 cut_node(
                     Some("block"),
                     (
-                        |i| check_block_start(i, start_s, s, "block", "endblock"),
-                        opt(Whitespace::parse),
+                        unpeek(|i| check_block_start(i, start_s, s, "block", "endblock")),
+                        opt(unpeek(Whitespace::parse)),
                         end_node("block", "endblock"),
                         cut_node(
                             Some("block"),
                             (
-                                opt(|before| {
-                                    let (after, end_name) = ws(identifier).parse_peek(before)?;
+                                opt(unpeek(|before| {
+                                    let (after, end_name) =
+                                        ws(unpeek(identifier)).parse_peek(before)?;
                                     check_end_name(before, after, name, end_name, "block")
-                                }),
-                                opt(Whitespace::parse),
+                                })),
+                                opt(unpeek(Whitespace::parse)),
                             ),
                         ),
                     ),
@@ -1118,21 +1150,21 @@ impl<'a> Raw<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let endraw = (
-            |i| s.tag_block_start(i),
-            opt(Whitespace::parse),
+            unpeek(|i| s.tag_block_start(i)),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("endraw")), // sic: ignore `{% end %}` in raw blocks
-            opt(Whitespace::parse),
-            peek(|i| s.tag_block_end(i)),
+            opt(unpeek(Whitespace::parse)),
+            peek(unpeek(|i| s.tag_block_end(i))),
         );
 
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("raw")),
             cut_node(
                 Some("raw"),
                 (
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
                     skip_till(Splitter1::new(s.syntax.block_start), endraw).with_recognized(),
                 ),
             ),
@@ -1157,17 +1189,17 @@ impl<'a> Let<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(alt((keyword("let"), keyword("set")))),
             cut_node(
                 Some("let"),
                 (
-                    ws(|i| Target::parse(i, s)),
+                    ws(unpeek(|i| Target::parse(i, s))),
                     opt(preceded(
                         ws('='),
-                        ws(|i| Expr::parse(i, s.level.get(), false)),
+                        ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
                     )),
-                    opt(Whitespace::parse),
+                    opt(unpeek(Whitespace::parse)),
                 ),
             ),
         );
@@ -1197,25 +1229,25 @@ impl<'a> If<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = (
-            opt(Whitespace::parse),
-            |i| CondTest::parse(i, s),
+            opt(unpeek(Whitespace::parse)),
+            unpeek(|i| CondTest::parse(i, s)),
             cut_node(
                 Some("if"),
                 (
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
+                    opt(unpeek(Whitespace::parse)),
+                    unpeek(|i| s.tag_block_end(i)),
                     cut_node(
                         Some("if"),
                         (
-                            |i| Node::many(i, s),
-                            repeat(0.., |i| Cond::parse(i, s)).map(|v: Vec<_>| v),
+                            unpeek(|i| Node::many(i, s)),
+                            repeat(0.., unpeek(|i| Cond::parse(i, s))).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("if"),
                                 (
-                                    |i| check_block_start(i, start, s, "if", "endif"),
-                                    opt(Whitespace::parse),
+                                    unpeek(|i| check_block_start(i, start, s, "if", "endif")),
+                                    opt(unpeek(Whitespace::parse)),
                                     end_node("if", "endif"),
-                                    opt(Whitespace::parse),
+                                    opt(unpeek(Whitespace::parse)),
                                 ),
                             ),
                         ),
@@ -1258,11 +1290,14 @@ impl<'a> Include<'a> {
     fn parse(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = (
-            opt(Whitespace::parse),
+            opt(unpeek(Whitespace::parse)),
             ws(keyword("include")),
             cut_node(
                 Some("include"),
-                (ws(str_lit_without_prefix), opt(Whitespace::parse)),
+                (
+                    ws(unpeek(str_lit_without_prefix)),
+                    opt(unpeek(Whitespace::parse)),
+                ),
             ),
         );
         let (i, (pws, _, (path, nws))) = p.parse_peek(i)?;
@@ -1288,10 +1323,13 @@ impl<'a> Extends<'a> {
     fn parse(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         preceded(
-            (opt(Whitespace::parse), ws(keyword("extends"))),
+            (opt(unpeek(Whitespace::parse)), ws(keyword("extends"))),
             cut_node(
                 Some("extends"),
-                terminated(ws(str_lit_without_prefix), opt(Whitespace::parse)),
+                terminated(
+                    ws(unpeek(str_lit_without_prefix)),
+                    opt(unpeek(Whitespace::parse)),
+                ),
             ),
         )
         .map(|path| WithSpan::new(Self { path }, start))
@@ -1315,8 +1353,8 @@ impl<'a> Comment<'a> {
 
         fn tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Tag> {
             alt((
-                (|i| s.tag_comment_start(i)).value(Tag::Open),
-                (|i| s.tag_comment_end(i)).value(Tag::Close),
+                unpeek(|i| s.tag_comment_start(i)).value(Tag::Open),
+                unpeek(|i| s.tag_comment_end(i)).value(Tag::Close),
             ))
             .parse_peek(i)
         }
@@ -1326,7 +1364,7 @@ impl<'a> Comment<'a> {
             let start = i;
             loop {
                 let splitter = Splitter2::new(s.syntax.comment_start, s.syntax.comment_end);
-                let (k, tag) = opt(skip_till(splitter, |i| tag(i, s))).parse_peek(i)?;
+                let (k, tag) = opt(skip_till(splitter, unpeek(|i| tag(i, s)))).parse_peek(i)?;
                 i = k;
                 let Some((inclusive, tag)) = tag else {
                     return Err(
@@ -1354,8 +1392,8 @@ impl<'a> Comment<'a> {
 
         let start = i;
         let (i, content) = preceded(
-            |i| s.tag_comment_start(i),
-            cut_node(Some("comment"), |i| content(i, s)),
+            unpeek(|i| s.tag_comment_start(i)),
+            cut_node(Some("comment"), unpeek(|i| content(i, s))),
         )
         .parse_peek(i)?;
 
@@ -1390,7 +1428,7 @@ fn end_node<'a, 'g: 'a>(
     expected: &'g str,
 ) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
     move |start| {
-        let (i, actual) = ws(identifier).parse_peek(start)?;
+        let (i, actual) = ws(unpeek(identifier)).parse_peek(start)?;
         if actual == expected {
             Ok((i, actual))
         } else if actual.starts_with("end") {

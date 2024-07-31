@@ -10,12 +10,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, str};
 
-use winnow::Parser;
 use winnow::ascii::escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::AsChar;
 use winnow::token::{any, one_of, take_till1, take_while};
+use winnow::{Parser, unpeek};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -349,7 +349,7 @@ fn skip_ws1(i: &str) -> InputParseResult<'_, ()> {
 fn ws<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
-    delimited(skip_ws0, inner, skip_ws0)
+    delimited(unpeek(skip_ws0), inner, unpeek(skip_ws0))
 }
 
 /// Skips input until `end` was found, but does not consume it.
@@ -359,7 +359,7 @@ fn skip_till<'a, 'b, O>(
     end: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
     let mut next = alt((end.map(Some), any.map(|_| None)));
-    move |mut i: &'a str| {
+    unpeek(move |mut i: &'a str| {
         loop {
             i = match candidate_finder.split(i) {
                 Some((_, i)) => i,
@@ -375,11 +375,11 @@ fn skip_till<'a, 'b, O>(
                 (inclusive, None) => inclusive,
             };
         }
-    }
+    })
 }
 
 fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
-    identifier.verify(move |v: &str| v == k)
+    unpeek(identifier).verify(move |v: &str| v == k)
 }
 
 fn identifier(input: &str) -> InputParseResult<'_> {
@@ -409,7 +409,7 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
         start: &'a str,
         i: &'a str,
     ) -> InputParseResult<'a, T> {
-        let (i, suffix) = identifier.parse_peek(i)?;
+        let (i, suffix) = unpeek(identifier).parse_peek(i)?;
         if let Some(value) = list
             .iter()
             .copied()
@@ -425,24 +425,27 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     }
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
-    let int_with_base = (opt('-'), |i| {
-        let (i, (base, kind)) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
-            .with_recognized()
-            .parse_peek(i)?;
-        match opt(separated_digits(base, false)).parse_peek(i)? {
-            (i, Some(_)) => Ok((i, ())),
-            (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                format!("expected digits after `{kind}`"),
-                start,
-            ))),
-        }
-    });
+    let int_with_base = (
+        opt('-'),
+        unpeek(|i| {
+            let (i, (base, kind)) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
+                .with_recognized()
+                .parse_peek(i)?;
+            match opt(separated_digits(base, false)).parse_peek(i)? {
+                (i, Some(_)) => Ok((i, ())),
+                (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                    format!("expected digits after `{kind}`"),
+                    start,
+                ))),
+            }
+        }),
+    );
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> InputParseResult<'a, ()> {
         let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_peek(i)?;
-        let (i, has_exp) = opt(|i| {
+        let (i, has_exp) = opt(unpeek(|i| {
             let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_peek(i)?;
             match opt(separated_digits(10, op.is_none())).parse_peek(i)? {
                 (i, Some(_)) => Ok((i, ())),
@@ -451,7 +454,7 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
                     start,
                 ))),
             }
-        })
+        }))
         .parse_peek(i)?;
         match (has_dot, has_exp) {
             (Some(_), _) | (_, Some(())) => Ok((i, ())),
@@ -460,20 +463,23 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     };
 
     let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_peek(start) {
-        let (i, suffix) =
-            opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_peek(i)?;
+        let (i, suffix) = opt(unpeek(|i| {
+            num_lit_suffix("integer", INTEGER_TYPES, start, i)
+        }))
+        .parse_peek(i)?;
         (i, Num::Int(num, suffix))
     } else {
-        let (i, (float, num)) = preceded((opt('-'), separated_digits(10, true)), opt(float))
-            .with_recognized()
-            .parse_peek(start)?;
+        let (i, (float, num)) =
+            preceded((opt('-'), separated_digits(10, true)), opt(unpeek(float)))
+                .with_recognized()
+                .parse_peek(start)?;
         if float.is_some() {
             let (i, suffix) =
-                opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_peek(i)?;
+                opt(unpeek(|i| num_lit_suffix("float", FLOAT_TYPES, start, i))).parse_peek(i)?;
             (i, Num::Float(num, suffix))
         } else {
             let (i, suffix) =
-                opt(|i| num_lit_suffix("number", NUM_TYPES, start, i)).parse_peek(i)?;
+                opt(unpeek(|i| num_lit_suffix("number", NUM_TYPES, start, i))).parse_peek(i)?;
             match suffix {
                 Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
                 Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
@@ -491,10 +497,10 @@ fn separated_digits<'a>(
     start: bool,
 ) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
     (
-        move |i: &'a _| match start {
+        unpeek(move |i: &'a _| match start {
             true => Ok((i, ())),
             false => repeat(0.., '_').parse_peek(i),
-        },
+        }),
         one_of(move |ch: char| ch.is_digit(radix)),
         repeat(0.., one_of(move |ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
     )
@@ -538,7 +544,8 @@ fn str_lit_without_prefix(i: &str) -> InputParseResult<'_> {
 }
 
 fn str_lit(i: &str) -> InputParseResult<'_, StrLit<'_>> {
-    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_peek(i)?;
+    let (i, (prefix, content)) =
+        (opt(alt(('b', 'c'))), unpeek(str_lit_without_prefix)).parse_peek(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
@@ -672,9 +679,9 @@ enum PathOrIdentifier<'a> {
 
 fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
-    let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
+    let tail = opt(repeat(1.., preceded(ws("::"), unpeek(identifier))).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = (root, identifier, tail).parse_peek(i)?;
+    let (i, (root, start, rest)) = (root, unpeek(identifier), tail).parse_peek(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:
@@ -964,7 +971,11 @@ fn filter<'a>(
     let (i, _) = ws(('|', not('|'))).parse_peek(i)?;
 
     *level = level.nest(start)?.1;
-    cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_peek(i)
+    cut_err((
+        ws(unpeek(identifier)),
+        opt(unpeek(|i| Expr::arguments(i, *level, false))),
+    ))
+    .parse_peek(i)
 }
 
 /// Returns the common parts of two paths.
@@ -1130,63 +1141,65 @@ mod test {
     #[test]
     fn test_num_lit() {
         // Should fail.
-        assert!(num_lit.parse_peek(".").is_err());
+        assert!(unpeek(num_lit).parse_peek(".").is_err());
         // Should succeed.
         assert_eq!(
-            num_lit.parse_peek("1.2E-02").unwrap(),
+            unpeek(num_lit).parse_peek("1.2E-02").unwrap(),
             ("", Num::Float("1.2E-02", None))
         );
         assert_eq!(
-            num_lit.parse_peek("4e3").unwrap(),
+            unpeek(num_lit).parse_peek("4e3").unwrap(),
             ("", Num::Float("4e3", None)),
         );
         assert_eq!(
-            num_lit.parse_peek("4e+_3").unwrap(),
+            unpeek(num_lit).parse_peek("4e+_3").unwrap(),
             ("", Num::Float("4e+_3", None)),
         );
         // Not supported because Rust wants a number before the `.`.
-        assert!(num_lit.parse_peek(".1").is_err());
-        assert!(num_lit.parse_peek(".1E-02").is_err());
+        assert!(unpeek(num_lit).parse_peek(".1").is_err());
+        assert!(unpeek(num_lit).parse_peek(".1E-02").is_err());
         // A `_` directly after the `.` denotes a field.
         assert_eq!(
-            num_lit.parse_peek("1._0").unwrap(),
+            unpeek(num_lit).parse_peek("1._0").unwrap(),
             ("._0", Num::Int("1", None))
         );
         assert_eq!(
-            num_lit.parse_peek("1_.0").unwrap(),
+            unpeek(num_lit).parse_peek("1_.0").unwrap(),
             ("", Num::Float("1_.0", None))
         );
         // Not supported (voluntarily because of `1..` syntax).
         assert_eq!(
-            num_lit.parse_peek("1.").unwrap(),
+            unpeek(num_lit).parse_peek("1.").unwrap(),
             (".", Num::Int("1", None))
         );
         assert_eq!(
-            num_lit.parse_peek("1_.").unwrap(),
+            unpeek(num_lit).parse_peek("1_.").unwrap(),
             (".", Num::Int("1_", None))
         );
         assert_eq!(
-            num_lit.parse_peek("1_2.").unwrap(),
+            unpeek(num_lit).parse_peek("1_2.").unwrap(),
             (".", Num::Int("1_2", None))
         );
         // Numbers with suffixes
         assert_eq!(
-            num_lit.parse_peek("-1usize").unwrap(),
+            unpeek(num_lit).parse_peek("-1usize").unwrap(),
             ("", Num::Int("-1", Some(IntKind::Usize)))
         );
         assert_eq!(
-            num_lit.parse_peek("123_f32").unwrap(),
+            unpeek(num_lit).parse_peek("123_f32").unwrap(),
             ("", Num::Float("123_", Some(FloatKind::F32)))
         );
         assert_eq!(
-            num_lit.parse_peek("1_.2_e+_3_f64|into_isize").unwrap(),
+            unpeek(num_lit)
+                .parse_peek("1_.2_e+_3_f64|into_isize")
+                .unwrap(),
             (
                 "|into_isize",
                 Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
             )
         );
         assert_eq!(
-            num_lit.parse_peek("4e3f128").unwrap(),
+            unpeek(num_lit).parse_peek("4e3f128").unwrap(),
             ("", Num::Float("4e3", Some(FloatKind::F128))),
         );
     }
@@ -1198,42 +1211,75 @@ mod test {
             content: s,
         };
 
-        assert_eq!(char_lit.parse_peek("'a'").unwrap(), ("", lit("a")));
-        assert_eq!(char_lit.parse_peek("'字'").unwrap(), ("", lit("字")));
+        assert_eq!(unpeek(char_lit).parse_peek("'a'").unwrap(), ("", lit("a")));
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'字'").unwrap(),
+            ("", lit("字"))
+        );
 
         // Escaped single characters.
-        assert_eq!(char_lit.parse_peek("'\\\"'").unwrap(), ("", lit("\\\"")));
-        assert_eq!(char_lit.parse_peek("'\\''").unwrap(), ("", lit("\\'")));
-        assert_eq!(char_lit.parse_peek("'\\t'").unwrap(), ("", lit("\\t")));
-        assert_eq!(char_lit.parse_peek("'\\n'").unwrap(), ("", lit("\\n")));
-        assert_eq!(char_lit.parse_peek("'\\r'").unwrap(), ("", lit("\\r")));
-        assert_eq!(char_lit.parse_peek("'\\0'").unwrap(), ("", lit("\\0")));
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\\"'").unwrap(),
+            ("", lit("\\\""))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\''").unwrap(),
+            ("", lit("\\'"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\t'").unwrap(),
+            ("", lit("\\t"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\n'").unwrap(),
+            ("", lit("\\n"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\r'").unwrap(),
+            ("", lit("\\r"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\0'").unwrap(),
+            ("", lit("\\0"))
+        );
         // Escaped ascii characters (up to `0x7F`).
-        assert_eq!(char_lit.parse_peek("'\\x12'").unwrap(), ("", lit("\\x12")));
-        assert_eq!(char_lit.parse_peek("'\\x02'").unwrap(), ("", lit("\\x02")));
-        assert_eq!(char_lit.parse_peek("'\\x6a'").unwrap(), ("", lit("\\x6a")));
-        assert_eq!(char_lit.parse_peek("'\\x7F'").unwrap(), ("", lit("\\x7F")));
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\x12'").unwrap(),
+            ("", lit("\\x12"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\x02'").unwrap(),
+            ("", lit("\\x02"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\x6a'").unwrap(),
+            ("", lit("\\x6a"))
+        );
+        assert_eq!(
+            unpeek(char_lit).parse_peek("'\\x7F'").unwrap(),
+            ("", lit("\\x7F"))
+        );
         // Escaped unicode characters (up to `0x10FFFF`).
         assert_eq!(
-            char_lit.parse_peek("'\\u{A}'").unwrap(),
+            unpeek(char_lit).parse_peek("'\\u{A}'").unwrap(),
             ("", lit("\\u{A}"))
         );
         assert_eq!(
-            char_lit.parse_peek("'\\u{10}'").unwrap(),
+            unpeek(char_lit).parse_peek("'\\u{10}'").unwrap(),
             ("", lit("\\u{10}"))
         );
         assert_eq!(
-            char_lit.parse_peek("'\\u{aa}'").unwrap(),
+            unpeek(char_lit).parse_peek("'\\u{aa}'").unwrap(),
             ("", lit("\\u{aa}"))
         );
         assert_eq!(
-            char_lit.parse_peek("'\\u{10FFFF}'").unwrap(),
+            unpeek(char_lit).parse_peek("'\\u{10FFFF}'").unwrap(),
             ("", lit("\\u{10FFFF}"))
         );
 
         // Check with `b` prefix.
         assert_eq!(
-            char_lit.parse_peek("b'a'").unwrap(),
+            unpeek(char_lit).parse_peek("b'a'").unwrap(),
             ("", crate::CharLit {
                 prefix: Some(crate::CharPrefix::Binary),
                 content: "a"
@@ -1241,33 +1287,33 @@ mod test {
         );
 
         // Should fail.
-        assert!(char_lit.parse_peek("''").is_err());
-        assert!(char_lit.parse_peek("'\\o'").is_err());
-        assert!(char_lit.parse_peek("'\\x'").is_err());
-        assert!(char_lit.parse_peek("'\\x1'").is_err());
-        assert!(char_lit.parse_peek("'\\x80'").is_err());
-        assert!(char_lit.parse_peek("'\\u'").is_err());
-        assert!(char_lit.parse_peek("'\\u{}'").is_err());
-        assert!(char_lit.parse_peek("'\\u{110000}'").is_err());
+        assert!(unpeek(char_lit).parse_peek("''").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\o'").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\x'").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\x1'").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\x80'").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\u'").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\u{}'").is_err());
+        assert!(unpeek(char_lit).parse_peek("'\\u{110000}'").is_err());
     }
 
     #[test]
     fn test_str_lit() {
         assert_eq!(
-            str_lit.parse_peek(r#"b"hello""#).unwrap(),
+            unpeek(str_lit).parse_peek(r#"b"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::Binary),
                 content: "hello"
             })
         );
         assert_eq!(
-            str_lit.parse_peek(r#"c"hello""#).unwrap(),
+            unpeek(str_lit).parse_peek(r#"c"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::CLike),
                 content: "hello"
             })
         );
-        assert!(str_lit.parse_peek(r#"d"hello""#).is_err());
+        assert!(unpeek(str_lit).parse_peek(r#"d"hello""#).is_err());
     }
 }
 
