@@ -1,6 +1,6 @@
-use winnow::Parser;
 use winnow::combinator::{alt, opt, peek, preceded, separated1};
 use winnow::token::one_of;
+use winnow::{Parser, unpeek};
 
 use crate::{
     CharLit, ErrorContext, InputParseResult, Num, ParseErr, PathOrIdentifier, State, StrLit,
@@ -27,13 +27,16 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
-        separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
-            .map(|v: Vec<_>| v)
-            .map(|mut opts| match opts.len() {
-                1 => opts.pop().unwrap(),
-                _ => Self::OrChain(opts),
-            })
-            .parse_peek(i)
+        separated1(
+            unpeek(|i| s.nest(i, unpeek(|i| Self::parse_one(i, s)))),
+            ws("or"),
+        )
+        .map(|v: Vec<_>| v)
+        .map(|mut opts| match opts.len() {
+            1 => opts.pop().unwrap(),
+            _ => Self::OrChain(opts),
+        })
+        .parse_peek(i)
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
@@ -42,7 +45,7 @@ impl<'a> Target<'a> {
         let mut opt_opening_brace = opt(ws('{')).map(|o| o.is_some());
         let mut opt_opening_bracket = opt(ws('[')).map(|o| o.is_some());
 
-        let (i, lit) = opt(Self::lit).parse_peek(i)?;
+        let (i, lit) = opt(unpeek(Self::lit)).parse_peek(i)?;
         if let Some(lit) = lit {
             return Ok((i, lit));
         }
@@ -50,7 +53,8 @@ impl<'a> Target<'a> {
         // match tuples and unused parentheses
         let (i, target_is_tuple) = opt_opening_paren.parse_peek(i)?;
         if target_is_tuple {
-            let (i, (singleton, mut targets)) = collect_targets(i, ')', |i| Self::unnamed(i, s))?;
+            let (i, (singleton, mut targets)) =
+                collect_targets(i, ')', unpeek(|i| Self::unnamed(i, s)))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -61,7 +65,8 @@ impl<'a> Target<'a> {
         }
         let (i, target_is_array) = opt_opening_bracket.parse_peek(i)?;
         if target_is_array {
-            let (i, (singleton, mut targets)) = collect_targets(i, ']', |i| Self::unnamed(i, s))?;
+            let (i, (singleton, mut targets)) =
+                collect_targets(i, ']', unpeek(|i| Self::unnamed(i, s)))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -71,7 +76,7 @@ impl<'a> Target<'a> {
             ));
         }
 
-        let path = path_or_identifier.try_map(|v| match v {
+        let path = unpeek(path_or_identifier).try_map(|v| match v {
             PathOrIdentifier::Path(v) => Ok(v),
             PathOrIdentifier::Identifier(v) => Err(v),
         });
@@ -84,7 +89,7 @@ impl<'a> Target<'a> {
 
             let (i, is_unnamed_struct) = opt_opening_paren.parse_peek(i)?;
             if is_unnamed_struct {
-                let (i, (_, targets)) = collect_targets(i, ')', |i| Self::unnamed(i, s))?;
+                let (i, (_, targets)) = collect_targets(i, ')', unpeek(|i| Self::unnamed(i, s)))?;
                 return Ok((
                     i,
                     Self::Tuple(path, only_one_rest_pattern(targets, false, "struct")?),
@@ -93,7 +98,7 @@ impl<'a> Target<'a> {
 
             let (i, is_named_struct) = opt_opening_brace.parse_peek(i)?;
             if is_named_struct {
-                let (i, (_, targets)) = collect_targets(i, '}', |i| Self::named(i, s))?;
+                let (i, (_, targets)) = collect_targets(i, '}', unpeek(|i| Self::named(i, s)))?;
                 return Ok((i, Self::Struct(path, targets)));
             }
 
@@ -102,7 +107,7 @@ impl<'a> Target<'a> {
 
         // neither literal nor struct nor path
         let i_before_identifier = i;
-        let (i, name) = identifier.parse_peek(i)?;
+        let (i, name) = unpeek(identifier).parse_peek(i)?;
         let target = match name {
             "_" => Self::Placeholder(WithSpan::new((), i_before_identifier)),
             _ => verify_name(i_before_identifier, name)?,
@@ -112,23 +117,23 @@ impl<'a> Target<'a> {
 
     fn lit(i: &'a str) -> InputParseResult<'a, Self> {
         alt((
-            str_lit.map(Self::StrLit),
-            char_lit.map(Self::CharLit),
-            num_lit
+            unpeek(str_lit).map(Self::StrLit),
+            unpeek(char_lit).map(Self::CharLit),
+            unpeek(num_lit)
                 .with_recognized()
                 .map(|(num, full)| Target::NumLit(full, num)),
-            bool_lit.map(Self::BoolLit),
+            unpeek(bool_lit).map(Self::BoolLit),
         ))
         .parse_peek(i)
     }
 
     fn unnamed(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
-        alt((Self::rest, |i| Self::parse(i, s))).parse_peek(i)
+        alt((unpeek(Self::rest), unpeek(|i| Self::parse(i, s)))).parse_peek(i)
     }
 
     fn named(i: &'a str, s: &State<'_>) -> InputParseResult<'a, (&'a str, Self)> {
         let start = i;
-        let (i, rest) = opt(Self::rest.with_recognized()).parse_peek(i)?;
+        let (i, rest) = opt(unpeek(Self::rest).with_recognized()).parse_peek(i)?;
         if let Some(rest) = rest {
             let (i, chr) = peek(ws(opt(one_of([',', ':'])))).parse_peek(i)?;
             if let Some(chr) = chr {
@@ -152,8 +157,11 @@ impl<'a> Target<'a> {
         }
 
         let i = start;
-        let (i, (src, target)) =
-            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_peek(i)?;
+        let (i, (src, target)) = (
+            unpeek(identifier),
+            opt(preceded(ws(':'), unpeek(|i| Self::parse(i, s)))),
+        )
+            .parse_peek(i)?;
 
         if src == "_" {
             let i = start;
@@ -172,7 +180,7 @@ impl<'a> Target<'a> {
 
     fn rest(i: &'a str) -> InputParseResult<'a, Self> {
         let start = i;
-        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_peek(i)?;
+        let (i, (ident, _)) = (opt((unpeek(identifier), ws('@'))), "..").parse_peek(i)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
