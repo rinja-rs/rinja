@@ -74,10 +74,9 @@ impl Config {
         template_whitespace: Option<&str>,
         config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
-        static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>>> =
+        static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, &'static Config>>> =
             ManuallyDrop::new(OnceLock::new());
-
-        let config = CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+        CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
             &ConfigKey {
                 source: source.into(),
                 config_path: config_path.map(Cow::Borrowed),
@@ -85,14 +84,13 @@ impl Config {
             },
             config_span,
             ConfigKey::to_owned,
-            |config_span, key| match Config::new_uncached(key.clone(), config_span) {
-                Ok(config) => Ok((Arc::clone(&config), config)),
-                Err(err) => Err(err),
+            |config_span, key| {
+                let config = Config::new_uncached(key.clone(), config_span)?;
+                let config = &*Box::leak(Box::new(config));
+                Ok((config, config))
             },
-            |_, _, value| Arc::clone(value),
-        )?;
-        // SAFETY: an inserted `Config` will never be evicted
-        Ok(unsafe { transmute::<&Config, &'static Config>(config.as_ref()) })
+            |_, _, config| config,
+        )
     }
 }
 
@@ -100,7 +98,7 @@ impl Config {
     fn new_uncached(
         key: OwnedConfigKey,
         config_span: Option<Span>,
-    ) -> Result<Arc<Config>, CompileError> {
+    ) -> Result<Config, CompileError> {
         // SAFETY: the resulting `Config` will keep a reference to the `key`
         let eternal_key =
             unsafe { transmute::<&ConfigKey<'_>, &'static ConfigKey<'static>>(key.borrow()) };
@@ -192,14 +190,14 @@ impl Config {
             ));
         }
 
-        Ok(Arc::new(Config {
+        Ok(Config {
             dirs,
             syntaxes,
             default_syntax,
             escapers,
             whitespace,
             _key: key,
-        }))
+        })
     }
 
     pub(crate) fn find_template(
