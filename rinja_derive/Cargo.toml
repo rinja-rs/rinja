@@ -1,6 +1,6 @@
 [package]
 name = "rinja_derive"
-version = "0.2.0"
+version = "0.3.0"
 description = "Procedural macro package for Rinja"
 homepage = "https://github.com/rinja-rs/rinja"
 repository = "https://github.com/rinja-rs/rinja"
@@ -25,7 +25,8 @@ with-rocket = []
 with-warp = []
 
 [dependencies]
-parser = { package = "rinja_parser", version = "0.2.0", path = "../rinja_parser" }
+parser = { package = "rinja_parser", version = "=0.3.0", path = "../rinja_parser" }
+
 basic-toml = { version = "0.1.1", optional = true }
 memchr = "2"
 mime = "0.3"
