@@ -1,6 +1,6 @@
 use std::borrow::{Borrow, Cow};
 use std::collections::btree_map::{BTreeMap, Entry};
-use std::mem::transmute;
+use std::mem::{transmute, ManuallyDrop};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -74,7 +74,8 @@ impl Config {
         template_whitespace: Option<&str>,
         config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
-        static CACHE: OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
+        static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>>> =
+            ManuallyDrop::new(OnceLock::new());
 
         let config = CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
             &ConfigKey {
