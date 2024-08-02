@@ -1,6 +1,6 @@
 use std::borrow::{Borrow, Cow};
 use std::collections::btree_map::{BTreeMap, Entry};
-use std::mem::transmute;
+use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -33,8 +33,8 @@ impl Drop for Config {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct OwnedConfigKey(Arc<ConfigKey<'static>>);
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+struct OwnedConfigKey(&'static ConfigKey<'static>);
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct ConfigKey<'a> {
@@ -47,7 +47,7 @@ impl<'a> ToOwned for ConfigKey<'a> {
     type Owned = OwnedConfigKey;
 
     fn to_owned(&self) -> Self::Owned {
-        OwnedConfigKey(Arc::new(ConfigKey {
+        let owned_key = ConfigKey {
             source: Cow::Owned(self.source.as_ref().to_owned()),
             config_path: self
                 .config_path
@@ -57,13 +57,15 @@ impl<'a> ToOwned for ConfigKey<'a> {
                 .template_whitespace
                 .as_ref()
                 .map(|s| Cow::Owned(s.as_ref().to_owned())),
-        }))
+        };
+        OwnedConfigKey(Box::leak(Box::new(owned_key)))
     }
 }
 
 impl<'a> Borrow<ConfigKey<'a>> for OwnedConfigKey {
+    #[inline]
     fn borrow(&self) -> &ConfigKey<'a> {
-        self.0.as_ref()
+        self.0
     }
 }
 
@@ -74,9 +76,9 @@ impl Config {
         template_whitespace: Option<&str>,
         config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
-        static CACHE: OnceLock<OnceMap<OwnedConfigKey, Arc<Config>>> = OnceLock::new();
-
-        let config = CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+        static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, &'static Config>>> =
+            ManuallyDrop::new(OnceLock::new());
+        CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
             &ConfigKey {
                 source: source.into(),
                 config_path: config_path.map(Cow::Borrowed),
@@ -84,14 +86,13 @@ impl Config {
             },
             config_span,
             ConfigKey::to_owned,
-            |config_span, key| match Config::new_uncached(key.clone(), config_span) {
-                Ok(config) => Ok((Arc::clone(&config), config)),
-                Err(err) => Err(err),
+            |config_span, key| {
+                let config = Config::new_uncached(*key, config_span)?;
+                let config = &*Box::leak(Box::new(config));
+                Ok((config, config))
             },
-            |_, _, value| Arc::clone(value),
-        )?;
-        // SAFETY: an inserted `Config` will never be evicted
-        Ok(unsafe { transmute::<&Config, &'static Config>(config.as_ref()) })
+            |_, _, config| config,
+        )
     }
 }
 
@@ -99,13 +100,10 @@ impl Config {
     fn new_uncached(
         key: OwnedConfigKey,
         config_span: Option<Span>,
-    ) -> Result<Arc<Config>, CompileError> {
-        // SAFETY: the resulting `Config` will keep a reference to the `key`
-        let eternal_key =
-            unsafe { transmute::<&ConfigKey<'_>, &'static ConfigKey<'static>>(key.borrow()) };
-        let s = eternal_key.source.as_ref();
-        let config_path = eternal_key.config_path.as_deref();
-        let template_whitespace = eternal_key.template_whitespace.as_deref();
+    ) -> Result<Config, CompileError> {
+        let s = key.0.source.as_ref();
+        let config_path = key.0.config_path.as_deref();
+        let template_whitespace = key.0.template_whitespace.as_deref();
 
         let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let default_dirs = vec![root.join("templates")];
@@ -191,14 +189,14 @@ impl Config {
             ));
         }
 
-        Ok(Arc::new(Config {
+        Ok(Config {
             dirs,
             syntaxes,
             default_syntax,
             escapers,
             whitespace,
             _key: key,
-        }))
+        })
     }
 
     pub(crate) fn find_template(
