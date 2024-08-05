@@ -50,6 +50,15 @@ struct Foo {{ {} }}"##,
                 ::rinja::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})
             }
         }
+        impl ::rinja::filters::FastWritable for Foo {
+            #[inline]
+            fn write_into<RinjaW: ::core::fmt::Write + ?::core::marker::Sized>(
+                &self,
+                dest: &mut RinjaW,
+            ) -> ::core::fmt::Result {
+                ::rinja::Template::render_into(self, dest).map_err(|_| ::core::fmt::Error)
+            }
+        }
     };
 
     let expected = prettyplease::unparse(&expected);

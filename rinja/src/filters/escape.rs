@@ -34,28 +34,28 @@ pub struct EscapeDisplay<T, E>(T, E);
 impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
     #[inline]
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        struct EscapeWriter<W, E>(W, E);
-
-        impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
-            #[inline]
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                self.1.write_escaped_str(&mut self.0, s)
-            }
-
-            #[inline]
-            fn write_char(&mut self, c: char) -> fmt::Result {
-                self.1.write_escaped_char(&mut self.0, c)
-            }
-        }
-
         write!(EscapeWriter(fmt, self.1), "{}", &self.0)
     }
 }
 
-impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for EscapeDisplay<&T, E> {
+impl<T: FastWritable, E: Escaper> FastWritable for EscapeDisplay<T, E> {
     #[inline]
     fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-        self.1.write_escaped_str(dest, self.0.as_ref())
+        self.0.write_into(&mut EscapeWriter(dest, self.1))
+    }
+}
+
+struct EscapeWriter<W, E>(W, E);
+
+impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.1.write_escaped_str(&mut self.0, s)
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.1.write_escaped_char(&mut self.0, c)
     }
 }
 

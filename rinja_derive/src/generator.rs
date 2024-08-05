@@ -86,6 +86,7 @@ impl<'a> Generator<'a> {
         }
 
         self.impl_display(&mut buf);
+        self.impl_fast_writable(&mut buf);
 
         #[cfg(feature = "with-actix-web")]
         self.impl_actix_web_responder(&mut buf);
@@ -165,6 +166,22 @@ impl<'a> Generator<'a> {
                 #[inline]\
                 fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{\
                     {CRATE}::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {{}})\
+                }}\
+            }}"
+        ));
+    }
+
+    // Implement `FastWritable` for the given context struct.
+    fn impl_fast_writable(&mut self, buf: &mut Buffer) {
+        self.write_header(buf, format_args!("{CRATE}::filters::FastWritable"), None);
+        buf.write(format_args!(
+            "\
+                #[inline]\
+                fn write_into<RinjaW: ::core::fmt::Write + ?::core::marker::Sized>(\
+                    &self,\
+                    dest: &mut RinjaW,\
+                ) -> ::core::fmt::Result {{\
+                    {CRATE}::Template::render_into(self, dest).map_err(|_| ::core::fmt::Error)\
                 }}\
             }}"
         ));
