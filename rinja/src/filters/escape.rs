@@ -1,5 +1,5 @@
 use std::convert::Infallible;
-use std::fmt::{self, Display, Formatter, Write};
+use std::fmt::{self, Formatter, Write};
 use std::{borrow, str};
 
 /// Marks a string (or other `Display` type) as safe
@@ -11,10 +11,7 @@ use std::{borrow, str};
 /// so this filter only takes a single argument of any type that implements
 /// `Display`.
 #[inline]
-pub fn safe(
-    text: impl fmt::Display,
-    escaper: impl Escaper,
-) -> Result<Safe<impl Display>, Infallible> {
+pub fn safe<T, E>(text: T, escaper: E) -> Result<Safe<T>, Infallible> {
     let _ = escaper; // it should not be part of the interface that the `escaper` is unused
     Ok(Safe(text))
 }
@@ -28,10 +25,7 @@ pub fn safe(
 /// It is possible to optionally specify an escaper other than the default for
 /// the template's extension, like `{{ val|escape("txt") }}`.
 #[inline]
-pub fn escape(
-    text: impl fmt::Display,
-    escaper: impl Escaper,
-) -> Result<Safe<impl Display>, Infallible> {
+pub fn escape<T, E>(text: T, escaper: E) -> Result<Safe<EscapeDisplay<T, E>>, Infallible> {
     Ok(Safe(EscapeDisplay(text, escaper)))
 }
 
@@ -40,34 +34,34 @@ pub struct EscapeDisplay<T, E>(T, E);
 impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
     #[inline]
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        struct EscapeWriter<W, E>(W, E);
-
-        impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
-            #[inline]
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                self.1.write_escaped_str(&mut self.0, s)
-            }
-
-            #[inline]
-            fn write_char(&mut self, c: char) -> fmt::Result {
-                self.1.write_escaped_char(&mut self.0, c)
-            }
-        }
-
         write!(EscapeWriter(fmt, self.1), "{}", &self.0)
     }
 }
 
-impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for EscapeDisplay<&T, E> {
+impl<T: FastWritable, E: Escaper> FastWritable for EscapeDisplay<T, E> {
     #[inline]
     fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-        self.1.write_escaped_str(dest, self.0.as_ref())
+        self.0.write_into(&mut EscapeWriter(dest, self.1))
+    }
+}
+
+struct EscapeWriter<W, E>(W, E);
+
+impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.1.write_escaped_str(&mut self.0, s)
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.1.write_escaped_char(&mut self.0, c)
     }
 }
 
 /// Alias for [`escape()`]
 #[inline]
-pub fn e(text: impl fmt::Display, escaper: impl Escaper) -> Result<Safe<impl Display>, Infallible> {
+pub fn e<T, E>(text: T, escaper: E) -> Result<Safe<EscapeDisplay<T, E>>, Infallible> {
     escape(text, escaper)
 }
 
@@ -237,6 +231,18 @@ const _: () = {
         }
     }
 
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: FastWritable> FastWritable for MaybeSafe<T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            let inner = match self {
+                MaybeSafe::Safe(inner) => inner,
+                MaybeSafe::NeedsEscaping(inner) => inner,
+            };
+            inner.write_into(dest)
+        }
+    }
+
     macro_rules! add_ref {
         ($([$($tt:tt)*])*) => { $(
             impl<'a, T: fmt::Display, E: Escaper> AutoEscape
@@ -262,12 +268,11 @@ const _: () = {
         NeedsEscaping(&'a T, E),
     }
 
-    impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
-        #[inline]
+    impl<T: FastWritable + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            match self {
-                Wrapped::Safe(t) => dest.write_str(t.as_ref()),
-                Wrapped::NeedsEscaping(t, e) => e.write_escaped_str(dest, t.as_ref()),
+            match *self {
+                Wrapped::Safe(t) => t.write_into(dest),
+                Wrapped::NeedsEscaping(t, e) => EscapeDisplay(t, e).write_into(dest),
             }
         }
     }
@@ -329,6 +334,14 @@ const _: () = {
         #[inline]
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.0)
+        }
+    }
+
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: FastWritable> FastWritable for Safe<T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            self.0.write_into(dest)
         }
     }
 

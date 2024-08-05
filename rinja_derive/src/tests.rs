@@ -40,14 +40,23 @@ struct Foo {{ {} }}"##,
                 #expected
                 ::rinja::Result::Ok(())
             }
-            const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = Some("txt");
-            const SIZE_HINT: ::std::primitive::usize = #size_hint;
-            const MIME_TYPE: &'static ::std::primitive::str = "text/plain; charset=utf-8";
+            const EXTENSION: ::core::option::Option<&'static ::core::primitive::str> = Some("txt");
+            const SIZE_HINT: ::core::primitive::usize = #size_hint;
+            const MIME_TYPE: &'static ::core::primitive::str = "text/plain; charset=utf-8";
         }
-        impl ::std::fmt::Display for Foo {
+        impl ::core::fmt::Display for Foo {
             #[inline]
-            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                ::rinja::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                ::rinja::Template::render_into(self, f).map_err(|_| ::core::fmt::Error)
+            }
+        }
+        impl ::rinja::filters::FastWritable for Foo {
+            #[inline]
+            fn write_into<RinjaW: ::core::fmt::Write + ?::core::marker::Sized>(
+                &self,
+                dest: &mut RinjaW,
+            ) -> ::core::fmt::Result {
+                ::rinja::Template::render_into(self, dest).map_err(|_| ::core::fmt::Error)
             }
         }
     };
