@@ -147,9 +147,9 @@ impl<'a> Generator<'a> {
             "\
                 {CRATE}::Result::Ok(())\
             }}\
-            const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = {:?};\
-            const SIZE_HINT: ::std::primitive::usize = {size_hint};\
-            const MIME_TYPE: &'static ::std::primitive::str = {:?};",
+            const EXTENSION: ::core::option::Option<&'static ::core::primitive::str> = {:?};\
+            const SIZE_HINT: ::core::primitive::usize = {size_hint};\
+            const MIME_TYPE: &'static ::core::primitive::str = {:?};",
             self.input.extension(),
             self.input.mime_type,
         ));
@@ -160,12 +160,12 @@ impl<'a> Generator<'a> {
 
     // Implement `Display` for the given context struct.
     fn impl_display(&mut self, buf: &mut Buffer) {
-        self.write_header(buf, "::std::fmt::Display", None);
+        self.write_header(buf, "::core::fmt::Display", None);
         buf.write(format_args!(
             "\
                 #[inline]\
-                fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{\
-                    {CRATE}::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {{}})\
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {{\
+                    {CRATE}::Template::render_into(self, f).map_err(|_| ::core::fmt::Error)\
                 }}\
             }}"
         ));
