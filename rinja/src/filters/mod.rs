@@ -105,8 +105,13 @@ impl fmt::Display for FilesizeFormatFilter {
 ///
 /// [`urlencode_strict`]: ./fn.urlencode_strict.html
 #[inline]
-pub fn urlencode(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Display>, Infallible> {
-    Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_SET)))
+pub fn urlencode<T>(
+    s: T,
+) -> Result<HtmlSafeOutput<_urlencode_filter::UrlencodeFilter<T>>, Infallible> {
+    Ok(HtmlSafeOutput(_urlencode_filter::UrlencodeFilter(
+        s,
+        URLENCODE_SET,
+    )))
 }
 
 #[cfg(feature = "urlencode")]
@@ -125,28 +130,42 @@ pub fn urlencode(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Displa
 ///
 /// If you want to preserve `/`, see [`urlencode`](./fn.urlencode.html).
 #[inline]
-pub fn urlencode_strict(
-    s: impl fmt::Display,
-) -> Result<HtmlSafeOutput<impl fmt::Display>, Infallible> {
-    Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_STRICT_SET)))
+pub fn urlencode_strict<T>(
+    s: T,
+) -> Result<HtmlSafeOutput<_urlencode_filter::UrlencodeFilter<T>>, Infallible> {
+    Ok(HtmlSafeOutput(_urlencode_filter::UrlencodeFilter(
+        s,
+        URLENCODE_STRICT_SET,
+    )))
 }
 
 #[cfg(feature = "urlencode")]
-struct UrlencodeFilter<T>(T, &'static AsciiSet);
+mod _urlencode_filter {
+    use super::*;
 
-#[cfg(feature = "urlencode")]
-impl<T: fmt::Display> fmt::Display for UrlencodeFilter<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Writer<'a, 'b>(&'a mut fmt::Formatter<'b>, &'static AsciiSet);
+    pub struct UrlencodeFilter<T>(pub T, pub &'static AsciiSet);
 
-        impl fmt::Write for Writer<'_, '_> {
-            #[inline]
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                write!(self.0, "{}", utf8_percent_encode(s, self.1))
-            }
+    impl<T: fmt::Display> fmt::Display for UrlencodeFilter<T> {
+        #[inline]
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(UrlencodeWriter(f, self.1), "{}", self.0)
         }
+    }
 
-        write!(Writer(f, self.1), "{}", self.0)
+    impl<T: FastWritable> FastWritable for UrlencodeFilter<T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> fmt::Result {
+            self.0.write_into(&mut UrlencodeWriter(f, self.1))
+        }
+    }
+
+    struct UrlencodeWriter<W>(W, &'static AsciiSet);
+
+    impl<W: fmt::Write> fmt::Write for UrlencodeWriter<W> {
+        #[inline]
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            write!(self.0, "{}", utf8_percent_encode(s, self.1))
+        }
     }
 }
 
