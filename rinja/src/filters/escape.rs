@@ -1,5 +1,5 @@
 use std::convert::Infallible;
-use std::fmt::{self, Display, Formatter, Write};
+use std::fmt::{self, Formatter, Write};
 use std::{borrow, str};
 
 /// Marks a string (or other `Display` type) as safe
@@ -11,10 +11,7 @@ use std::{borrow, str};
 /// so this filter only takes a single argument of any type that implements
 /// `Display`.
 #[inline]
-pub fn safe(
-    text: impl fmt::Display,
-    escaper: impl Escaper,
-) -> Result<Safe<impl Display>, Infallible> {
+pub fn safe<T, E>(text: T, escaper: E) -> Result<Safe<T>, Infallible> {
     let _ = escaper; // it should not be part of the interface that the `escaper` is unused
     Ok(Safe(text))
 }
@@ -28,10 +25,7 @@ pub fn safe(
 /// It is possible to optionally specify an escaper other than the default for
 /// the template's extension, like `{{ val|escape("txt") }}`.
 #[inline]
-pub fn escape(
-    text: impl fmt::Display,
-    escaper: impl Escaper,
-) -> Result<Safe<impl Display>, Infallible> {
+pub fn escape<T, E>(text: T, escaper: E) -> Result<Safe<EscapeDisplay<T, E>>, Infallible> {
     Ok(Safe(EscapeDisplay(text, escaper)))
 }
 
@@ -67,7 +61,7 @@ impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for EscapeDisplay<&T, E> {
 
 /// Alias for [`escape()`]
 #[inline]
-pub fn e(text: impl fmt::Display, escaper: impl Escaper) -> Result<Safe<impl Display>, Infallible> {
+pub fn e<T, E>(text: T, escaper: E) -> Result<Safe<EscapeDisplay<T, E>>, Infallible> {
     escape(text, escaper)
 }
 
@@ -347,6 +341,13 @@ const _: () = {
     }
 
     add_ref!([] [&] [&&] [&&&]);
+
+    impl<T: FastWritable> FastWritable for Safe<T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            T::write_into(&self.0, dest)
+        }
+    }
 };
 
 /// There is not need to mark the output of a custom filter as "unsafe"; this is simply the default
