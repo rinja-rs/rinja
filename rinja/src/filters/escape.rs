@@ -256,12 +256,11 @@ const _: () = {
         NeedsEscaping(&'a T, E),
     }
 
-    impl<T: AsRef<str> + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
-        #[inline]
+    impl<T: FastWritable + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            match self {
-                Wrapped::Safe(t) => dest.write_str(t.as_ref()),
-                Wrapped::NeedsEscaping(t, e) => e.write_escaped_str(dest, t.as_ref()),
+            match *self {
+                Wrapped::Safe(t) => t.write_into(dest),
+                Wrapped::NeedsEscaping(t, e) => EscapeDisplay(t, e).write_into(dest),
             }
         }
     }
