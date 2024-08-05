@@ -105,7 +105,7 @@ impl Config {
         let config_path = key.0.config_path.as_deref();
         let template_whitespace = key.0.template_whitespace.as_deref();
 
-        let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let root = manifest_root();
         let default_dirs = vec![root.join("templates")];
 
         let mut syntaxes = BTreeMap::new();
@@ -445,7 +445,7 @@ pub(crate) fn read_config_file(
     config_path: Option<&str>,
     span: Option<Span>,
 ) -> Result<String, CompileError> {
-    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let root = manifest_root();
     let filename = match config_path {
         Some(config_path) => root.join(config_path),
         None => root.join(CONFIG_FILE_NAME),
@@ -466,6 +466,10 @@ pub(crate) fn read_config_file(
     } else {
         Ok("".to_string())
     }
+}
+
+fn manifest_root() -> PathBuf {
+    env::var_os("CARGO_MANIFEST_DIR").map_or_else(|| PathBuf::from("."), PathBuf::from)
 }
 
 fn str_set(vals: &[&'static str]) -> Vec<Cow<'static, str>> {

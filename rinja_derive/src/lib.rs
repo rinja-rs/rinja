@@ -90,7 +90,10 @@ use syn::parse_quote_spanned;
     proc_macro_derive(Template, attributes(template))
 )]
 pub fn derive_template(input: TokenStream12) -> TokenStream12 {
-    let ast = syn::parse2(input.into()).unwrap();
+    let ast = match syn::parse2(input.into()) {
+        Ok(ast) => ast,
+        Err(err) => return err.to_compile_error().into(),
+    };
     match build_template(&ast) {
         Ok(source) => source.parse().unwrap(),
         Err(CompileError {
