@@ -48,13 +48,13 @@ const MAX_LEN: usize = 10_000;
 /// assert_eq!(tmpl.to_string(),  "Filesize: 1.23 MB.");
 /// ```
 #[inline]
-pub fn filesizeformat(b: &impl ToF64) -> Result<impl fmt::Display, Infallible> {
+pub fn filesizeformat(b: &impl ToF64) -> Result<FilesizeFormatFilter, Infallible> {
     Ok(FilesizeFormatFilter(b.to_f64()))
 }
 
 #[cfg(feature = "humansize")]
 #[derive(Debug, Clone, Copy)]
-struct FilesizeFormatFilter(f64);
+pub struct FilesizeFormatFilter(f64);
 
 #[cfg(feature = "humansize")]
 impl fmt::Display for FilesizeFormatFilter {
@@ -172,7 +172,7 @@ pub fn format() {}
 /// A single newline becomes an HTML line break `<br>` and a new line
 /// followed by a blank line becomes a paragraph break `<p>`.
 #[inline]
-pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Display>, fmt::Error> {
+pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn linebreaks(s: String) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace('\n', "<br/>");
         format!("<p>{linebroken}</p>")
@@ -182,7 +182,7 @@ pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Displ
 
 /// Converts all newlines in a piece of plain text to HTML line breaks
 #[inline]
-pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Display>, fmt::Error> {
+pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn linebreaksbr(s: String) -> String {
         s.replace('\n', "<br/>")
     }
@@ -195,9 +195,7 @@ pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<impl fmt::Dis
 /// Paragraph tags only wrap content; empty paragraphs are removed.
 /// No `<br/>` tags are added.
 #[inline]
-pub fn paragraphbreaks(
-    s: impl fmt::Display,
-) -> Result<HtmlSafeOutput<impl fmt::Display>, fmt::Error> {
+pub fn paragraphbreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn paragraphbreaks(s: String) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace("<p></p>", "");
         format!("<p>{linebroken}</p>")
@@ -207,7 +205,7 @@ pub fn paragraphbreaks(
 
 /// Converts to lowercase
 #[inline]
-pub fn lower(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+pub fn lower(s: impl fmt::Display) -> Result<String, fmt::Error> {
     fn lower(s: String) -> Result<String, fmt::Error> {
         Ok(s.to_lowercase())
     }
@@ -216,13 +214,13 @@ pub fn lower(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
 
 /// Alias for the `lower()` filter
 #[inline]
-pub fn lowercase(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+pub fn lowercase(s: impl fmt::Display) -> Result<String, fmt::Error> {
     lower(s)
 }
 
 /// Converts to uppercase
 #[inline]
-pub fn upper(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+pub fn upper(s: impl fmt::Display) -> Result<String, fmt::Error> {
     fn upper(s: String) -> Result<String, fmt::Error> {
         Ok(s.to_uppercase())
     }
@@ -231,12 +229,12 @@ pub fn upper(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
 
 /// Alias for the `upper()` filter
 #[inline]
-pub fn uppercase(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+pub fn uppercase(s: impl fmt::Display) -> Result<String, fmt::Error> {
     upper(s)
 }
 
 /// Strip leading and trailing whitespace
-pub fn trim<T: fmt::Display>(s: T) -> Result<impl fmt::Display> {
+pub fn trim<T: fmt::Display>(s: T) -> Result<String> {
     struct Collector(String);
 
     impl fmt::Write for Collector {
@@ -344,7 +342,7 @@ impl<W: fmt::Write> fmt::Write for TruncateWriter<W> {
 
 /// Indent lines with `width` spaces
 #[inline]
-pub fn indent(s: impl fmt::Display, width: usize) -> Result<impl fmt::Display, fmt::Error> {
+pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> {
     fn indent(s: String, width: usize) -> Result<String, fmt::Error> {
         if width >= MAX_LEN || s.len() >= MAX_LEN {
             return Ok(s);
@@ -384,7 +382,7 @@ where
 
 /// Joins iterable into a string separated by provided argument
 #[inline]
-pub fn join<I, S>(input: I, separator: S) -> Result<impl fmt::Display, Infallible>
+pub fn join<I, S>(input: I, separator: S) -> Result<JoinFilter<I, S>, Infallible>
 where
     I: IntoIterator,
     I::Item: fmt::Display,
@@ -405,7 +403,7 @@ where
 // in multiple invocations for the same object. We break this contract, because have to consume the
 // iterator, unless we want to enforce `I: Clone`, nor do we want to "memorize" the result of the
 // joined data.
-struct JoinFilter<I, S>(Cell<Option<(I, S)>>);
+pub struct JoinFilter<I, S>(Cell<Option<(I, S)>>);
 
 impl<I, S> fmt::Display for JoinFilter<I, S>
 where
@@ -438,7 +436,7 @@ where
 
 /// Capitalize a value. The first character will be uppercase, all others lowercase.
 #[inline]
-pub fn capitalize(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error> {
+pub fn capitalize(s: impl fmt::Display) -> Result<String, fmt::Error> {
     fn capitalize(s: String) -> Result<String, fmt::Error> {
         match s.chars().next() {
             Some(c) => {
@@ -454,11 +452,11 @@ pub fn capitalize(s: impl fmt::Display) -> Result<impl fmt::Display, fmt::Error>
 
 /// Centers the value in a field of a given width
 #[inline]
-pub fn center(src: impl fmt::Display, width: usize) -> Result<impl fmt::Display, Infallible> {
+pub fn center<T: fmt::Display>(src: T, width: usize) -> Result<Center<T>, Infallible> {
     Ok(Center { src, width })
 }
 
-struct Center<T> {
+pub struct Center<T> {
     src: T,
     width: usize,
 }
