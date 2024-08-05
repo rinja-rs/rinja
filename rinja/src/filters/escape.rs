@@ -231,6 +231,18 @@ const _: () = {
         }
     }
 
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: FastWritable> FastWritable for MaybeSafe<T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            let inner = match self {
+                MaybeSafe::Safe(inner) => inner,
+                MaybeSafe::NeedsEscaping(inner) => inner,
+            };
+            inner.write_into(dest)
+        }
+    }
+
     macro_rules! add_ref {
         ($([$($tt:tt)*])*) => { $(
             impl<'a, T: fmt::Display, E: Escaper> AutoEscape
@@ -325,6 +337,14 @@ const _: () = {
         }
     }
 
+    // This is the fallback. The filter is not the last element of the filter chain.
+    impl<T: FastWritable> FastWritable for Safe<T> {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            self.0.write_into(dest)
+        }
+    }
+
     macro_rules! add_ref {
         ($([$($tt:tt)*])*) => { $(
             impl<'a, T: fmt::Display, E> AutoEscape for &AutoEscaper<'a, $($tt)* Safe<T>, E> {
@@ -340,13 +360,6 @@ const _: () = {
     }
 
     add_ref!([] [&] [&&] [&&&]);
-
-    impl<T: FastWritable> FastWritable for Safe<T> {
-        #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            T::write_into(&self.0, dest)
-        }
-    }
 };
 
 /// There is not need to mark the output of a custom filter as "unsafe"; this is simply the default
