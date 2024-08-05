@@ -260,71 +260,85 @@ pub fn trim<T: fmt::Display>(s: T) -> Result<impl fmt::Display> {
 pub fn truncate<S: fmt::Display>(
     source: S,
     remaining: usize,
-) -> Result<impl fmt::Display, Infallible> {
+) -> Result<TruncateFilter<S>, Infallible> {
     Ok(TruncateFilter { source, remaining })
 }
 
-struct TruncateFilter<S> {
+pub struct TruncateFilter<S> {
     source: S,
     remaining: usize,
 }
 
 impl<S: fmt::Display> fmt::Display for TruncateFilter<S> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Writer<'a, 'b> {
-            dest: Option<&'a mut fmt::Formatter<'b>>,
-            remaining: usize,
+        write!(TruncateWriter::new(f, self.remaining), "{}", self.source)
+    }
+}
+
+impl<S: FastWritable> FastWritable for TruncateFilter<S> {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        self.source
+            .write_into(&mut TruncateWriter::new(dest, self.remaining))
+    }
+}
+
+struct TruncateWriter<W> {
+    dest: Option<W>,
+    remaining: usize,
+}
+
+impl<W> TruncateWriter<W> {
+    fn new(dest: W, remaining: usize) -> Self {
+        TruncateWriter {
+            dest: Some(dest),
+            remaining,
         }
+    }
+}
 
-        impl fmt::Write for Writer<'_, '_> {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                let Some(dest) = &mut self.dest else {
-                    return Ok(());
-                };
-                let mut rem = self.remaining;
-                if rem >= s.len() {
-                    dest.write_str(s)?;
-                    self.remaining -= s.len();
-                } else {
-                    if rem > 0 {
-                        while !s.is_char_boundary(rem) {
-                            rem += 1;
-                        }
-                        if rem == s.len() {
-                            // Don't write "..." if the char bound extends to the end of string.
-                            self.remaining = 0;
-                            return dest.write_str(s);
-                        }
-                        dest.write_str(&s[..rem])?;
-                    }
-                    dest.write_str("...")?;
-                    self.dest = None;
-                }
-                Ok(())
-            }
-
-            #[inline]
-            fn write_char(&mut self, c: char) -> fmt::Result {
-                match self.dest.is_some() {
-                    true => self.write_str(c.encode_utf8(&mut [0; 4])),
-                    false => Ok(()),
-                }
-            }
-
-            #[inline]
-            fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> fmt::Result {
-                match self.dest.is_some() {
-                    true => fmt::write(self, args),
-                    false => Ok(()),
-                }
-            }
-        }
-
-        let mut writer = Writer {
-            dest: Some(f),
-            remaining: self.remaining,
+impl<W: fmt::Write> fmt::Write for TruncateWriter<W> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let Some(dest) = &mut self.dest else {
+            return Ok(());
         };
-        write!(writer, "{}", self.source)
+        let mut rem = self.remaining;
+        if rem >= s.len() {
+            dest.write_str(s)?;
+            self.remaining -= s.len();
+        } else {
+            if rem > 0 {
+                while !s.is_char_boundary(rem) {
+                    rem += 1;
+                }
+                if rem == s.len() {
+                    // Don't write "..." if the char bound extends to the end of string.
+                    self.remaining = 0;
+                    return dest.write_str(s);
+                }
+                dest.write_str(&s[..rem])?;
+            }
+            dest.write_str("...")?;
+            self.dest = None;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        match self.dest.is_some() {
+            true => self.write_str(c.encode_utf8(&mut [0; 4])),
+            false => Ok(()),
+        }
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> fmt::Result {
+        match self.dest.is_some() {
+            true => fmt::write(self, args),
+            false => Ok(()),
+        }
     }
 }
 
