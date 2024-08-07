@@ -65,3 +65,25 @@ fn test_path_ext_html_jinja_and_ext_txt() {
     assert_eq!(t.render().unwrap(), "foo.html.jinja");
     assert_eq!(PathHtmlJinjaAndExtTxt::EXTENSION, Some("txt"));
 }
+
+#[derive(Template)]
+#[template(path = "foo.rinja")]
+struct PathRinja;
+
+#[test]
+fn test_path_ext_rinja() {
+    let t = PathRinja;
+    assert_eq!(t.render().unwrap(), "foo.rinja");
+    assert_eq!(PathRinja::EXTENSION, Some("rinja"));
+}
+
+#[derive(Template)]
+#[template(path = "foo.html.rinja")]
+struct PathHtmlRinja;
+
+#[test]
+fn test_path_ext_html_rinja() {
+    let t = PathHtmlRinja;
+    assert_eq!(t.render().unwrap(), "foo.html.rinja");
+    assert_eq!(PathHtmlRinja::EXTENSION, Some("html"));
+}

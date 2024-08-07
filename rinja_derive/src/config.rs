@@ -480,7 +480,9 @@ static CONFIG_FILE_NAME: &str = "rinja.toml";
 static DEFAULT_SYNTAX_NAME: &str = "default";
 static DEFAULT_ESCAPERS: &[(&[&str], &str)] = &[
     (
-        &["html", "htm", "j2", "jinja", "jinja2", "svg", "xml"],
+        &[
+            "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml",
+        ],
         "Html",
     ),
     (&["md", "none", "txt", "yml", ""], "Text"),
@@ -753,7 +755,9 @@ mod tests {
             vec![
                 (str_set(&["js"]), "::my_filters::Js".into()),
                 (
-                    str_set(&["html", "htm", "j2", "jinja", "jinja2", "svg", "xml"]),
+                    str_set(&[
+                        "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml"
+                    ]),
                     "::rinja::filters::Html".into()
                 ),
                 (
