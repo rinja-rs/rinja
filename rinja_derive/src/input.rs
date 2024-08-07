@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
 use std::fs::read_to_string;
+use std::iter::FusedIterator;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
@@ -290,47 +291,45 @@ pub(crate) struct TemplateArgs {
 }
 
 impl TemplateArgs {
-    pub(crate) fn new(ast: &'_ syn::DeriveInput) -> Result<Self, CompileError> {
-        // Check that an attribute called `template()` exists once and that it is
+    pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
+        // Check that an attribute called `template()` exists at least once and that it is
         // the proper type (list).
-        let mut span = None;
-        let mut template_args = None;
-        for attr in &ast.attrs {
-            let path = &attr.path();
-            if !path.is_ident("template") {
-                continue;
+
+        let mut templates_attrs = ast
+            .attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("template"))
+            .peekable();
+        let mut args = match templates_attrs.peek() {
+            Some(attr) => Self {
+                template_span: Some(attr.path().span()),
+                ..Self::default()
+            },
+            None => {
+                return Err(CompileError::no_file_info(
+                    "no attribute `template` found",
+                    None,
+                ));
             }
-
-            span = Some(path.span());
-            match attr.parse_args_with(Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated) {
-                Ok(args) if template_args.is_none() => template_args = Some(args),
-                Ok(_) => {
-                    return Err(CompileError::no_file_info(
-                        "duplicated 'template' attribute",
-                        span,
-                    ));
-                }
-                Err(e) => {
-                    return Err(CompileError::no_file_info(
-                        format!("unable to parse template arguments: {e}"),
-                        span,
-                    ));
-                }
-            };
-        }
-
-        let template_args = template_args
-            .ok_or_else(|| CompileError::no_file_info("no attribute 'template' found", None))?;
-
-        let mut args = Self {
-            template_span: span,
-            ..Self::default()
         };
+        let attrs = templates_attrs
+            .map(|attr| {
+                type Attrs = Punctuated<syn::Meta, syn::Token![,]>;
+                match attr.parse_args_with(Attrs::parse_terminated) {
+                    Ok(args) => Ok(args),
+                    Err(e) => Err(CompileError::no_file_info(
+                        format!("unable to parse template arguments: {e}"),
+                        Some(attr.path().span()),
+                    )),
+                }
+            })
+            .flat_map(ResultIter::from);
+
         // Loop over the meta attributes and find everything that we
         // understand. Return a CompileError if something is not right.
         // `source` contains an enum that can represent `path` or `source`.
-        for item in &template_args {
-            let pair = match item {
+        for item in attrs {
+            let pair = match item? {
                 syn::Meta::NameValue(pair) => pair,
                 v => {
                     return Err(CompileError::no_file_info(
@@ -426,6 +425,30 @@ impl TemplateArgs {
         self.config.as_deref()
     }
 }
+
+struct ResultIter<I, E>(Result<I, Option<E>>);
+
+impl<I: IntoIterator, E> From<Result<I, E>> for ResultIter<I::IntoIter, E> {
+    fn from(value: Result<I, E>) -> Self {
+        Self(match value {
+            Ok(i) => Ok(i.into_iter()),
+            Err(e) => Err(Some(e)),
+        })
+    }
+}
+
+impl<I: Iterator, E> Iterator for ResultIter<I, E> {
+    type Item = Result<I::Item, E>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            Ok(iter) => Some(Ok(iter.next()?)),
+            Err(err) => Some(Err(err.take()?)),
+        }
+    }
+}
+
+impl<I: FusedIterator, E> FusedIterator for ResultIter<I, E> {}
 
 fn source_or_path(
     name: &syn::Ident,
