@@ -4,7 +4,7 @@ use std::str;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
-use nom::combinator::{cut, map, not, opt, peek, recognize, value};
+use nom::combinator::{cut, fail, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
 use nom::multi::{fold_many0, many0, separated_list0};
@@ -127,7 +127,7 @@ impl<'a> Expr<'a> {
         if !is_template_macro {
             // If this is not a template macro, we don't want to parse named arguments so
             // we instead return an error which will allow to continue the parsing.
-            return Err(nom::Err::Error(error_position!(i, ErrorKind::Alt)));
+            return fail(i);
         }
 
         let (_, level) = level.nest(i)?;
@@ -486,10 +486,7 @@ impl<'a> Suffix<'a> {
             if nested == 0 {
                 Ok((&input[last..], ()))
             } else {
-                Err(nom::Err::Error(error_position!(
-                    input,
-                    ErrorKind::SeparatedNonEmptyList
-                )))
+                fail(input)
             }
         }
 
