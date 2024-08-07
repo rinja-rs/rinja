@@ -478,11 +478,12 @@ fn ext_default_to_path<'a>(ext: Option<&'a str>, path: &'a Path) -> Option<&'a s
 fn extension(path: &Path) -> Option<&str> {
     const JINJA_EXTENSIONS: &[&str] = &["j2", "jinja", "jinja2", "rinja"];
 
-    let ext = path.extension().map(|s| s.to_str().unwrap())?;
+    let ext = path.extension()?.to_str()?;
     if JINJA_EXTENSIONS.contains(&ext) {
+        // an extension was found: file stem cannot be absent
         Path::new(path.file_stem().unwrap())
             .extension()
-            .map(|s| s.to_str().unwrap())
+            .and_then(|s| s.to_str())
             .or(Some(ext))
     } else {
         Some(ext)
