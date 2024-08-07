@@ -544,10 +544,19 @@ struct TestI16ToU8 {
 }
 
 #[test]
-#[allow(clippy::needless_borrows_for_generic_args)]
 fn test_i16_to_u8() {
     assert_eq!(TestI16ToU8 { input: 0 }.to_string(), "0 0 0");
     assert_eq!(TestI16ToU8 { input: 0x7f00 }.to_string(), "0 0 0");
     assert_eq!(TestI16ToU8 { input: 255 }.to_string(), "255 255 255");
     assert_eq!(TestI16ToU8 { input: -12345 }.to_string(), "199 199 199");
+}
+
+#[derive(Template)]
+#[template(source = "🙂")]
+#[template(ext = "txt")]
+struct SplitTemplateDeclaration;
+
+#[test]
+fn test_split_template_declaration() {
+    assert_eq!(SplitTemplateDeclaration.to_string(), "🙂")
 }

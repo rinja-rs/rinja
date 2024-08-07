@@ -1,4 +1,4 @@
-error: no attribute 'template' found
+error: no attribute `template` found
  --> tests/ui/no_template_attribute.rs:4:8
   |
 4 | struct NoTemplate;

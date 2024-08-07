@@ -1,5 +1,5 @@
-error: duplicated 'template' attribute
- --> tests/ui/duplicated_template_attribute.rs:8:3
+error: must specify `source` OR `path` exactly once
+ --> tests/ui/duplicated_template_attribute.rs:9:5
   |
-8 | #[template(
-  |   ^^^^^^^^
+9 |     source = "🙃",
+  |     ^^^^^^
