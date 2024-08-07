@@ -4,8 +4,6 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
 use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, peek, recognize, value};
-use nom::error::ErrorKind;
-use nom::error_position;
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, tuple};
 
@@ -79,12 +77,7 @@ impl<'a> Node<'a> {
             "break" => |i, s| Self::r#break(i, s),
             "continue" => |i, s| Self::r#continue(i, s),
             "filter" => |i, s| wrap(Self::FilterBlock, FilterBlock::parse(i, s)),
-            _ => {
-                return Err(ErrorContext::from_err(nom::Err::Error(error_position!(
-                    i,
-                    ErrorKind::Tag
-                ))));
-            }
+            _ => return fail(i),
         };
 
         let (i, node) = s.nest(j, |i| func(i, s))?;
@@ -773,7 +766,7 @@ impl<'a> Lit<'a> {
         let (i, content) = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
-                return Err(nom::Err::Error(error_position!(i, ErrorKind::TakeUntil)));
+                return fail(i);
             }
             Some(content) => (i, content),
             None => ("", i), // there is no {block,comment,expr}_start: take everything

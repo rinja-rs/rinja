@@ -12,11 +12,11 @@ use std::{fmt, str};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
 use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{complete, cut, eof, map, not, opt, recognize};
-use nom::error::{Error, ErrorKind, FromExternalError};
+use nom::combinator::{complete, cut, eof, fail, map, not, opt, recognize};
+use nom::error::{ErrorKind, FromExternalError};
 use nom::multi::{many0_count, many1};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
-use nom::{error_position, AsChar, InputTakeAtPosition};
+use nom::{AsChar, InputTakeAtPosition};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -240,20 +240,6 @@ impl<'a> ErrorContext<'a> {
             message: Some(message.into()),
         }
     }
-
-    pub(crate) fn from_err(error: nom::Err<Error<&'a str>>) -> nom::Err<Self> {
-        match error {
-            nom::Err::Incomplete(i) => nom::Err::Incomplete(i),
-            nom::Err::Failure(Error { input, .. }) => nom::Err::Failure(Self {
-                input,
-                message: None,
-            }),
-            nom::Err::Error(Error { input, .. }) => nom::Err::Error(Self {
-                input,
-                message: None,
-            }),
-        }
-    }
 }
 
 impl<'a> nom::error::ParseError<&'a str> for ErrorContext<'a> {
@@ -323,11 +309,7 @@ fn skip_till<'a, 'b, O>(
 fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'_> {
     move |i: &'a str| -> ParseResult<'a> {
         let (j, v) = identifier(i)?;
-        if k == v {
-            Ok((j, v))
-        } else {
-            Err(nom::Err::Error(error_position!(i, ErrorKind::Tag)))
-        }
+        if k == v { Ok((j, v)) } else { fail(i) }
     }
 }
 
@@ -366,7 +348,7 @@ fn num_lit(i: &str) -> ParseResult<'_> {
                 Ok((i, suffix))
             } else if ignore.contains(&suffix) {
                 // no need for a message, this case only occures in an `opt(…)`
-                Err(nom::Err::Error(ErrorContext::new("", i)))
+                fail(i)
             } else {
                 Err(nom::Err::Failure(ErrorContext::new(
                     format!("unknown {kind} suffix `{suffix}`"),
