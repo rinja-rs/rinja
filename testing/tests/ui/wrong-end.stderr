@@ -45,3 +45,11 @@ error: expected `endif` to terminate `if` node, found `end`
    |
 24 | #[template(source = "{% if true %}{% end %}", ext = "txt")]
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `endif` to terminate `if` node, found `endfor`
+ --> <source attribute>:1:15
+       " endfor %}"
+  --> tests/ui/wrong-end.rs:28:21
+   |
+28 | #[template(source = "{% if true %}{% endfor %}", ext = "txt")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^

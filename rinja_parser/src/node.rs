@@ -1058,7 +1058,7 @@ fn end_node<'a, 'g: 'a>(
         let (i, actual) = ws(identifier)(start)?;
         if actual == expected {
             Ok((i, actual))
-        } else if actual == "end" {
+        } else if actual.starts_with("end") {
             Err(nom::Err::Failure(ErrorContext::new(
                 format!("expected `{expected}` to terminate `{node}` node, found `{actual}`"),
                 start,

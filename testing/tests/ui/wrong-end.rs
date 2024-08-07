@@ -24,4 +24,8 @@ struct Block;
 #[template(source = "{% if true %}{% end %}", ext = "txt")]
 struct If;
 
+#[derive(Template)]
+#[template(source = "{% if true %}{% endfor %}", ext = "txt")]
+struct IfFor;
+
 fn main() {}
