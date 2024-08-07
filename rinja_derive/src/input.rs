@@ -476,9 +476,9 @@ fn ext_default_to_path<'a>(ext: Option<&'a str>, path: &'a Path) -> Option<&'a s
 }
 
 fn extension(path: &Path) -> Option<&str> {
-    let ext = path.extension().map(|s| s.to_str().unwrap())?;
+    const JINJA_EXTENSIONS: &[&str] = &["j2", "jinja", "jinja2", "rinja"];
 
-    const JINJA_EXTENSIONS: [&str; 3] = ["j2", "jinja", "jinja2"];
+    let ext = path.extension().map(|s| s.to_str().unwrap())?;
     if JINJA_EXTENSIONS.contains(&ext) {
         Path::new(path.file_stem().unwrap())
             .extension()
