@@ -1,0 +1,47 @@
+error: failed to parse template source
+ --> <source attribute>:1:24
+       "end %}"
+ --> tests/ui/wrong-end.rs:4:21
+  |
+4 | #[template(source = "{% for _ in 1..=10 %}{% end %}", ext = "txt")]
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: failed to parse template source
+ --> <source attribute>:1:21
+       "end %}"
+ --> tests/ui/wrong-end.rs:8:21
+  |
+8 | #[template(source = "{% macro test() %}{% end %}", ext = "txt")]
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: failed to parse template source
+ --> <source attribute>:1:21
+       "end %}"
+  --> tests/ui/wrong-end.rs:12:21
+   |
+12 | #[template(source = "{% filter upper %}{% end %}", ext = "txt")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: failed to parse template source
+ --> <source attribute>:1:30
+       "end %}"
+  --> tests/ui/wrong-end.rs:16:21
+   |
+16 | #[template(source = "{% match () %}{% when () %}{% end %}", ext = "txt")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: failed to parse template source
+ --> <source attribute>:1:19
+       "end %}"
+  --> tests/ui/wrong-end.rs:20:21
+   |
+20 | #[template(source = "{% block body %}{% end %}", ext = "txt")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: failed to parse template source
+ --> <source attribute>:1:16
+       "end %}"
+  --> tests/ui/wrong-end.rs:24:21
+   |
+24 | #[template(source = "{% if true %}{% end %}", ext = "txt")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^
