@@ -224,3 +224,15 @@ fn test_match_enum_or() {
     };
     assert_eq!(template.render().unwrap(), "The card is red\n");
 }
+
+#[derive(Template)]
+#[template(
+    source = "{% match true %}{% else %}otherwise{% endmatch %}",
+    ext = "html"
+)]
+struct EmptyMatch;
+
+#[test]
+fn test_empty_match() {
+    assert_eq!(EmptyMatch.to_string(), "otherwise");
+}
