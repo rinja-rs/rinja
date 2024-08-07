@@ -3,7 +3,7 @@ use std::str;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
-use nom::combinator::{complete, consumed, cut, eof, map, not, opt, peek, recognize, value};
+use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
 use nom::multi::{many0, many1, separated_list0};
@@ -377,7 +377,7 @@ impl<'a> Loop<'a> {
                             |i| s.tag_block_start(i),
                             opt(Whitespace::parse),
                             opt(else_block),
-                            ws(keyword("endfor")),
+                            end_node("for", "endfor"),
                             opt(Whitespace::parse),
                         ))),
                     ))),
@@ -449,7 +449,7 @@ impl<'a> Macro<'a> {
             cut(tuple((
                 |i| s.tag_block_start(i),
                 opt(Whitespace::parse),
-                ws(keyword("endmacro")),
+                end_node("macro", "endmacro"),
                 cut(preceded(
                     opt(|before| {
                         let (after, end_name) = ws(identifier)(before)?;
@@ -525,7 +525,7 @@ impl<'a> FilterBlock<'a> {
             cut(tuple((
                 |i| s.tag_block_start(i),
                 opt(Whitespace::parse),
-                ws(keyword("endfilter")),
+                end_node("filter", "endfilter"),
                 opt(Whitespace::parse),
             ))),
         )));
@@ -645,7 +645,7 @@ impl<'a> Match<'a> {
                         cut(tuple((
                             ws(|i| s.tag_block_start(i)),
                             opt(Whitespace::parse),
-                            ws(keyword("endmatch")),
+                            end_node("match", "endmatch"),
                             opt(Whitespace::parse),
                         ))),
                     ))),
@@ -699,7 +699,7 @@ impl<'a> BlockDef<'a> {
             cut(tuple((
                 |i| s.tag_block_start(i),
                 opt(Whitespace::parse),
-                ws(keyword("endblock")),
+                end_node("block", "endblock"),
                 cut(tuple((
                     opt(|before| {
                         let (after, end_name) = ws(identifier)(before)?;
@@ -806,7 +806,7 @@ impl<'a> Raw<'a> {
         let endraw = tuple((
             |i| s.tag_block_start(i),
             opt(Whitespace::parse),
-            ws(keyword("endraw")),
+            ws(keyword("endraw")), // sic: ignore `{% end %}` in raw blocks
             opt(Whitespace::parse),
             peek(|i| s.tag_block_end(i)),
         ));
@@ -888,7 +888,7 @@ impl<'a> If<'a> {
                     cut(tuple((
                         |i| s.tag_block_start(i),
                         opt(Whitespace::parse),
-                        ws(keyword("endif")),
+                        end_node("if", "endif"),
                         opt(Whitespace::parse),
                     ))),
                 ))),
@@ -1056,6 +1056,25 @@ impl<'a> Comment<'a> {
 /// Second field is "minus/plus sign was used on the right part of the item".
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
+
+fn end_node<'a, 'g: 'a>(
+    node: &'g str,
+    expected: &'g str,
+) -> impl Fn(&'a str) -> ParseResult<'a> + 'g {
+    move |start| {
+        let (i, actual) = ws(identifier)(start)?;
+        if actual == expected {
+            Ok((i, actual))
+        } else if actual == "end" {
+            Err(nom::Err::Failure(ErrorContext::new(
+                format!("expected `{expected}` to terminate `{node}` node, found `{actual}`"),
+                start,
+            )))
+        } else {
+            fail(start)
+        }
+    }
+}
 
 #[doc(hidden)]
 pub const MAX_KW_LEN: usize = 8;
