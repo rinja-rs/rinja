@@ -559,16 +559,55 @@ expand an `Option`:
 {% endmatch %}
 ```
 
-That is, a `match` block can optionally contain some whitespace (but
-no other literal content), followed by a number of `when` blocks
-and an optional `else` block. Each `when` block must name a list of
-matches (`(val)`), optionally introduced with a variant name. The
-`else` block is equivalent to matching on `_` (matching anything).
+That is, a `{% match %}` block may contain whitespaces (but no other literal content)
+and comment blocks, followed by a number of `{% when %}` blocks
+and an optional `{% else %}` block.
 
-Struct-like enum variants are supported from version 0.8, with the list
-of matches surrounded by curly braces instead (`{ field }`).  New names
-for the fields can be specified after a colon in the list of matches
-(`{ field: val }`).
+[Like in Rust](https://doc.rust-lang.org/book/ch18-00-patterns.html),
+the matching is done against a pattern. Such a pattern may be a literal, e.g.
+
+```jinja
+{% match multiple_choice_answer %}
+  {% when 3 %} Correct!
+  {% else %} Sorry, the right answer is "3".
+{% endmatch %}
+```
+
+Or some more complex type, such as a [`Result<T, E>`](https://doc.rust-lang.org/stable/std/result/enum.Result.html):
+
+```jinja
+{% match result %}
+  {% when Ok(val) %} Good: {{ val }}.
+  {% when Err(err) %} Bad: {{ err }}.
+{% endmatch %}
+```
+
+Using the placeholder `_` to match against any value without capturing the datum, works too.
+The wildcard operator `..` is used to match against an arbitrary amount of items,
+and the same restrictions as in Rust, e.g. that it can be used only once in a slice or struct:
+
+```jinja
+{% match list_of_ints %}
+  {% when [first, ..] %} The list starts with a {{ first }}
+  {% when _ %} The list is empty.
+{% endmatch %}
+```
+
+The `{% else %}` node is syntactical sugar for `{% when _ %}`.
+If used, it must come last, after all other `{% when %}` blocks.
+A `{% match %}` must be exhaustive, i.e. all possible inputs must have a case.
+This is most easily done by using proving an `{% else %}` case,
+if not all possible values need an individual handling.
+
+```jinja
+{% match answer %}
+  {% when Ok(42) %} The answer is "42".
+  {% else %} No answer wrong answer?
+{% endmatch %}
+```
+
+Because a `{% match %}` block could not generate valid code otherwise,
+you have to provide at least one `{% when %}` case and/or an `{% else %}` case.
 
 ### Referencing and dereferencing variables
 
