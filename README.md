@@ -10,11 +10,14 @@ and generates type-safe Rust code from your templates at compile time
 based on a user-defined `struct` to hold the template's context.
 See below for an example. It is a fork of [Askama](https://crates.io/crates/askama).
 
-All feedback welcome. Feel free to file bugs, requests for documentation and
+All feedback welcome! Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
 
 You can find the documentation about our syntax, features, configuration in our book:
 [rinja.readthedocs.io](https://rinja.readthedocs.io/).
+
+Have a look at our [*Rinja Playground*](https://rinja-rs.github.io/play-rinja/),
+if our want to try out rinja's code generation online.
 
 ### Feature highlights
 
