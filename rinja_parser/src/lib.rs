@@ -277,7 +277,7 @@ impl fmt::Display for ParseError {
 }
 
 pub(crate) type ParseErr<'a> = winnow::error::ErrMode<ErrorContext<'a>>;
-pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
+pub(crate) type InputParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
 /// It used to generate `ParserError`.
@@ -332,12 +332,12 @@ impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
 }
 
 #[inline]
-fn skip_ws0(i: &str) -> ParseResult<'_, ()> {
+fn skip_ws0(i: &str) -> InputParseResult<'_, ()> {
     Ok((i.trim_ascii_start(), ()))
 }
 
 #[inline]
-fn skip_ws1(i: &str) -> ParseResult<'_, ()> {
+fn skip_ws1(i: &str) -> InputParseResult<'_, ()> {
     let j = i.trim_ascii_start();
     if i.len() != j.len() {
         Ok((j, ()))
@@ -382,7 +382,7 @@ fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
     identifier.verify(move |v: &str| v == k)
 }
 
-fn identifier(input: &str) -> ParseResult<'_> {
+fn identifier(input: &str) -> InputParseResult<'_> {
     let start = take_while(1.., |c: char| c.is_alpha() || c == '_' || c >= '\u{0080}');
 
     let tail = take_while(1.., |c: char| {
@@ -392,7 +392,7 @@ fn identifier(input: &str) -> ParseResult<'_> {
     (start, opt(tail)).recognize().parse_next(input)
 }
 
-fn bool_lit(i: &str) -> ParseResult<'_> {
+fn bool_lit(i: &str) -> InputParseResult<'_> {
     alt((keyword("false"), keyword("true"))).parse_next(i)
 }
 
@@ -402,13 +402,13 @@ pub enum Num<'a> {
     Float(&'a str, Option<FloatKind>),
 }
 
-fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
+fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     fn num_lit_suffix<'a, T: Copy>(
         kind: &'a str,
         list: &[(&str, T)],
         start: &'a str,
         i: &'a str,
-    ) -> ParseResult<'a, T> {
+    ) -> InputParseResult<'a, T> {
         let (i, suffix) = identifier.parse_next(i)?;
         if let Some(value) = list
             .iter()
@@ -440,7 +440,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
-    let float = |i: &'a str| -> ParseResult<'a, ()> {
+    let float = |i: &'a str| -> InputParseResult<'a, ()> {
         let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
             let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_next(i)?;
@@ -531,13 +531,13 @@ pub struct StrLit<'a> {
     pub content: &'a str,
 }
 
-fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
+fn str_lit_without_prefix(i: &str) -> InputParseResult<'_> {
     let (i, s) =
         delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
-fn str_lit(i: &str) -> ParseResult<'_, StrLit<'_>> {
+fn str_lit(i: &str) -> InputParseResult<'_, StrLit<'_>> {
     let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
@@ -560,7 +560,7 @@ pub struct CharLit<'a> {
 
 // Information about allowed character escapes is available at:
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
-fn char_lit(i: &str) -> ParseResult<'_, CharLit<'_>> {
+fn char_lit(i: &str) -> InputParseResult<'_, CharLit<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = (
         opt('b'),
@@ -635,7 +635,7 @@ enum Char<'a> {
 }
 
 impl<'a> Char<'a> {
-    fn parse(i: &'a str) -> ParseResult<'a, Self> {
+    fn parse(i: &'a str) -> InputParseResult<'a, Self> {
         if i.chars().count() == 1 {
             return any.value(Self::Literal).parse_next(i);
         }
@@ -670,7 +670,7 @@ enum PathOrIdentifier<'a> {
     Identifier(&'a str),
 }
 
-fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
+fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
     let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
@@ -725,7 +725,7 @@ impl<'a> State<'a> {
         &self,
         i: &'b str,
         mut callback: F,
-    ) -> ParseResult<'b, T> {
+    ) -> InputParseResult<'b, T> {
         let prev_level = self.level.get();
         let (_, level) = prev_level.nest(i)?;
         self.level.set(level);
@@ -734,11 +734,11 @@ impl<'a> State<'a> {
         ret
     }
 
-    fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+    fn tag_block_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
         self.syntax.block_start.value(()).parse_next(i)
     }
 
-    fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+    fn tag_block_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
         let (i, control) = alt((
             self.syntax.block_end.value(None),
             peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
@@ -756,19 +756,19 @@ impl<'a> State<'a> {
         }
     }
 
-    fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+    fn tag_comment_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
         self.syntax.comment_start.value(()).parse_next(i)
     }
 
-    fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+    fn tag_comment_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
         self.syntax.comment_end.value(()).parse_next(i)
     }
 
-    fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+    fn tag_expr_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
         self.syntax.expr_start.value(()).parse_next(i)
     }
 
-    fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+    fn tag_expr_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
         self.syntax.expr_end.value(()).parse_next(i)
     }
 
@@ -942,7 +942,7 @@ impl<'a> SyntaxBuilder<'a> {
 pub(crate) struct Level(u8);
 
 impl Level {
-    fn nest(self, i: &str) -> ParseResult<'_, Level> {
+    fn nest(self, i: &str) -> InputParseResult<'_, Level> {
         if self.0 >= Self::MAX_DEPTH {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "your template code is too deeply nested, or last expression is too complex",
@@ -959,7 +959,7 @@ impl Level {
 fn filter<'a>(
     i: &'a str,
     level: &mut Level,
-) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
+) -> InputParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
     let start = i;
     let (i, _) = ws(('|', not('|'))).parse_next(i)?;
 
