@@ -3,8 +3,8 @@ use winnow::combinator::{alt, opt, peek, preceded, separated1};
 use winnow::token::one_of;
 
 use crate::{
-    CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
-    bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
+    CharLit, ErrorContext, InputParseResult, Num, ParseErr, PathOrIdentifier, State, StrLit,
+    WithSpan, bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,7 +26,7 @@ pub enum Target<'a> {
 
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
-    pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    pub(super) fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
             .map(|v: Vec<_>| v)
             .map(|mut opts| match opts.len() {
@@ -37,7 +37,7 @@ impl<'a> Target<'a> {
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
-    fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn parse_one(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         let mut opt_opening_paren = opt(ws('(')).map(|o| o.is_some());
         let mut opt_opening_brace = opt(ws('{')).map(|o| o.is_some());
         let mut opt_opening_bracket = opt(ws('[')).map(|o| o.is_some());
@@ -110,7 +110,7 @@ impl<'a> Target<'a> {
         Ok((i, target))
     }
 
-    fn lit(i: &'a str) -> ParseResult<'a, Self> {
+    fn lit(i: &'a str) -> InputParseResult<'a, Self> {
         alt((
             str_lit.map(Self::StrLit),
             char_lit.map(Self::CharLit),
@@ -122,11 +122,11 @@ impl<'a> Target<'a> {
         .parse_next(i)
     }
 
-    fn unnamed(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn unnamed(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         alt((Self::rest, |i| Self::parse(i, s))).parse_next(i)
     }
 
-    fn named(i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
+    fn named(i: &'a str, s: &State<'_>) -> InputParseResult<'a, (&'a str, Self)> {
         let start = i;
         let (i, rest) = opt(Self::rest.with_recognized()).parse_next(i)?;
         if let Some(rest) = rest {
@@ -170,7 +170,7 @@ impl<'a> Target<'a> {
         Ok((i, (src, target)))
     }
 
-    fn rest(i: &'a str) -> ParseResult<'a, Self> {
+    fn rest(i: &'a str) -> InputParseResult<'a, Self> {
         let start = i;
         let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(i)?;
         Ok((
@@ -197,7 +197,7 @@ fn collect_targets<'a, T>(
     i: &'a str,
     delim: char,
     one: impl Parser<&'a str, T, ErrorContext<'a>>,
-) -> ParseResult<'a, (bool, Vec<T>)> {
+) -> InputParseResult<'a, (bool, Vec<T>)> {
     let opt_comma = ws(opt(',')).map(|o| o.is_some());
     let mut opt_end = ws(opt(one_of(delim))).map(|o| o.is_some());
 
