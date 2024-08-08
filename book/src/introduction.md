@@ -5,8 +5,11 @@ It generates Rust code from your templates at compile time
 based on a user-defined `struct` to hold the template's context.
 See below for an example.
 
-All feedback welcome. Feel free to file bugs, requests for documentation and
+All feedback welcome! Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
+
+Have a look at our [*Rinja Playground*](https://rinja-rs.github.io/play-rinja/),
+if our want to try out rinja's code generation online.
 
 ### Feature highlights
 
