@@ -17,7 +17,7 @@ You can find the documentation about our syntax, features, configuration in our 
 [rinja.readthedocs.io](https://rinja.readthedocs.io/).
 
 Have a look at our [*Rinja Playground*](https://rinja-rs.github.io/play-rinja/),
-if our want to try out rinja's code generation online.
+if you want to try out rinja's code generation online.
 
 ### Feature highlights
 
