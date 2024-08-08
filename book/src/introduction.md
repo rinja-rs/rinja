@@ -9,7 +9,7 @@ All feedback welcome! Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
 
 Have a look at our [*Rinja Playground*](https://rinja-rs.github.io/play-rinja/),
-if our want to try out rinja's code generation online.
+if you want to try out rinja's code generation online.
 
 ### Feature highlights
 
