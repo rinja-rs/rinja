@@ -967,18 +967,18 @@ impl Level {
 }
 
 fn filter<'a>(
-    i: &'a str,
+    i: &mut &'a str,
     level: &mut Level,
-) -> InputParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let start = i;
-    let (i, _) = ws(('|', not('|'))).parse_peek(i)?;
+) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
+    let start = *i;
+    let _ = ws(('|', not('|'))).parse_next(i)?;
 
     *level = level.nest(start)?.1;
     cut_err((
         ws(identifier),
         opt(unpeek(|i| Expr::arguments(i, *level, false))),
     ))
-    .parse_peek(i)
+    .parse_next(i)
 }
 
 /// Returns the common parts of two paths.

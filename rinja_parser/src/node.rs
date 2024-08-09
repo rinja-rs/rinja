@@ -781,12 +781,10 @@ impl<'a> FilterBlock<'a> {
                 (
                     ws(identifier),
                     opt(unpeek(|i| Expr::arguments(i, s.level.get(), false))),
-                    repeat(
-                        0..,
-                        unpeek(|i| {
-                            filter(i, &mut level).map(|(j, (name, params))| (j, (name, params, i)))
-                        }),
-                    )
+                    repeat(0.., |i: &mut _| {
+                        let start = *i;
+                        filter(i, &mut level).map(|(name, params)| (name, params, start))
+                    })
                     .map(|v: Vec<_>| v),
                     ws(unpeek(|i| Ok((i, ())))),
                     opt(unpeek(Whitespace::parse)),
