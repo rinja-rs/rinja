@@ -7,7 +7,7 @@ pub(crate) trait Splitter: Copy {
     fn split<'a>(&self, haystack: &'a str) -> Option<(&'a str, &'a str)>;
 }
 
-impl<T: Splitter + ?Sized> Splitter for &T {
+impl<T: Splitter> Splitter for &T {
     #[inline]
     fn split<'a>(&self, haystack: &'a str) -> Option<(&'a str, &'a str)> {
         T::split(self, haystack)
