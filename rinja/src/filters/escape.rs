@@ -404,6 +404,7 @@ impl<T: HtmlSafe + ?Sized> HtmlSafe for Box<T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::Ref<'_, T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::RefMut<'_, T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::rc::Rc<T> {}
+impl<T: HtmlSafe + ?Sized> HtmlSafe for std::pin::Pin<&T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::Arc<T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::MutexGuard<'_, T> {}
 impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockReadGuard<'_, T> {}
@@ -417,8 +418,6 @@ where
     T::Owned: HtmlSafe,
 {
 }
-
-impl<T: HtmlSafe> HtmlSafe for std::pin::Pin<&T> {}
 
 /// Used internally by rinja to select the appropriate [`write!()`] mechanism
 pub struct Writable<'a, S: ?Sized>(pub &'a S);
@@ -454,6 +453,7 @@ const _: () = {
         Box<T>
         std::cell::Ref<'_, T>
         std::cell::RefMut<'_, T>
+        std::pin::Pin<&T>
         std::rc::Rc<T>
         std::sync::Arc<T>
         std::sync::MutexGuard<'_, T>
@@ -465,13 +465,6 @@ const _: () = {
         #[inline]
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
             T::write_into(self.as_ref(), dest)
-        }
-    }
-
-    impl<T: FastWritable> FastWritable for std::pin::Pin<&T> {
-        #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            T::write_into(self, dest)
         }
     }
 
