@@ -122,7 +122,7 @@ impl<'a> Target<'a> {
             unpeek(num_lit)
                 .with_recognized()
                 .map(|(num, full)| Target::NumLit(full, num)),
-            unpeek(bool_lit).map(Self::BoolLit),
+            bool_lit.map(Self::BoolLit),
         ))
         .parse_peek(i)
     }
