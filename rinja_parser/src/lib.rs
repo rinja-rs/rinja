@@ -146,6 +146,11 @@ impl<'a, T> WithSpan<'a, T> {
     pub fn span(&self) -> &'a str {
         self.span
     }
+
+    pub fn deconstruct(self) -> (T, &'a str) {
+        let Self { inner, span } = self;
+        (inner, span)
+    }
 }
 
 impl<'a, T> Deref for WithSpan<'a, T> {

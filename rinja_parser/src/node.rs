@@ -272,6 +272,7 @@ impl<'a> Cond<'a> {
 pub struct CondTest<'a> {
     pub target: Option<Target<'a>>,
     pub expr: WithSpan<'a, Expr<'a>>,
+    pub contains_bool_lit_or_is_defined: bool,
 }
 
 impl<'a> CondTest<'a> {
@@ -288,7 +289,15 @@ impl<'a> CondTest<'a> {
             )),
             ws(|i| Expr::parse(i, s.level.get())),
         )(i)?;
-        Ok((i, Self { target, expr }))
+        let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
+        Ok((
+            i,
+            Self {
+                target,
+                expr,
+                contains_bool_lit_or_is_defined,
+            },
+        ))
     }
 }
 
