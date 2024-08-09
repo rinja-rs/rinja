@@ -4,6 +4,8 @@ use std::{fmt, io, str};
 use serde::Serialize;
 use serde_json::ser::{to_writer, PrettyFormatter, Serializer};
 
+use super::FastWritable;
+
 /// Serialize to JSON (requires `json` feature)
 ///
 /// The generated string does not contain ampersands `&`, chevrons `< >`, or apostrophes `'`.
@@ -119,26 +121,50 @@ impl<T: AsIndent + ?Sized> AsIndent for std::sync::Arc<T> {
     }
 }
 
+impl<S: Serialize> FastWritable for ToJson<S> {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> fmt::Result {
+        fmt_json(f, &self.value)
+    }
+}
+
 impl<S: Serialize> fmt::Display for ToJson<S> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        to_writer(JsonWriter(f), &self.value).map_err(|_| fmt::Error)
+        fmt_json(f, &self.value)
+    }
+}
+
+impl<S: Serialize, I: AsIndent> FastWritable for ToJsonPretty<S, I> {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> fmt::Result {
+        fmt_json_pretty(f, &self.value, self.indent.as_indent())
     }
 }
 
 impl<S: Serialize, I: AsIndent> fmt::Display for ToJsonPretty<S, I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let indent = self.indent.as_indent();
-        let formatter = PrettyFormatter::with_indent(indent.as_bytes());
-        let mut serializer = Serializer::with_formatter(JsonWriter(f), formatter);
-        self.value
-            .serialize(&mut serializer)
-            .map_err(|_| fmt::Error)
+        fmt_json_pretty(f, &self.value, self.indent.as_indent())
     }
 }
 
-struct JsonWriter<'a, 'b: 'a>(&'a mut fmt::Formatter<'b>);
+fn fmt_json<S: Serialize, W: fmt::Write + ?Sized>(dest: &mut W, value: &S) -> fmt::Result {
+    to_writer(JsonWriter(dest), value).map_err(|_| fmt::Error)
+}
 
-impl io::Write for JsonWriter<'_, '_> {
+fn fmt_json_pretty<S: Serialize, W: fmt::Write + ?Sized>(
+    dest: &mut W,
+    value: &S,
+    indent: &str,
+) -> fmt::Result {
+    let formatter = PrettyFormatter::with_indent(indent.as_bytes());
+    let mut serializer = Serializer::with_formatter(JsonWriter(dest), formatter);
+    value.serialize(&mut serializer).map_err(|_| fmt::Error)
+}
+
+struct JsonWriter<'a, W: fmt::Write + ?Sized>(&'a mut W);
+
+impl<W: fmt::Write + ?Sized> io::Write for JsonWriter<'_, W> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         self.write_all(bytes)?;
@@ -156,7 +182,7 @@ impl io::Write for JsonWriter<'_, '_> {
     }
 }
 
-fn write(f: &mut fmt::Formatter<'_>, bytes: &[u8]) -> fmt::Result {
+fn write<W: fmt::Write + ?Sized>(f: &mut W, bytes: &[u8]) -> fmt::Result {
     let mut last = 0;
     for (index, byte) in bytes.iter().enumerate() {
         let escaped = match byte {
