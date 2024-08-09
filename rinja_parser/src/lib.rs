@@ -393,8 +393,8 @@ fn identifier<'i>(input: &mut &'i str) -> ParseResult<'i> {
     (start, opt(tail)).recognize().parse_next(input)
 }
 
-fn bool_lit(i: &str) -> InputParseResult<'_> {
-    alt((keyword("false"), keyword("true"))).parse_peek(i)
+fn bool_lit<'i>(i: &mut &'i str) -> ParseResult<'i> {
+    alt((keyword("false"), keyword("true"))).parse_next(i)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
