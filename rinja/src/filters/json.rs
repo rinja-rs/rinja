@@ -84,39 +84,37 @@ impl AsIndent for usize {
     }
 }
 
-impl<T: AsIndent + ?Sized> AsIndent for &T {
+impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
     #[inline]
     fn as_indent(&self) -> &str {
         T::as_indent(self)
     }
 }
 
-impl<T: AsIndent + ?Sized> AsIndent for Box<T> {
-    #[inline]
-    fn as_indent(&self) -> &str {
-        T::as_indent(self.as_ref())
-    }
+// implement AsIdent for a list of reference wrapper types to AsIdent
+macro_rules! impl_as_ident_for_ref {
+    ($T:ident => $($ty:ty)*) => { $(
+        impl<T: AsIndent + ?Sized> AsIndent for $ty {
+            #[inline]
+            fn as_indent(&self) -> &str {
+                <T>::as_indent(self)
+            }
+        }
+    )* };
 }
 
-impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
-    #[inline]
-    fn as_indent(&self) -> &str {
-        T::as_indent(self.as_ref())
-    }
-}
-
-impl<T: AsIndent + ?Sized> AsIndent for std::rc::Rc<T> {
-    #[inline]
-    fn as_indent(&self) -> &str {
-        T::as_indent(self.as_ref())
-    }
-}
-
-impl<T: AsIndent + ?Sized> AsIndent for std::sync::Arc<T> {
-    #[inline]
-    fn as_indent(&self) -> &str {
-        T::as_indent(self.as_ref())
-    }
+impl_as_ident_for_ref! {
+    T =>
+    &T
+    Box<T>
+    std::cell::Ref<'_, T>
+    std::cell::RefMut<'_, T>
+    std::pin::Pin<&T>
+    std::rc::Rc<T>
+    std::sync::Arc<T>
+    std::sync::MutexGuard<'_, T>
+    std::sync::RwLockReadGuard<'_, T>
+    std::sync::RwLockWriteGuard<'_, T>
 }
 
 impl<S: Serialize> fmt::Display for ToJson<S> {
