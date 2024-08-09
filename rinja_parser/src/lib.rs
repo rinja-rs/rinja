@@ -748,21 +748,21 @@ impl<'a> State<'a> {
         self.syntax.block_start.value(()).parse_next(i)
     }
 
-    fn tag_block_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        let (i, control) = alt((
+    fn tag_block_end<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
+        let control = alt((
             self.syntax.block_end.value(None),
             peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
             fail, // rollback on partial matches in the previous line
         ))
-        .parse_peek(i)?;
+        .parse_next(i)?;
         if let Some(control) = control {
             let message = format!(
                 "unclosed block, you likely meant to apply whitespace control: {:?}",
                 format!("{control}{}", self.syntax.block_end),
             );
-            Err(ParseErr::backtrack(ErrorContext::new(message, i).into()))
+            Err(ParseErr::backtrack(ErrorContext::new(message, *i).into()))
         } else {
-            Ok((i, ()))
+            Ok(())
         }
     }
 

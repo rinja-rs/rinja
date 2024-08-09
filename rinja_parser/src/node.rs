@@ -122,7 +122,7 @@ impl<'a> Node<'a> {
             None,
             alt((
                 ws(eof).value(false),
-                unpeek(|i| s.tag_block_end(i)).value(true),
+                (|i: &mut _| s.tag_block_end(i)).value(true),
             )),
         )
         .parse_peek(i)?;
@@ -285,7 +285,7 @@ impl<'a> When<'a> {
                 Some("match-else"),
                 (
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                     cut_node(Some("match-else"), unpeek(|i| Node::many(i, s))),
                 ),
             ),
@@ -319,7 +319,7 @@ impl<'a> When<'a> {
                 Some("match-endwhen"),
                 (
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                     repeat(0.., ws(unpeek(|i| Comment::parse(i, s)))).map(|()| ()),
                 ),
             ),
@@ -347,7 +347,7 @@ impl<'a> When<'a> {
                 (
                     separated1(ws(unpeek(|i| Target::parse(i, s))), '|'),
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                     cut_node(Some("match-when"), unpeek(|i| Node::many(i, s))),
                     opt(endwhen),
                 ),
@@ -395,7 +395,7 @@ impl<'a> Cond<'a> {
                 ),
             )),
             opt(unpeek(Whitespace::parse)),
-            cut_node(Some("if"), unpeek(|i| s.tag_block_end(i))),
+            cut_node(Some("if"), |i: &mut _| s.tag_block_end(i)),
             cut_node(Some("if"), unpeek(|i| Node::many(i, s))),
         )
             .parse_peek(i)?;
@@ -540,7 +540,7 @@ impl<'a> Loop<'a> {
                     (
                         opt(unpeek(Whitespace::parse)),
                         delimited(
-                            unpeek(|i| s.tag_block_end(i)),
+                            |i: &mut _| s.tag_block_end(i),
                             unpeek(|i| Node::many(i, s)),
                             |i: &mut _| s.tag_block_start(i),
                         ),
@@ -587,7 +587,7 @@ impl<'a> Loop<'a> {
                             ws(unpeek(|i| Expr::parse(i, s.level.get(), true))),
                             opt(if_cond),
                             opt(unpeek(Whitespace::parse)),
-                            unpeek(|i| s.tag_block_end(i)),
+                            |i: &mut _| s.tag_block_end(i),
                             unpeek(body_and_end),
                         ),
                     ),
@@ -684,7 +684,7 @@ impl<'a> Macro<'a> {
                     ws(identifier),
                     unpeek(parameters),
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                 ),
             ),
         );
@@ -788,7 +788,7 @@ impl<'a> FilterBlock<'a> {
                     .map(|v: Vec<_>| v),
                     ws(unpeek(|i| Ok((i, ())))),
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                 ),
             ),
         );
@@ -947,7 +947,7 @@ impl<'a> Match<'a> {
                 (
                     ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                     cut_node(
                         Some("match"),
                         (
@@ -1022,7 +1022,7 @@ impl<'a> BlockDef<'a> {
                 (
                     ws(identifier),
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                 ),
             ),
         );
@@ -1151,7 +1151,7 @@ impl<'a> Raw<'a> {
             opt(unpeek(Whitespace::parse)),
             ws(keyword("endraw")), // sic: ignore `{% end %}` in raw blocks
             opt(unpeek(Whitespace::parse)),
-            peek(unpeek(|i| s.tag_block_end(i))),
+            peek(|i: &mut _| s.tag_block_end(i)),
         );
 
         let mut p = (
@@ -1161,7 +1161,7 @@ impl<'a> Raw<'a> {
                 Some("raw"),
                 (
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                     skip_till(Splitter1::new(s.syntax.block_start), endraw).with_recognized(),
                 ),
             ),
@@ -1232,7 +1232,7 @@ impl<'a> If<'a> {
                 Some("if"),
                 (
                     opt(unpeek(Whitespace::parse)),
-                    unpeek(|i| s.tag_block_end(i)),
+                    |i: &mut _| s.tag_block_end(i),
                     cut_node(
                         Some("if"),
                         (
