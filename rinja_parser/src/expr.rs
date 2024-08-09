@@ -197,7 +197,7 @@ impl<'a> Expr<'a> {
 
         let (_, level) = level.nest(i)?;
         let (i, (argument, _, value)) = (
-            unpeek(identifier),
+            identifier,
             ws('='),
             unpeek(move |i| Self::parse(i, level, false)),
         )
@@ -308,11 +308,11 @@ impl<'a> Expr<'a> {
         let start = i;
         let (i, lhs) = Self::filtered(i, level)?;
         let before_keyword = i;
-        let (i, rhs) = opt(ws(unpeek(identifier))).parse_peek(i)?;
+        let (i, rhs) = opt(ws(identifier)).parse_peek(i)?;
         let i = match rhs {
             Some("is") => i,
             Some("as") => {
-                let (i, target) = opt(unpeek(identifier)).parse_peek(i)?;
+                let (i, target) = opt(identifier).parse_peek(i)?;
                 let target = target.unwrap_or_default();
                 if crate::PRIMITIVE_TYPES.contains(&target) {
                     return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
@@ -674,12 +674,9 @@ impl<'a> Suffix<'a> {
     }
 
     fn attr(i: &'a str) -> InputParseResult<'a, Self> {
-        preceded(
-            ws(('.', not('.'))),
-            cut_err(alt((digit1, unpeek(identifier)))),
-        )
-        .map(Self::Attr)
-        .parse_peek(i)
+        preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier))))
+            .map(Self::Attr)
+            .parse_peek(i)
     }
 
     fn index(i: &'a str, level: Level) -> InputParseResult<'a, Self> {

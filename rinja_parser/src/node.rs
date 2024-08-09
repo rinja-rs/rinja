@@ -93,7 +93,7 @@ impl<'a> Node<'a> {
             unpeek(|i| s.tag_block_start(i)),
             peek(preceded(
                 (opt(unpeek(Whitespace::parse)), unpeek(skip_ws0)),
-                unpeek(identifier),
+                identifier,
             )),
         )
         .parse_peek(i)?;
@@ -254,7 +254,7 @@ fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, ()> {
 }
 
 fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> InputParseResult<'a, ()> {
-    let (_, tag) = ws(unpeek(identifier)).parse_peek(i)?;
+    let (_, tag) = ws(identifier).parse_peek(i)?;
     let msg = match tag {
         "end" | "elif" | "else" | "when" => match kind {
             Some(kind) => {
@@ -653,7 +653,7 @@ impl<'a> Macro<'a> {
                     opt(terminated(
                         separated1(
                             (
-                                ws(unpeek(identifier)),
+                                ws(identifier),
                                 opt(preceded('=', ws(unpeek(|i| Expr::parse(i, level, false))))),
                             ),
                             ',',
@@ -683,7 +683,7 @@ impl<'a> Macro<'a> {
             cut_node(
                 Some("macro"),
                 (
-                    ws(unpeek(identifier)),
+                    ws(identifier),
                     unpeek(parameters),
                     opt(unpeek(Whitespace::parse)),
                     unpeek(|i| s.tag_block_end(i)),
@@ -735,8 +735,7 @@ impl<'a> Macro<'a> {
                             Some("macro"),
                             preceded(
                                 opt(unpeek(|before| {
-                                    let (after, end_name) =
-                                        ws(unpeek(identifier)).parse_peek(before)?;
+                                    let (after, end_name) = ws(identifier).parse_peek(before)?;
                                     check_end_name(before, after, name, end_name, "macro")
                                 })),
                                 opt(unpeek(Whitespace::parse)),
@@ -782,7 +781,7 @@ impl<'a> FilterBlock<'a> {
             cut_node(
                 Some("filter"),
                 (
-                    ws(unpeek(identifier)),
+                    ws(identifier),
                     opt(unpeek(|i| Expr::arguments(i, s.level.get(), false))),
                     repeat(
                         0..,
@@ -869,7 +868,7 @@ impl<'a> Import<'a> {
                     ws(keyword("as")),
                     cut_node(
                         Some("import"),
-                        (ws(unpeek(identifier)), opt(unpeek(Whitespace::parse))),
+                        (ws(identifier), opt(unpeek(Whitespace::parse))),
                     ),
                 ),
             ),
@@ -906,8 +905,8 @@ impl<'a> Call<'a> {
             cut_node(
                 Some("call"),
                 (
-                    opt((ws(unpeek(identifier)), ws("::"))),
-                    ws(unpeek(identifier)),
+                    opt((ws(identifier), ws("::"))),
+                    ws(identifier),
                     opt(ws(unpeek(|nested| {
                         Expr::arguments(nested, s.level.get(), true)
                     }))),
@@ -1025,7 +1024,7 @@ impl<'a> BlockDef<'a> {
             cut_node(
                 Some("block"),
                 (
-                    ws(unpeek(identifier)),
+                    ws(identifier),
                     opt(unpeek(Whitespace::parse)),
                     unpeek(|i| s.tag_block_end(i)),
                 ),
@@ -1047,8 +1046,7 @@ impl<'a> BlockDef<'a> {
                             Some("block"),
                             (
                                 opt(unpeek(|before| {
-                                    let (after, end_name) =
-                                        ws(unpeek(identifier)).parse_peek(before)?;
+                                    let (after, end_name) = ws(identifier).parse_peek(before)?;
                                     check_end_name(before, after, name, end_name, "block")
                                 })),
                                 opt(unpeek(Whitespace::parse)),
@@ -1431,7 +1429,7 @@ fn end_node<'a, 'g: 'a>(
 ) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
     move |i: &mut &'a str| {
         let start = i.checkpoint();
-        let actual = ws(unpeek(identifier)).parse_next(i)?;
+        let actual = ws(identifier).parse_next(i)?;
         if actual == expected {
             Ok(actual)
         } else if actual.starts_with("end") {

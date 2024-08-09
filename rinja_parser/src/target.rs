@@ -107,7 +107,7 @@ impl<'a> Target<'a> {
 
         // neither literal nor struct nor path
         let i_before_identifier = i;
-        let (i, name) = unpeek(identifier).parse_peek(i)?;
+        let (i, name) = identifier.parse_peek(i)?;
         let target = match name {
             "_" => Self::Placeholder(WithSpan::new((), i_before_identifier)),
             _ => verify_name(i_before_identifier, name)?,
@@ -158,7 +158,7 @@ impl<'a> Target<'a> {
 
         let i = start;
         let (i, (src, target)) = (
-            unpeek(identifier),
+            identifier,
             opt(preceded(ws(':'), unpeek(|i| Self::parse(i, s)))),
         )
             .parse_peek(i)?;
@@ -180,7 +180,7 @@ impl<'a> Target<'a> {
 
     fn rest(i: &'a str) -> InputParseResult<'a, Self> {
         let start = i;
-        let (i, (ident, _)) = (opt((unpeek(identifier), ws('@'))), "..").parse_peek(i)?;
+        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_peek(i)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
