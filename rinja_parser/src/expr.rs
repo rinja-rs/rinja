@@ -371,7 +371,7 @@ impl<'a> Expr<'a> {
     fn filtered(i: &'a str, mut level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let (mut i, mut res) = Self::prefix(i, level)?;
-        while let (j, Some((name, args))) = opt(unpeek(|i| filter(i, &mut level))).parse_peek(i)? {
+        while let (j, Some((name, args))) = opt(|i: &mut _| filter(i, &mut level)).parse_peek(i)? {
             i = j;
 
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
