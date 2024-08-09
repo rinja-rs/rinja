@@ -277,6 +277,7 @@ impl fmt::Display for ParseError {
 }
 
 pub(crate) type ParseErr<'a> = winnow::error::ErrMode<ErrorContext<'a>>;
+pub(crate) type ParseResult<'a, T = &'a str> = Result<T, ParseErr<'a>>;
 pub(crate) type InputParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
@@ -379,17 +380,17 @@ fn skip_till<'a, 'b, O>(
 }
 
 fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
-    unpeek(identifier).verify(move |v: &str| v == k)
+    identifier.verify(move |v: &str| v == k)
 }
 
-fn identifier(input: &str) -> InputParseResult<'_> {
+fn identifier<'i>(input: &mut &'i str) -> ParseResult<'i> {
     let start = take_while(1.., |c: char| c.is_alpha() || c == '_' || c >= '\u{0080}');
 
     let tail = take_while(1.., |c: char| {
         c.is_alphanum() || c == '_' || c >= '\u{0080}'
     });
 
-    (start, opt(tail)).recognize().parse_peek(input)
+    (start, opt(tail)).recognize().parse_next(input)
 }
 
 fn bool_lit(i: &str) -> InputParseResult<'_> {
@@ -409,7 +410,7 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
         start: &'a str,
         i: &'a str,
     ) -> InputParseResult<'a, T> {
-        let (i, suffix) = unpeek(identifier).parse_peek(i)?;
+        let (i, suffix) = identifier.parse_peek(i)?;
         if let Some(value) = list
             .iter()
             .copied()
@@ -679,9 +680,9 @@ enum PathOrIdentifier<'a> {
 
 fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
-    let tail = opt(repeat(1.., preceded(ws("::"), unpeek(identifier))).map(|v: Vec<_>| v));
+    let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = (root, unpeek(identifier), tail).parse_peek(i)?;
+    let (i, (root, start, rest)) = (root, identifier, tail).parse_peek(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:
@@ -972,7 +973,7 @@ fn filter<'a>(
 
     *level = level.nest(start)?.1;
     cut_err((
-        ws(unpeek(identifier)),
+        ws(identifier),
         opt(unpeek(|i| Expr::arguments(i, *level, false))),
     ))
     .parse_peek(i)
