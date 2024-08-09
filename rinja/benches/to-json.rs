@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use rinja::filters::{escape, json, json_pretty, Html};
+use rinja::Template;
 
 criterion_main!(benches);
 criterion_group!(benches, functions);
@@ -12,34 +12,58 @@ fn functions(c: &mut Criterion) {
 }
 
 fn escape_json(b: &mut criterion::Bencher<'_>) {
+    #[derive(Template)]
+    #[template(ext = "html", source = "{{self.0|json|safe}}")]
+    struct Tmpl(&'static str);
+
     b.iter(|| {
+        let mut len = 0;
         for &s in STRINGS {
-            format!("{}", json(s).unwrap());
+            len += Tmpl(s).to_string().len();
         }
+        len
     });
 }
 
 fn escape_json_pretty(b: &mut criterion::Bencher<'_>) {
+    #[derive(Template)]
+    #[template(ext = "html", source = "{{self.0|json(2)|safe}}")]
+    struct Tmpl(&'static str);
+
     b.iter(|| {
+        let mut len = 0;
         for &s in STRINGS {
-            format!("{}", json_pretty(s, 2).unwrap());
+            len += Tmpl(s).to_string().len();
         }
+        len
     });
 }
 
 fn escape_json_for_html(b: &mut criterion::Bencher<'_>) {
+    #[derive(Template)]
+    #[template(ext = "html", source = "{{self.0|json}}")]
+    struct Tmpl(&'static str);
+
     b.iter(|| {
+        let mut len = 0;
         for &s in STRINGS {
-            format!("{}", escape(json(s).unwrap(), Html).unwrap());
+            len += Tmpl(s).to_string().len();
         }
+        len
     });
 }
 
 fn escape_json_for_html_pretty(b: &mut criterion::Bencher<'_>) {
+    #[derive(Template)]
+    #[template(ext = "html", source = "{{self.0|json(2)}}")]
+    struct Tmpl(&'static str);
+
     b.iter(|| {
+        let mut len = 0;
         for &s in STRINGS {
-            format!("{}", escape(json_pretty(s, 2).unwrap(), Html).unwrap(),);
+            len += Tmpl(s).to_string().len();
         }
+        len
     });
 }
 
