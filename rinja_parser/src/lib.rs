@@ -744,8 +744,8 @@ impl<'a> State<'a> {
         ret
     }
 
-    fn tag_block_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.block_start.value(()).parse_peek(i)
+    fn tag_block_start<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
+        self.syntax.block_start.value(()).parse_next(i)
     }
 
     fn tag_block_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {

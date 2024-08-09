@@ -90,7 +90,7 @@ impl<'a> Node<'a> {
 
         let start = i;
         let (i, tag) = preceded(
-            unpeek(|i| s.tag_block_start(i)),
+            |i: &mut _| s.tag_block_start(i),
             peek(preceded(
                 (opt(unpeek(Whitespace::parse)), unpeek(skip_ws0)),
                 identifier,
@@ -245,7 +245,7 @@ fn cut_node<'a, O>(
 
 fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, ()> {
     (
-        unpeek(|i| s.tag_block_start(i)),
+        |i: &mut _| s.tag_block_start(i),
         opt(unpeek(Whitespace::parse)),
         unpeek(|i| unexpected_raw_tag(None, i)),
     )
@@ -278,7 +278,7 @@ pub struct When<'a> {
 impl<'a> When<'a> {
     fn r#else(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let mut p = (
-            unpeek(|i| s.tag_block_start(i)),
+            |i: &mut _| s.tag_block_start(i),
             opt(unpeek(Whitespace::parse)),
             ws(keyword("else")),
             cut_node(
@@ -311,7 +311,7 @@ impl<'a> When<'a> {
         let start = i;
         let endwhen = ws((
             delimited(
-                unpeek(|i| s.tag_block_start(i)),
+                |i: &mut _| s.tag_block_start(i),
                 opt(unpeek(Whitespace::parse)),
                 ws(keyword("endwhen")),
             ),
@@ -339,7 +339,7 @@ impl<'a> When<'a> {
             ))
         });
         let mut p = (
-            unpeek(|i| s.tag_block_start(i)),
+            |i: &mut _| s.tag_block_start(i),
             opt(unpeek(Whitespace::parse)),
             ws(keyword("when")),
             cut_node(
@@ -382,7 +382,7 @@ impl<'a> Cond<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let (i, (_, pws, cond, nws, _, nodes)) = (
-            unpeek(|i| s.tag_block_start(i)),
+            |i: &mut _| s.tag_block_start(i),
             opt(unpeek(Whitespace::parse)),
             alt((
                 preceded(ws(keyword("else")), opt(unpeek(|i| CondTest::parse(i, s)))),
@@ -499,7 +499,7 @@ fn check_block_start<'a>(
             start,
         )));
     }
-    s.tag_block_start(i)
+    (|i: &mut _| s.tag_block_start(i)).parse_peek(i)
 }
 
 #[derive(Debug, PartialEq)]
@@ -542,7 +542,7 @@ impl<'a> Loop<'a> {
                         delimited(
                             unpeek(|i| s.tag_block_end(i)),
                             unpeek(|i| Node::many(i, s)),
-                            unpeek(|i| s.tag_block_start(i)),
+                            |i: &mut _| s.tag_block_start(i),
                         ),
                         opt(unpeek(Whitespace::parse)),
                     ),
@@ -1147,7 +1147,7 @@ impl<'a> Raw<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let endraw = (
-            unpeek(|i| s.tag_block_start(i)),
+            |i: &mut _| s.tag_block_start(i),
             opt(unpeek(Whitespace::parse)),
             ws(keyword("endraw")), // sic: ignore `{% end %}` in raw blocks
             opt(unpeek(Whitespace::parse)),
