@@ -392,10 +392,12 @@ impl<'a> Generator<'a> {
 
     fn evaluate_condition(
         &self,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: WithSpan<'a, Expr<'a>>,
         only_contains_is_defined: &mut bool,
-    ) -> EvaluatedResult {
-        match **expr {
+    ) -> (EvaluatedResult, WithSpan<'a, Expr<'a>>) {
+        let (expr, span) = expr.deconstruct();
+
+        match expr {
             Expr::NumLit(_)
             | Expr::StrLit(_)
             | Expr::CharLit(_)
@@ -414,65 +416,123 @@ impl<'a> Generator<'a> {
             | Expr::FilterSource
             | Expr::As(_, _) => {
                 *only_contains_is_defined = false;
-                EvaluatedResult::Unknown
+                (EvaluatedResult::Unknown, WithSpan::new(expr, span))
             }
-            Expr::BoolLit(true) => EvaluatedResult::AlwaysTrue,
-            Expr::BoolLit(false) => EvaluatedResult::AlwaysFalse,
-            Expr::Unary("!", ref inner) => {
-                match self.evaluate_condition(inner, only_contains_is_defined) {
-                    EvaluatedResult::AlwaysTrue => EvaluatedResult::AlwaysFalse,
-                    EvaluatedResult::AlwaysFalse => EvaluatedResult::AlwaysTrue,
-                    EvaluatedResult::Unknown => EvaluatedResult::Unknown,
+            Expr::BoolLit(true) => (EvaluatedResult::AlwaysTrue, WithSpan::new(expr, span)),
+            Expr::BoolLit(false) => (EvaluatedResult::AlwaysFalse, WithSpan::new(expr, span)),
+            Expr::Unary("!", inner) => {
+                let (result, expr) = self.evaluate_condition(*inner, only_contains_is_defined);
+                match result {
+                    EvaluatedResult::AlwaysTrue => (
+                        EvaluatedResult::AlwaysFalse,
+                        WithSpan::new(Expr::BoolLit(false), ""),
+                    ),
+                    EvaluatedResult::AlwaysFalse => (
+                        EvaluatedResult::AlwaysTrue,
+                        WithSpan::new(Expr::BoolLit(true), ""),
+                    ),
+                    EvaluatedResult::Unknown => (EvaluatedResult::Unknown, expr),
                 }
             }
-            Expr::Unary(_, _) => EvaluatedResult::Unknown,
-            Expr::BinOp("&&", ref left, ref right) => {
-                match (
-                    self.evaluate_condition(left, only_contains_is_defined),
-                    self.evaluate_condition(right, only_contains_is_defined),
-                ) {
-                    (EvaluatedResult::AlwaysTrue, EvaluatedResult::AlwaysTrue) => {
-                        EvaluatedResult::AlwaysTrue
-                    }
-                    (EvaluatedResult::AlwaysFalse, _) | (_, EvaluatedResult::AlwaysFalse) => {
-                        EvaluatedResult::AlwaysFalse
-                    }
-                    _ => EvaluatedResult::Unknown,
+            Expr::Unary(_, _) => (EvaluatedResult::Unknown, WithSpan::new(expr, span)),
+            Expr::BinOp("&&", left, right) => {
+                let (result_left, expr_left) =
+                    self.evaluate_condition(*left, only_contains_is_defined);
+                if result_left == EvaluatedResult::AlwaysFalse {
+                    // The right side of the `&&` won't be evaluated, no need to go any further.
+                    return (result_left, WithSpan::new(Expr::BoolLit(false), ""));
+                }
+                let (result_right, expr_right) =
+                    self.evaluate_condition(*right, only_contains_is_defined);
+                match (result_left, result_right) {
+                    (EvaluatedResult::AlwaysTrue, EvaluatedResult::AlwaysTrue) => (
+                        EvaluatedResult::AlwaysTrue,
+                        WithSpan::new(Expr::BoolLit(true), ""),
+                    ),
+                    (_, EvaluatedResult::AlwaysFalse) => (
+                        EvaluatedResult::AlwaysFalse,
+                        WithSpan::new(
+                            Expr::BinOp("&&", Box::new(expr_left), Box::new(expr_right)),
+                            span,
+                        ),
+                    ),
+                    (EvaluatedResult::AlwaysTrue, _) => (result_right, expr_right),
+                    (_, EvaluatedResult::AlwaysTrue) => (result_left, expr_left),
+                    _ => (
+                        EvaluatedResult::Unknown,
+                        WithSpan::new(
+                            Expr::BinOp("&&", Box::new(expr_left), Box::new(expr_right)),
+                            span,
+                        ),
+                    ),
                 }
             }
-            Expr::BinOp("||", ref left, ref right) => {
-                match (
-                    self.evaluate_condition(left, only_contains_is_defined),
-                    self.evaluate_condition(right, only_contains_is_defined),
-                ) {
-                    (EvaluatedResult::AlwaysTrue, _) | (_, EvaluatedResult::AlwaysTrue) => {
-                        EvaluatedResult::AlwaysTrue
-                    }
-                    (EvaluatedResult::AlwaysFalse, EvaluatedResult::AlwaysFalse) => {
-                        EvaluatedResult::AlwaysFalse
-                    }
-                    _ => EvaluatedResult::Unknown,
+            Expr::BinOp("||", left, right) => {
+                let (result_left, expr_left) =
+                    self.evaluate_condition(*left, only_contains_is_defined);
+                if result_left == EvaluatedResult::AlwaysTrue {
+                    // The right side of the `||` won't be evaluated, no need to go any further.
+                    return (result_left, WithSpan::new(Expr::BoolLit(true), ""));
+                }
+                let (result_right, expr_right) =
+                    self.evaluate_condition(*right, only_contains_is_defined);
+                match (result_left, result_right) {
+                    (EvaluatedResult::AlwaysFalse, EvaluatedResult::AlwaysFalse) => (
+                        EvaluatedResult::AlwaysFalse,
+                        WithSpan::new(Expr::BoolLit(false), ""),
+                    ),
+                    (_, EvaluatedResult::AlwaysTrue) => (
+                        EvaluatedResult::AlwaysTrue,
+                        WithSpan::new(
+                            Expr::BinOp("||", Box::new(expr_left), Box::new(expr_right)),
+                            span,
+                        ),
+                    ),
+                    (EvaluatedResult::AlwaysFalse, _) => (result_right, expr_right),
+                    (_, EvaluatedResult::AlwaysFalse) => (result_left, expr_left),
+                    _ => (
+                        EvaluatedResult::Unknown,
+                        WithSpan::new(
+                            Expr::BinOp("||", Box::new(expr_left), Box::new(expr_right)),
+                            span,
+                        ),
+                    ),
                 }
             }
             Expr::BinOp(_, _, _) => {
                 *only_contains_is_defined = false;
-                EvaluatedResult::Unknown
+                (EvaluatedResult::Unknown, WithSpan::new(expr, span))
             }
-            Expr::Group(ref inner) => self.evaluate_condition(inner, only_contains_is_defined),
+            Expr::Group(inner) => {
+                let (result, expr) = self.evaluate_condition(*inner, only_contains_is_defined);
+                (result, WithSpan::new(Expr::Group(Box::new(expr)), span))
+            }
             Expr::IsDefined(left) => {
                 // Variable is defined so we want to keep the condition.
                 if self.is_var_defined(left) {
-                    EvaluatedResult::AlwaysTrue
+                    (
+                        EvaluatedResult::AlwaysTrue,
+                        WithSpan::new(Expr::BoolLit(true), ""),
+                    )
                 } else {
-                    EvaluatedResult::AlwaysFalse
+                    (
+                        EvaluatedResult::AlwaysFalse,
+                        WithSpan::new(Expr::BoolLit(false), ""),
+                    )
                 }
             }
             Expr::IsNotDefined(left) => {
                 // Variable is defined so we don't want to keep the condition.
                 if self.is_var_defined(left) {
-                    EvaluatedResult::AlwaysFalse
+                    (
+                        EvaluatedResult::AlwaysFalse,
+                        WithSpan::new(Expr::BoolLit(false), ""),
+                    )
                 } else {
-                    EvaluatedResult::AlwaysTrue
+                    (
+                        EvaluatedResult::AlwaysTrue,
+                        WithSpan::new(Expr::BoolLit(true), ""),
+                    )
                 }
             }
         }
@@ -506,7 +566,9 @@ impl<'a> Generator<'a> {
             self.locals.push();
             let mut arm_size = 0;
 
-            if let Some(CondTest { target, expr }) = &cond.cond {
+            if let Some(CondTest { target, expr, .. }) = &cond.cond {
+                let expr = cond_info.cond_expr.as_ref().unwrap_or(expr);
+
                 if pos == 0 {
                     if cond_info.generate_condition {
                         buf.write("if ");
@@ -2267,6 +2329,7 @@ impl BufferFmt for Arguments<'_> {
 
 struct CondInfo<'a> {
     cond: &'a WithSpan<'a, Cond<'a>>,
+    cond_expr: Option<WithSpan<'a, Expr<'a>>>,
     generate_condition: bool,
     generate_content: bool,
 }
@@ -2279,7 +2342,7 @@ struct Conds<'a> {
 }
 
 impl<'a> Conds<'a> {
-    fn compute_branches(generator: &Generator<'_>, i: &'a If<'a>) -> Self {
+    fn compute_branches(generator: &Generator<'a>, i: &'a If<'a>) -> Self {
         let mut conds = Vec::with_capacity(i.branches.len());
         let mut ws_before = None;
         let mut ws_after = None;
@@ -2291,10 +2354,23 @@ impl<'a> Conds<'a> {
                 ws_after = Some(cond.ws);
                 break;
             }
-            if let Some(CondTest { expr, .. }) = &cond.cond {
+            if let Some(CondTest {
+                expr,
+                contains_bool_lit_or_is_defined,
+                ..
+            }) = &cond.cond
+            {
                 let mut only_contains_is_defined = true;
 
-                match generator.evaluate_condition(expr, &mut only_contains_is_defined) {
+                let (evaluated_result, cond_expr) = if *contains_bool_lit_or_is_defined {
+                    let (evaluated_result, expr) =
+                        generator.evaluate_condition(expr.clone(), &mut only_contains_is_defined);
+                    (evaluated_result, Some(expr))
+                } else {
+                    (EvaluatedResult::Unknown, None)
+                };
+
+                match evaluated_result {
                     // We generate the condition in case some calls are changing a variable, but
                     // no need to generate the condition body since it will never be called.
                     //
@@ -2312,6 +2388,7 @@ impl<'a> Conds<'a> {
                         nb_conds += 1;
                         conds.push(CondInfo {
                             cond,
+                            cond_expr,
                             generate_condition: true,
                             generate_content: false,
                         });
@@ -2327,6 +2404,7 @@ impl<'a> Conds<'a> {
                         }
                         conds.push(CondInfo {
                             cond,
+                            cond_expr,
                             generate_condition,
                             generate_content: true,
                         });
@@ -2337,6 +2415,7 @@ impl<'a> Conds<'a> {
                         nb_conds += 1;
                         conds.push(CondInfo {
                             cond,
+                            cond_expr,
                             generate_condition: true,
                             generate_content: true,
                         });
@@ -2349,6 +2428,7 @@ impl<'a> Conds<'a> {
                 }
                 conds.push(CondInfo {
                     cond,
+                    cond_expr: None,
                     generate_condition,
                     generate_content: true,
                 });

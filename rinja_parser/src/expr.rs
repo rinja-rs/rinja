@@ -367,6 +367,34 @@ impl<'a> Expr<'a> {
         let start = i;
         map(char_lit, |i| WithSpan::new(Self::CharLit(i), start))(i)
     }
+
+    pub fn contains_bool_lit_or_is_defined(&self) -> bool {
+        match self {
+            Self::BoolLit(_) | Self::IsDefined(_) | Self::IsNotDefined(_) => true,
+            Self::Unary(_, expr) | Self::Group(expr) => expr.contains_bool_lit_or_is_defined(),
+            Self::BinOp("&&" | "||", left, right) => {
+                left.contains_bool_lit_or_is_defined() || right.contains_bool_lit_or_is_defined()
+            }
+            Self::NumLit(_)
+            | Self::StrLit(_)
+            | Self::CharLit(_)
+            | Self::Var(_)
+            | Self::FilterSource
+            | Self::RustMacro(_, _)
+            | Self::As(_, _)
+            | Self::Call(_, _)
+            | Self::Range(_, _, _)
+            | Self::Try(_)
+            | Self::NamedArgument(_, _)
+            | Self::Filter(_)
+            | Self::Attr(_, _)
+            | Self::Index(_, _)
+            | Self::Tuple(_)
+            | Self::Array(_)
+            | Self::BinOp(_, _, _)
+            | Self::Path(_) => false,
+        }
+    }
 }
 
 fn token_xor(i: &str) -> ParseResult<'_> {
