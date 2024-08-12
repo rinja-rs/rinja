@@ -53,9 +53,9 @@ impl TemplateInput<'_> {
         // Validate the `source` and `ext` value together, since they are
         // related. In case `source` was used instead of `path`, the value
         // of `ext` is merged into a synthetic `path` value here.
-        let &(ref source, source_span) = source
-            .as_ref()
-            .expect("template path or source not found in attributes");
+        let &(ref source, source_span) = source.as_ref().ok_or_else(|| {
+            CompileError::new("template `path` or `source` not found in attributes", None)
+        })?;
         let path = match (&source, &ext) {
             (Source::Path(path), _) => config.find_template(path, None, None)?,
             (&Source::Source(_), Some(ext)) => {
