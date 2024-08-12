@@ -344,22 +344,17 @@ impl TemplateArgs {
                 None => unreachable!("not possible in syn::Meta::NameValue(…)"),
             };
 
-            let value = match &pair.value {
-                syn::Expr::Lit(lit) => lit,
-                syn::Expr::Group(group) => match &*group.expr {
-                    syn::Expr::Lit(lit) => lit,
+            let mut value_expr = &pair.value;
+            let value = loop {
+                match value_expr {
+                    syn::Expr::Lit(lit) => break lit,
+                    syn::Expr::Group(group) => value_expr = &group.expr,
                     v => {
                         return Err(CompileError::no_file_info(
                             format!("unsupported argument value type for `{ident}`"),
                             Some(v.span()),
                         ));
                     }
-                },
-                v => {
-                    return Err(CompileError::no_file_info(
-                        format!("unsupported argument value type for `{ident}`"),
-                        Some(v.span()),
-                    ));
                 }
             };
 
