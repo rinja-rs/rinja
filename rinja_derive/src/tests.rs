@@ -588,3 +588,72 @@ A
         15,
     );
 }
+
+#[test]
+fn test_code_in_comment() {
+    let ts = r#"
+        #[template(ext = "txt")]
+        /// ```rinja
+        /// Hello world!
+        /// ```
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello world!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = r#"
+        #[template(ext = "txt")]
+        /// ```rinja
+        /// Hello
+        /// world!
+        /// ```
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    eprintln!("{}", &generated);
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = r#"
+        /// ```rinja
+        /// Hello
+        #[template(ext = "txt")]
+        /// world!
+        /// ```
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = r#"
+        /// This template greets the whole world
+        ///
+        /// ```rinja
+        /// Hello
+        #[template(ext = "txt")]
+        /// world!
+        /// ```
+        ///
+        /// Some more text.
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = "
+        #[template(ext = \"txt\")]
+        #[doc = \"```rinja\nHello\nworld!\n```\"]
+        struct Tmpl;
+    ";
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+}
