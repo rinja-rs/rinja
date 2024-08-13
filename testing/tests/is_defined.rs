@@ -31,3 +31,16 @@ const v = 0;
 </script>"#
     );
 }
+
+#[derive(Template)]
+#[template(
+    source = r#"{% if x is defined && x == 12 %}bli{% else %}bla{% endif %}"#,
+    ext = "html"
+)]
+struct IsDefinedChaining;
+
+// This test ensures that if the variable is not defined, it will not generate following code.
+#[test]
+fn is_defined_chaining() {
+    assert_eq!(IsDefinedChaining.render().unwrap(), r#"bla"#);
+}

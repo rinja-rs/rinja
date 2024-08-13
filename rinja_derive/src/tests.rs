@@ -285,7 +285,7 @@ writer.write_str("12")?;
     // are present.
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(false || self.x == 12) as &::core::primitive::bool) {
+        r#"if *(&(self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -300,17 +300,68 @@ writer.write_str("12")?;
     );
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(true || self.x == 12) as &::core::primitive::bool) {
+        r#"match (
+    &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
+) {
+    (expr0,) => {
+        (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+    }
+}
+"#,
+        &[("y", "u32"), ("x", "u32")],
+        3,
+    );
+    compare(
+        "{% if y is defined && y == 12 %}{{x}}{% endif %}",
+        r#""#,
+        &[],
+        0,
+    );
+    compare(
+        "{% if y is defined && y == 12 %}{{y}}{% else %}bli{% endif %}",
+        r#"writer.write_str("bli")?;"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if y is defined && y == 12 %}{{y}}{% else %}bli{% endif %}",
+        r#"
+if *(&(self.y == 12) as &::core::primitive::bool) {
     match (
-        &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
+        &((&&::rinja::filters::AutoEscaper::new(
+            &(self.y),
+            ::rinja::filters::Text,
+        ))
+            .rinja_auto_escape()?),
     ) {
         (expr0,) => {
             (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
         }
     }
+} else {
+    writer.write_str("bli")?;
 }
 "#,
-        &[("y", "u32"), ("x", "u32")],
+        &[("y", "u32")],
+        6,
+    );
+    // Since the first `if` is always `true`, the `else` should not be generated.
+    compare(
+        "{% if y is defined %}{{y}}{% else %}bli{% endif %}",
+        r#"
+match (
+    &((&&::rinja::filters::AutoEscaper::new(
+        &(self.y),
+        ::rinja::filters::Text,
+    ))
+        .rinja_auto_escape()?),
+) {
+    (expr0,) => {
+        (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+    }
+}
+"#,
+        &[("y", "u32")],
         3,
     );
 
@@ -388,13 +439,11 @@ fn check_bool_conditions() {
 
     compare(
         "{% if true || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(true || self.x == 12) as &::core::primitive::bool) {
-    match (
-        &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
-    ) {
-        (expr0,) => {
-            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
-        }
+        r#"match (
+    &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
+) {
+    (expr0,) => {
+        (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
     }
 }
 "#,
@@ -403,7 +452,7 @@ fn check_bool_conditions() {
     );
     compare(
         "{% if false || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(false || self.x == 12) as &::core::primitive::bool) {
+        r#"if *(&(self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(
             &(self.x),
@@ -418,6 +467,68 @@ fn check_bool_conditions() {
 }
 "#,
         &[("x", "u32")],
+        3,
+    );
+
+    // Checking that it also works with sub conditions.
+
+    // It's important here that the `(true || x == 12)` part remains since it's not first in the
+    // condition.
+    compare(
+        "{% if y == 3 || (true || x == 12) %}{{x}}{% endif %}",
+        r#"if *(&(self.y == 3 || (true)) as &::core::primitive::bool) {
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(
+            &(self.x),
+            ::rinja::filters::Text,
+        ))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
+}
+"#,
+        &[],
+        3,
+    );
+    // However in this case, since `(true || x == 12)` is evaluated to `true`, `y == 3` will never
+    // be evaluated so the whole code is removed.
+    compare(
+        "{% if (true || x == 12) || y == 3 %}{{x}}{% endif %}",
+        r#"match (
+    &((&&::rinja::filters::AutoEscaper::new(
+        &(self.x),
+        ::rinja::filters::Text,
+    ))
+        .rinja_auto_escape()?),
+) {
+    (expr0,) => {
+        (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+    }
+}
+"#,
+        &[],
+        3,
+    );
+    compare(
+        "{% if y == 3 || (x == 12 || true) %}{{x}}{% endif %}",
+        r#"if *(&(self.y == 3 || (self.x == 12 || true)) as &::core::primitive::bool) {
+    match (
+        &((&&::rinja::filters::AutoEscaper::new(
+            &(self.x),
+            ::rinja::filters::Text,
+        ))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0,) => {
+            (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        }
+    }
+}
+"#,
+        &[],
         3,
     );
 
