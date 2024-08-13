@@ -594,10 +594,7 @@ and the same restrictions as in Rust, e.g. that it can be used only once in a sl
 ```
 
 The `{% else %}` node is syntactical sugar for `{% when _ %}`.
-If used, it must come last, after all other `{% when %}` blocks.
-A `{% match %}` must be exhaustive, i.e. all possible inputs must have a case.
-This is most easily done by using proving an `{% else %}` case,
-if not all possible values need an individual handling.
+If used, it must come last, after all other `{% when %}` blocks:
 
 ```jinja
 {% match answer %}
@@ -605,6 +602,10 @@ if not all possible values need an individual handling.
   {% else %} No answer wrong answer?
 {% endmatch %}
 ```
+
+A `{% match %}` must be exhaustive, i.e. all possible inputs must have a case.
+This is most easily done by using proving an `{% else %}` case,
+if not all possible values need an individual handling.
 
 Because a `{% match %}` block could not generate valid code otherwise,
 you have to provide at least one `{% when %}` case and/or an `{% else %}` case.
