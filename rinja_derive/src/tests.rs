@@ -589,6 +589,7 @@ A
     );
 }
 
+#[cfg(feature = "code-in-doc")]
 #[test]
 fn test_code_in_comment() {
     let ts = r#"

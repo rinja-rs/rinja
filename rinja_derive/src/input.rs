@@ -9,7 +9,6 @@ use mime::Mime;
 use once_map::OnceMap;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 use rustc_hash::FxBuildHasher;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -407,6 +406,7 @@ impl TemplateArgs {
             }
         }
 
+        #[cfg(feature = "code-in-doc")]
         if args.source.is_none() {
             args.source = source_from_docs(ast);
         }
@@ -427,6 +427,7 @@ impl TemplateArgs {
     }
 }
 
+#[cfg(feature = "code-in-doc")]
 /// Try to find the souce in the comment, in a "```rinja```" block
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
@@ -437,6 +438,7 @@ fn source_from_docs(ast: &syn::DeriveInput) -> Option<(Source, Option<Span>)> {
     Some((source, span))
 }
 
+#[cfg(feature = "code-in-doc")]
 fn collect_comment_blocks(ast: &syn::DeriveInput) -> Option<(Option<Span>, String)> {
     let mut span: Option<Span> = None;
     let mut assign_span = |kv: &syn::MetaNameValue| {
@@ -486,6 +488,7 @@ fn collect_comment_blocks(ast: &syn::DeriveInput) -> Option<(Option<Span>, Strin
     Some((span, source))
 }
 
+#[cfg(feature = "code-in-doc")]
 fn strip_common_ws_prefix(source: String) -> Option<String> {
     let mut common_prefix_iter = source
         .lines()
@@ -515,7 +518,10 @@ fn strip_common_ws_prefix(source: String) -> Option<String> {
     )
 }
 
+#[cfg(feature = "code-in-doc")]
 fn collect_rinja_code_blocks(source: String) -> Option<Source> {
+    use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
+
     let mut tmpl_source = String::new();
     let mut in_rinja_code = false;
     let mut had_rinja_code = false;

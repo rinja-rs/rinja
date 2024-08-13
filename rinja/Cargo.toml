@@ -22,6 +22,7 @@ maintenance = { status = "actively-developed" }
 
 [features]
 default = ["config", "humansize", "num-traits", "urlencode"]
+code-in-doc = ["rinja_derive/code-in-doc"]
 config = ["rinja_derive/config"]
 humansize = ["rinja_derive/humansize", "dep:humansize"]
 num-traits = ["rinja_derive/num-traits", "dep:num-traits"]

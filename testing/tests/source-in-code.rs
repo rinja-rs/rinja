@@ -1,3 +1,5 @@
+#![cfg(feature = "code-in-doc")]
+
 // Regarding `#[rustfmt::skip]`: `cargo fmt` strips extraneous newlines in code block,
 // but we want to test if `rinja_derive` works with extraneous newlines.
 
