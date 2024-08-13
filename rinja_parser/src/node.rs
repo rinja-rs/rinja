@@ -4,7 +4,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
 use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, peek, recognize, value};
-use nom::multi::{many0, many1, separated_list0};
+use nom::multi::{many0, separated_list0};
 use nom::sequence::{delimited, pair, preceded, tuple};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
@@ -641,7 +641,7 @@ impl<'a> Match<'a> {
                 |i| s.tag_block_end(i),
                 cut(tuple((
                     ws(many0(ws(value((), |i| Comment::parse(i, s))))),
-                    many1(|i| When::when(i, s)),
+                    many0(|i| When::when(i, s)),
                     cut(tuple((
                         opt(|i| When::r#match(i, s)),
                         cut(tuple((
@@ -654,11 +654,16 @@ impl<'a> Match<'a> {
                 ))),
             ))),
         ));
-        let (i, (pws1, _, (expr, nws1, _, (_, arms, (else_arm, (_, pws2, _, nws2)))))) = p(i)?;
+        let (i, (pws1, _, (expr, nws1, _, (_, mut arms, (else_arm, (_, pws2, _, nws2)))))) = p(i)?;
 
-        let mut arms = arms;
         if let Some(arm) = else_arm {
             arms.push(arm);
+        }
+        if arms.is_empty() {
+            return Err(nom::Err::Failure(ErrorContext::new(
+                "`match` nodes must contain at least one `when` node and/or an `else` case",
+                start,
+            )));
         }
 
         Ok((
