@@ -1,13 +1,13 @@
-error: unterminated "```rinja" block
- --> tests/ui/rinja-block.rs:7:1
-  |
-7 | /// ```html,rinja
-  | ^^^^^^^^^^^^^^^^^
-
 error: failed to parse template source
  --> <source attribute>:2:6
        " fail %}\n{% endif %}"
-  --> tests/ui/rinja-block.rs:15:1
+ --> tests/ui/rinja-block.rs:5:1
+  |
+5 | /// Some documentation
+  | ^^^^^^^^^^^^^^^^^^^^^^
+
+error: template `path` or `source` not found in attributes
+  --> tests/ui/rinja-block.rs:15:3
    |
-15 | /// ```html,rinja
-   | ^^^^^^^^^^^^^^^^^
+15 | #[template(ext = "txt")]
+   |   ^^^^^^^^

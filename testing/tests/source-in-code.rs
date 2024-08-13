@@ -268,7 +268,7 @@ fn test_code_in_comment_backticks() {
     /// `````
     /// ```
     struct Tmpl4;
-    assert_eq!(Tmpl4.to_string(), "`````\nHello\n`````");
+    assert_eq!(Tmpl4.to_string(), "");
 
     #[derive(Template)]
     #[template(ext = "txt")]

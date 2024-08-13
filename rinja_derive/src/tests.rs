@@ -613,7 +613,6 @@ fn test_code_in_comment() {
     "#;
     let ast = syn::parse_str(ts).unwrap();
     let generated = build_template(&ast).unwrap();
-    eprintln!("{}", &generated);
     assert!(generated.contains("Hello\nworld!"));
     assert!(!generated.contains("compile_error"));
 
@@ -655,5 +654,34 @@ fn test_code_in_comment() {
     let ast = syn::parse_str(ts).unwrap();
     let generated = build_template(&ast).unwrap();
     assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = "
+        #[template(ext = \"txt\")]
+        /// `````
+        /// ```rinja
+        /// {{bla}}
+        /// ```
+        /// `````
+        struct BlockOnBlock;
+    ";
+    let ast = syn::parse_str(ts).unwrap();
+    let err = build_template(&ast).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "template `path` or `source` not found in attributes"
+    );
+
+    let ts = "
+        #[template(ext = \"txt\")]
+        /// ```rinja
+        /// `````
+        /// {{bla}}
+        /// `````
+        /// ```
+        struct BlockOnBlock;
+    ";
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
     assert!(!generated.contains("compile_error"));
 }

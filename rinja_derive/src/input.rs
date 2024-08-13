@@ -9,6 +9,7 @@ use mime::Mime;
 use once_map::OnceMap;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
+use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 use rustc_hash::FxBuildHasher;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -407,7 +408,7 @@ impl TemplateArgs {
         }
 
         if args.source.is_none() {
-            args.source = source_from_docs(ast)?;
+            args.source = source_from_docs(ast);
         }
 
         Ok(args)
@@ -429,18 +430,14 @@ impl TemplateArgs {
 /// Try to find the souce in the comment, in a "```rinja```" block
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
-fn source_from_docs(
-    ast: &syn::DeriveInput,
-) -> Result<Option<(Source, Option<Span>)>, CompileError> {
-    #[derive(PartialEq, Eq)]
-    enum State {
-        Any,
-        /// number of backticks
-        OtherCode(usize),
-        /// number of backticks, previous whitespace prefix
-        RinjaCode(usize, String),
-    }
+fn source_from_docs(ast: &syn::DeriveInput) -> Option<(Source, Option<Span>)> {
+    let (span, source) = collect_comment_blocks(ast)?;
+    let source = strip_common_ws_prefix(source)?;
+    let source = collect_rinja_code_blocks(source)?;
+    Some((source, span))
+}
 
+fn collect_comment_blocks(ast: &syn::DeriveInput) -> Option<(Option<Span>, String)> {
     let mut span: Option<Span> = None;
     let mut assign_span = |kv: &syn::MetaNameValue| {
         // FIXME: uncomment once <https://github.com/rust-lang/rust/issues/54725> is stable
@@ -456,7 +453,6 @@ fn source_from_docs(
     };
 
     let mut source = String::new();
-    let mut state = State::Any;
     for a in &ast.attrs {
         // is a comment?
         let syn::Meta::NameValue(kv) = &a.meta else {
@@ -479,87 +475,71 @@ fn source_from_docs(
             continue;
         };
 
-        // an empty string has no lines, but we must print a newline
-        let value = value.value();
-        if value.is_empty() {
-            if matches!(state, State::RinjaCode { .. }) {
-                source.push('\n');
-            }
-            continue;
-        }
-
-        // iterate over the lines of the input
-        for line in value.lines() {
-            // doc lines start with an extra space
-            let strip_pos = line
-                .find(|c: char| !c.is_ascii_whitespace())
-                .unwrap_or_default();
-            let (prefix, stripped_line) = line.split_at(strip_pos);
-
-            // count number of leading backticks, if there are at least 3
-            let (backtick_count, backtick_syntax) = match stripped_line
-                .find(|c: char| c != '`')
-                .unwrap_or(stripped_line.len())
-            {
-                0..=2 => (0, ""),
-                i => (i, &stripped_line[i..]),
-            };
-
-            match state {
-                State::Any => {
-                    if backtick_count > 0 {
-                        // at the start of a ```block```
-                        if !backtick_syntax
-                            .split(",")
-                            .any(|s| JINJA_EXTENSIONS.contains(&s.trim()))
-                        {
-                            state = State::OtherCode(backtick_count);
-                        } else {
-                            assign_span(kv);
-                            state = State::RinjaCode(backtick_count, prefix.to_owned());
-                            // combined rinja blocks are separated by a newline
-                            if !source.is_empty() {
-                                source.push('\n');
-                            }
-                        }
-                    }
-                }
-                State::OtherCode(expected_count) => {
-                    if backtick_count == expected_count && backtick_syntax.is_empty() {
-                        // end the block
-                        state = State::Any;
-                    }
-                }
-                State::RinjaCode(expected_count, ref prefix) => {
-                    if backtick_count == expected_count && backtick_syntax.is_empty() {
-                        // end the block
-                        state = State::Any;
-                        // the "```" is on a new line
-                        if source.ends_with('\n') {
-                            source.pop();
-                        }
-                    } else {
-                        assign_span(kv);
-                        source.push_str(line.strip_prefix(prefix).unwrap_or(line));
-                        source.push('\n');
-                    }
-                }
-            }
-        }
+        assign_span(kv);
+        source.push_str(value.value().as_str());
+        source.push('\n');
     }
     if source.is_empty() {
-        return Ok(None);
-    }
-    if matches!(state, State::RinjaCode(..)) {
-        // we don't care about other unclosed blocks
-        return Err(CompileError::new_with_span(
-            r#"unterminated "```rinja" block"#,
-            None,
-            span,
-        ));
+        return None;
     }
 
-    Ok(Some((Source::Source(source.into()), span)))
+    Some((span, source))
+}
+
+fn strip_common_ws_prefix(source: String) -> Option<String> {
+    let mut common_prefix_iter = source
+        .lines()
+        .filter_map(|s| Some(&s[..s.find(|c: char| !c.is_ascii_whitespace())?]));
+    let mut common_prefix = common_prefix_iter.next().unwrap_or_default();
+    for p in common_prefix_iter {
+        if common_prefix.is_empty() {
+            break;
+        }
+        let ((pos, _), _) = common_prefix
+            .char_indices()
+            .zip(p.char_indices())
+            .take_while(|(l, r)| l == r)
+            .last()
+            .unwrap_or_default();
+        common_prefix = &common_prefix[..pos];
+    }
+    if common_prefix.is_empty() {
+        return Some(source);
+    }
+
+    Some(
+        source
+            .lines()
+            .flat_map(|s| [s.get(common_prefix.len()..).unwrap_or_default(), "\n"])
+            .collect(),
+    )
+}
+
+fn collect_rinja_code_blocks(source: String) -> Option<Source> {
+    let mut tmpl_source = String::new();
+    let mut in_rinja_code = false;
+    let mut had_rinja_code = false;
+    for e in Parser::new(&source) {
+        match (in_rinja_code, e) {
+            (false, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(s)))) => {
+                if s.split(",").any(|s| JINJA_EXTENSIONS.contains(&s)) {
+                    in_rinja_code = true;
+                    had_rinja_code = true;
+                }
+            }
+            (true, Event::End(TagEnd::CodeBlock)) => in_rinja_code = false,
+            (true, Event::Text(text)) => tmpl_source.push_str(&text),
+            _ => {}
+        }
+    }
+    if !had_rinja_code {
+        return None;
+    }
+
+    if tmpl_source.ends_with('\n') {
+        tmpl_source.pop();
+    }
+    Some(Source::Source(tmpl_source.into()))
 }
 
 struct ResultIter<I, E>(Result<I, Option<E>>);
