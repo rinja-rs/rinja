@@ -2284,7 +2284,7 @@ impl Buffer {
         const OPEN: &str = r#"writer.write_str(""#;
         const CLOSE: &str = r#"")?;"#;
 
-        if !self.discard {
+        if !s.is_empty() && !self.discard {
             if !self.last_was_write_str {
                 self.last_was_write_str = true;
                 self.buf.push_str(OPEN);
