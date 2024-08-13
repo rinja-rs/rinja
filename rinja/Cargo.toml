@@ -13,6 +13,10 @@ readme = "../README.md"
 edition = "2021"
 rust-version = "1.71"
 
+[package.metadata.docs.rs]
+features = ["default", "serde_json"]
+rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
+
 [badges]
 maintenance = { status = "actively-developed" }
 
@@ -34,13 +38,13 @@ with-warp = ["rinja_derive/with-warp"]
 [dependencies]
 rinja_derive = { version = "=0.3.0", path = "../rinja_derive" }
 
-itoa = "1.0.11"
-
 humansize = { version = "2", optional = true }
 num-traits = { version = "0.2.6", optional = true }
 percent-encoding = { version = "2.1.0", optional = true }
 serde = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
+
+itoa = "1.0.11"
 
 [dev-dependencies]
 criterion = "0.5"
@@ -53,7 +57,3 @@ required-features = ["serde_json"]
 [[bench]]
 name = "escape"
 harness = false
-
-[package.metadata.docs.rs]
-features = ["default", "serde_json"]
-rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]

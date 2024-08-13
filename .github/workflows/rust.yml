@@ -70,7 +70,7 @@ jobs:
             cd "$PKG"
             echo "Testing: $PKG"
             cargo fmt -- --check
-            cd -
+            cd - > /dev/null
           done
 
   MSRV:
@@ -83,7 +83,53 @@ jobs:
       - run: cargo check --lib -p rinja --all-features
 
   Audit:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v1
+
+  Book:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook
+      - run: mdbook build book
+
+  DevSkim:
+    name: DevSkim
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run DevSkim scanner
+        uses: microsoft/DevSkim-Action@v1
+
+      - name: Upload DevSkim scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: devskim-results.sarif
+
+  CargoSort:
+    name: Check order in Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-sort
+      - run: |
+          set -eu
+          for PKG in \
+            rinja rinja_actix rinja_axum rinja_derive rinja_derive_standalone \
+            rinja_parser rinja_rocket rinja_warp testing
+          do
+            cd "$PKG"
+            cargo sort --check --check-format --grouped
+            cd - > /dev/null
+          done

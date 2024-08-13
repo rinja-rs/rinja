@@ -14,6 +14,7 @@ readme = "README.md"
 
 [dependencies]
 rinja = { version = "0.3.0", path = "../rinja", default-features = false, features = ["with-axum"] }
+
 axum-core = "0.4"
 http = "1.0"
 
