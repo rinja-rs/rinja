@@ -321,38 +321,28 @@ impl<'a> RawSyntax<'a> {
             comment_end: self.comment_end.unwrap_or(default.comment_end),
         };
 
-        for s in [
-            syntax.block_start,
-            syntax.block_end,
-            syntax.expr_start,
-            syntax.expr_end,
-            syntax.comment_start,
-            syntax.comment_end,
+        for (s, k) in [
+            (syntax.block_start, "opening block"),
+            (syntax.block_end, "closing block"),
+            (syntax.expr_start, "opening expression"),
+            (syntax.expr_end, "closing expression"),
+            (syntax.comment_start, "opening comment"),
+            (syntax.comment_end, "closing comment"),
         ] {
             if s.len() < 2 {
                 return Err(CompileError::new_with_span(
-                    format!("delimiters must be at least two characters long: {s:?}"),
+                    format!(
+                        "delimiters must be at least two characters long. \
+                         The {k} delimiter ({s:?}) is too short",
+                    ),
                     file_info.copied(),
                     config_span,
                 ));
             } else if s.chars().any(|c| c.is_whitespace()) {
                 return Err(CompileError::new_with_span(
-                    format!("delimiters may not contain white spaces: {s:?}"),
-                    file_info.copied(),
-                    config_span,
-                ));
-            }
-        }
-
-        for (s1, s2) in [
-            (syntax.block_start, syntax.expr_start),
-            (syntax.block_start, syntax.comment_start),
-            (syntax.expr_start, syntax.comment_start),
-        ] {
-            if s1.starts_with(s2) || s2.starts_with(s1) {
-                return Err(CompileError::new_with_span(
                     format!(
-                        "a delimiter may not be the prefix of another delimiter: {s1:?} vs {s2:?}",
+                        "delimiters may not contain white spaces. \
+                         The {k} delimiter ({s:?}) contains white spaces",
                     ),
                     file_info.copied(),
                     config_span,
@@ -360,15 +350,52 @@ impl<'a> RawSyntax<'a> {
             }
         }
 
-        for end in [syntax.block_end, syntax.expr_end, syntax.comment_end] {
+        for ((s1, k1), (s2, k2)) in [
+            (
+                (syntax.block_start, "block"),
+                (syntax.expr_start, "expression"),
+            ),
+            (
+                (syntax.block_start, "block"),
+                (syntax.comment_start, "comment"),
+            ),
+            (
+                (syntax.expr_start, "expression"),
+                (syntax.comment_start, "comment"),
+            ),
+        ] {
+            if s1.starts_with(s2) || s2.starts_with(s1) {
+                let (s1, k1, s2, k2) = match s1.len() < s2.len() {
+                    true => (s1, k1, s2, k2),
+                    false => (s2, k2, s1, k1),
+                };
+                return Err(CompileError::new_with_span(
+                    format!(
+                        "an opening delimiter may not be the prefix of another delimiter. \
+                         The {k1} delimiter ({s1:?}) clashes with the {k2} delimiter ({s2:?})",
+                    ),
+                    file_info.copied(),
+                    config_span,
+                ));
+            }
+        }
+
+        for (end, kind) in [
+            (syntax.block_end, "block"),
+            (syntax.expr_end, "expression"),
+            (syntax.comment_end, "comment"),
+        ] {
             for prefix in ["<<", ">>", "&&", "..", "||"] {
                 if end.starts_with(prefix) {
                     let msg = if end == prefix {
-                        format!("a closing delimiter must not start with an operator: {end:?}")
+                        format!(
+                            "a closing delimiter must not start with an operator. \
+                             The {kind} delimiter ({end:?}) is also an operator",
+                        )
                     } else {
                         format!(
-                            "a closing delimiter must not start an with operator: \
-                             {end:?} starts with {prefix:?}",
+                            "a closing delimiter must not start an with operator. \
+                             The {kind} delimiter ({end:?}) starts with the {prefix:?} operator",
                         )
                     };
                     return Err(CompileError::new_with_span(
@@ -693,7 +720,7 @@ mod tests {
         let config = Config::new(raw_config, None, None, None);
         assert_eq!(
             expect_err(config).msg,
-            r#"delimiters must be at least two characters long: "<""#,
+            r#"delimiters must be at least two characters long. The opening block delimiter ("<") is too short"#,
         );
 
         let raw_config = r#"
@@ -704,7 +731,7 @@ mod tests {
         let config = Config::new(raw_config, None, None, None);
         assert_eq!(
             expect_err(config).msg,
-            r#"delimiters may not contain white spaces: " {{ ""#,
+            r#"delimiters may not contain white spaces. The opening block delimiter (" {{ ") contains white spaces"#,
         );
 
         let raw_config = r#"
@@ -717,7 +744,7 @@ mod tests {
         let config = Config::new(raw_config, None, None, None);
         assert_eq!(
             expect_err(config).msg,
-            r#"a delimiter may not be the prefix of another delimiter: "{{" vs "{{$""#,
+            r#"an opening delimiter may not be the prefix of another delimiter. The block delimiter ("{{") clashes with the expression delimiter ("{{$")"#,
         );
     }
 

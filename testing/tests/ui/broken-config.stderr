@@ -10,14 +10,14 @@ error: unable to read $WORKSPACE/target/tests/trybuild/rinja_testing/folder-conf
 8 | #[template(source = "", ext = "txt", config = "folder-config.toml")]
   |                                               ^^^^^^^^^^^^^^^^^^^^
 
-error: a delimiter may not be the prefix of another delimiter: "<<<" vs "<<<<"
+error: an opening delimiter may not be the prefix of another delimiter. The block delimiter ("<<<") clashes with the expression delimiter ("<<<<")
         --> testing/delim-clash.toml
   --> tests/ui/broken-config.rs:12:47
    |
 12 | #[template(source = "", ext = "txt", config = "delim-clash.toml")]
    |                                               ^^^^^^^^^^^^^^^^^^
 
-error: delimiters must be at least two characters long: "<"
+error: delimiters must be at least two characters long. The opening block delimiter ("<") is too short
         --> testing/delim-too-short.toml
   --> tests/ui/broken-config.rs:16:47
    |
