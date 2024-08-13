@@ -70,7 +70,7 @@ jobs:
             cd "$PKG"
             echo "Testing: $PKG"
             cargo fmt -- --check
-            cd -
+            cd - > /dev/null
           done
 
   MSRV:
@@ -114,3 +114,22 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: devskim-results.sarif
+
+  CargoSort:
+    name: Check order in Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-sort
+      - run: |
+          set -eu
+          for PKG in \
+            rinja rinja_actix rinja_axum rinja_derive rinja_derive_standalone \
+            rinja_parser rinja_rocket rinja_warp testing
+          do
+            cd "$PKG"
+            cargo sort --check --check-format --grouped
+            cd - > /dev/null
+          done

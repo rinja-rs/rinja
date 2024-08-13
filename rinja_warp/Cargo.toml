@@ -14,6 +14,7 @@ rust-version = "1.71"
 
 [dependencies]
 rinja = { version = "0.3.0", path = "../rinja", default-features = false, features = ["with-warp"] }
+
 warp = { version = "0.3", default-features = false }
 
 [dev-dependencies]

@@ -233,7 +233,7 @@ fn filter_block_include() {
     <body class=""><h1>Metadata</h1>
         
 
-    99</body>
+    100</body>
 </html>"#
     );
 }
