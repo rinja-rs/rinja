@@ -360,6 +360,26 @@ impl<'a> RawSyntax<'a> {
             }
         }
 
+        for end in [syntax.block_end, syntax.expr_end, syntax.comment_end] {
+            for prefix in ["<<", ">>", "&&", "..", "||"] {
+                if end.starts_with(prefix) {
+                    let msg = if end == prefix {
+                        format!("a closing delimiter must not start with an operator: {end:?}")
+                    } else {
+                        format!(
+                            "a closing delimiter must not start an with operator: \
+                             {end:?} starts with {prefix:?}",
+                        )
+                    };
+                    return Err(CompileError::new_with_span(
+                        msg,
+                        file_info.copied(),
+                        config_span,
+                    ));
+                }
+            }
+        }
+
         Ok(syntax)
     }
 }
