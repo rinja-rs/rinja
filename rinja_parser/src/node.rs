@@ -4,7 +4,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
 use nom::character::complete::char;
 use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, peek, recognize, value};
-use nom::multi::{many0, separated_list0};
+use nom::multi::{many0, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded, tuple};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
@@ -170,7 +170,7 @@ impl<'a> Node<'a> {
 #[derive(Debug, PartialEq)]
 pub struct When<'a> {
     pub ws: Ws,
-    pub target: Target<'a>,
+    pub target: Vec<Target<'a>>,
     pub nodes: Vec<Node<'a>>,
 }
 
@@ -193,7 +193,7 @@ impl<'a> When<'a> {
             WithSpan::new(
                 Self {
                     ws: Ws(pws, nws),
-                    target: Target::Placeholder("_"),
+                    target: vec![Target::Placeholder("_")],
                     nodes,
                 },
                 start,
@@ -209,7 +209,7 @@ impl<'a> When<'a> {
             opt(Whitespace::parse),
             ws(keyword("when")),
             cut(tuple((
-                ws(|i| Target::parse(i, s)),
+                separated_list1(char('|'), ws(|i| Target::parse(i, s))),
                 opt(Whitespace::parse),
                 |i| s.tag_block_end(i),
                 cut(|i| Node::many(i, s)),
