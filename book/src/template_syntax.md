@@ -610,6 +610,15 @@ if not all possible values need an individual handling.
 Because a `{% match %}` block could not generate valid code otherwise,
 you have to provide at least one `{% when %}` case and/or an `{% else %}` case.
 
+You can also match against multiple alternative patterns at once:
+
+```jinja
+{% match number %}
+  {% when 1 | 4 | 86 %} Some numbers
+  {% when n %} Number is {{ n }}
+{% endmatch %}
+```
+
 ### Referencing and dereferencing variables
 
 If you need to put something behind a reference or to dereference it, you
