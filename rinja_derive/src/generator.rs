@@ -673,7 +673,12 @@ impl<'a> Generator<'a> {
             }
 
             self.locals.push();
-            self.visit_target(buf, true, true, &arm.target);
+            for (index, target) in arm.target.iter().enumerate() {
+                if index != 0 {
+                    buf.write("|");
+                }
+                self.visit_target(buf, true, true, target);
+            }
             buf.write(" => {");
 
             arm_size = self.handle(ctx, &arm.nodes, buf, AstLevel::Nested)?;

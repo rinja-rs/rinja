@@ -236,3 +236,32 @@ struct EmptyMatch;
 fn test_empty_match() {
     assert_eq!(EmptyMatch.to_string(), "otherwise");
 }
+
+#[derive(Template)]
+#[template(
+    ext = "txt",
+    source = r#"
+{%- match n -%}
+    {%- when 1 | 2 | 3 | 4 -%}
+        a listed one!
+    {%- when 6 | 7 -%}
+        another listed one!
+    {%- when n -%}
+        {{ n }}
+{%- endmatch -%}"#
+)]
+struct MatchPatterns {
+    n: u8,
+}
+
+#[test]
+fn test_match_with_patterns() {
+    let s = MatchPatterns { n: 1 };
+    assert_eq!(s.render().unwrap(), "a listed one!");
+
+    let s = MatchPatterns { n: 6 };
+    assert_eq!(s.render().unwrap(), "another listed one!");
+
+    let s = MatchPatterns { n: 12 };
+    assert_eq!(s.render().unwrap(), "12");
+}
