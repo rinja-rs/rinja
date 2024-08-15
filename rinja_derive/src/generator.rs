@@ -154,7 +154,7 @@ impl<'a> Generator<'a> {
             self.input.mime_type,
         ));
 
-        buf.write("}");
+        buf.write('}');
         Ok(())
     }
 
@@ -628,7 +628,7 @@ impl<'a> Generator<'a> {
         self.handle_ws(if_.ws);
         flushed += self.write_buf_writable(ctx, buf)?;
         if conds.nb_conds > 0 {
-            buf.write("}");
+            buf.write('}');
         }
         if !conds.conds.is_empty() {
             self.locals.pop();
@@ -668,14 +668,14 @@ impl<'a> Generator<'a> {
             if i > 0 {
                 arm_sizes.push(arm_size + self.write_buf_writable(ctx, buf)?);
 
-                buf.write("}");
+                buf.write('}');
                 self.locals.pop();
             }
 
             self.locals.push();
             for (index, target) in arm.target.iter().enumerate() {
                 if index != 0 {
-                    buf.write("|");
+                    buf.write('|');
                 }
                 self.visit_target(buf, true, true, target);
             }
@@ -686,10 +686,10 @@ impl<'a> Generator<'a> {
 
         self.handle_ws(ws2);
         arm_sizes.push(arm_size + self.write_buf_writable(ctx, buf)?);
-        buf.write("}");
+        buf.write('}');
         self.locals.pop();
 
-        buf.write("}");
+        buf.write('}');
 
         Ok(flushed + median(&mut arm_sizes))
     }
@@ -709,7 +709,7 @@ impl<'a> Generator<'a> {
         let has_else_nodes = !loop_block.else_nodes.is_empty();
 
         let flushed = self.write_buf_writable(ctx, buf)?;
-        buf.write("{");
+        buf.write('{');
         if has_else_nodes {
             buf.write("let mut _did_loop = false;");
         }
@@ -757,7 +757,7 @@ impl<'a> Generator<'a> {
         self.handle_ws(loop_block.ws2);
         size_hint1 += self.write_buf_writable(ctx, buf)?;
         self.locals.pop();
-        buf.write("}");
+        buf.write('}');
 
         let mut size_hint2;
         if has_else_nodes {
@@ -767,13 +767,13 @@ impl<'a> Generator<'a> {
             self.handle_ws(loop_block.ws3);
             size_hint2 += self.write_buf_writable(ctx, buf)?;
             self.locals.pop();
-            buf.write("}");
+            buf.write('}');
         } else {
             self.handle_ws(loop_block.ws3);
             size_hint2 = self.write_buf_writable(ctx, buf)?;
         }
 
-        buf.write("}");
+        buf.write('}');
 
         Ok(flushed + ((size_hint1 * 3) + size_hint2) / 2)
     }
@@ -818,7 +818,7 @@ impl<'a> Generator<'a> {
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
         self.locals.push();
         self.write_buf_writable(ctx, buf)?;
-        buf.write("{");
+        buf.write('{');
         self.prepare_ws(def.ws1);
 
         let mut names = Buffer::new();
@@ -908,17 +908,17 @@ impl<'a> Generator<'a> {
                     if is_first_variable {
                         is_first_variable = false
                     } else {
-                        names.write(", ");
-                        values.write(", ");
+                        names.write(',');
+                        values.write(',');
                     }
                     names.write(arg);
 
-                    values.write("(");
+                    values.write('(');
                     if !is_copyable(expr) {
-                        values.write("&");
+                        values.write('&');
                     }
                     values.write(self.visit_expr_root(ctx, expr)?);
-                    values.write(")");
+                    values.write(')');
                     self.locals.insert_with_default(Cow::Borrowed(arg));
                 }
             }
@@ -933,7 +933,7 @@ impl<'a> Generator<'a> {
 
         self.flush_ws(def.ws2);
         size_hint += self.write_buf_writable(ctx, buf)?;
-        buf.write("}");
+        buf.write('}');
         self.locals.pop();
         self.prepare_ws(ws);
         Ok(size_hint)
@@ -949,7 +949,7 @@ impl<'a> Generator<'a> {
         self.flush_ws(filter.ws1);
         self.is_in_filter_block += 1;
         self.write_buf_writable(ctx, buf)?;
-        buf.write("{");
+        buf.write('{');
 
         // build `FmtCell` that contains the inner block
         buf.write(format_args!(
@@ -987,7 +987,7 @@ impl<'a> Generator<'a> {
             }}"
         ));
 
-        buf.write("}");
+        buf.write('}');
         self.is_in_filter_block -= 1;
         self.prepare_ws(filter.ws2);
         Ok(size_hint)
@@ -1104,7 +1104,7 @@ impl<'a> Generator<'a> {
             self.write_buf_writable(ctx, buf)?;
             buf.write("let ");
             self.visit_target(buf, false, true, &l.var);
-            buf.write(";");
+            buf.write(';');
             return Ok(());
         };
 
@@ -1550,7 +1550,7 @@ impl<'a> Generator<'a> {
         self.visit_path(buf, path);
         buf.write("!(");
         buf.write(args);
-        buf.write(")");
+        buf.write(')');
 
         DisplayWrap::Unwrapped
     }
@@ -1624,7 +1624,7 @@ impl<'a> Generator<'a> {
             [arg] => arg,
             _ => return Err(ctx.generate_error("unexpected argument(s) in `as_ref` filter", node)),
         };
-        buf.write("&");
+        buf.write('&');
         self.visit_expr(ctx, buf, arg)?;
         Ok(DisplayWrap::Unwrapped)
     }
@@ -1640,7 +1640,7 @@ impl<'a> Generator<'a> {
             [arg] => arg,
             _ => return Err(ctx.generate_error("unexpected argument(s) in `deref` filter", node)),
         };
-        buf.write("*");
+        buf.write('*');
         self.visit_expr(ctx, buf, arg)?;
         Ok(DisplayWrap::Unwrapped)
     }
@@ -1744,10 +1744,10 @@ impl<'a> Generator<'a> {
                 buf.write("::std::format!(");
                 self.visit_str_lit(buf, fmt);
                 if args.len() > 1 {
-                    buf.write(", ");
+                    buf.write(',');
                     self._visit_args(ctx, buf, &args[1..])?;
                 }
-                buf.write(")");
+                buf.write(')');
                 return Ok(DisplayWrap::Unwrapped);
             }
         }
@@ -1765,9 +1765,9 @@ impl<'a> Generator<'a> {
             if let Expr::StrLit(fmt) = **arg2 {
                 buf.write("::std::format!(");
                 self.visit_str_lit(buf, fmt);
-                buf.write(", ");
+                buf.write(',');
                 self._visit_args(ctx, buf, &args[..1])?;
-                buf.write(")");
+                buf.write(')');
                 return Ok(DisplayWrap::Unwrapped);
             }
         }
@@ -1808,7 +1808,7 @@ impl<'a> Generator<'a> {
 
         for (i, arg) in args.iter().enumerate() {
             if i > 0 {
-                buf.write(", ");
+                buf.write(',');
             }
 
             let borrow = !is_copyable(arg);
@@ -1818,9 +1818,9 @@ impl<'a> Generator<'a> {
 
             match **arg {
                 Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
-                    buf.write("{");
+                    buf.write('{');
                     self.visit_expr(ctx, buf, arg)?;
-                    buf.write("}");
+                    buf.write('}');
                 }
                 _ => {
                     self.visit_expr(ctx, buf, arg)?;
@@ -1828,7 +1828,7 @@ impl<'a> Generator<'a> {
             }
 
             if borrow {
-                buf.write(")");
+                buf.write(')');
             }
         }
         Ok(())
@@ -1872,11 +1872,11 @@ impl<'a> Generator<'a> {
         obj: &WithSpan<'_, Expr<'_>>,
         key: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write("&");
+        buf.write('&');
         self.visit_expr(ctx, buf, obj)?;
-        buf.write("[");
+        buf.write('[');
         self.visit_expr(ctx, buf, key)?;
-        buf.write("]");
+        buf.write(']');
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -1931,9 +1931,9 @@ impl<'a> Generator<'a> {
                         self.visit_expr(ctx, buf, left)?;
                     }
                 }
-                buf.write("(");
+                buf.write('(');
                 self._visit_args(ctx, buf, args)?;
-                buf.write(")");
+                buf.write(')');
             }
         }
         Ok(DisplayWrap::Unwrapped)
@@ -1989,9 +1989,9 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         inner: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write("(");
+        buf.write('(');
         self.visit_expr(ctx, buf, inner)?;
-        buf.write(")");
+        buf.write(')');
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -2001,15 +2001,15 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         exprs: &[WithSpan<'_, Expr<'_>>],
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write("(");
+        buf.write('(');
         for (index, expr) in exprs.iter().enumerate() {
             if index > 0 {
-                buf.write(" ");
+                buf.write(' ');
             }
             self.visit_expr(ctx, buf, expr)?;
-            buf.write(",");
+            buf.write(',');
         }
-        buf.write(")");
+        buf.write(')');
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -2029,14 +2029,14 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         elements: &[WithSpan<'_, Expr<'_>>],
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write("[");
+        buf.write('[');
         for (i, el) in elements.iter().enumerate() {
             if i > 0 {
-                buf.write(", ");
+                buf.write(',');
             }
             self.visit_expr(ctx, buf, el)?;
         }
-        buf.write("]");
+        buf.write(']');
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -2120,36 +2120,36 @@ impl<'a> Generator<'a> {
                 buf.write(name);
             }
             Target::OrChain(targets) => match targets.first() {
-                None => buf.write("_"),
+                None => buf.write('_'),
                 Some(first_target) => {
                     self.visit_target(buf, initialized, first_level, first_target);
                     for target in &targets[1..] {
-                        buf.write(" | ");
+                        buf.write('|');
                         self.visit_target(buf, initialized, first_level, target);
                     }
                 }
             },
             Target::Tuple(path, targets) => {
                 buf.write(SeparatedPath(path));
-                buf.write("(");
+                buf.write('(');
                 for target in targets {
                     self.visit_target(buf, initialized, false, target);
-                    buf.write(",");
+                    buf.write(',');
                 }
-                buf.write(")");
+                buf.write(')');
             }
             Target::Array(path, targets) => {
                 buf.write(SeparatedPath(path));
-                buf.write("[");
+                buf.write('[');
                 for target in targets {
                     self.visit_target(buf, initialized, false, target);
-                    buf.write(",");
+                    buf.write(',');
                 }
-                buf.write("]");
+                buf.write(']');
             }
             Target::Struct(path, targets) => {
                 buf.write(SeparatedPath(path));
-                buf.write(" { ");
+                buf.write('{');
                 for (name, target) in targets {
                     if let Target::Rest(_) = target {
                         buf.write("..");
@@ -2159,34 +2159,34 @@ impl<'a> Generator<'a> {
                     buf.write(normalize_identifier(name));
                     buf.write(": ");
                     self.visit_target(buf, initialized, false, target);
-                    buf.write(",");
+                    buf.write(',');
                 }
-                buf.write(" }");
+                buf.write('}');
             }
             Target::Path(path) => {
                 self.visit_path(buf, path);
             }
             Target::StrLit(s) => {
                 if first_level {
-                    buf.write("&");
+                    buf.write('&');
                 }
                 self.visit_str_lit(buf, s);
             }
             Target::NumLit(s) => {
                 if first_level {
-                    buf.write("&");
+                    buf.write('&');
                 }
                 self.visit_num_lit(buf, s);
             }
             Target::CharLit(s) => {
                 if first_level {
-                    buf.write("&");
+                    buf.write('&');
                 }
                 self.visit_char_lit(buf, s);
             }
             Target::BoolLit(s) => {
                 if first_level {
-                    buf.write("&");
+                    buf.write('&');
                 }
                 buf.write(s);
             }
@@ -2311,6 +2311,12 @@ trait BufferFmt {
 impl<T: BufferFmt + ?Sized> BufferFmt for &T {
     fn append_to(&self, buf: &mut String) {
         T::append_to(self, buf)
+    }
+}
+
+impl BufferFmt for char {
+    fn append_to(&self, buf: &mut String) {
+        buf.push(*self);
     }
 }
 
