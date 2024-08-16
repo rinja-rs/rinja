@@ -10,6 +10,7 @@ use once_map::sync::OnceMap;
 use parser::node::Whitespace;
 use parser::{ParseError, Parsed, Syntax};
 use proc_macro2::Span;
+use rustc_hash::FxBuildHasher;
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
@@ -76,9 +77,10 @@ impl Config {
         template_whitespace: Option<&str>,
         config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
-        static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, &'static Config>>> =
-            ManuallyDrop::new(OnceLock::new());
-        CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+        static CACHE: ManuallyDrop<
+            OnceLock<OnceMap<OwnedConfigKey, &'static Config, FxBuildHasher>>,
+        > = ManuallyDrop::new(OnceLock::new());
+        CACHE.get_or_init(OnceMap::default).get_or_try_insert_ref(
             &ConfigKey {
                 source: source.into(),
                 config_path: config_path.map(Cow::Borrowed),
@@ -232,7 +234,7 @@ impl Config {
 #[derive(Debug, Default)]
 pub(crate) struct SyntaxAndCache<'a> {
     syntax: Syntax<'a>,
-    cache: OnceMap<OwnedSyntaxAndCacheKey, Arc<Parsed>>,
+    cache: OnceMap<OwnedSyntaxAndCacheKey, Arc<Parsed>, FxBuildHasher>,
 }
 
 impl<'a> Deref for SyntaxAndCache<'a> {
@@ -270,7 +272,7 @@ impl<'a> SyntaxAndCache<'a> {
     fn new(syntax: Syntax<'a>) -> Self {
         Self {
             syntax,
-            cache: OnceMap::new(),
+            cache: OnceMap::default(),
         }
     }
 

@@ -11,6 +11,7 @@ use parser::node::{
 };
 use parser::{Expr, Filter, Node, Target, WithSpan};
 use quote::quote;
+use rustc_hash::FxBuildHasher;
 
 use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
@@ -29,7 +30,7 @@ pub(crate) struct Generator<'a> {
     // The template input state: original struct AST and attributes
     input: &'a TemplateInput<'a>,
     // All contexts, keyed by the package-relative template path
-    contexts: &'a HashMap<&'a Arc<Path>, Context<'a>>,
+    contexts: &'a HashMap<&'a Arc<Path>, Context<'a>, FxBuildHasher>,
     // The heritage contains references to blocks and their ancestry
     heritage: Option<&'a Heritage<'a>>,
     // Variables accessible directly from the current scope (not redirected to context)
@@ -52,7 +53,7 @@ pub(crate) struct Generator<'a> {
 impl<'a> Generator<'a> {
     pub(crate) fn new<'n>(
         input: &'n TemplateInput<'_>,
-        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>>,
+        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>, FxBuildHasher>,
         heritage: Option<&'n Heritage<'_>>,
         locals: MapChain<'n, Cow<'n, str>, LocalMeta>,
         buf_writable_discard: bool,
@@ -2489,15 +2490,13 @@ impl LocalMeta {
     }
 }
 
-// type SetChain<'a, T> = MapChain<'a, T, ()>;
-
 #[derive(Debug, Clone)]
 pub(crate) struct MapChain<'a, K, V>
 where
     K: cmp::Eq + hash::Hash,
 {
     parent: Option<&'a MapChain<'a, K, V>>,
-    scopes: Vec<HashMap<K, V>>,
+    scopes: Vec<HashMap<K, V, FxBuildHasher>>,
 }
 
 impl<'a, K: 'a, V: 'a> MapChain<'a, K, V>
@@ -2507,7 +2506,7 @@ where
     fn with_parent<'p>(parent: &'p MapChain<'_, K, V>) -> MapChain<'p, K, V> {
         MapChain {
             parent: Some(parent),
-            scopes: vec![HashMap::new()],
+            scopes: vec![HashMap::default()],
         }
     }
 
@@ -2542,7 +2541,7 @@ where
     }
 
     fn push(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(HashMap::default());
     }
 
     fn pop(&mut self) {
@@ -2570,7 +2569,7 @@ impl<'a, K: Eq + hash::Hash, V> Default for MapChain<'a, K, V> {
     fn default() -> Self {
         Self {
             parent: None,
-            scopes: vec![HashMap::new()],
+            scopes: vec![HashMap::default()],
         }
     }
 }
