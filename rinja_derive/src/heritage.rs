@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use parser::node::{BlockDef, Macro};
 use parser::{Node, Parsed, WithSpan};
+use rustc_hash::FxBuildHasher;
 
 use crate::config::Config;
 use crate::{CompileError, FileInfo};
@@ -16,7 +17,7 @@ pub(crate) struct Heritage<'a> {
 impl Heritage<'_> {
     pub(crate) fn new<'n>(
         mut ctx: &'n Context<'n>,
-        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>>,
+        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>, FxBuildHasher>,
     ) -> Heritage<'n> {
         let mut blocks: BlockAncestry<'n> = ctx
             .blocks
@@ -35,15 +36,15 @@ impl Heritage<'_> {
     }
 }
 
-type BlockAncestry<'a> = HashMap<&'a str, Vec<(&'a Context<'a>, &'a BlockDef<'a>)>>;
+type BlockAncestry<'a> = HashMap<&'a str, Vec<(&'a Context<'a>, &'a BlockDef<'a>)>, FxBuildHasher>;
 
 #[derive(Clone)]
 pub(crate) struct Context<'a> {
     pub(crate) nodes: &'a [Node<'a>],
     pub(crate) extends: Option<Arc<Path>>,
-    pub(crate) blocks: HashMap<&'a str, &'a BlockDef<'a>>,
-    pub(crate) macros: HashMap<&'a str, &'a Macro<'a>>,
-    pub(crate) imports: HashMap<&'a str, Arc<Path>>,
+    pub(crate) blocks: HashMap<&'a str, &'a BlockDef<'a>, FxBuildHasher>,
+    pub(crate) macros: HashMap<&'a str, &'a Macro<'a>, FxBuildHasher>,
+    pub(crate) imports: HashMap<&'a str, Arc<Path>, FxBuildHasher>,
     pub(crate) path: Option<&'a Path>,
     pub(crate) parsed: &'a Parsed,
 }
@@ -53,9 +54,9 @@ impl Context<'_> {
         Context {
             nodes: &[],
             extends: None,
-            blocks: HashMap::new(),
-            macros: HashMap::new(),
-            imports: HashMap::new(),
+            blocks: HashMap::default(),
+            macros: HashMap::default(),
+            imports: HashMap::default(),
             path: None,
             parsed,
         }
@@ -67,9 +68,9 @@ impl Context<'_> {
         parsed: &'n Parsed,
     ) -> Result<Context<'n>, CompileError> {
         let mut extends = None;
-        let mut blocks = HashMap::new();
-        let mut macros = HashMap::new();
-        let mut imports = HashMap::new();
+        let mut blocks = HashMap::default();
+        let mut macros = HashMap::default();
+        let mut imports = HashMap::default();
         let mut nested = vec![parsed.nodes()];
         let mut top = true;
 

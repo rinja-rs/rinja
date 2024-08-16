@@ -9,6 +9,7 @@ use mime::Mime;
 use once_map::OnceMap;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
+use rustc_hash::FxBuildHasher;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
@@ -144,7 +145,7 @@ impl TemplateInput<'_> {
 
     pub(crate) fn find_used_templates(
         &self,
-        map: &mut HashMap<Arc<Path>, Arc<Parsed>>,
+        map: &mut HashMap<Arc<Path>, Arc<Parsed>, FxBuildHasher>,
     ) -> Result<(), CompileError> {
         let (source, source_path) = match &self.source {
             Source::Source(s) => (s.clone(), None),
@@ -571,9 +572,9 @@ pub(crate) fn get_template_source(
     tpl_path: &Arc<Path>,
     import_from: Option<(&Arc<Path>, &str, &str)>,
 ) -> Result<Arc<str>, CompileError> {
-    static CACHE: OnceLock<OnceMap<Arc<Path>, Arc<str>>> = OnceLock::new();
+    static CACHE: OnceLock<OnceMap<Arc<Path>, Arc<str>, FxBuildHasher>> = OnceLock::new();
 
-    CACHE.get_or_init(OnceMap::new).get_or_try_insert_ref(
+    CACHE.get_or_init(OnceMap::default).get_or_try_insert_ref(
         tpl_path,
         (),
         Arc::clone,

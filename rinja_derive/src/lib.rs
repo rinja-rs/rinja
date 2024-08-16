@@ -118,7 +118,7 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let template_args = TemplateArgs::fallback();
     let config = Config::new("", None, None, None)?;
     let input = TemplateInput::new(ast, config, &template_args)?;
-    let mut contexts = HashMap::new();
+    let mut contexts = HashMap::default();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
     Generator::new(
@@ -168,10 +168,10 @@ fn build_template_inner(
     )?;
     let input = TemplateInput::new(ast, config, template_args)?;
 
-    let mut templates = HashMap::new();
+    let mut templates = HashMap::default();
     input.find_used_templates(&mut templates)?;
 
-    let mut contexts = HashMap::new();
+    let mut contexts = HashMap::default();
     for (path, parsed) in &templates {
         contexts.insert(path, Context::new(input.config, path, parsed)?);
     }
