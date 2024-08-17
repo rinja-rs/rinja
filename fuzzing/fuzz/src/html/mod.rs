@@ -1,9 +1,10 @@
+#[allow(clippy::module_inception)]
 mod html;
 
 use arbitrary::{Arbitrary, Unstructured};
 use html_escape::decode_html_entities_to_string;
 
-#[derive(Arbitrary, Debug)]
+#[derive(Arbitrary, Debug, Clone, Copy)]
 pub enum Scenario<'a> {
     String(&'a str),
     Char(char),
@@ -19,8 +20,8 @@ impl<'a> super::Scenario<'a> for Scenario<'a> {
     }
 
     fn run(&self) -> Result<(), Self::RunError> {
-        match self {
-            &Scenario::String(src) => {
+        match *self {
+            Scenario::String(src) => {
                 let mut dest = String::with_capacity(src.len());
                 html::write_escaped_str(&mut dest, src).unwrap();
 
@@ -28,7 +29,7 @@ impl<'a> super::Scenario<'a> for Scenario<'a> {
                 let unescaped = decode_html_entities_to_string(dest, &mut unescaped);
                 assert_eq!(src, unescaped);
             }
-            &Scenario::Char(c) => {
+            Scenario::Char(c) => {
                 let mut dest = String::with_capacity(6);
                 html::write_escaped_char(&mut dest, c).unwrap();
 

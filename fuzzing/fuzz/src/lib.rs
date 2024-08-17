@@ -4,13 +4,13 @@ pub mod parser;
 use std::error::Error;
 use std::fmt;
 
-pub const TARGETS: &[(
-    &str,
-    for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, Box<dyn Error + Send + 'static>>,
-)] = &[
+pub const TARGETS: &[(&str, TargetBuilder)] = &[
     ("html", |data| NamedTarget::new::<html::Scenario>(data)),
     ("parser", |data| NamedTarget::new::<parser::Scenario>(data)),
 ];
+
+pub type TargetBuilder =
+    for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, Box<dyn Error + Send + 'static>>;
 
 pub trait Scenario<'a>: fmt::Debug + Sized {
     type NewError: Error + Send + 'static;
