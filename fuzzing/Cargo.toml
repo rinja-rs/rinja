@@ -1,14 +1,13 @@
 [package]
-name = "fuzz_parser"
+name = "rinja_fuzzing"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-rinja_parser = { path = "../rinja_parser" }
+fuzz = { path = "fuzz"}
 
-arbitrary = { version = "1.3.2", features = ["derive"] }
 pretty-error-debug = "0.3.0"
 thiserror = "1.0.63"
 

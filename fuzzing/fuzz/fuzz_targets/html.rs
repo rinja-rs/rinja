@@ -1,7 +1,9 @@
 #![no_main]
 
+use fuzz::Scenario;
+
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
-    if let Ok(scenario) = fuzz_parser::Scenario::new(data) {
+    if let Ok(scenario) = fuzz::html::Scenario::new(data) {
         let _ = scenario.run();
     }
 });

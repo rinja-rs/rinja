@@ -37,7 +37,7 @@ jobs:
         package: [
           rinja, rinja_actix, rinja_axum, rinja_derive, rinja_derive_standalone,
           rinja_parser, rinja_rocket, rinja_warp, testing, examples/actix-web-app,
-          fuzz_parser
+          fuzzing
         ]
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +67,7 @@ jobs:
           for PKG in \
             rinja rinja_actix rinja_axum rinja_derive rinja_derive_standalone \
             rinja_parser rinja_rocket rinja_warp testing examples/actix-web-app \
-            fuzz_parser
+            fuzzing
           do
             cd "$PKG"
             echo "Testing: $PKG"

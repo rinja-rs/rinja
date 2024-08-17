@@ -7,8 +7,12 @@ pub struct Scenario<'a> {
     src: &'a str,
 }
 
-impl<'a> Scenario<'a> {
-    pub fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
+impl<'a> super::Scenario<'a> for Scenario<'a> {
+    type NewError = arbitrary::Error;
+
+    type RunError = rinja_parser::ParseError;
+
+    fn new(data: &'a [u8]) -> Result<Self, Self::NewError> {
         let mut data = Unstructured::new(data);
 
         let syntax = ArbitrarySyntax::arbitrary(&mut data)?;
@@ -21,7 +25,7 @@ impl<'a> Scenario<'a> {
         Ok(Self { syntax, src })
     }
 
-    pub fn run(&self) -> Result<(), rinja_parser::ParseError> {
+    fn run(&self) -> Result<(), Self::RunError> {
         let Scenario { syntax, src } = self;
         Ast::from_str(src, None, syntax)?;
         Ok(())
