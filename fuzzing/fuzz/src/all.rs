@@ -65,6 +65,7 @@ macro_rules! this_file {
 }
 
 this_file! {
+    crate::filters::Filters;
     crate::html::Html;
     crate::parser::Parser;
 }

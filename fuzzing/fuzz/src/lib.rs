@@ -1,4 +1,5 @@
 pub mod all;
+pub mod filters;
 pub mod html;
 pub mod parser;
 
@@ -7,6 +8,9 @@ use std::fmt;
 
 pub const TARGETS: &[(&str, TargetBuilder)] = &[
     ("all", |data| NamedTarget::new::<all::Scenario>(data)),
+    ("filters", |data| {
+        NamedTarget::new::<filters::Scenario>(data)
+    }),
     ("html", |data| NamedTarget::new::<html::Scenario>(data)),
     ("parser", |data| NamedTarget::new::<parser::Scenario>(data)),
 ];
@@ -16,8 +20,23 @@ pub type TargetBuilder = for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, arbitra
 pub trait Scenario<'a>: fmt::Debug + Sized {
     type RunError: Error + Send + 'static;
 
+    fn fuzz(data: &'a [u8]) -> Result<(), FuzzError<Self::RunError>> {
+        Self::new(data)
+            .map_err(FuzzError::New)?
+            .run()
+            .map_err(FuzzError::Run)
+    }
+
     fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error>;
     fn run(&self) -> Result<(), Self::RunError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum FuzzError<RunError: Error + Send + 'static> {
+    #[error("could not build scenario")]
+    New(#[source] arbitrary::Error),
+    #[error("could not run scenario")]
+    Run(#[source] RunError),
 }
 
 #[derive(Debug, Clone, Copy, Default)]
