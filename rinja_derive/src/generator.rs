@@ -1270,18 +1270,15 @@ impl<'a> Generator<'a> {
             }
 
             // for now, we only escape strings and chars at compile time
-            let (lit, escape_prefix) = match &**s {
-                Expr::StrLit(StrLit { prefix, content }) => {
-                    (InputKind::StrLit(content), prefix.map(|p| p.to_char()))
-                }
-                Expr::CharLit(CharLit { prefix, content }) => (
-                    InputKind::CharLit(content),
-                    if *prefix == Some(CharPrefix::Binary) {
-                        Some('b')
-                    } else {
-                        None
-                    },
-                ),
+            let lit = match &**s {
+                Expr::StrLit(StrLit {
+                    prefix: None,
+                    content,
+                }) => InputKind::StrLit(content),
+                Expr::CharLit(CharLit {
+                    prefix: None,
+                    content,
+                }) => InputKind::CharLit(content),
                 _ => return None,
             };
 
@@ -1323,9 +1320,6 @@ impl<'a> Generator<'a> {
                 OutputKind::Text => unescaped,
                 OutputKind::Html => {
                     let mut escaped = String::with_capacity(unescaped.len() + 20);
-                    if let Some(escape_prefix) = escape_prefix {
-                        escaped.push(escape_prefix);
-                    }
                     write_escaped_str(&mut escaped, &unescaped).ok()?;
                     match escaped == unescaped {
                         true => unescaped,
