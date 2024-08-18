@@ -340,20 +340,16 @@ fn bool_lit(i: &str) -> ParseResult<'_> {
     alt((keyword("false"), keyword("true")))(i)
 }
 
-fn num_lit(i: &str) -> ParseResult<'_> {
+fn num_lit<'a>(i: &'a str) -> ParseResult<'a> {
     fn suffix<'a>(
         start: &'a str,
         kind: &'a str,
         list: &'a [&str],
-        ignore: &'a [&str],
-    ) -> impl Fn(&'a str) -> ParseResult<'a> + Copy + 'a {
+    ) -> impl Fn(&'a str) -> ParseResult<'a, ()> + Copy + 'a {
         move |i| {
             let (i, suffix) = identifier(i)?;
             if list.contains(&suffix) {
-                Ok((i, suffix))
-            } else if ignore.contains(&suffix) {
-                // no need for a message, this case only occures in an `opt(…)`
-                fail(i)
+                Ok((i, ()))
             } else {
                 Err(nom::Err::Failure(ErrorContext::new(
                     format!("unknown {kind} suffix `{suffix}`"),
@@ -363,9 +359,16 @@ fn num_lit(i: &str) -> ParseResult<'_> {
         }
     }
 
-    let integer_suffix = suffix(i, "integer", INTEGER_TYPES, &[]);
-    let float_suffix = suffix(i, "float", FLOAT_TYPES, &["e"]);
-    let either_suffix = suffix(i, "number", NUM_TYPES, &["e"]);
+    let float = |start: &'a str| -> ParseResult<'a, ()> {
+        let (i, has_dot) = opt(tuple((char('.'), separated_digits(10, true))))(start)?;
+        let (i, has_exp) = opt(pair(one_of("eE"), opt(one_of("+-"))))(i)?;
+        if has_dot.is_none() && has_exp.is_none() {
+            return fail(start);
+        }
+        let (i, _) = cut(separated_digits(10, false))(i)?;
+        let (i, _) = opt(suffix(i, "float", FLOAT_TYPES))(i)?;
+        Ok((i, ()))
+    };
 
     recognize(tuple((
         opt(char('-')),
@@ -377,25 +380,11 @@ fn num_lit(i: &str) -> ParseResult<'_> {
                     recognize(tuple((char('o'), separated_digits(8, false)))),
                     recognize(tuple((char('x'), separated_digits(16, false)))),
                 )),
-                opt(integer_suffix),
+                opt(suffix(i, "integer", INTEGER_TYPES)),
             ))),
             recognize(tuple((
                 separated_digits(10, true),
-                opt(alt((
-                    either_suffix,
-                    recognize(tuple((
-                        opt(tuple((char('.'), separated_digits(10, true)))),
-                        one_of("eE"),
-                        opt(one_of("+-")),
-                        separated_digits(10, false),
-                        opt(float_suffix),
-                    ))),
-                    recognize(tuple((
-                        char('.'),
-                        separated_digits(10, true),
-                        opt(float_suffix),
-                    ))),
-                ))),
+                opt(alt((float, suffix(i, "number", NUM_TYPES)))),
             ))),
         )),
     )))(i)

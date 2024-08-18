@@ -1067,3 +1067,16 @@ fn fuzzed_filter_recursion() {
     const TEMPLATE: &str = include_str!("../tests/filter-recursion.txt");
     assert!(Ast::from_str(TEMPLATE, None, &Syntax::default()).is_err());
 }
+
+#[test]
+fn four_thousand() {
+    assert_eq!(
+        Ast::from_str("{{4e3}}", None, &Syntax::default())
+            .unwrap()
+            .nodes,
+        vec![Node::Expr(
+            Ws(None, None),
+            WithSpan::no_span(Expr::NumLit("4e3")),
+        )],
+    );
+}
