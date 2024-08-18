@@ -580,4 +580,26 @@ A
         &[],
         23,
     );
+
+    compare(
+        r#"{{ 1_2_3_4 }} {{ 4e3 }} {{ false }}"#,
+        r#"match (
+            &((&&::rinja::filters::AutoEscaper::new(&(1_2_3_4), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&(4e3), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+            &((&&::rinja::filters::AutoEscaper::new(&(false), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+        ) {
+            (expr0, expr2, expr4) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                writer.write_str(" ")?;
+                (&&::rinja::filters::Writable(expr2)).rinja_write(writer)?;
+                writer.write_str(" ")?;
+                (&&::rinja::filters::Writable(expr4)).rinja_write(writer)?;
+            }
+        }"#,
+        &[],
+        11,
+    );
 }
