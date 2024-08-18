@@ -10,11 +10,10 @@ use nom::error_position;
 use nom::multi::{fold_many0, many0, separated_list0};
 use nom::sequence::{pair, preceded, terminated, tuple};
 
-use super::{
-    char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws, Level,
-    PathOrIdentifier,
+use crate::{
+    char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws,
+    CharLit, ErrorContext, Level, ParseResult, PathOrIdentifier, WithSpan,
 };
-use crate::{ErrorContext, ParseResult, WithSpan};
 
 macro_rules! expr_prec_layer {
     ( $name:ident, $inner:ident, $op:expr ) => {
@@ -38,7 +37,7 @@ pub enum Expr<'a> {
     BoolLit(bool),
     NumLit(&'a str),
     StrLit(&'a str),
-    CharLit(&'a str),
+    CharLit(CharLit<'a>),
     Var(&'a str),
     Path(Vec<&'a str>),
     Array(Vec<WithSpan<'a, Expr<'a>>>),

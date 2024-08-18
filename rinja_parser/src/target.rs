@@ -6,7 +6,7 @@ use nom::multi::separated_list1;
 use nom::sequence::{pair, preceded, tuple};
 
 use crate::{
-    bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
+    bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws, CharLit,
     ErrorContext, ParseErr, ParseResult, PathOrIdentifier, State, WithSpan,
 };
 
@@ -18,7 +18,7 @@ pub enum Target<'a> {
     Struct(Vec<&'a str>, Vec<(&'a str, Target<'a>)>),
     NumLit(&'a str),
     StrLit(&'a str),
-    CharLit(&'a str),
+    CharLit(CharLit<'a>),
     BoolLit(&'a str),
     Path(Vec<&'a str>),
     OrChain(Vec<Target<'a>>),

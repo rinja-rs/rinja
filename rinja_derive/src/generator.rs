@@ -9,7 +9,7 @@ use std::{cmp, hash, mem, str};
 use parser::node::{
     Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
-use parser::{Expr, Filter, Node, Target, WithSpan};
+use parser::{CharLit, CharPrefix, Expr, Filter, Node, Target, WithSpan};
 use quote::quote;
 use rustc_hash::FxBuildHasher;
 
@@ -1270,9 +1270,16 @@ impl<'a> Generator<'a> {
             }
 
             // for now, we only escape strings and chars at compile time
-            let lit = match &**s {
-                Expr::StrLit(input) => InputKind::StrLit(input),
-                Expr::CharLit(input) => InputKind::CharLit(input),
+            let (lit, escape_prefix) = match &**s {
+                Expr::StrLit(input) => (InputKind::StrLit(input), None),
+                Expr::CharLit(CharLit { prefix, content }) => (
+                    InputKind::CharLit(content),
+                    if *prefix == Some(CharPrefix::Binary) {
+                        Some('b')
+                    } else {
+                        None
+                    },
+                ),
                 _ => return None,
             };
 
@@ -1314,6 +1321,9 @@ impl<'a> Generator<'a> {
                 OutputKind::Text => unescaped,
                 OutputKind::Html => {
                     let mut escaped = String::with_capacity(unescaped.len() + 20);
+                    if let Some(escape_prefix) = escape_prefix {
+                        escaped.push(escape_prefix);
+                    }
                     write_escaped_str(&mut escaped, &unescaped).ok()?;
                     match escaped == unescaped {
                         true => unescaped,
@@ -1479,7 +1489,7 @@ impl<'a> Generator<'a> {
             Expr::BoolLit(s) => self.visit_bool_lit(buf, s),
             Expr::NumLit(s) => self.visit_num_lit(buf, s),
             Expr::StrLit(s) => self.visit_str_lit(buf, s),
-            Expr::CharLit(s) => self.visit_char_lit(buf, s),
+            Expr::CharLit(ref s) => self.visit_char_lit(buf, s),
             Expr::Var(s) => self.visit_var(buf, s),
             Expr::Path(ref path) => self.visit_path(buf, path),
             Expr::Array(ref elements) => self.visit_array(ctx, buf, elements)?,
@@ -2082,8 +2092,11 @@ impl<'a> Generator<'a> {
         DisplayWrap::Unwrapped
     }
 
-    fn visit_char_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(format_args!("'{s}'"));
+    fn visit_char_lit(&mut self, buf: &mut Buffer, c: &CharLit<'_>) -> DisplayWrap {
+        if c.prefix == Some(CharPrefix::Binary) {
+            buf.write('b');
+        }
+        buf.write(format_args!("'{}'", c.content));
         DisplayWrap::Unwrapped
     }
 
