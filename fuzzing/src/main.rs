@@ -52,7 +52,7 @@ enum Error {
     #[error("could not read opened input file {}", .1.display())]
     Read(#[source] std::io::Error, PathBuf),
     #[error("could not build scenario")]
-    Build(#[source] Box<dyn std::error::Error + Send + 'static>),
+    Build(#[source] arbitrary::Error),
     #[error("could not run scenario")]
     Run(#[source] Box<dyn std::error::Error + Send + 'static>),
 }

@@ -1,3 +1,4 @@
+pub mod all;
 pub mod html;
 pub mod parser;
 
@@ -5,18 +6,17 @@ use std::error::Error;
 use std::fmt;
 
 pub const TARGETS: &[(&str, TargetBuilder)] = &[
+    ("all", |data| NamedTarget::new::<all::Scenario>(data)),
     ("html", |data| NamedTarget::new::<html::Scenario>(data)),
     ("parser", |data| NamedTarget::new::<parser::Scenario>(data)),
 ];
 
-pub type TargetBuilder =
-    for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, Box<dyn Error + Send + 'static>>;
+pub type TargetBuilder = for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, arbitrary::Error>;
 
 pub trait Scenario<'a>: fmt::Debug + Sized {
-    type NewError: Error + Send + 'static;
     type RunError: Error + Send + 'static;
 
-    fn new(data: &'a [u8]) -> Result<Self, Self::NewError>;
+    fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error>;
     fn run(&self) -> Result<(), Self::RunError>;
 }
 
@@ -53,11 +53,8 @@ impl fmt::Debug for NamedTarget<'_> {
 
 impl<'a> NamedTarget<'a> {
     #[inline]
-    fn new<S: Scenario<'a> + 'a>(data: &'a [u8]) -> Result<Self, Box<dyn Error + Send + 'static>> {
-        match S::new(data) {
-            Ok(scenario) => Ok(Self(Box::new(scenario))),
-            Err(err) => Err(Box::new(err)),
-        }
+    fn new<S: Scenario<'a> + 'a>(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
+        Ok(Self(Box::new(S::new(data)?)))
     }
 }
 

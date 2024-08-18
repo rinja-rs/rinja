@@ -8,11 +8,9 @@ pub struct Scenario<'a> {
 }
 
 impl<'a> super::Scenario<'a> for Scenario<'a> {
-    type NewError = arbitrary::Error;
-
     type RunError = rinja_parser::ParseError;
 
-    fn new(data: &'a [u8]) -> Result<Self, Self::NewError> {
+    fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
         let mut data = Unstructured::new(data);
 
         let syntax = ArbitrarySyntax::arbitrary(&mut data)?;

@@ -11,11 +11,9 @@ pub enum Scenario<'a> {
 }
 
 impl<'a> super::Scenario<'a> for Scenario<'a> {
-    type NewError = arbitrary::Error;
-
     type RunError = std::convert::Infallible;
 
-    fn new(data: &'a [u8]) -> Result<Self, Self::NewError> {
+    fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
         Self::arbitrary_take_rest(Unstructured::new(data))
     }
 

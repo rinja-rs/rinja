@@ -13,7 +13,7 @@ Then execute in this folder:
 RUST_BACKTRACE=1 nice cargo +nightly fuzz run <fuzz_target>
 ```
 
-`fuzz_target` is one out of `html` or `parser`.
+`fuzz_target` is one out of `all`, `html` or `parser`.
 
 The execution won't stop, but continue until you kill it with ctrl+c.
 Or until it finds a panic.

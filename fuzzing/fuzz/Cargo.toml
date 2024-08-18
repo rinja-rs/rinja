@@ -16,6 +16,12 @@ html-escape = "0.2.13"
 libfuzzer-sys = "0.4.7"
 
 [[bin]]
+name = "all"
+path = "fuzz_targets/all.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "html"
 path = "fuzz_targets/html.rs"
 test = false
