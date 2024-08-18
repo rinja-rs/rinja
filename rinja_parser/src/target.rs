@@ -7,7 +7,7 @@ use nom::sequence::{pair, preceded, tuple};
 
 use crate::{
     bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws, CharLit,
-    ErrorContext, ParseErr, ParseResult, PathOrIdentifier, State, WithSpan,
+    ErrorContext, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,7 +17,7 @@ pub enum Target<'a> {
     Array(Vec<&'a str>, Vec<Target<'a>>),
     Struct(Vec<&'a str>, Vec<(&'a str, Target<'a>)>),
     NumLit(&'a str),
-    StrLit(&'a str),
+    StrLit(StrLit<'a>),
     CharLit(CharLit<'a>),
     BoolLit(&'a str),
     Path(Vec<&'a str>),

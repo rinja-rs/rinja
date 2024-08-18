@@ -416,13 +416,53 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
     }
 }
 
-fn str_lit(i: &str) -> ParseResult<'_> {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StrPrefix {
+    Binary,
+    CLike,
+}
+
+impl StrPrefix {
+    pub fn to_char(self) -> char {
+        match self {
+            Self::Binary => 'b',
+            Self::CLike => 'c',
+        }
+    }
+}
+
+impl fmt::Display for StrPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use std::fmt::Write;
+
+        f.write_char(self.to_char())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StrLit<'a> {
+    pub prefix: Option<StrPrefix>,
+    pub content: &'a str,
+}
+
+fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
     let (i, s) = delimited(
         char('"'),
         opt(escaped(is_not("\\\""), '\\', anychar)),
         char('"'),
     )(i)?;
     Ok((i, s.unwrap_or_default()))
+}
+
+fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
+    let (i, (prefix, content)) =
+        tuple((opt(alt((char('b'), char('c')))), str_lit_without_prefix))(i)?;
+    let prefix = match prefix {
+        Some('b') => Some(StrPrefix::Binary),
+        Some('c') => Some(StrPrefix::CLike),
+        _ => None,
+    };
+    Ok((i, StrLit { prefix, content }))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -803,7 +843,7 @@ const PRIMITIVE_TYPES: &[&str] = &{
 mod test {
     use std::path::Path;
 
-    use super::{char_lit, num_lit, strip_common};
+    use super::{char_lit, num_lit, str_lit, strip_common, StrLit, StrPrefix};
 
     #[test]
     fn test_strip_common() {
@@ -895,5 +935,30 @@ mod test {
         assert!(char_lit("'\\u'").is_err());
         assert!(char_lit("'\\u{}'").is_err());
         assert!(char_lit("'\\u{110000}'").is_err());
+    }
+
+    #[test]
+    fn test_str_lit() {
+        assert_eq!(
+            str_lit(r#"b"hello""#).unwrap(),
+            (
+                "",
+                StrLit {
+                    prefix: Some(StrPrefix::Binary),
+                    content: "hello"
+                }
+            )
+        );
+        assert_eq!(
+            str_lit(r#"c"hello""#).unwrap(),
+            (
+                "",
+                StrLit {
+                    prefix: Some(StrPrefix::CLike),
+                    content: "hello"
+                }
+            )
+        );
+        assert!(str_lit(r#"d"hello""#).is_err());
     }
 }

@@ -12,7 +12,7 @@ use nom::sequence::{pair, preceded, terminated, tuple};
 
 use crate::{
     char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws,
-    CharLit, ErrorContext, Level, ParseResult, PathOrIdentifier, WithSpan,
+    CharLit, ErrorContext, Level, ParseResult, PathOrIdentifier, StrLit, WithSpan,
 };
 
 macro_rules! expr_prec_layer {
@@ -36,7 +36,7 @@ macro_rules! expr_prec_layer {
 pub enum Expr<'a> {
     BoolLit(bool),
     NumLit(&'a str),
-    StrLit(&'a str),
+    StrLit(StrLit<'a>),
     CharLit(CharLit<'a>),
     Var(&'a str),
     Path(Vec<&'a str>),

@@ -9,8 +9,8 @@ use nom::sequence::{delimited, pair, preceded, tuple};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
-    filter, identifier, is_ws, keyword, not_ws, skip_till, str_lit, ws, ErrorContext, Expr, Filter,
-    ParseResult, State, Target, WithSpan,
+    filter, identifier, is_ws, keyword, not_ws, skip_till, str_lit_without_prefix, ws,
+    ErrorContext, Expr, Filter, ParseResult, State, Target, WithSpan,
 };
 
 #[derive(Debug, PartialEq)]
@@ -562,7 +562,7 @@ impl<'a> Import<'a> {
             opt(Whitespace::parse),
             ws(keyword("import")),
             cut(tuple((
-                ws(str_lit),
+                ws(str_lit_without_prefix),
                 ws(keyword("as")),
                 cut(pair(ws(identifier), opt(Whitespace::parse))),
             ))),
@@ -938,7 +938,7 @@ impl<'a> Include<'a> {
         let mut p = tuple((
             opt(Whitespace::parse),
             ws(keyword("include")),
-            cut(pair(ws(str_lit), opt(Whitespace::parse))),
+            cut(pair(ws(str_lit_without_prefix), opt(Whitespace::parse))),
         ));
         let (i, (pws, _, (path, nws))) = p(i)?;
         Ok((
@@ -966,7 +966,7 @@ impl<'a> Extends<'a> {
         let (i, (pws, _, (path, nws))) = tuple((
             opt(Whitespace::parse),
             ws(keyword("extends")),
-            cut(pair(ws(str_lit), opt(Whitespace::parse))),
+            cut(pair(ws(str_lit_without_prefix), opt(Whitespace::parse))),
         ))(i)?;
         match (pws, nws) {
             (None, None) => Ok((i, WithSpan::new(Self { path }, start))),

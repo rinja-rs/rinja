@@ -9,7 +9,7 @@ use std::{cmp, hash, mem, str};
 use parser::node::{
     Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
-use parser::{CharLit, CharPrefix, Expr, Filter, Node, Target, WithSpan};
+use parser::{CharLit, CharPrefix, Expr, Filter, Node, StrLit, StrPrefix, Target, WithSpan};
 use quote::quote;
 use rustc_hash::FxBuildHasher;
 
@@ -1271,7 +1271,9 @@ impl<'a> Generator<'a> {
 
             // for now, we only escape strings and chars at compile time
             let (lit, escape_prefix) = match &**s {
-                Expr::StrLit(input) => (InputKind::StrLit(input), None),
+                Expr::StrLit(StrLit { prefix, content }) => {
+                    (InputKind::StrLit(content), prefix.map(|p| p.to_char()))
+                }
                 Expr::CharLit(CharLit { prefix, content }) => (
                     InputKind::CharLit(content),
                     if *prefix == Some(CharPrefix::Binary) {
@@ -1488,7 +1490,7 @@ impl<'a> Generator<'a> {
         Ok(match **expr {
             Expr::BoolLit(s) => self.visit_bool_lit(buf, s),
             Expr::NumLit(s) => self.visit_num_lit(buf, s),
-            Expr::StrLit(s) => self.visit_str_lit(buf, s),
+            Expr::StrLit(ref s) => self.visit_str_lit(buf, s),
             Expr::CharLit(ref s) => self.visit_char_lit(buf, s),
             Expr::Var(s) => self.visit_var(buf, s),
             Expr::Path(ref path) => self.visit_path(buf, path),
@@ -1709,7 +1711,22 @@ impl<'a> Generator<'a> {
             return Err(ctx.generate_error("only two arguments allowed to escape filter", node));
         }
         let opt_escaper = match args.get(1).map(|expr| &**expr) {
-            Some(Expr::StrLit(name)) => Some(*name),
+            Some(Expr::StrLit(StrLit { prefix, content })) => {
+                if let Some(prefix) = prefix {
+                    let kind = if *prefix == StrPrefix::Binary {
+                        "slice"
+                    } else {
+                        "CStr"
+                    };
+                    return Err(ctx.generate_error(
+                        &format!(
+                            "invalid escaper `b{content:?}`. Expected a string, found a {kind}"
+                        ),
+                        &args[1],
+                    ));
+                }
+                Some(content)
+            }
             Some(_) => {
                 return Err(ctx.generate_error("invalid escaper type for escape filter", node));
             }
@@ -1751,7 +1768,7 @@ impl<'a> Generator<'a> {
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         if !args.is_empty() {
-            if let Expr::StrLit(fmt) = *args[0] {
+            if let Expr::StrLit(ref fmt) = *args[0] {
                 buf.write("::std::format!(");
                 self.visit_str_lit(buf, fmt);
                 if args.len() > 1 {
@@ -1773,7 +1790,7 @@ impl<'a> Generator<'a> {
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         if let [_, arg2] = args {
-            if let Expr::StrLit(fmt) = **arg2 {
+            if let Expr::StrLit(ref fmt) = **arg2 {
                 buf.write("::std::format!(");
                 self.visit_str_lit(buf, fmt);
                 buf.write(',');
@@ -2087,8 +2104,11 @@ impl<'a> Generator<'a> {
         DisplayWrap::Unwrapped
     }
 
-    fn visit_str_lit(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
-        buf.write(format_args!("\"{s}\""));
+    fn visit_str_lit(&mut self, buf: &mut Buffer, s: &StrLit<'_>) -> DisplayWrap {
+        if let Some(prefix) = s.prefix {
+            buf.write(prefix.to_char());
+        }
+        buf.write(format_args!("\"{}\"", s.content));
         DisplayWrap::Unwrapped
     }
 
