@@ -416,7 +416,36 @@ fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_>
     }
 }
 
-fn str_lit(i: &str) -> ParseResult<'_> {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StrPrefix {
+    Binary,
+    CLike,
+}
+
+impl StrPrefix {
+    pub fn to_char(self) -> char {
+        match self {
+            Self::Binary => 'b',
+            Self::CLike => 'c',
+        }
+    }
+}
+
+impl fmt::Display for StrPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use std::fmt::Write;
+
+        f.write_char(self.to_char())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StrLit<'a> {
+    pub prefix: Option<StrPrefix>,
+    pub content: &'a str,
+}
+
+fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
     let (i, s) = delimited(
         char('"'),
         opt(escaped(is_not("\\\""), '\\', anychar)),
@@ -425,15 +454,40 @@ fn str_lit(i: &str) -> ParseResult<'_> {
     Ok((i, s.unwrap_or_default()))
 }
 
+fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
+    let (i, (prefix, content)) =
+        tuple((opt(alt((char('b'), char('c')))), str_lit_without_prefix))(i)?;
+    let prefix = match prefix {
+        Some('b') => Some(StrPrefix::Binary),
+        Some('c') => Some(StrPrefix::CLike),
+        _ => None,
+    };
+    Ok((i, StrLit { prefix, content }))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CharPrefix {
+    Binary,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CharLit<'a> {
+    pub prefix: Option<CharPrefix>,
+    pub content: &'a str,
+}
+
 // Information about allowed character escapes is available at:
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
-fn char_lit(i: &str) -> ParseResult<'_> {
+fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
-    let (i, s) = delimited(
-        char('\''),
-        opt(escaped(is_not("\\\'"), '\\', anychar)),
-        char('\''),
-    )(i)?;
+    let (i, (b_prefix, s)) = tuple((
+        opt(char('b')),
+        delimited(
+            char('\''),
+            opt(escaped(is_not("\\\'"), '\\', anychar)),
+            char('\''),
+        ),
+    ))(i)?;
 
     let Some(s) = s else {
         return Err(nom::Err::Failure(ErrorContext::new(
@@ -449,7 +503,15 @@ fn char_lit(i: &str) -> ParseResult<'_> {
     };
 
     let (nb, max_value, err1, err2) = match c {
-        Char::Literal | Char::Escaped => return Ok((i, s)),
+        Char::Literal | Char::Escaped => {
+            return Ok((
+                i,
+                CharLit {
+                    prefix: b_prefix.map(|_| CharPrefix::Binary),
+                    content: s,
+                },
+            ));
+        }
         Char::AsciiEscape(nb) => (
             nb,
             // `0x7F` is the maximum value for a `\x` escaped character.
@@ -473,7 +535,13 @@ fn char_lit(i: &str) -> ParseResult<'_> {
         return Err(nom::Err::Failure(ErrorContext::new(err2, start)));
     }
 
-    Ok((i, s))
+    Ok((
+        i,
+        CharLit {
+            prefix: b_prefix.map(|_| CharPrefix::Binary),
+            content: s,
+        },
+    ))
 }
 
 /// Represents the different kinds of char declarations:
@@ -775,7 +843,7 @@ const PRIMITIVE_TYPES: &[&str] = &{
 mod test {
     use std::path::Path;
 
-    use super::{char_lit, num_lit, strip_common};
+    use super::{char_lit, num_lit, str_lit, strip_common, StrLit, StrPrefix};
 
     #[test]
     fn test_strip_common() {
@@ -820,26 +888,43 @@ mod test {
 
     #[test]
     fn test_char_lit() {
-        assert_eq!(char_lit("'a'").unwrap(), ("", "a"));
-        assert_eq!(char_lit("'字'").unwrap(), ("", "字"));
+        let lit = |s: &'static str| crate::CharLit {
+            prefix: None,
+            content: s,
+        };
+
+        assert_eq!(char_lit("'a'").unwrap(), ("", lit("a")));
+        assert_eq!(char_lit("'字'").unwrap(), ("", lit("字")));
 
         // Escaped single characters.
-        assert_eq!(char_lit("'\\\"'").unwrap(), ("", "\\\""));
-        assert_eq!(char_lit("'\\''").unwrap(), ("", "\\'"));
-        assert_eq!(char_lit("'\\t'").unwrap(), ("", "\\t"));
-        assert_eq!(char_lit("'\\n'").unwrap(), ("", "\\n"));
-        assert_eq!(char_lit("'\\r'").unwrap(), ("", "\\r"));
-        assert_eq!(char_lit("'\\0'").unwrap(), ("", "\\0"));
+        assert_eq!(char_lit("'\\\"'").unwrap(), ("", lit("\\\"")));
+        assert_eq!(char_lit("'\\''").unwrap(), ("", lit("\\'")));
+        assert_eq!(char_lit("'\\t'").unwrap(), ("", lit("\\t")));
+        assert_eq!(char_lit("'\\n'").unwrap(), ("", lit("\\n")));
+        assert_eq!(char_lit("'\\r'").unwrap(), ("", lit("\\r")));
+        assert_eq!(char_lit("'\\0'").unwrap(), ("", lit("\\0")));
         // Escaped ascii characters (up to `0x7F`).
-        assert_eq!(char_lit("'\\x12'").unwrap(), ("", "\\x12"));
-        assert_eq!(char_lit("'\\x02'").unwrap(), ("", "\\x02"));
-        assert_eq!(char_lit("'\\x6a'").unwrap(), ("", "\\x6a"));
-        assert_eq!(char_lit("'\\x7F'").unwrap(), ("", "\\x7F"));
+        assert_eq!(char_lit("'\\x12'").unwrap(), ("", lit("\\x12")));
+        assert_eq!(char_lit("'\\x02'").unwrap(), ("", lit("\\x02")));
+        assert_eq!(char_lit("'\\x6a'").unwrap(), ("", lit("\\x6a")));
+        assert_eq!(char_lit("'\\x7F'").unwrap(), ("", lit("\\x7F")));
         // Escaped unicode characters (up to `0x10FFFF`).
-        assert_eq!(char_lit("'\\u{A}'").unwrap(), ("", "\\u{A}"));
-        assert_eq!(char_lit("'\\u{10}'").unwrap(), ("", "\\u{10}"));
-        assert_eq!(char_lit("'\\u{aa}'").unwrap(), ("", "\\u{aa}"));
-        assert_eq!(char_lit("'\\u{10FFFF}'").unwrap(), ("", "\\u{10FFFF}"));
+        assert_eq!(char_lit("'\\u{A}'").unwrap(), ("", lit("\\u{A}")));
+        assert_eq!(char_lit("'\\u{10}'").unwrap(), ("", lit("\\u{10}")));
+        assert_eq!(char_lit("'\\u{aa}'").unwrap(), ("", lit("\\u{aa}")));
+        assert_eq!(char_lit("'\\u{10FFFF}'").unwrap(), ("", lit("\\u{10FFFF}")));
+
+        // Check with `b` prefix.
+        assert_eq!(
+            char_lit("b'a'").unwrap(),
+            (
+                "",
+                crate::CharLit {
+                    prefix: Some(crate::CharPrefix::Binary),
+                    content: "a"
+                }
+            )
+        );
 
         // Should fail.
         assert!(char_lit("''").is_err());
@@ -850,5 +935,30 @@ mod test {
         assert!(char_lit("'\\u'").is_err());
         assert!(char_lit("'\\u{}'").is_err());
         assert!(char_lit("'\\u{110000}'").is_err());
+    }
+
+    #[test]
+    fn test_str_lit() {
+        assert_eq!(
+            str_lit(r#"b"hello""#).unwrap(),
+            (
+                "",
+                StrLit {
+                    prefix: Some(StrPrefix::Binary),
+                    content: "hello"
+                }
+            )
+        );
+        assert_eq!(
+            str_lit(r#"c"hello""#).unwrap(),
+            (
+                "",
+                StrLit {
+                    prefix: Some(StrPrefix::CLike),
+                    content: "hello"
+                }
+            )
+        );
+        assert!(str_lit(r#"d"hello""#).is_err());
     }
 }

@@ -1,5 +1,5 @@
-use super::node::{Lit, Whitespace, Ws};
-use super::{Ast, Expr, Filter, Node, Syntax, WithSpan};
+use crate::node::{Lit, Whitespace, Ws};
+use crate::{Ast, Expr, Filter, Node, StrLit, Syntax, WithSpan};
 
 impl<T> WithSpan<'static, T> {
     fn no_span(inner: T) -> Self {
@@ -218,7 +218,10 @@ fn test_parse_var_call() {
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Var("function"))),
                 vec![
-                    WithSpan::no_span(Expr::StrLit("123")),
+                    WithSpan::no_span(Expr::StrLit(StrLit {
+                        content: "123",
+                        prefix: None,
+                    })),
                     WithSpan::no_span(Expr::NumLit("3"))
                 ]
             )),
@@ -259,7 +262,10 @@ fn test_parse_path_call() {
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Path(vec!["self", "function"]))),
                 vec![
-                    WithSpan::no_span(Expr::StrLit("123")),
+                    WithSpan::no_span(Expr::StrLit(StrLit {
+                        content: "123",
+                        prefix: None,
+                    })),
                     WithSpan::no_span(Expr::NumLit("3"))
                 ],
             ),)
