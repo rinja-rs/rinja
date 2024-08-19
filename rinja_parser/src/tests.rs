@@ -1,5 +1,5 @@
 use crate::node::{Lit, Whitespace, Ws};
-use crate::{Ast, Expr, Filter, Node, StrLit, Syntax, WithSpan};
+use crate::{Ast, Expr, Filter, InnerSyntax, Node, StrLit, Syntax, WithSpan};
 
 impl<T> WithSpan<'static, T> {
     fn no_span(inner: T) -> Self {
@@ -372,21 +372,21 @@ fn test_rust_macro() {
 
 #[test]
 fn change_delimiters_parse_filter() {
-    let syntax = Syntax {
+    let syntax = Syntax(InnerSyntax {
         expr_start: "{=",
         expr_end: "=}",
-        ..Syntax::default()
-    };
+        ..InnerSyntax::default()
+    });
     Ast::from_str("{= strvar|e =}", None, &syntax).unwrap();
 }
 
 #[test]
 fn unicode_delimiters_in_syntax() {
-    let syntax = Syntax {
+    let syntax = Syntax(InnerSyntax {
         expr_start: "🖎", // U+1F58E == b"\xf0\x9f\x96\x8e"
         expr_end: "✍",   // U+270D = b'\xe2\x9c\x8d'
-        ..Syntax::default()
-    };
+        ..InnerSyntax::default()
+    });
     assert_eq!(
         Ast::from_str("Here comes the expression: 🖎 e ✍.", None, &syntax)
             .unwrap()

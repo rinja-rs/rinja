@@ -13,7 +13,7 @@ publish = false
 [features]
 default = ["__standalone"]
 __standalone = []
-config = ["dep:serde", "dep:basic-toml"]
+config = ["dep:serde", "dep:basic-toml", "parser/config"]
 humansize = []
 urlencode = []
 serde_json = []

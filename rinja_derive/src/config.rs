@@ -8,7 +8,7 @@ use std::{env, fs};
 
 use once_map::sync::OnceMap;
 use parser::node::Whitespace;
-use parser::{ParseError, Parsed, Syntax};
+use parser::{ParseError, Parsed, Syntax, SyntaxBuilder};
 use proc_macro2::Span;
 use rustc_hash::FxBuildHasher;
 #[cfg(feature = "config")]
@@ -157,9 +157,9 @@ impl Config {
                 let name = raw_s.name;
                 match syntaxes.entry(name.to_string()) {
                     Entry::Vacant(entry) => {
-                        entry.insert(SyntaxAndCache::new(
-                            raw_s.to_syntax(config_span, file_info.as_ref())?,
-                        ));
+                        entry.insert(raw_s.to_syntax().map(SyntaxAndCache::new).map_err(
+                            |err| CompileError::new_with_span(err, file_info, config_span),
+                        )?);
                     }
                     Entry::Occupied(_) => {
                         return Err(CompileError::new(
@@ -307,118 +307,12 @@ impl<'a> SyntaxAndCache<'a> {
     }
 }
 
-impl<'a> RawSyntax<'a> {
-    fn to_syntax(
-        &self,
-        config_span: Option<Span>,
-        file_info: Option<&FileInfo<'_>>,
-    ) -> Result<Syntax<'a>, CompileError> {
-        let default = Syntax::default();
-        let syntax = Syntax {
-            block_start: self.block_start.unwrap_or(default.block_start),
-            block_end: self.block_end.unwrap_or(default.block_end),
-            expr_start: self.expr_start.unwrap_or(default.expr_start),
-            expr_end: self.expr_end.unwrap_or(default.expr_end),
-            comment_start: self.comment_start.unwrap_or(default.comment_start),
-            comment_end: self.comment_end.unwrap_or(default.comment_end),
-        };
-
-        for (s, k) in [
-            (syntax.block_start, "opening block"),
-            (syntax.block_end, "closing block"),
-            (syntax.expr_start, "opening expression"),
-            (syntax.expr_end, "closing expression"),
-            (syntax.comment_start, "opening comment"),
-            (syntax.comment_end, "closing comment"),
-        ] {
-            if s.len() < 2 {
-                return Err(CompileError::new_with_span(
-                    format!(
-                        "delimiters must be at least two characters long. \
-                         The {k} delimiter ({s:?}) is too short",
-                    ),
-                    file_info.copied(),
-                    config_span,
-                ));
-            } else if s.chars().any(|c| c.is_whitespace()) {
-                return Err(CompileError::new_with_span(
-                    format!(
-                        "delimiters may not contain white spaces. \
-                         The {k} delimiter ({s:?}) contains white spaces",
-                    ),
-                    file_info.copied(),
-                    config_span,
-                ));
-            }
-        }
-
-        for ((s1, k1), (s2, k2)) in [
-            (
-                (syntax.block_start, "block"),
-                (syntax.expr_start, "expression"),
-            ),
-            (
-                (syntax.block_start, "block"),
-                (syntax.comment_start, "comment"),
-            ),
-            (
-                (syntax.expr_start, "expression"),
-                (syntax.comment_start, "comment"),
-            ),
-        ] {
-            if s1.starts_with(s2) || s2.starts_with(s1) {
-                let (s1, k1, s2, k2) = match s1.len() < s2.len() {
-                    true => (s1, k1, s2, k2),
-                    false => (s2, k2, s1, k1),
-                };
-                return Err(CompileError::new_with_span(
-                    format!(
-                        "an opening delimiter may not be the prefix of another delimiter. \
-                         The {k1} delimiter ({s1:?}) clashes with the {k2} delimiter ({s2:?})",
-                    ),
-                    file_info.copied(),
-                    config_span,
-                ));
-            }
-        }
-
-        for (end, kind) in [
-            (syntax.block_end, "block"),
-            (syntax.expr_end, "expression"),
-            (syntax.comment_end, "comment"),
-        ] {
-            for prefix in ["<<", ">>", "&&", "..", "||"] {
-                if end.starts_with(prefix) {
-                    let msg = if end == prefix {
-                        format!(
-                            "a closing delimiter must not start with an operator. \
-                             The {kind} delimiter ({end:?}) is also an operator",
-                        )
-                    } else {
-                        format!(
-                            "a closing delimiter must not start an with operator. \
-                             The {kind} delimiter ({end:?}) starts with the {prefix:?} operator",
-                        )
-                    };
-                    return Err(CompileError::new_with_span(
-                        msg,
-                        file_info.copied(),
-                        config_span,
-                    ));
-                }
-            }
-        }
-
-        Ok(syntax)
-    }
-}
-
 #[cfg_attr(feature = "config", derive(Deserialize))]
 #[derive(Default)]
 struct RawConfig<'a> {
     #[cfg_attr(feature = "config", serde(borrow))]
     general: Option<General<'a>>,
-    syntax: Option<Vec<RawSyntax<'a>>>,
+    syntax: Option<Vec<SyntaxBuilder<'a>>>,
     escaper: Option<Vec<RawEscaper<'a>>>,
 }
 
@@ -471,17 +365,6 @@ struct General<'a> {
     default_syntax: Option<&'a str>,
     #[cfg_attr(feature = "config", serde(default))]
     whitespace: WhitespaceHandling,
-}
-
-#[cfg_attr(feature = "config", derive(Deserialize))]
-struct RawSyntax<'a> {
-    name: &'a str,
-    block_start: Option<&'a str>,
-    block_end: Option<&'a str>,
-    expr_start: Option<&'a str>,
-    expr_end: Option<&'a str>,
-    comment_start: Option<&'a str>,
-    comment_end: Option<&'a str>,
 }
 
 #[cfg_attr(feature = "config", derive(Deserialize))]

@@ -696,8 +696,12 @@ impl<'a> State<'a> {
     }
 }
 
-#[derive(Debug, Hash, PartialEq)]
-pub struct Syntax<'a> {
+#[derive(Default, Hash, PartialEq, Clone, Copy)]
+pub struct Syntax<'a>(InnerSyntax<'a>);
+
+// This abstraction ensures that the fields are readable, but not writable.
+#[derive(Hash, PartialEq, Clone, Copy)]
+pub struct InnerSyntax<'a> {
     pub block_start: &'a str,
     pub block_end: &'a str,
     pub expr_start: &'a str,
@@ -706,7 +710,16 @@ pub struct Syntax<'a> {
     pub comment_end: &'a str,
 }
 
-impl Default for Syntax<'static> {
+impl<'a> Deref for Syntax<'a> {
+    type Target = InnerSyntax<'a>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Default for InnerSyntax<'static> {
     fn default() -> Self {
         Self {
             block_start: "{%",
@@ -716,6 +729,129 @@ impl Default for Syntax<'static> {
             comment_start: "{#",
             comment_end: "#}",
         }
+    }
+}
+
+impl<'a> fmt::Debug for InnerSyntax<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt_syntax("Syntax", self, f)
+    }
+}
+
+impl<'a> fmt::Debug for Syntax<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt_syntax("InnerSyntax", self, f)
+    }
+}
+
+fn fmt_syntax(name: &str, inner: &InnerSyntax<'_>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct(name)
+        .field("block_start", &inner.block_start)
+        .field("block_end", &inner.block_end)
+        .field("expr_start", &inner.expr_start)
+        .field("expr_end", &inner.expr_end)
+        .field("comment_start", &inner.comment_start)
+        .field("comment_end", &inner.comment_end)
+        .finish()
+}
+
+#[derive(Debug, Default, Clone, Copy, Hash, PartialEq)]
+#[cfg_attr(feature = "config", derive(serde::Deserialize))]
+pub struct SyntaxBuilder<'a> {
+    pub name: &'a str,
+    pub block_start: Option<&'a str>,
+    pub block_end: Option<&'a str>,
+    pub expr_start: Option<&'a str>,
+    pub expr_end: Option<&'a str>,
+    pub comment_start: Option<&'a str>,
+    pub comment_end: Option<&'a str>,
+}
+
+impl<'a> SyntaxBuilder<'a> {
+    pub fn to_syntax(&self) -> Result<Syntax<'a>, String> {
+        let default = InnerSyntax::default();
+        let syntax = Syntax(InnerSyntax {
+            block_start: self.block_start.unwrap_or(default.block_start),
+            block_end: self.block_end.unwrap_or(default.block_end),
+            expr_start: self.expr_start.unwrap_or(default.expr_start),
+            expr_end: self.expr_end.unwrap_or(default.expr_end),
+            comment_start: self.comment_start.unwrap_or(default.comment_start),
+            comment_end: self.comment_end.unwrap_or(default.comment_end),
+        });
+
+        for (s, k) in [
+            (syntax.block_start, "opening block"),
+            (syntax.block_end, "closing block"),
+            (syntax.expr_start, "opening expression"),
+            (syntax.expr_end, "closing expression"),
+            (syntax.comment_start, "opening comment"),
+            (syntax.comment_end, "closing comment"),
+        ] {
+            if s.len() < 2 {
+                return Err(format!(
+                    "delimiters must be at least two characters long. \
+                        The {k} delimiter ({s:?}) is too short",
+                ));
+            } else if s.chars().any(|c| c.is_whitespace()) {
+                return Err(format!(
+                    "delimiters may not contain white spaces. \
+                        The {k} delimiter ({s:?}) contains white spaces",
+                ));
+            }
+        }
+
+        for ((s1, k1), (s2, k2)) in [
+            (
+                (syntax.block_start, "block"),
+                (syntax.expr_start, "expression"),
+            ),
+            (
+                (syntax.block_start, "block"),
+                (syntax.comment_start, "comment"),
+            ),
+            (
+                (syntax.expr_start, "expression"),
+                (syntax.comment_start, "comment"),
+            ),
+        ] {
+            if s1.starts_with(s2) || s2.starts_with(s1) {
+                let (s1, k1, s2, k2) = match s1.len() < s2.len() {
+                    true => (s1, k1, s2, k2),
+                    false => (s2, k2, s1, k1),
+                };
+                return Err(format!(
+                    "an opening delimiter may not be the prefix of another delimiter. \
+                        The {k1} delimiter ({s1:?}) clashes with the {k2} delimiter ({s2:?})",
+                ));
+            }
+        }
+
+        for (end, kind) in [
+            (syntax.block_end, "block"),
+            (syntax.expr_end, "expression"),
+            (syntax.comment_end, "comment"),
+        ] {
+            for prefix in ["<<", ">>", "&&", "..", "||"] {
+                if end.starts_with(prefix) {
+                    let msg = if end == prefix {
+                        format!(
+                            "a closing delimiter must not start with an operator. \
+                             The {kind} delimiter ({end:?}) is also an operator",
+                        )
+                    } else {
+                        format!(
+                            "a closing delimiter must not start an with operator. \
+                             The {kind} delimiter ({end:?}) starts with the {prefix:?} operator",
+                        )
+                    };
+                    return Err(msg);
+                }
+            }
+        }
+
+        Ok(syntax)
     }
 }
 
