@@ -2284,17 +2284,35 @@ fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a
                 NumKind::Int(Some(IntKind::I8)) => int(i8::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I16)) => int(i16::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I32)) => int(i32::from_str_radix, &value)?,
-                NumKind::Int(Some(IntKind::I64 | IntKind::Isize)) => {
-                    int(i64::from_str_radix, &value)?
-                }
+                NumKind::Int(Some(IntKind::I64)) => int(i64::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I128)) => int(i128::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::Isize)) => {
+                    if cfg!(target_pointer_width = "16") {
+                        int(i16::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "32") {
+                        int(i32::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "64") {
+                        int(i64::from_str_radix, &value)?
+                    } else {
+                        unreachable!("unexpected `cfg!(target_pointer_width)`")
+                    }
+                }
                 NumKind::Int(Some(IntKind::U8)) => int(u8::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U16)) => int(u16::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U32)) => int(u32::from_str_radix, &value)?,
-                NumKind::Int(Some(IntKind::U64 | IntKind::Usize)) => {
-                    int(u64::from_str_radix, &value)?
-                }
+                NumKind::Int(Some(IntKind::U64)) => int(u64::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U128)) => int(u128::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::Usize)) => {
+                    if cfg!(target_pointer_width = "16") {
+                        int(u16::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "32") {
+                        int(u32::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "64") {
+                        int(u64::from_str_radix, &value)?
+                    } else {
+                        unreachable!("unexpected `cfg!(target_pointer_width)`")
+                    }
+                }
                 NumKind::Int(None) => match value.starts_with('-') {
                     true => int(i128::from_str_radix, &value)?,
                     false => int(u128::from_str_radix, &value)?,
@@ -2303,7 +2321,7 @@ fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a
                 NumKind::Float(Some(FloatKind::F64) | None) => {
                     value.parse::<f64>().ok()?.to_string()
                 }
-                // implement once `f16` and `f128` are available
+                // FIXME: implement once `f16` and `f128` are available
                 NumKind::Float(Some(FloatKind::F16 | FloatKind::F128)) => return None,
             };
             match value == orig_value {

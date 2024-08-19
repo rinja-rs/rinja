@@ -368,6 +368,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         }
     }
 
+    // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
     let int_with_base = pair(opt(char('-')), |i| {
         let (i, (kind, base)) = consumed(preceded(
             char('0'),
@@ -386,6 +387,8 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         }
     });
 
+    // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
+    // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> ParseResult<'a, ()> {
         let (i, has_dot) = opt(pair(char('.'), separated_digits(10, true)))(i)?;
         let (i, has_exp) = opt(|i| {
@@ -1090,6 +1093,8 @@ mod test {
             num_lit("1.2E-02").unwrap(),
             ("", Num::Float("1.2E-02", None))
         );
+        assert_eq!(num_lit("4e3").unwrap(), ("", Num::Float("4e3", None)),);
+        assert_eq!(num_lit("4e+_3").unwrap(), ("", Num::Float("4e+_3", None)),);
         // Not supported because Rust wants a number before the `.`.
         assert!(num_lit(".1").is_err());
         assert!(num_lit(".1E-02").is_err());
@@ -1115,6 +1120,10 @@ mod test {
                 "|into_isize",
                 Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
             )
+        );
+        assert_eq!(
+            num_lit("4e3f128").unwrap(),
+            ("", Num::Float("4e3", Some(FloatKind::F128))),
         );
     }
 
