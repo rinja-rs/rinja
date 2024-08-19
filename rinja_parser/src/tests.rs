@@ -1,5 +1,5 @@
 use crate::node::{Lit, Whitespace, Ws};
-use crate::{Ast, Expr, Filter, InnerSyntax, Node, StrLit, Syntax, WithSpan};
+use crate::{Ast, Expr, Filter, InnerSyntax, Node, Num, StrLit, Syntax, WithSpan};
 
 impl<T> WithSpan<'static, T> {
     fn no_span(inner: T) -> Self {
@@ -29,6 +29,10 @@ fn test_invalid_block() {
     Ast::from_str("{% extend \"blah\" %}", None, &Syntax::default()).unwrap();
 }
 
+fn int_lit(i: &str) -> Expr<'_> {
+    Expr::NumLit(i, Num::Int(i, None))
+}
+
 #[test]
 fn test_parse_filter() {
     let syntax = Syntax::default();
@@ -50,7 +54,7 @@ fn test_parse_filter() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
-                arguments: vec![WithSpan::no_span(Expr::NumLit("2"))]
+                arguments: vec![WithSpan::no_span(int_lit("2"))]
             })),
         )],
     );
@@ -62,7 +66,7 @@ fn test_parse_filter() {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Unary(
                     "-",
-                    WithSpan::no_span(Expr::NumLit("2")).into()
+                    WithSpan::no_span(int_lit("2")).into()
                 ))]
             })),
         )],
@@ -78,8 +82,8 @@ fn test_parse_filter() {
                 arguments: vec![WithSpan::no_span(Expr::Group(
                     WithSpan::no_span(Expr::BinOp(
                         "-",
-                        WithSpan::no_span(Expr::NumLit("1")).into(),
-                        WithSpan::no_span(Expr::NumLit("2")).into()
+                        WithSpan::no_span(int_lit("1")).into(),
+                        WithSpan::no_span(int_lit("2")).into()
                     ))
                     .into()
                 ))],
@@ -93,16 +97,13 @@ fn test_parse_numbers() {
     let syntax = Syntax::default();
     assert_eq!(
         Ast::from_str("{{ 2 }}", None, &syntax).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::NumLit("2"))
-        )],
+        vec![Node::Expr(Ws(None, None), WithSpan::no_span(int_lit("2")))],
     );
     assert_eq!(
         Ast::from_str("{{ 2.5 }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::NumLit("2.5"))
+            WithSpan::no_span(Expr::NumLit("2.5", Num::Float("2.5", None)))
         )],
     );
 }
@@ -180,7 +181,7 @@ fn test_parse_path() {
             Ws(None, None),
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Path(vec!["Some"]))),
-                vec![WithSpan::no_span(Expr::NumLit("123"))]
+                vec![WithSpan::no_span(int_lit("123"))]
             )),
         )],
     );
@@ -191,7 +192,7 @@ fn test_parse_path() {
             Ws(None, None),
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Path(vec!["Ok"]))),
-                vec![WithSpan::no_span(Expr::NumLit("123"))]
+                vec![WithSpan::no_span(int_lit("123"))]
             )),
         )],
     );
@@ -201,7 +202,7 @@ fn test_parse_path() {
             Ws(None, None),
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Path(vec!["Err"]))),
-                vec![WithSpan::no_span(Expr::NumLit("123"))]
+                vec![WithSpan::no_span(int_lit("123"))]
             )),
         )],
     );
@@ -222,7 +223,7 @@ fn test_parse_var_call() {
                         content: "123",
                         prefix: None,
                     })),
-                    WithSpan::no_span(Expr::NumLit("3"))
+                    WithSpan::no_span(int_lit("3"))
                 ]
             )),
         )],
@@ -248,7 +249,7 @@ fn test_parse_path_call() {
             Ws(None, None),
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Path(vec!["Option", "Some"]))),
-                vec![WithSpan::no_span(Expr::NumLit("123"))],
+                vec![WithSpan::no_span(int_lit("123"))],
             ),)
         )],
     );
@@ -266,7 +267,7 @@ fn test_parse_path_call() {
                         content: "123",
                         prefix: None,
                     })),
-                    WithSpan::no_span(Expr::NumLit("3"))
+                    WithSpan::no_span(int_lit("3"))
                 ],
             ),)
         )],
@@ -791,35 +792,35 @@ fn test_parse_tuple() {
         Ast::from_str("{{ (1) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(Expr::NumLit("1"))),))
+            WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(int_lit("1"))),))
         )],
     );
     assert_eq!(
         Ast::from_str("{{ (1,) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(Expr::NumLit("1"))])),
+            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(int_lit("1"))])),
         )],
     );
     assert_eq!(
         Ast::from_str("{{ (1, ) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(Expr::NumLit("1"))])),
+            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(int_lit("1"))])),
         )],
     );
     assert_eq!(
         Ast::from_str("{{ (1 ,) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(Expr::NumLit("1"))])),
+            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(int_lit("1"))])),
         )],
     );
     assert_eq!(
         Ast::from_str("{{ (1 , ) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(Expr::NumLit("1"))])),
+            WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(int_lit("1"))])),
         )],
     );
     assert_eq!(
@@ -827,8 +828,8 @@ fn test_parse_tuple() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Tuple(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2"))
             ])),
         )],
     );
@@ -837,8 +838,8 @@ fn test_parse_tuple() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Tuple(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2"))
             ])),
         )],
     );
@@ -849,9 +850,9 @@ fn test_parse_tuple() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Tuple(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2")),
-                WithSpan::no_span(Expr::NumLit("3"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2")),
+                WithSpan::no_span(int_lit("3"))
             ])),
         )],
     );
@@ -872,7 +873,7 @@ fn test_parse_tuple() {
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
-                    Expr::NumLit("1")
+                    int_lit("1")
                 ))))]
             })),
         )],
@@ -886,7 +887,7 @@ fn test_parse_tuple() {
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(
-                    Expr::NumLit("1")
+                    int_lit("1")
                 )]))]
             })),
         )],
@@ -900,8 +901,8 @@ fn test_parse_tuple() {
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Tuple(vec![
-                    WithSpan::no_span(Expr::NumLit("1")),
-                    WithSpan::no_span(Expr::NumLit("2"))
+                    WithSpan::no_span(int_lit("1")),
+                    WithSpan::no_span(int_lit("2"))
                 ]))]
             })),
         )],
@@ -932,21 +933,21 @@ fn test_parse_array() {
         Ast::from_str("{{ [1] }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(Expr::NumLit("1"))]))
+            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(int_lit("1"))]))
         )],
     );
     assert_eq!(
         Ast::from_str("{{ [ 1] }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(Expr::NumLit("1"))]))
+            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(int_lit("1"))]))
         )],
     );
     assert_eq!(
         Ast::from_str("{{ [1 ] }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(Expr::NumLit("1"))]))
+            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(int_lit("1"))]))
         )],
     );
     assert_eq!(
@@ -954,8 +955,8 @@ fn test_parse_array() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Array(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2"))
             ]))
         )],
     );
@@ -964,8 +965,8 @@ fn test_parse_array() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Array(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2"))
             ]))
         )],
     );
@@ -974,8 +975,8 @@ fn test_parse_array() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Array(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2"))
             ]))
         )],
     );
@@ -984,8 +985,8 @@ fn test_parse_array() {
         vec![Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::Array(vec![
-                WithSpan::no_span(Expr::NumLit("1")),
-                WithSpan::no_span(Expr::NumLit("2"))
+                WithSpan::no_span(int_lit("1")),
+                WithSpan::no_span(int_lit("2"))
             ]))
         )],
     );

@@ -3,8 +3,8 @@ use std::str;
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
-use nom::character::complete::char;
-use nom::combinator::{cut, fail, map, not, opt, peek, recognize, value};
+use nom::character::complete::{char, digit1};
+use nom::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
 use nom::multi::{fold_many0, many0, separated_list0};
@@ -12,7 +12,7 @@ use nom::sequence::{pair, preceded, terminated, tuple};
 
 use crate::{
     char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws,
-    CharLit, ErrorContext, Level, ParseResult, PathOrIdentifier, StrLit, WithSpan,
+    CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan,
 };
 
 macro_rules! expr_prec_layer {
@@ -35,7 +35,7 @@ macro_rules! expr_prec_layer {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<'a> {
     BoolLit(bool),
-    NumLit(&'a str),
+    NumLit(&'a str, Num<'a>),
     StrLit(StrLit<'a>),
     CharLit(CharLit<'a>),
     Var(&'a str),
@@ -359,7 +359,8 @@ impl<'a> Expr<'a> {
 
     fn num(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        map(num_lit, |i| WithSpan::new(Self::NumLit(i), start))(i)
+        let (i, (full, num)) = consumed(num_lit)(i)?;
+        Ok((i, WithSpan::new(Expr::NumLit(full, num), start)))
     }
 
     fn char(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
@@ -374,7 +375,7 @@ impl<'a> Expr<'a> {
             Self::BinOp("&&" | "||", left, right) => {
                 left.contains_bool_lit_or_is_defined() || right.contains_bool_lit_or_is_defined()
             }
-            Self::NumLit(_)
+            Self::NumLit(_, _)
             | Self::StrLit(_)
             | Self::CharLit(_)
             | Self::Var(_)
@@ -530,7 +531,7 @@ impl<'a> Suffix<'a> {
         map(
             preceded(
                 ws(pair(char('.'), not(char('.')))),
-                cut(alt((num_lit, identifier))),
+                cut(alt((digit1, identifier))),
             ),
             Self::Attr,
         )(i)

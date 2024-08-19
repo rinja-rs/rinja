@@ -9,7 +9,10 @@ use std::{cmp, hash, mem, str};
 use parser::node::{
     Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
 };
-use parser::{CharLit, CharPrefix, Expr, Filter, Node, StrLit, StrPrefix, Target, WithSpan};
+use parser::{
+    CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, StrLit, StrPrefix, Target,
+    WithSpan,
+};
 use quote::quote;
 use rustc_hash::FxBuildHasher;
 
@@ -399,7 +402,7 @@ impl<'a> Generator<'a> {
         let (expr, span) = expr.deconstruct();
 
         match expr {
-            Expr::NumLit(_)
+            Expr::NumLit(_, _)
             | Expr::StrLit(_)
             | Expr::CharLit(_)
             | Expr::Var(_)
@@ -1256,88 +1259,9 @@ impl<'a> Generator<'a> {
     }
 
     fn write_expr(&mut self, ws: Ws, s: &'a WithSpan<'a, Expr<'a>>) {
-        // In here, we inspect in the expression if it is a literal, and if it is, whether it
-        // can be escaped at compile time. We use an IIFE to make the code more readable
-        // (immediate returns, try expressions).
-        let writable = (|| -> Option<Writable<'a>> {
-            enum InputKind<'a> {
-                StrLit(&'a str),
-                CharLit(&'a str),
-            }
-            enum OutputKind {
-                Html,
-                Text,
-            }
-
-            // for now, we only escape strings and chars at compile time
-            let (lit, escape_prefix) = match &**s {
-                Expr::StrLit(StrLit { prefix, content }) => {
-                    (InputKind::StrLit(content), prefix.map(|p| p.to_char()))
-                }
-                Expr::CharLit(CharLit { prefix, content }) => (
-                    InputKind::CharLit(content),
-                    if *prefix == Some(CharPrefix::Binary) {
-                        Some('b')
-                    } else {
-                        None
-                    },
-                ),
-                _ => return None,
-            };
-
-            // we only optimize for known escapers
-            let output = match self.input.escaper.strip_prefix(CRATE)? {
-                "::filters::Html" => OutputKind::Html,
-                "::filters::Text" => OutputKind::Text,
-                _ => return None,
-            };
-
-            // the input could be string escaped if it contains any backslashes
-            let escaped = match lit {
-                InputKind::StrLit(s) => s,
-                InputKind::CharLit(s) => s,
-            };
-            let unescaped = if escaped.find('\\').is_none() {
-                // if the literal does not contain any backslashes, then it does not need unescaping
-                Cow::Borrowed(escaped)
-            } else {
-                // convert the input into a TokenStream and extract the first token
-                Cow::Owned(match lit {
-                    InputKind::StrLit(escaped) => {
-                        let input = format!(r#""{escaped}""#);
-                        let input = input.parse().ok()?;
-                        let input = syn::parse2::<syn::LitStr>(input).ok()?;
-                        input.value()
-                    }
-                    InputKind::CharLit(escaped) => {
-                        let input = format!(r#"'{escaped}'"#);
-                        let input = input.parse().ok()?;
-                        let input = syn::parse2::<syn::LitChar>(input).ok()?;
-                        input.value().to_string()
-                    }
-                })
-            };
-
-            // escape the un-string-escaped input using the selected escaper
-            Some(Writable::Lit(match output {
-                OutputKind::Text => unescaped,
-                OutputKind::Html => {
-                    let mut escaped = String::with_capacity(unescaped.len() + 20);
-                    if let Some(escape_prefix) = escape_prefix {
-                        escaped.push(escape_prefix);
-                    }
-                    write_escaped_str(&mut escaped, &unescaped).ok()?;
-                    match escaped == unescaped {
-                        true => unescaped,
-                        false => Cow::Owned(escaped),
-                    }
-                }
-            }))
-        })()
-        .unwrap_or(Writable::Expr(s));
-
         self.handle_ws(ws);
-        self.buf_writable.push(writable);
+        self.buf_writable
+            .push(compile_time_escape(s, self.input.escaper).unwrap_or(Writable::Expr(s)));
     }
 
     // Write expression buffer and empty
@@ -1489,7 +1413,7 @@ impl<'a> Generator<'a> {
     ) -> Result<DisplayWrap, CompileError> {
         Ok(match **expr {
             Expr::BoolLit(s) => self.visit_bool_lit(buf, s),
-            Expr::NumLit(s) => self.visit_num_lit(buf, s),
+            Expr::NumLit(s, _) => self.visit_num_lit(buf, s),
             Expr::StrLit(ref s) => self.visit_str_lit(buf, s),
             Expr::CharLit(ref s) => self.visit_char_lit(buf, s),
             Expr::Var(s) => self.visit_var(buf, s),
@@ -2206,7 +2130,7 @@ impl<'a> Generator<'a> {
                 }
                 self.visit_str_lit(buf, s);
             }
-            Target::NumLit(s) => {
+            Target::NumLit(s, _) => {
                 if first_level {
                     buf.write('&');
                 }
@@ -2284,6 +2208,144 @@ impl<'a> Generator<'a> {
     fn prepare_ws(&mut self, ws: Ws) {
         self.skip_ws = self.should_trim_ws(ws.1);
     }
+}
+
+/// In here, we inspect in the expression if it is a literal, and if it is, whether it
+/// can be escaped at compile time.
+fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a>> {
+    // we only optimize for known escapers
+    enum OutputKind {
+        Html,
+        Text,
+    }
+
+    // we only optimize for known escapers
+    let output = match escaper.strip_prefix(CRATE)? {
+        "::filters::Html" => OutputKind::Html,
+        "::filters::Text" => OutputKind::Text,
+        _ => return None,
+    };
+
+    // for now, we only escape strings, chars, numbers, and bools at compile time
+    let value = match *expr {
+        Expr::StrLit(StrLit {
+            prefix: None,
+            content,
+        }) => {
+            if content.find('\\').is_none() {
+                // if the literal does not contain any backslashes, then it does not need unescaping
+                Cow::Borrowed(content)
+            } else {
+                // the input could be string escaped if it contains any backslashes
+                let input = format!(r#""{content}""#);
+                let input = input.parse().ok()?;
+                let input = syn::parse2::<syn::LitStr>(input).ok()?;
+                Cow::Owned(input.value())
+            }
+        }
+        Expr::CharLit(CharLit {
+            prefix: None,
+            content,
+        }) => {
+            if content.find('\\').is_none() {
+                // if the literal does not contain any backslashes, then it does not need unescaping
+                Cow::Borrowed(content)
+            } else {
+                // the input could be string escaped if it contains any backslashes
+                let input = format!(r#"'{content}'"#);
+                let input = input.parse().ok()?;
+                let input = syn::parse2::<syn::LitChar>(input).ok()?;
+                Cow::Owned(input.value().to_string())
+            }
+        }
+        Expr::NumLit(_, value) => {
+            enum NumKind {
+                Int(Option<IntKind>),
+                Float(Option<FloatKind>),
+            }
+
+            let (orig_value, kind) = match value {
+                Num::Int(value, kind) => (value, NumKind::Int(kind)),
+                Num::Float(value, kind) => (value, NumKind::Float(kind)),
+            };
+            let value = match orig_value.chars().any(|c| c == '_') {
+                true => Cow::Owned(orig_value.chars().filter(|&c| c != '_').collect()),
+                false => Cow::Borrowed(orig_value),
+            };
+
+            fn int<T: ToString, E>(
+                from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
+                value: &str,
+            ) -> Option<String> {
+                Some(from_str_radix(value, 10).ok()?.to_string())
+            }
+
+            let value = match kind {
+                NumKind::Int(Some(IntKind::I8)) => int(i8::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::I16)) => int(i16::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::I32)) => int(i32::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::I64)) => int(i64::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::I128)) => int(i128::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::Isize)) => {
+                    if cfg!(target_pointer_width = "16") {
+                        int(i16::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "32") {
+                        int(i32::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "64") {
+                        int(i64::from_str_radix, &value)?
+                    } else {
+                        unreachable!("unexpected `cfg!(target_pointer_width)`")
+                    }
+                }
+                NumKind::Int(Some(IntKind::U8)) => int(u8::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::U16)) => int(u16::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::U32)) => int(u32::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::U64)) => int(u64::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::U128)) => int(u128::from_str_radix, &value)?,
+                NumKind::Int(Some(IntKind::Usize)) => {
+                    if cfg!(target_pointer_width = "16") {
+                        int(u16::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "32") {
+                        int(u32::from_str_radix, &value)?
+                    } else if cfg!(target_pointer_width = "64") {
+                        int(u64::from_str_radix, &value)?
+                    } else {
+                        unreachable!("unexpected `cfg!(target_pointer_width)`")
+                    }
+                }
+                NumKind::Int(None) => match value.starts_with('-') {
+                    true => int(i128::from_str_radix, &value)?,
+                    false => int(u128::from_str_radix, &value)?,
+                },
+                NumKind::Float(Some(FloatKind::F32)) => value.parse::<f32>().ok()?.to_string(),
+                NumKind::Float(Some(FloatKind::F64) | None) => {
+                    value.parse::<f64>().ok()?.to_string()
+                }
+                // FIXME: implement once `f16` and `f128` are available
+                NumKind::Float(Some(FloatKind::F16 | FloatKind::F128)) => return None,
+            };
+            match value == orig_value {
+                true => Cow::Borrowed(orig_value),
+                false => Cow::Owned(value),
+            }
+        }
+        Expr::BoolLit(true) => Cow::Borrowed("true"),
+        Expr::BoolLit(false) => Cow::Borrowed("false"),
+        _ => return None,
+    };
+
+    // escape the un-string-escaped input using the selected escaper
+    Some(Writable::Lit(match output {
+        OutputKind::Text => value,
+        OutputKind::Html => {
+            let mut escaped = String::with_capacity(value.len() + 20);
+            write_escaped_str(&mut escaped, &value).ok()?;
+            match escaped == value {
+                true => value,
+                false => Cow::Owned(escaped),
+            }
+        }
+    }))
 }
 
 #[derive(Debug)]
@@ -2615,7 +2677,7 @@ fn is_copyable(expr: &Expr<'_>) -> bool {
 
 fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
     match expr {
-        Expr::BoolLit(_) | Expr::NumLit(_) | Expr::StrLit(_) | Expr::CharLit(_) => true,
+        Expr::BoolLit(_) | Expr::NumLit(_, _) | Expr::StrLit(_) | Expr::CharLit(_) => true,
         Expr::Unary(.., expr) => is_copyable_within_op(expr, true),
         Expr::BinOp(_, lhs, rhs) => {
             is_copyable_within_op(lhs, true) && is_copyable_within_op(rhs, true)
@@ -2651,7 +2713,7 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
     match &**expr {
         // Literals are the definition of pure:
         Expr::BoolLit(_) => true,
-        Expr::NumLit(_) => true,
+        Expr::NumLit(_, _) => true,
         Expr::StrLit(_) => true,
         Expr::CharLit(_) => true,
         // fmt::Display should have no effects:
