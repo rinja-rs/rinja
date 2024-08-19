@@ -399,7 +399,7 @@ impl<'a> Generator<'a> {
         let (expr, span) = expr.deconstruct();
 
         match expr {
-            Expr::NumLit(_)
+            Expr::NumLit(_, _)
             | Expr::StrLit(_)
             | Expr::CharLit(_)
             | Expr::Var(_)
@@ -1483,7 +1483,7 @@ impl<'a> Generator<'a> {
     ) -> Result<DisplayWrap, CompileError> {
         Ok(match **expr {
             Expr::BoolLit(s) => self.visit_bool_lit(buf, s),
-            Expr::NumLit(s) => self.visit_num_lit(buf, s),
+            Expr::NumLit(s, _) => self.visit_num_lit(buf, s),
             Expr::StrLit(ref s) => self.visit_str_lit(buf, s),
             Expr::CharLit(ref s) => self.visit_char_lit(buf, s),
             Expr::Var(s) => self.visit_var(buf, s),
@@ -2200,7 +2200,7 @@ impl<'a> Generator<'a> {
                 }
                 self.visit_str_lit(buf, s);
             }
-            Target::NumLit(s) => {
+            Target::NumLit(s, _) => {
                 if first_level {
                     buf.write('&');
                 }
@@ -2609,7 +2609,7 @@ fn is_copyable(expr: &Expr<'_>) -> bool {
 
 fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
     match expr {
-        Expr::BoolLit(_) | Expr::NumLit(_) | Expr::StrLit(_) | Expr::CharLit(_) => true,
+        Expr::BoolLit(_) | Expr::NumLit(_, _) | Expr::StrLit(_) | Expr::CharLit(_) => true,
         Expr::Unary(.., expr) => is_copyable_within_op(expr, true),
         Expr::BinOp(_, lhs, rhs) => {
             is_copyable_within_op(lhs, true) && is_copyable_within_op(rhs, true)
@@ -2645,7 +2645,7 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
     match &**expr {
         // Literals are the definition of pure:
         Expr::BoolLit(_) => true,
-        Expr::NumLit(_) => true,
+        Expr::NumLit(_, _) => true,
         Expr::StrLit(_) => true,
         Expr::CharLit(_) => true,
         // fmt::Display should have no effects:

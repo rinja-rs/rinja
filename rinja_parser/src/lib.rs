@@ -12,7 +12,7 @@ use std::{fmt, str};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
 use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{complete, cut, eof, fail, map, not, opt, recognize};
+use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, recognize, value};
 use nom::error::{ErrorKind, FromExternalError};
 use nom::multi::{many0_count, many1};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
@@ -340,54 +340,91 @@ fn bool_lit(i: &str) -> ParseResult<'_> {
     alt((keyword("false"), keyword("true")))(i)
 }
 
-fn num_lit<'a>(i: &'a str) -> ParseResult<'a> {
-    fn suffix<'a>(
-        start: &'a str,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Num<'a> {
+    Int(&'a str, Option<IntKind>),
+    Float(&'a str, Option<FloatKind>),
+}
+
+fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
+    fn num_lit_suffix<'a, T: Copy>(
         kind: &'a str,
-        list: &'a [&str],
-    ) -> impl Fn(&'a str) -> ParseResult<'a, ()> + Copy + 'a {
-        move |i| {
-            let (i, suffix) = identifier(i)?;
-            if list.contains(&suffix) {
-                Ok((i, ()))
-            } else {
-                Err(nom::Err::Failure(ErrorContext::new(
-                    format!("unknown {kind} suffix `{suffix}`"),
-                    start,
-                )))
-            }
+        list: &[(&str, T)],
+        start: &'a str,
+        i: &'a str,
+    ) -> ParseResult<'a, T> {
+        let (i, suffix) = identifier(i)?;
+        if let Some(value) = list
+            .iter()
+            .copied()
+            .find_map(|(name, value)| (name == suffix).then_some(value))
+        {
+            Ok((i, value))
+        } else {
+            Err(nom::Err::Failure(ErrorContext::new(
+                format!("unknown {kind} suffix `{suffix}`"),
+                start,
+            )))
         }
     }
 
-    let float = |start: &'a str| -> ParseResult<'a, ()> {
-        let (i, has_dot) = opt(tuple((char('.'), separated_digits(10, true))))(start)?;
-        let (i, has_exp) = opt(pair(one_of("eE"), opt(one_of("+-"))))(i)?;
-        if has_dot.is_none() && has_exp.is_none() {
-            return fail(start);
+    let int_with_base = pair(opt(char('-')), |i| {
+        let (i, (kind, base)) = consumed(preceded(
+            char('0'),
+            alt((
+                value(2, char('b')),
+                value(8, char('o')),
+                value(16, char('x')),
+            )),
+        ))(i)?;
+        match opt(separated_digits(base, false))(i)? {
+            (i, Some(_)) => Ok((i, ())),
+            (_, None) => Err(nom::Err::Failure(ErrorContext::new(
+                format!("expected digits after `{kind}`"),
+                start,
+            ))),
         }
-        let (i, _) = cut(separated_digits(10, false))(i)?;
-        let (i, _) = opt(suffix(i, "float", FLOAT_TYPES))(i)?;
-        Ok((i, ()))
+    });
+
+    let float = |i: &'a str| -> ParseResult<'a, ()> {
+        let (i, has_dot) = opt(pair(char('.'), separated_digits(10, true)))(i)?;
+        let (i, has_exp) = opt(|i| {
+            let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-")))(i)?;
+            match opt(separated_digits(10, op.is_none()))(i)? {
+                (i, Some(_)) => Ok((i, ())),
+                (_, None) => Err(nom::Err::Failure(ErrorContext::new(
+                    format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
+                    start,
+                ))),
+            }
+        })(i)?;
+        match (has_dot, has_exp) {
+            (Some(_), _) | (_, Some(_)) => Ok((i, ())),
+            _ => fail(start),
+        }
     };
 
-    recognize(tuple((
-        opt(char('-')),
-        alt((
-            recognize(tuple((
-                char('0'),
-                alt((
-                    recognize(tuple((char('b'), separated_digits(2, false)))),
-                    recognize(tuple((char('o'), separated_digits(8, false)))),
-                    recognize(tuple((char('x'), separated_digits(16, false)))),
-                )),
-                opt(suffix(i, "integer", INTEGER_TYPES)),
-            ))),
-            recognize(tuple((
-                separated_digits(10, true),
-                opt(alt((float, suffix(i, "number", NUM_TYPES)))),
-            ))),
-        )),
-    )))(i)
+    let (i, num) = if let Ok((i, Some(num))) = opt(recognize(int_with_base))(start) {
+        let (i, suffix) = opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i))(i)?;
+        (i, Num::Int(num, suffix))
+    } else {
+        let (i, (num, float)) = consumed(preceded(
+            pair(opt(char('-')), separated_digits(10, true)),
+            opt(float),
+        ))(start)?;
+        if float.is_some() {
+            let (i, suffix) = opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i))(i)?;
+            (i, Num::Float(num, suffix))
+        } else {
+            let (i, suffix) = opt(|i| num_lit_suffix("number", NUM_TYPES, start, i))(i)?;
+            match suffix {
+                Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
+                Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
+                None => (i, Num::Int(num, None)),
+            }
+        }
+    };
+    Ok((i, num))
 }
 
 /// Underscore separated digits of the given base, unless `start` is true this may start
@@ -922,27 +959,75 @@ pub fn strip_common(base: &Path, path: &Path) -> String {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntKind {
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FloatKind {
+    F16,
+    F32,
+    F64,
+    F128,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NumKind {
+    Int(IntKind),
+    Float(FloatKind),
+}
+
 /// Primitive integer types. Also used as number suffixes.
-const INTEGER_TYPES: &[&str] = &[
-    "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize",
+const INTEGER_TYPES: &[(&str, IntKind)] = &[
+    ("i8", IntKind::I8),
+    ("i16", IntKind::I16),
+    ("i32", IntKind::I32),
+    ("i64", IntKind::I64),
+    ("i128", IntKind::I128),
+    ("isize", IntKind::Isize),
+    ("u8", IntKind::U8),
+    ("u16", IntKind::U16),
+    ("u32", IntKind::U32),
+    ("u64", IntKind::U64),
+    ("u128", IntKind::U128),
+    ("usize", IntKind::Usize),
 ];
 
 /// Primitive floating point types. Also used as number suffixes.
-const FLOAT_TYPES: &[&str] = &["f16", "f32", "f64", "f128"];
+const FLOAT_TYPES: &[(&str, FloatKind)] = &[
+    ("f16", FloatKind::F16),
+    ("f32", FloatKind::F32),
+    ("f64", FloatKind::F64),
+    ("f128", FloatKind::F128),
+];
 
 /// Primitive numeric types. Also used as number suffixes.
-const NUM_TYPES: &[&str] = &{
-    let mut list = [""; INTEGER_TYPES.len() + FLOAT_TYPES.len()];
+const NUM_TYPES: &[(&str, NumKind)] = &{
+    let mut list = [("", NumKind::Int(IntKind::I8)); INTEGER_TYPES.len() + FLOAT_TYPES.len()];
     let mut i = 0;
     let mut o = 0;
     while i < INTEGER_TYPES.len() {
-        list[o] = INTEGER_TYPES[i];
+        let (name, value) = INTEGER_TYPES[i];
+        list[o] = (name, NumKind::Int(value));
         i += 1;
         o += 1;
     }
     let mut i = 0;
     while i < FLOAT_TYPES.len() {
-        list[o] = FLOAT_TYPES[i];
+        let (name, value) = FLOAT_TYPES[i];
+        list[o] = (name, NumKind::Float(value));
         i += 1;
         o += 1;
     }
@@ -955,7 +1040,7 @@ const PRIMITIVE_TYPES: &[&str] = &{
     let mut i = 0;
     let mut o = 0;
     while i < NUM_TYPES.len() {
-        list[o] = NUM_TYPES[i];
+        list[o] = NUM_TYPES[i].0;
         i += 1;
         o += 1;
     }
@@ -968,7 +1053,7 @@ const PRIMITIVE_TYPES: &[&str] = &{
 mod test {
     use std::path::Path;
 
-    use super::{char_lit, num_lit, str_lit, strip_common, StrLit, StrPrefix};
+    use super::*;
 
     #[test]
     fn test_strip_common() {
@@ -1001,14 +1086,36 @@ mod test {
         // Should fail.
         assert!(num_lit(".").is_err());
         // Should succeed.
-        assert_eq!(num_lit("1.2E-02").unwrap(), ("", "1.2E-02"));
+        assert_eq!(
+            num_lit("1.2E-02").unwrap(),
+            ("", Num::Float("1.2E-02", None))
+        );
         // Not supported because Rust wants a number before the `.`.
         assert!(num_lit(".1").is_err());
         assert!(num_lit(".1E-02").is_err());
+        // A `_` directly after the `.` denotes a field.
+        assert_eq!(num_lit("1._0").unwrap(), ("._0", Num::Int("1", None)));
+        assert_eq!(num_lit("1_.0").unwrap(), ("", Num::Float("1_.0", None)));
         // Not supported (voluntarily because of `1..` syntax).
-        assert_eq!(num_lit("1.").unwrap(), (".", "1"));
-        assert_eq!(num_lit("1_.").unwrap(), (".", "1_"));
-        assert_eq!(num_lit("1_2.").unwrap(), (".", "1_2"));
+        assert_eq!(num_lit("1.").unwrap(), (".", Num::Int("1", None)));
+        assert_eq!(num_lit("1_.").unwrap(), (".", Num::Int("1_", None)));
+        assert_eq!(num_lit("1_2.").unwrap(), (".", Num::Int("1_2", None)));
+        // Numbers with suffixes
+        assert_eq!(
+            num_lit("-1usize").unwrap(),
+            ("", Num::Int("-1", Some(IntKind::Usize)))
+        );
+        assert_eq!(
+            num_lit("123_f32").unwrap(),
+            ("", Num::Float("123_", Some(FloatKind::F32)))
+        );
+        assert_eq!(
+            num_lit("1_.2_e+_3_f64|into_isize").unwrap(),
+            (
+                "|into_isize",
+                Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
+            )
+        );
     }
 
     #[test]
