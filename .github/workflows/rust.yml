@@ -52,6 +52,22 @@ jobs:
       - run: cd ${{ matrix.package }} && cargo nextest run
       - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
 
+  Docs:
+    strategy:
+      matrix:
+        package: [
+          rinja, rinja_actix, rinja_axum, rinja_derive,
+          rinja_parser, rinja_rocket, rinja_warp,
+        ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - run: cd ${{ matrix.package }} && cargo doc --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -Z unstable-options --generate-link-to-definition --cfg=docsrs -D warnings
+
   Rustfmt:
     runs-on: ubuntu-latest
     steps:
