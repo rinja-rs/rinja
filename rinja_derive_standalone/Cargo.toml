@@ -10,6 +10,10 @@ edition = "2021"
 rust-version = "1.71"
 publish = false
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
+
 [features]
 default = ["__standalone"]
 __standalone = []
@@ -36,7 +40,7 @@ once_map = { version = "0.4.18", default-features = false, features = ["std"] }
 proc-macro2 = "1"
 quote = "1"
 rustc-hash = "2.0.0"
-syn = "2"
+syn = "2.0.3"
 
 [dev-dependencies]
 console = "0.15.8"

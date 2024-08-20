@@ -54,10 +54,9 @@
 //! as well as Jinja-derivatives like [Twig](http://twig.sensiolabs.org/) or
 //! [Tera](https://github.com/Keats/tera).
 
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 mod error;
 pub mod filters;

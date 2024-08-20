@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
 

@@ -1,3 +1,7 @@
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![deny(elided_lifetimes_in_paths)]
+#![deny(unreachable_pub)]
+
 pub mod all;
 pub mod filters;
 pub mod html;
@@ -7,12 +11,14 @@ use std::error::Error;
 use std::fmt;
 
 pub const TARGETS: &[(&str, TargetBuilder)] = &[
-    ("all", |data| NamedTarget::new::<all::Scenario>(data)),
+    ("all", |data| NamedTarget::new::<all::Scenario<'_>>(data)),
     ("filters", |data| {
-        NamedTarget::new::<filters::Scenario>(data)
+        NamedTarget::new::<filters::Scenario<'_>>(data)
     }),
-    ("html", |data| NamedTarget::new::<html::Scenario>(data)),
-    ("parser", |data| NamedTarget::new::<parser::Scenario>(data)),
+    ("html", |data| NamedTarget::new::<html::Scenario<'_>>(data)),
+    ("parser", |data| {
+        NamedTarget::new::<parser::Scenario<'_>>(data)
+    }),
 ];
 
 pub type TargetBuilder = for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, arbitrary::Error>;
