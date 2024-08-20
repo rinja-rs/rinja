@@ -147,7 +147,7 @@ impl<W: fmt::Write> fmt::Write for UrlencodeWriter<W> {
 /// composition.
 ///
 /// ```ignore
-/// {{ value | fmt("{:?}") }}
+/// {{ value|fmt("{:?}") }}
 /// ```
 ///
 /// Compare with [format](./fn.format.html).
@@ -161,7 +161,7 @@ pub fn fmt() {}
 /// the Rinja code generator.
 ///
 /// ```ignore
-/// {{ "{:?}{:?}" | format(value, other_value) }}
+/// {{ "{:?}{:?}"|format(value, other_value) }}
 /// ```
 ///
 /// Compare with [fmt](./fn.fmt.html).
@@ -181,6 +181,25 @@ pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::E
 }
 
 /// Converts all newlines in a piece of plain text to HTML line breaks
+///
+/// ```rust
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ lines|linebreaksbr }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     lines: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { lines: "a\nb\nc" }.to_string(),
+///     "<div>a<br/>b<br/>c</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn linebreaksbr(s: String) -> String {

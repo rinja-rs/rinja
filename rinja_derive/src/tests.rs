@@ -588,3 +588,101 @@ A
         15,
     );
 }
+
+#[cfg(feature = "code-in-doc")]
+#[test]
+fn test_code_in_comment() {
+    let ts = r#"
+        #[template(ext = "txt", in_doc = true)]
+        /// ```rinja
+        /// Hello world!
+        /// ```
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello world!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = r#"
+        #[template(ext = "txt", in_doc = true)]
+        /// ```rinja
+        /// Hello
+        /// world!
+        /// ```
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = r#"
+        /// ```rinja
+        /// Hello
+        #[template(ext = "txt", in_doc = true)]
+        /// world!
+        /// ```
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = r#"
+        /// This template greets the whole world
+        ///
+        /// ```rinja
+        /// Hello
+        #[template(ext = "txt", in_doc = true)]
+        /// world!
+        /// ```
+        ///
+        /// Some more text.
+        struct Tmpl;
+    "#;
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = "
+        #[template(ext = \"txt\", in_doc = true)]
+        #[doc = \"```rinja\nHello\nworld!\n```\"]
+        struct Tmpl;
+    ";
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(generated.contains("Hello\nworld!"));
+    assert!(!generated.contains("compile_error"));
+
+    let ts = "
+        #[template(ext = \"txt\", in_doc = true)]
+        /// `````
+        /// ```rinja
+        /// {{bla}}
+        /// ```
+        /// `````
+        struct BlockOnBlock;
+    ";
+    let ast = syn::parse_str(ts).unwrap();
+    let err = build_template(&ast).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "when using `in_doc = true`, the struct's documentation needs a `rinja` code block"
+    );
+
+    let ts = "
+        #[template(ext = \"txt\", in_doc = true)]
+        /// ```rinja
+        /// `````
+        /// {{bla}}
+        /// `````
+        /// ```
+        struct BlockOnBlock;
+    ";
+    let ast = syn::parse_str(ts).unwrap();
+    let generated = build_template(&ast).unwrap();
+    assert!(!generated.contains("compile_error"));
+}

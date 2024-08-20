@@ -26,6 +26,7 @@ tokio = { version = "1.0", features = ["macros", "rt"] }
 
 [features]
 default = ["rinja/default"]
+code-in-doc = ["rinja/code-in-doc"]
 config = ["rinja/config"]
 humansize = ["rinja/humansize"]
 num-traits = ["rinja/num-traits"]

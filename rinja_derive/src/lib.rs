@@ -64,6 +64,29 @@ use syn::parse_quote_spanned;
 /// web framework integrations use it to determine the content type.
 /// Cannot be used together with `path`.
 ///
+/// ### in_doc
+///
+/// E.g. `in_doc = true`
+///
+/// As an alternative to supplying the code template code in an external file (as `path` argument),
+/// or as a string (as `source` argument), you can also enable the `"code-in-doc"` feature.
+/// With this feature, you can specify the template code directly in the documentation
+/// of the template `struct`.
+///
+/// Instead of `path = "…"` or `source = "…"`, specify `in_doc = true` in the `#[template]`
+/// attribute, and in the struct's documentation add a `rinja` code block:
+///
+/// ```rust,ignore
+/// /// ```rinja
+/// /// <div>{{ lines|linebreaksbr }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     lines: &'a str,
+/// }
+/// ```
+///
 /// ### print
 ///
 /// E.g. `print = "code"`
