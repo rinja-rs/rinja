@@ -24,17 +24,17 @@ error: unsupported attribute argument
 33 | #[template(ext = "txt", in_doc)]
    |                         ^^^^^^
 
-error: argument `in_doc` expects boolean literal `true`
-  --> tests/ui/rinja-block.rs:42:25
+error: specify one template argument `path` OR `source` OR `in_doc`
+  --> tests/ui/rinja-block.rs:42:3
    |
 42 | #[template(ext = "txt", in_doc = false)]
-   |                         ^^^^^^
+   |   ^^^^^^^^
 
-error: argument `in_doc` expects boolean literal `true`
-  --> tests/ui/rinja-block.rs:51:25
+error: argument `in_doc` expects as boolean value
+  --> tests/ui/rinja-block.rs:51:34
    |
 51 | #[template(ext = "txt", in_doc = "yes")]
-   |                         ^^^^^^
+   |                                  ^^^^^
 
 error: when using `in_doc = true`, the enum's documentation needs a `rinja` code block
   --> tests/ui/rinja-block.rs:60:25

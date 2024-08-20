@@ -374,13 +374,7 @@ impl TemplateArgs {
             } else if ident == "source" {
                 source_or_path(ident, value, &mut args.source, |s| Source::Source(s.into()))?;
             } else if ident == "in_doc" {
-                #[cfg(feature = "code-in-doc")]
                 source_from_docs(ident, value, &mut args.source, ast)?;
-                #[cfg(not(feature = "code-in-doc"))]
-                return Err(CompileError::no_file_info(
-                    "enable feature `code-in-doc` to use `in_doc` argument",
-                    Some(ident.span()),
-                ));
             } else if ident == "block" {
                 set_template_str_attr(ident, value, &mut args.block)?;
             } else if ident == "print" {
@@ -439,7 +433,6 @@ impl TemplateArgs {
     }
 }
 
-#[cfg(feature = "code-in-doc")]
 /// Try to find the souce in the comment, in a "```rinja```" block
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
@@ -449,19 +442,36 @@ fn source_from_docs(
     dest: &mut Option<(Source, Option<Span>)>,
     ast: &syn::DeriveInput,
 ) -> Result<(), CompileError> {
-    let syn::Lit::Bool(syn::LitBool { value: true, .. }) = &value.lit else {
-        return Err(CompileError::no_file_info(
-            "argument `in_doc` expects boolean literal `true`",
-            Some(name.span()),
-        ));
+    match &value.lit {
+        syn::Lit::Bool(syn::LitBool { value, .. }) => {
+            if !value {
+                return Ok(());
+            }
+        }
+        lit => {
+            return Err(CompileError::no_file_info(
+                "argument `in_doc` expects as boolean value",
+                Some(lit.span()),
+            ));
+        }
     };
-
-    ensure_source_once(name, dest)?;
-    let (span, source) = collect_comment_blocks(name, ast)?;
-    let source = strip_common_ws_prefix(source);
-    let source = collect_rinja_code_blocks(name, ast, source)?;
-    *dest = Some((source, span));
-    Ok(())
+    #[cfg(not(feature = "code-in-doc"))]
+    {
+        let _ = (name, dest, ast);
+        Err(CompileError::no_file_info(
+            "enable feature `code-in-doc` to use `in_doc` argument",
+            Some(name.span()),
+        ))
+    }
+    #[cfg(feature = "code-in-doc")]
+    {
+        ensure_source_once(name, dest)?;
+        let (span, source) = collect_comment_blocks(name, ast)?;
+        let source = strip_common_ws_prefix(source);
+        let source = collect_rinja_code_blocks(name, ast, source)?;
+        *dest = Some((source, span));
+        Ok(())
+    }
 }
 
 #[cfg(feature = "code-in-doc")]
