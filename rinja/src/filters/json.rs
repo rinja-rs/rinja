@@ -55,7 +55,15 @@ struct ToJsonPretty<S, I> {
     indent: I,
 }
 
+/// A prefix usable for indenting [prettified JSON data](json_pretty)
+///
+/// ```
+/// # use rinja::filters::AsIndent;
+/// assert_eq!(4.as_indent(), "    ");
+/// assert_eq!(" -> ".as_indent(), " -> ");
+/// ```
 pub trait AsIndent {
+    /// Borrow `self` as prefix to use.
     fn as_indent(&self) -> &str;
 }
 
