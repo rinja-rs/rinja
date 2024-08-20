@@ -6,8 +6,44 @@ error: failed to parse template source
 5 | /// Some documentation
   | ^^^^^^^^^^^^^^^^^^^^^^
 
-error: template `path` or `source` not found in attributes
-  --> tests/ui/rinja-block.rs:15:3
+error: when using `in_doc = true`, the struct's documentation needs a `rinja` code block
+  --> tests/ui/rinja-block.rs:15:25
    |
-15 | #[template(ext = "txt")]
+15 | #[template(ext = "txt", in_doc = true)]
+   |                         ^^^^^^
+
+error: specify one template argument `path` OR `source` OR `in_doc`
+  --> tests/ui/rinja-block.rs:24:3
+   |
+24 | #[template(ext = "txt")]
    |   ^^^^^^^^
+
+error: unsupported attribute argument
+  --> tests/ui/rinja-block.rs:33:25
+   |
+33 | #[template(ext = "txt", in_doc)]
+   |                         ^^^^^^
+
+error: argument `in_doc` expects boolean literal `true`
+  --> tests/ui/rinja-block.rs:42:25
+   |
+42 | #[template(ext = "txt", in_doc = false)]
+   |                         ^^^^^^
+
+error: argument `in_doc` expects boolean literal `true`
+  --> tests/ui/rinja-block.rs:51:25
+   |
+51 | #[template(ext = "txt", in_doc = "yes")]
+   |                         ^^^^^^
+
+error: when using `in_doc = true`, the enum's documentation needs a `rinja` code block
+  --> tests/ui/rinja-block.rs:60:25
+   |
+60 | #[template(ext = "txt", in_doc = true)]
+   |                         ^^^^^^
+
+error: when using `in_doc = true`, the union's documentation needs a `rinja` code block
+  --> tests/ui/rinja-block.rs:67:25
+   |
+67 | #[template(ext = "txt", in_doc = true)]
+   |                         ^^^^^^

@@ -55,7 +55,13 @@ impl TemplateInput<'_> {
         // related. In case `source` was used instead of `path`, the value
         // of `ext` is merged into a synthetic `path` value here.
         let &(ref source, source_span) = source.as_ref().ok_or_else(|| {
-            CompileError::new("template `path` or `source` not found in attributes", None)
+            CompileError::new(
+                #[cfg(not(feature = "code-in-doc"))]
+                "specify one template argument `path` OR `source`",
+                #[cfg(feature = "code-in-doc")]
+                "specify one template argument `path` OR `source` OR `in_doc`",
+                None,
+            )
         })?;
         let path = match (&source, &ext) {
             (Source::Path(path), _) => config.find_template(path, None, None)?,
@@ -64,7 +70,10 @@ impl TemplateInput<'_> {
             }
             (&Source::Source(_), None) => {
                 return Err(CompileError::no_file_info(
-                    "must include 'ext' attribute when using 'source' attribute",
+                    #[cfg(not(feature = "code-in-doc"))]
+                    "must include `ext` attribute when using `source` attribute",
+                    #[cfg(feature = "code-in-doc")]
+                    "must include `ext` attribute when using `source` or `in_doc` attribute",
                     None,
                 ));
             }
@@ -364,6 +373,14 @@ impl TemplateArgs {
                 args.ext_span = Some(value.span());
             } else if ident == "source" {
                 source_or_path(ident, value, &mut args.source, |s| Source::Source(s.into()))?;
+            } else if ident == "in_doc" {
+                #[cfg(feature = "code-in-doc")]
+                source_from_docs(ident, value, &mut args.source, ast)?;
+                #[cfg(not(feature = "code-in-doc"))]
+                return Err(CompileError::no_file_info(
+                    "enable feature `code-in-doc` to use `in_doc` argument",
+                    Some(ident.span()),
+                ));
             } else if ident == "block" {
                 set_template_str_attr(ident, value, &mut args.block)?;
             } else if ident == "print" {
@@ -406,11 +423,6 @@ impl TemplateArgs {
             }
         }
 
-        #[cfg(feature = "code-in-doc")]
-        if args.source.is_none() {
-            args.source = source_from_docs(ast);
-        }
-
         Ok(args)
     }
 
@@ -431,15 +443,32 @@ impl TemplateArgs {
 /// Try to find the souce in the comment, in a "```rinja```" block
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
-fn source_from_docs(ast: &syn::DeriveInput) -> Option<(Source, Option<Span>)> {
-    let (span, source) = collect_comment_blocks(ast)?;
-    let source = strip_common_ws_prefix(source)?;
-    let source = collect_rinja_code_blocks(source)?;
-    Some((source, span))
+fn source_from_docs(
+    name: &syn::Ident,
+    value: &syn::ExprLit,
+    dest: &mut Option<(Source, Option<Span>)>,
+    ast: &syn::DeriveInput,
+) -> Result<(), CompileError> {
+    let syn::Lit::Bool(syn::LitBool { value: true, .. }) = &value.lit else {
+        return Err(CompileError::no_file_info(
+            "argument `in_doc` expects boolean literal `true`",
+            Some(name.span()),
+        ));
+    };
+
+    ensure_source_once(name, dest)?;
+    let (span, source) = collect_comment_blocks(name, ast)?;
+    let source = strip_common_ws_prefix(source);
+    let source = collect_rinja_code_blocks(name, ast, source)?;
+    *dest = Some((source, span));
+    Ok(())
 }
 
 #[cfg(feature = "code-in-doc")]
-fn collect_comment_blocks(ast: &syn::DeriveInput) -> Option<(Option<Span>, String)> {
+fn collect_comment_blocks(
+    name: &syn::Ident,
+    ast: &syn::DeriveInput,
+) -> Result<(Option<Span>, String), CompileError> {
     let mut span: Option<Span> = None;
     let mut assign_span = |kv: &syn::MetaNameValue| {
         // FIXME: uncomment once <https://github.com/rust-lang/rust/issues/54725> is stable
@@ -482,14 +511,29 @@ fn collect_comment_blocks(ast: &syn::DeriveInput) -> Option<(Option<Span>, Strin
         source.push('\n');
     }
     if source.is_empty() {
-        return None;
+        return Err(no_rinja_code_block(name, ast));
     }
 
-    Some((span, source))
+    Ok((span, source))
 }
 
 #[cfg(feature = "code-in-doc")]
-fn strip_common_ws_prefix(source: String) -> Option<String> {
+fn no_rinja_code_block(name: &syn::Ident, ast: &syn::DeriveInput) -> CompileError {
+    let kind = match &ast.data {
+        syn::Data::Struct(_) => "struct",
+        syn::Data::Enum(_) => "enum",
+        syn::Data::Union(_) => "union",
+    };
+    CompileError::no_file_info(
+        format!(
+            "when using `in_doc = true`, the {kind}'s documentation needs a `rinja` code block"
+        ),
+        Some(name.span()),
+    )
+}
+
+#[cfg(feature = "code-in-doc")]
+fn strip_common_ws_prefix(source: String) -> String {
     let mut common_prefix_iter = source
         .lines()
         .filter_map(|s| Some(&s[..s.find(|c: char| !c.is_ascii_whitespace())?]));
@@ -507,19 +551,21 @@ fn strip_common_ws_prefix(source: String) -> Option<String> {
         common_prefix = &common_prefix[..pos];
     }
     if common_prefix.is_empty() {
-        return Some(source);
+        return source;
     }
 
-    Some(
-        source
-            .lines()
-            .flat_map(|s| [s.get(common_prefix.len()..).unwrap_or_default(), "\n"])
-            .collect(),
-    )
+    source
+        .lines()
+        .flat_map(|s| [s.get(common_prefix.len()..).unwrap_or_default(), "\n"])
+        .collect()
 }
 
 #[cfg(feature = "code-in-doc")]
-fn collect_rinja_code_blocks(source: String) -> Option<Source> {
+fn collect_rinja_code_blocks(
+    name: &syn::Ident,
+    ast: &syn::DeriveInput,
+    source: String,
+) -> Result<Source, CompileError> {
     use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
     let mut tmpl_source = String::new();
@@ -539,13 +585,13 @@ fn collect_rinja_code_blocks(source: String) -> Option<Source> {
         }
     }
     if !had_rinja_code {
-        return None;
+        return Err(no_rinja_code_block(name, ast));
     }
 
     if tmpl_source.ends_with('\n') {
         tmpl_source.pop();
     }
-    Some(Source::Source(tmpl_source.into()))
+    Ok(Source::Source(tmpl_source.into()))
 }
 
 struct ResultIter<I, E>(Result<I, Option<E>>);
@@ -578,18 +624,31 @@ fn source_or_path(
     dest: &mut Option<(Source, Option<Span>)>,
     ctor: fn(String) -> Source,
 ) -> Result<(), CompileError> {
-    if dest.is_some() {
-        Err(CompileError::no_file_info(
-            "must specify `source` OR `path` exactly once",
-            Some(name.span()),
-        ))
-    } else if let syn::Lit::Str(s) = &value.lit {
+    ensure_source_once(name, dest)?;
+    if let syn::Lit::Str(s) = &value.lit {
         *dest = Some((ctor(s.value()), Some(value.span())));
         Ok(())
     } else {
         Err(CompileError::no_file_info(
             format!("`{name}` value must be string literal"),
             Some(value.lit.span()),
+        ))
+    }
+}
+
+fn ensure_source_once(
+    name: &syn::Ident,
+    source: &mut Option<(Source, Option<Span>)>,
+) -> Result<(), CompileError> {
+    if source.is_none() {
+        Ok(())
+    } else {
+        Err(CompileError::no_file_info(
+            #[cfg(feature = "code-in-doc")]
+            "must specify `source` OR `path` OR `is_doc` exactly once",
+            #[cfg(not(feature = "code-in-doc"))]
+            "must specify `source` OR `path` exactly once",
+            Some(name.span()),
         ))
     }
 }

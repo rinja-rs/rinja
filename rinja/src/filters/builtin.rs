@@ -189,7 +189,7 @@ pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::E
 /// /// <div>{{ lines|linebreaksbr }}</div>
 /// /// ```
 /// #[derive(Template)]
-/// #[template(ext = "html")]
+/// #[template(ext = "html", in_doc = true)]
 /// struct Example<'a> {
 ///     lines: &'a str,
 /// }

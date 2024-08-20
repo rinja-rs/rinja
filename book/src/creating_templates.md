@@ -114,7 +114,10 @@ recognized:
 As an alternative to supplying the code template code in an external file (as `path` argument),
 or as a string (as `source` argument), you can also enable the `"code-in-doc"` feature.
 With this feature, you can specify the template code directly in the documentation
-of the template `struct`. Simply add a ```` ```rinja ```` code block to your documentation:
+of the template `struct`.
+
+Instead of `path = "…"` or `source = "…"`, specify `in_doc = true` in the `#[template]` attribute,
+and in the struct's documentation add a ```` ```rinja ```` code block:
 
 ```rust
 /// Here you can put our usual comments.
@@ -134,7 +137,7 @@ of the template `struct`. Simply add a ```` ```rinja ```` code block to your doc
 ///
 /// All comments are still optional, though.
 #[derive(Template)]
-#[template(ext = "html")]
+#[template(ext = "html", in_doc = true)]
 struct Example<'a> {
     lines: &'a str,
 }
@@ -142,8 +145,6 @@ struct Example<'a> {
 
 If you want to supply the template code in the comments,
 then you have to specify the `ext` argument, too, e.g. `#[template(ext = "html")]`.
-If the `path` or `source` argument is given,
-then this argument takes precedence over the code in the comments.
 
-Instead of ```` ```rinja ````, you can also write ```` ```jinja ```` or ```` ```jinja2 ````,
-e.g. to get it to work better in conjunction with sytax highlighters.
+Instead of `rinja`, you can also write `jinja` or `jinja2`,
+e.g. to get it to work better in conjunction with syntax highlighters.

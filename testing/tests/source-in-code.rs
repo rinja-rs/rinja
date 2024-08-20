@@ -9,7 +9,7 @@ use rinja::Template;
 #[test]
 fn test_code_in_comment_only() {
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// Hello world!
     /// ```
@@ -22,7 +22,7 @@ fn test_code_in_comment_only() {
 #[test]
 fn test_code_in_comment_with_line_break() {
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// Hello
     /// world!
@@ -31,7 +31,7 @@ fn test_code_in_comment_with_line_break() {
     assert_eq!(Tmpl1.to_string(), "Hello\nworld!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// Hello
     ///
@@ -41,7 +41,7 @@ fn test_code_in_comment_with_line_break() {
     assert_eq!(Tmpl2.to_string(), "Hello\n\nworld!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// 
     /// Hello
@@ -52,7 +52,7 @@ fn test_code_in_comment_with_line_break() {
     assert_eq!(Tmpl3.to_string(), "\nHello\n\nworld!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// Hello
     ///
@@ -63,7 +63,7 @@ fn test_code_in_comment_with_line_break() {
     assert_eq!(Tmpl4.to_string(), "Hello\n\nworld!\n");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// 
     ///
@@ -84,7 +84,7 @@ fn test_code_in_comment_with_derive_in_between() {
     /// ```rinja
     /// Hello
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// world!
     /// ```
     struct Tmpl1;
@@ -95,7 +95,7 @@ fn test_code_in_comment_with_derive_in_between() {
     /// ```rinja
     /// Hello
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// world!
     /// ```
     /// 
@@ -108,7 +108,7 @@ fn test_code_in_comment_with_derive_in_between() {
 #[test]
 fn test_code_in_comment_split_up() {
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// Text1
     /// ```rinja
     /// Hello
@@ -122,7 +122,7 @@ fn test_code_in_comment_split_up() {
     assert_eq!(Tmpl1.to_string(), "Hello\nworld!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// Text1
     ///
     /// ```rinja
@@ -144,13 +144,13 @@ fn test_code_in_comment_split_up() {
 #[test]
 fn test_code_in_comment_doc() {
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     #[doc = "```rinja\nHello world!\n```"]
     struct Tmpl1;
     assert_eq!(Tmpl1.to_string(), "Hello world!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     #[doc = "```rinja"]
     #[doc = "Hello world!"]
     #[doc = "```"]
@@ -158,14 +158,14 @@ fn test_code_in_comment_doc() {
     assert_eq!(Tmpl2.to_string(), "Hello world!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     #[doc = "```rinja\nHello world!"]
     #[doc = "```"]
     struct Tmpl3;
     assert_eq!(Tmpl3.to_string(), "Hello world!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     #[doc = "```rinja"]
     #[doc = "Hello world!\n```"]
     struct Tmpl4;
@@ -176,7 +176,7 @@ fn test_code_in_comment_doc() {
 #[test]
 fn test_code_in_comment_multiline() {
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /**
     ```rinja
     Hello world!
@@ -186,7 +186,7 @@ fn test_code_in_comment_multiline() {
     assert_eq!(Tmpl1.to_string(), "Hello world!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /**
     ```rinja
     Hello
@@ -197,7 +197,7 @@ fn test_code_in_comment_multiline() {
     assert_eq!(Tmpl2.to_string(), "Hello\nworld!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /**
     ```rinja
 
@@ -209,7 +209,7 @@ fn test_code_in_comment_multiline() {
     assert_eq!(Tmpl3.to_string(), "\nHello\nworld!");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /**
     ```rinja
     Hello
@@ -221,7 +221,7 @@ fn test_code_in_comment_multiline() {
     assert_eq!(Tmpl4.to_string(), "Hello\nworld!\n");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /**
     ```rinja
 
@@ -239,7 +239,7 @@ fn test_code_in_comment_multiline() {
 #[test]
 fn test_code_in_comment_backticks() {
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ````rinja
     /// Hello
     /// ````
@@ -247,7 +247,7 @@ fn test_code_in_comment_backticks() {
     assert_eq!(Tmpl1.to_string(), "Hello");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// `````rinja
     /// Hello
     /// `````
@@ -255,7 +255,7 @@ fn test_code_in_comment_backticks() {
     assert_eq!(Tmpl2.to_string(), "Hello");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ``````````````````````````````````````````````````````````````````````````````````````rinja
     /// Hello
     /// ``````````````````````````````````````````````````````````````````````````````````````
@@ -263,7 +263,7 @@ fn test_code_in_comment_backticks() {
     assert_eq!(Tmpl3.to_string(), "Hello");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// ```rinja
     /// `````
     /// Hello
@@ -273,7 +273,7 @@ fn test_code_in_comment_backticks() {
     assert_eq!(Tmpl4.to_string(), "");
 
     #[derive(Template)]
-    #[template(ext = "txt")]
+    #[template(ext = "txt", in_doc = true)]
     /// `````rinja
     /// ```
     /// Hello

@@ -593,7 +593,7 @@ A
 #[test]
 fn test_code_in_comment() {
     let ts = r#"
-        #[template(ext = "txt")]
+        #[template(ext = "txt", in_doc = true)]
         /// ```rinja
         /// Hello world!
         /// ```
@@ -605,7 +605,7 @@ fn test_code_in_comment() {
     assert!(!generated.contains("compile_error"));
 
     let ts = r#"
-        #[template(ext = "txt")]
+        #[template(ext = "txt", in_doc = true)]
         /// ```rinja
         /// Hello
         /// world!
@@ -620,7 +620,7 @@ fn test_code_in_comment() {
     let ts = r#"
         /// ```rinja
         /// Hello
-        #[template(ext = "txt")]
+        #[template(ext = "txt", in_doc = true)]
         /// world!
         /// ```
         struct Tmpl;
@@ -635,7 +635,7 @@ fn test_code_in_comment() {
         ///
         /// ```rinja
         /// Hello
-        #[template(ext = "txt")]
+        #[template(ext = "txt", in_doc = true)]
         /// world!
         /// ```
         ///
@@ -648,7 +648,7 @@ fn test_code_in_comment() {
     assert!(!generated.contains("compile_error"));
 
     let ts = "
-        #[template(ext = \"txt\")]
+        #[template(ext = \"txt\", in_doc = true)]
         #[doc = \"```rinja\nHello\nworld!\n```\"]
         struct Tmpl;
     ";
@@ -658,7 +658,7 @@ fn test_code_in_comment() {
     assert!(!generated.contains("compile_error"));
 
     let ts = "
-        #[template(ext = \"txt\")]
+        #[template(ext = \"txt\", in_doc = true)]
         /// `````
         /// ```rinja
         /// {{bla}}
@@ -670,11 +670,11 @@ fn test_code_in_comment() {
     let err = build_template(&ast).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "template `path` or `source` not found in attributes"
+        "when using `in_doc = true`, the struct's documentation needs a `rinja` code block"
     );
 
     let ts = "
-        #[template(ext = \"txt\")]
+        #[template(ext = \"txt\", in_doc = true)]
         /// ```rinja
         /// `````
         /// {{bla}}
