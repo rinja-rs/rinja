@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::fmt::{self, Display};
 
+/// The [`Result`](std::result::Result) type with [`Error`] as default error type
 pub type Result<I, E = Error> = std::result::Result<I, E>;
 
 /// rinja error type

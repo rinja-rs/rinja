@@ -1,5 +1,6 @@
-#![deny(unreachable_pub)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![deny(elided_lifetimes_in_paths)]
+#![deny(unreachable_pub)]
 
 use std::borrow::Cow;
 use std::cell::Cell;

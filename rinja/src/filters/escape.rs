@@ -108,8 +108,10 @@ impl Escaper for Text {
 /// E.g. in an [`Html`] context, any and all generated text can be used in HTML/XML text nodes and
 /// attributes, without for for maliciously injected data.
 pub trait Escaper: Copy {
+    /// Escaped the input string `string` into `fmt`
     fn write_escaped_str<W: Write>(&self, fmt: W, string: &str) -> fmt::Result;
 
+    /// Escaped the input char `c` into `fmt`
     #[inline]
     fn write_escaped_char<W: Write>(&self, fmt: W, c: char) -> fmt::Result {
         self.write_escaped_str(fmt, c.encode_utf8(&mut [0; 4]))
@@ -118,9 +120,12 @@ pub trait Escaper: Copy {
 
 /// Used internally by rinja to select the appropriate escaper
 pub trait AutoEscape {
+    /// The wrapped or converted result type
     type Escaped: fmt::Display;
+    /// Early error testing for the input value, usually [`Infallible`]
     type Error: Into<crate::Error>;
 
+    /// Used internally by rinja to select the appropriate escaper
     fn rinja_auto_escape(&self) -> Result<Self::Escaped, Self::Error>;
 }
 
@@ -132,6 +137,7 @@ pub struct AutoEscaper<'a, T: ?Sized, E> {
 }
 
 impl<'a, T: ?Sized, E> AutoEscaper<'a, T, E> {
+    /// Used internally by rinja to select the appropriate escaper
     #[inline]
     pub fn new(text: &'a T, escaper: E) -> Self {
         Self { text, escaper }
@@ -214,7 +220,9 @@ impl<'a, T: HtmlSafe + ?Sized> AutoEscape for &AutoEscaper<'a, T, Html> {
 /// );
 /// ```
 pub enum MaybeSafe<T> {
+    /// The contained value does not need escaping
     Safe(T),
+    /// The contained value needs to be escaped
     NeedsEscaping(T),
 }
 
@@ -424,6 +432,7 @@ pub struct Writable<'a, S: ?Sized>(pub &'a S);
 
 /// Used internally by rinja to select the appropriate [`write!()`] mechanism
 pub trait WriteWritable {
+    /// Used internally by rinja to select the appropriate [`write!()`] mechanism
     fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result;
 }
 
@@ -431,6 +440,7 @@ pub trait WriteWritable {
 ///
 /// Types implementing this trait can be written without needing to employ an [`fmt::Formatter`].
 pub trait FastWritable {
+    /// Used internally by rinja to speed up writing some types.
     fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result;
 }
 
