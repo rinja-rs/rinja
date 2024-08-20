@@ -74,7 +74,7 @@ use syn::parse_quote_spanned;
 /// of the template `struct`.
 ///
 /// Instead of `path = "…"` or `source = "…"`, specify `in_doc = true` in the `#[template]`
-/// attribute, and in the struct's documentation add a ```` ```rinja ```` code block:
+/// attribute, and in the struct's documentation add a `rinja` code block:
 ///
 /// ```rust,ignore
 /// /// ```rinja

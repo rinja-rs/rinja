@@ -124,10 +124,10 @@ recognized:
 As an alternative to supplying the code template code in an external file (as `path` argument),
 or as a string (as `source` argument), you can also enable the `"code-in-doc"` feature.
 With this feature, you can specify the template code directly in the documentation
-of the template `struct`.
+of the template item.
 
 Instead of `path = "…"` or `source = "…"`, specify `in_doc = true` in the `#[template]` attribute,
-and in the struct's documentation add a ```` ```rinja ```` code block:
+and in the item's documentation, add a code block with the `rinja` attribute:
 
 ```rust
 /// Here you can put our usual comments.

@@ -12,7 +12,7 @@ error: when using `in_doc = true`, the struct's documentation needs a `rinja` co
 15 | #[template(ext = "txt", in_doc = true)]
    |                         ^^^^^^
 
-error: specify one template argument `path` OR `source` OR `in_doc`
+error: specify one template argument `path`, `source` or `in_doc`
   --> tests/ui/rinja-block.rs:24:3
    |
 24 | #[template(ext = "txt")]
@@ -24,7 +24,7 @@ error: unsupported attribute argument
 33 | #[template(ext = "txt", in_doc)]
    |                         ^^^^^^
 
-error: specify one template argument `path` OR `source` OR `in_doc`
+error: specify one template argument `path`, `source` or `in_doc`
   --> tests/ui/rinja-block.rs:42:3
    |
 42 | #[template(ext = "txt", in_doc = false)]

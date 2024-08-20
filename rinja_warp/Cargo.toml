@@ -1,6 +1,6 @@
 [package]
 name = "rinja_warp"
-version = "0.3.1"
+version = "0.3.0"
 description = "Warp integration for Rinja templates"
 documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
@@ -17,7 +17,7 @@ all-features = true
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
 [dependencies]
-rinja = { version = "0.3.1", path = "../rinja", default-features = false, features = ["with-warp"] }
+rinja = { version = "0.3.0", path = "../rinja", default-features = false, features = ["with-warp"] }
 
 warp = { version = "0.3", default-features = false }
 

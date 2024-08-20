@@ -1,4 +1,4 @@
-error: must specify `source` OR `path` OR `is_doc` exactly once
+error: must specify `source`, `path` or `is_doc` exactly once
  --> tests/ui/duplicated_template_attribute.rs:9:5
   |
 9 |     source = "🙃",

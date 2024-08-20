@@ -57,9 +57,9 @@ impl TemplateInput<'_> {
         let &(ref source, source_span) = source.as_ref().ok_or_else(|| {
             CompileError::new(
                 #[cfg(not(feature = "code-in-doc"))]
-                "specify one template argument `path` OR `source`",
+                "specify one template argument `path` or `source`",
                 #[cfg(feature = "code-in-doc")]
-                "specify one template argument `path` OR `source` OR `in_doc`",
+                "specify one template argument `path`, `source` or `in_doc`",
                 None,
             )
         })?;
@@ -433,7 +433,7 @@ impl TemplateArgs {
     }
 }
 
-/// Try to find the souce in the comment, in a "```rinja```" block
+/// Try to find the souce in the comment, in a `rinja` code block.
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
 fn source_from_docs(
@@ -655,9 +655,9 @@ fn ensure_source_once(
     } else {
         Err(CompileError::no_file_info(
             #[cfg(feature = "code-in-doc")]
-            "must specify `source` OR `path` OR `is_doc` exactly once",
+            "must specify `source`, `path` or `is_doc` exactly once",
             #[cfg(not(feature = "code-in-doc"))]
-            "must specify `source` OR `path` exactly once",
+            "must specify `source` or `path` exactly once",
             Some(name.span()),
         ))
     }
