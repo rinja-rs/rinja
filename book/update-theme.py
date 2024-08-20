@@ -13,13 +13,14 @@ INDEX_HBS_DOMAIN = "api.github.com"
 INDEX_HBS_PORT = 443
 INDEX_HBS_PROTO = "GET"
 INDEX_HBS_PATH = "/repos/rust-lang/mdBook/contents/src/theme/index.hbs"
+INDEX_HBS_DATA = None
 INDEX_HBS_HEADERS = {
     "user-agent": "Update index.hbs for +https://github.com/rinja-rs/rinja",
 }
 
 SIDEBAR_STYLE = 'style="display:flex; flex-direction:column"'
 SCROLLBOX_END = r"""
-<div id="ethical-ad-placement" data-ea-publisher="readthedocs" data-ea-type="image"></div>
+<div id="ethical-ad-placement" class="ethical-sidebar" data-ea-publisher="readthedocs" data-ea-type="image"></div>
 <readthedocs-flyout></readthedocs-flyout>
 """
 TOC_START = '<div style="flex:1">'
@@ -53,7 +54,7 @@ SIDEBAR_END = r"""
 
 def update_theme(target: PathLike) -> None:
     with closing(HTTPSConnection(INDEX_HBS_DOMAIN, INDEX_HBS_PORT)) as conn:
-        conn.request(INDEX_HBS_PROTO, INDEX_HBS_PATH, None, INDEX_HBS_HEADERS)
+        conn.request(INDEX_HBS_PROTO, INDEX_HBS_PATH, INDEX_HBS_DATA, INDEX_HBS_HEADERS)
         res = conn.getresponse()
         if res.status != 200:
             raise Exception(f"Status={res.status!r}")
