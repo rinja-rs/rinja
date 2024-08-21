@@ -104,6 +104,16 @@ impl<'a> Generator<'a> {
         Ok(buf.buf)
     }
 
+    fn push_locals<T, F: FnOnce(&mut Self) -> Result<T, CompileError>>(
+        &mut self,
+        callback: F,
+    ) -> Result<T, CompileError> {
+        self.locals.scopes.push(HashMap::default());
+        let res = callback(self);
+        self.locals.scopes.pop().unwrap();
+        res
+    }
+
     // Implement `Template` for the given context struct.
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
         self.write_header(buf, format_args!("{CRATE}::Template"), None);
@@ -558,84 +568,91 @@ impl<'a> Generator<'a> {
             self.handle_ws(ws_before);
         }
 
-        for (pos, cond_info) in conds.conds.iter().enumerate() {
+        let mut iter = conds.conds.iter().enumerate().peekable();
+        while let Some((pos, cond_info)) = iter.next() {
             let cond = cond_info.cond;
 
-            self.handle_ws(cond.ws);
-            flushed += self.write_buf_writable(ctx, buf)?;
-            if pos > 0 {
-                self.locals.pop();
+            if pos == 0 {
+                self.handle_ws(cond.ws);
+                flushed += self.write_buf_writable(ctx, buf)?;
             }
 
-            self.locals.push();
-            let mut arm_size = 0;
+            self.push_locals(|this| {
+                let mut arm_size = 0;
 
-            if let Some(CondTest { target, expr, .. }) = &cond.cond {
-                let expr = cond_info.cond_expr.as_ref().unwrap_or(expr);
+                if let Some(CondTest { target, expr, .. }) = &cond.cond {
+                    let expr = cond_info.cond_expr.as_ref().unwrap_or(expr);
 
-                if pos == 0 {
-                    if cond_info.generate_condition {
-                        buf.write("if ");
+                    if pos == 0 {
+                        if cond_info.generate_condition {
+                            buf.write("if ");
+                        }
+                        // Otherwise it means it will be the only condition generated,
+                        // so nothing to be added here.
+                    } else if cond_info.generate_condition {
+                        buf.write("} else if ");
+                    } else {
+                        buf.write("} else {");
+                        has_else = true;
                     }
-                    // Otherwise it means it will be the only condition generated,
-                    // so nothing to be added here.
-                } else if cond_info.generate_condition {
-                    buf.write("} else if ");
-                } else {
+
+                    if let Some(target) = target {
+                        let mut expr_buf = Buffer::new();
+                        buf.write("let ");
+                        // If this is a chain condition, then we need to declare the variable after the
+                        // left expression has been handled but before the right expression is handled
+                        // but this one should have access to the let-bound variable.
+                        match &**expr {
+                            Expr::BinOp(op, ref left, ref right) if *op == "||" || *op == "&&" => {
+                                this.visit_expr(ctx, &mut expr_buf, left)?;
+                                this.visit_target(buf, true, true, target);
+                                expr_buf.write(format_args!(" {op} "));
+                                this.visit_expr(ctx, &mut expr_buf, right)?;
+                            }
+                            _ => {
+                                this.visit_expr(ctx, &mut expr_buf, expr)?;
+                                this.visit_target(buf, true, true, target);
+                            }
+                        }
+                        buf.write(format_args!("= &{} {{", expr_buf.buf));
+                    } else if cond_info.generate_condition {
+                        // The following syntax `*(&(...) as &bool)` is used to
+                        // trigger Rust's automatic dereferencing, to coerce
+                        // e.g. `&&&&&bool` to `bool`. First `&(...) as &bool`
+                        // coerces e.g. `&&&bool` to `&bool`. Then `*(&bool)`
+                        // finally dereferences it to `bool`.
+                        buf.write("*(&(");
+                        buf.write(this.visit_expr_root(ctx, expr)?);
+                        buf.write(") as &::core::primitive::bool) {");
+                    }
+                } else if pos != 0 {
                     buf.write("} else {");
                     has_else = true;
                 }
 
-                if let Some(target) = target {
-                    let mut expr_buf = Buffer::new();
-                    buf.write("let ");
-                    // If this is a chain condition, then we need to declare the variable after the
-                    // left expression has been handled but before the right expression is handled
-                    // but this one should have access to the let-bound variable.
-                    match &**expr {
-                        Expr::BinOp(op, ref left, ref right) if *op == "||" || *op == "&&" => {
-                            self.visit_expr(ctx, &mut expr_buf, left)?;
-                            self.visit_target(buf, true, true, target);
-                            expr_buf.write(format_args!(" {op} "));
-                            self.visit_expr(ctx, &mut expr_buf, right)?;
-                        }
-                        _ => {
-                            self.visit_expr(ctx, &mut expr_buf, expr)?;
-                            self.visit_target(buf, true, true, target);
-                        }
-                    }
-                    buf.write(format_args!("= &{} {{", expr_buf.buf));
-                } else if cond_info.generate_condition {
-                    // The following syntax `*(&(...) as &bool)` is used to
-                    // trigger Rust's automatic dereferencing, to coerce
-                    // e.g. `&&&&&bool` to `bool`. First `&(...) as &bool`
-                    // coerces e.g. `&&&bool` to `&bool`. Then `*(&bool)`
-                    // finally dereferences it to `bool`.
-                    buf.write("*(&(");
-                    buf.write(self.visit_expr_root(ctx, expr)?);
-                    buf.write(") as &::core::primitive::bool) {");
+                if cond_info.generate_content {
+                    arm_size += this.handle(ctx, &cond.nodes, buf, AstLevel::Nested)?;
                 }
-            } else if pos != 0 {
-                buf.write("} else {");
-                has_else = true;
-            }
+                arm_sizes.push(arm_size);
 
-            if cond_info.generate_content {
-                arm_size += self.handle(ctx, &cond.nodes, buf, AstLevel::Nested)?;
-            }
-            arm_sizes.push(arm_size);
+                if let Some((_, cond_info)) = iter.peek() {
+                    let cond = cond_info.cond;
+
+                    this.handle_ws(cond.ws);
+                    flushed += this.write_buf_writable(ctx, buf)?;
+                } else {
+                    if let Some(ws_after) = conds.ws_after {
+                        this.handle_ws(ws_after);
+                    }
+                    this.handle_ws(if_.ws);
+                    flushed += this.write_buf_writable(ctx, buf)?;
+                }
+                Ok(0)
+            })?;
         }
 
-        if let Some(ws_after) = conds.ws_after {
-            self.handle_ws(ws_after);
-        }
-        self.handle_ws(if_.ws);
-        flushed += self.write_buf_writable(ctx, buf)?;
         if conds.nb_conds > 0 {
             buf.write('}');
-        }
-        if !conds.conds.is_empty() {
-            self.locals.pop();
         }
 
         if !has_else && !conds.conds.is_empty() {
@@ -666,32 +683,36 @@ impl<'a> Generator<'a> {
         buf.write(format_args!("match &{expr_code} {{"));
 
         let mut arm_size = 0;
-        for (i, arm) in arms.iter().enumerate() {
-            self.handle_ws(arm.ws);
-
-            if i > 0 {
-                arm_sizes.push(arm_size + self.write_buf_writable(ctx, buf)?);
-
-                buf.write('}');
-                self.locals.pop();
+        let mut iter = arms.iter().enumerate().peekable();
+        while let Some((i, arm)) = iter.next() {
+            if i == 0 {
+                self.handle_ws(arm.ws);
             }
 
-            self.locals.push();
-            for (index, target) in arm.target.iter().enumerate() {
-                if index != 0 {
-                    buf.write('|');
+            self.push_locals(|this| {
+                for (index, target) in arm.target.iter().enumerate() {
+                    if index != 0 {
+                        buf.write('|');
+                    }
+                    this.visit_target(buf, true, true, target);
                 }
-                self.visit_target(buf, true, true, target);
-            }
-            buf.write(" => {");
+                buf.write(" => {");
 
-            arm_size = self.handle(ctx, &arm.nodes, buf, AstLevel::Nested)?;
+                arm_size = this.handle(ctx, &arm.nodes, buf, AstLevel::Nested)?;
+
+                if let Some((_, arm)) = iter.peek() {
+                    this.handle_ws(arm.ws);
+                    arm_sizes.push(arm_size + this.write_buf_writable(ctx, buf)?);
+
+                    buf.write('}');
+                } else {
+                    this.handle_ws(ws2);
+                    arm_sizes.push(arm_size + this.write_buf_writable(ctx, buf)?);
+                    buf.write('}');
+                }
+                Ok(0)
+            })?;
         }
-
-        self.handle_ws(ws2);
-        arm_sizes.push(arm_size + self.write_buf_writable(ctx, buf)?);
-        buf.write('}');
-        self.locals.pop();
 
         buf.write('}');
 
@@ -706,81 +727,85 @@ impl<'a> Generator<'a> {
         loop_block: &'a WithSpan<'_, Loop<'_>>,
     ) -> Result<usize, CompileError> {
         self.handle_ws(loop_block.ws1);
-        self.locals.push();
+        self.push_locals(|this| {
+            let expr_code = this.visit_expr_root(ctx, &loop_block.iter)?;
 
-        let expr_code = self.visit_expr_root(ctx, &loop_block.iter)?;
+            let has_else_nodes = !loop_block.else_nodes.is_empty();
 
-        let has_else_nodes = !loop_block.else_nodes.is_empty();
-
-        let flushed = self.write_buf_writable(ctx, buf)?;
-        buf.write('{');
-        if has_else_nodes {
-            buf.write("let mut _did_loop = false;");
-        }
-        match &*loop_block.iter {
-            Expr::Range(_, _, _) => buf.write(format_args!("let _iter = {expr_code};")),
-            Expr::Array(..) => buf.write(format_args!("let _iter = {expr_code}.iter();")),
-            // If `iter` is a call then we assume it's something that returns
-            // an iterator. If not then the user can explicitly add the needed
-            // call without issues.
-            Expr::Call(..) | Expr::Index(..) => {
-                buf.write(format_args!("let _iter = ({expr_code}).into_iter();"))
+            let flushed = this.write_buf_writable(ctx, buf)?;
+            buf.write('{');
+            if has_else_nodes {
+                buf.write("let mut _did_loop = false;");
             }
-            // If accessing `self` then it most likely needs to be
-            // borrowed, to prevent an attempt of moving.
-            _ if expr_code.starts_with("self.") => {
-                buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"))
+            match &*loop_block.iter {
+                Expr::Range(_, _, _) => buf.write(format_args!("let _iter = {expr_code};")),
+                Expr::Array(..) => buf.write(format_args!("let _iter = {expr_code}.iter();")),
+                // If `iter` is a call then we assume it's something that returns
+                // an iterator. If not then the user can explicitly add the needed
+                // call without issues.
+                Expr::Call(..) | Expr::Index(..) => {
+                    buf.write(format_args!("let _iter = ({expr_code}).into_iter();"))
+                }
+                // If accessing `self` then it most likely needs to be
+                // borrowed, to prevent an attempt of moving.
+                _ if expr_code.starts_with("self.") => {
+                    buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"))
+                }
+                // If accessing a field then it most likely needs to be
+                // borrowed, to prevent an attempt of moving.
+                Expr::Attr(..) => {
+                    buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"))
+                }
+                // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
+                _ => buf.write(format_args!("let _iter = ({expr_code}).into_iter();")),
             }
-            // If accessing a field then it most likely needs to be
-            // borrowed, to prevent an attempt of moving.
-            Expr::Attr(..) => buf.write(format_args!("let _iter = (&{expr_code}).into_iter();")),
-            // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
-            _ => buf.write(format_args!("let _iter = ({expr_code}).into_iter();")),
-        }
-        if let Some(cond) = &loop_block.cond {
-            self.locals.push();
-            buf.write("let _iter = _iter.filter(|");
-            self.visit_target(buf, true, true, &loop_block.var);
-            buf.write("| -> bool {");
-            self.visit_expr(ctx, buf, cond)?;
-            buf.write("});");
-            self.locals.pop();
-        }
+            if let Some(cond) = &loop_block.cond {
+                this.push_locals(|this| {
+                    buf.write("let _iter = _iter.filter(|");
+                    this.visit_target(buf, true, true, &loop_block.var);
+                    buf.write("| -> bool {");
+                    this.visit_expr(ctx, buf, cond)?;
+                    buf.write("});");
+                    Ok(0)
+                })?;
+            }
 
-        self.locals.push();
-        buf.write("for (");
-        self.visit_target(buf, true, true, &loop_block.var);
-        buf.write(", _loop_item) in ");
-        buf.write(CRATE);
-        buf.write("::helpers::TemplateLoop::new(_iter) {");
+            let size_hint1 = this.push_locals(|this| {
+                buf.write("for (");
+                this.visit_target(buf, true, true, &loop_block.var);
+                buf.write(", _loop_item) in ");
+                buf.write(CRATE);
+                buf.write("::helpers::TemplateLoop::new(_iter) {");
 
-        if has_else_nodes {
-            buf.write("_did_loop = true;");
-        }
-        let mut size_hint1 = self.handle(ctx, &loop_block.body, buf, AstLevel::Nested)?;
-        self.handle_ws(loop_block.ws2);
-        size_hint1 += self.write_buf_writable(ctx, buf)?;
-        self.locals.pop();
-        buf.write('}');
-
-        let mut size_hint2;
-        if has_else_nodes {
-            buf.write("if !_did_loop {");
-            self.locals.push();
-            size_hint2 = self.handle(ctx, &loop_block.else_nodes, buf, AstLevel::Nested)?;
-            self.handle_ws(loop_block.ws3);
-            size_hint2 += self.write_buf_writable(ctx, buf)?;
-            self.locals.pop();
+                if has_else_nodes {
+                    buf.write("_did_loop = true;");
+                }
+                let mut size_hint1 = this.handle(ctx, &loop_block.body, buf, AstLevel::Nested)?;
+                this.handle_ws(loop_block.ws2);
+                size_hint1 += this.write_buf_writable(ctx, buf)?;
+                Ok(size_hint1)
+            })?;
             buf.write('}');
-        } else {
-            self.handle_ws(loop_block.ws3);
-            size_hint2 = self.write_buf_writable(ctx, buf)?;
-        }
 
-        buf.write('}');
-        self.locals.pop();
+            let size_hint2;
+            if has_else_nodes {
+                buf.write("if !_did_loop {");
+                size_hint2 = this.push_locals(|this| {
+                    let mut size_hint =
+                        this.handle(ctx, &loop_block.else_nodes, buf, AstLevel::Nested)?;
+                    this.handle_ws(loop_block.ws3);
+                    size_hint += this.write_buf_writable(ctx, buf)?;
+                    Ok(size_hint)
+                })?;
+                buf.write('}');
+            } else {
+                this.handle_ws(loop_block.ws3);
+                size_hint2 = this.write_buf_writable(ctx, buf)?;
+            }
 
-        Ok(flushed + ((size_hint1 * 3) + size_hint2) / 2)
+            buf.write('}');
+            Ok(flushed + ((size_hint1 * 3) + size_hint2) / 2)
+        })
     }
 
     fn write_call(
@@ -821,125 +846,126 @@ impl<'a> Generator<'a> {
         };
 
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
-        self.locals.push();
-        self.write_buf_writable(ctx, buf)?;
-        buf.write('{');
-        self.prepare_ws(def.ws1);
+        let size_hint = self.push_locals(|this| {
+            this.write_buf_writable(ctx, buf)?;
+            buf.write('{');
+            this.prepare_ws(def.ws1);
 
-        let mut names = Buffer::new();
-        let mut values = Buffer::new();
-        let mut is_first_variable = true;
-        if args.len() != def.args.len() {
-            return Err(ctx.generate_error(
-                &format!(
-                    "macro {name:?} expected {} argument{}, found {}",
-                    def.args.len(),
-                    if def.args.len() != 1 { "s" } else { "" },
-                    args.len()
-                ),
-                call,
-            ));
-        }
-        let mut named_arguments = HashMap::new();
-        // Since named arguments can only be passed last, we only need to check if the last argument
-        // is a named one.
-        if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
-            // First we check that all named arguments actually exist in the called item.
-            for arg in args.iter().rev() {
-                let Expr::NamedArgument(arg_name, _) = &**arg else {
-                    break;
-                };
-                if !def.args.iter().any(|arg| arg == arg_name) {
-                    return Err(ctx.generate_error(
-                        &format!("no argument named `{arg_name}` in macro {name:?}"),
-                        call,
-                    ));
-                }
-                named_arguments.insert(Cow::Borrowed(arg_name), arg);
+            let mut names = Buffer::new();
+            let mut values = Buffer::new();
+            let mut is_first_variable = true;
+            if args.len() != def.args.len() {
+                return Err(ctx.generate_error(
+                    &format!(
+                        "macro {name:?} expected {} argument{}, found {}",
+                        def.args.len(),
+                        if def.args.len() != 1 { "s" } else { "" },
+                        args.len()
+                    ),
+                    call,
+                ));
             }
-        }
-
-        // Handling both named and unnamed arguments requires to be careful of the named arguments
-        // order. To do so, we iterate through the macro defined arguments and then check if we have
-        // a named argument with this name:
-        //
-        // * If there is one, we add it and move to the next argument.
-        // * If there isn't one, then we pick the next argument (we can do it without checking
-        //   anything since named arguments are always last).
-        let mut allow_positional = true;
-        for (index, arg) in def.args.iter().enumerate() {
-            let expr = match named_arguments.get(&Cow::Borrowed(arg)) {
-                Some(expr) => {
-                    allow_positional = false;
-                    expr
-                }
-                None => {
-                    if !allow_positional {
-                        // If there is already at least one named argument, then it's not allowed
-                        // to use unnamed ones at this point anymore.
+            let mut named_arguments = HashMap::new();
+            // Since named arguments can only be passed last, we only need to check if the last argument
+            // is a named one.
+            if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
+                // First we check that all named arguments actually exist in the called item.
+                for arg in args.iter().rev() {
+                    let Expr::NamedArgument(arg_name, _) = &**arg else {
+                        break;
+                    };
+                    if !def.args.iter().any(|arg| arg == arg_name) {
                         return Err(ctx.generate_error(
-                            &format!(
-                            "cannot have unnamed argument (`{arg}`) after named argument in macro \
-                             {name:?}"
-                        ),
+                            &format!("no argument named `{arg_name}` in macro {name:?}"),
                             call,
                         ));
                     }
-                    &args[index]
-                }
-            };
-            match &**expr {
-                // If `expr` is already a form of variable then
-                // don't reintroduce a new variable. This is
-                // to avoid moving non-copyable values.
-                Expr::Var(name) if *name != "self" => {
-                    let var = self.locals.resolve_or_self(name);
-                    self.locals
-                        .insert(Cow::Borrowed(arg), LocalMeta::with_ref(var));
-                }
-                Expr::Attr(obj, attr) => {
-                    let mut attr_buf = Buffer::new();
-                    self.visit_attr(ctx, &mut attr_buf, obj, attr)?;
-
-                    let var = self.locals.resolve(&attr_buf.buf).unwrap_or(attr_buf.buf);
-                    self.locals
-                        .insert(Cow::Borrowed(arg), LocalMeta::with_ref(var));
-                }
-                // Everything else still needs to become variables,
-                // to avoid having the same logic be executed
-                // multiple times, e.g. in the case of macro
-                // parameters being used multiple times.
-                _ => {
-                    if is_first_variable {
-                        is_first_variable = false
-                    } else {
-                        names.write(',');
-                        values.write(',');
-                    }
-                    names.write(arg);
-
-                    values.write('(');
-                    if !is_copyable(expr) {
-                        values.write('&');
-                    }
-                    values.write(self.visit_expr_root(ctx, expr)?);
-                    values.write(')');
-                    self.locals.insert_with_default(Cow::Borrowed(arg));
+                    named_arguments.insert(Cow::Borrowed(arg_name), arg);
                 }
             }
-        }
 
-        debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
-        if !names.buf.is_empty() {
-            buf.write(format_args!("let ({}) = ({});", names.buf, values.buf));
-        }
+            // Handling both named and unnamed arguments requires to be careful of the named arguments
+            // order. To do so, we iterate through the macro defined arguments and then check if we have
+            // a named argument with this name:
+            //
+            // * If there is one, we add it and move to the next argument.
+            // * If there isn't one, then we pick the next argument (we can do it without checking
+            //   anything since named arguments are always last).
+            let mut allow_positional = true;
+            for (index, arg) in def.args.iter().enumerate() {
+                let expr = match named_arguments.get(&Cow::Borrowed(arg)) {
+                    Some(expr) => {
+                        allow_positional = false;
+                        expr
+                    }
+                    None => {
+                        if !allow_positional {
+                            // If there is already at least one named argument, then it's not allowed
+                            // to use unnamed ones at this point anymore.
+                            return Err(ctx.generate_error(
+                                &format!(
+                                "cannot have unnamed argument (`{arg}`) after named argument in macro \
+                                 {name:?}"
+                            ),
+                                call,
+                            ));
+                        }
+                        &args[index]
+                    }
+                };
+                match &**expr {
+                    // If `expr` is already a form of variable then
+                    // don't reintroduce a new variable. This is
+                    // to avoid moving non-copyable values.
+                    Expr::Var(name) if *name != "self" => {
+                        let var = this.locals.resolve_or_self(name);
+                        this.locals
+                            .insert(Cow::Borrowed(arg), LocalMeta::with_ref(var));
+                    }
+                    Expr::Attr(obj, attr) => {
+                        let mut attr_buf = Buffer::new();
+                        this.visit_attr(ctx, &mut attr_buf, obj, attr)?;
 
-        let mut size_hint = self.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
+                        let var = this.locals.resolve(&attr_buf.buf).unwrap_or(attr_buf.buf);
+                        this.locals
+                            .insert(Cow::Borrowed(arg), LocalMeta::with_ref(var));
+                    }
+                    // Everything else still needs to become variables,
+                    // to avoid having the same logic be executed
+                    // multiple times, e.g. in the case of macro
+                    // parameters being used multiple times.
+                    _ => {
+                        if is_first_variable {
+                            is_first_variable = false
+                        } else {
+                            names.write(',');
+                            values.write(',');
+                        }
+                        names.write(arg);
 
-        self.flush_ws(def.ws2);
-        size_hint += self.write_buf_writable(ctx, buf)?;
-        buf.write('}');
-        self.locals.pop();
+                        values.write('(');
+                        if !is_copyable(expr) {
+                            values.write('&');
+                        }
+                        values.write(this.visit_expr_root(ctx, expr)?);
+                        values.write(')');
+                        this.locals.insert_with_default(Cow::Borrowed(arg));
+                    }
+                }
+            }
+
+            debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
+            if !names.buf.is_empty() {
+                buf.write(format_args!("let ({}) = ({});", names.buf, values.buf));
+            }
+
+            let mut size_hint = this.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
+
+            this.flush_ws(def.ws2);
+            size_hint += this.write_buf_writable(ctx, buf)?;
+            buf.write('}');
+            Ok(size_hint)
+        })?;
         self.prepare_ws(ws);
         Ok(size_hint)
     }
@@ -961,12 +987,13 @@ impl<'a> Generator<'a> {
             "let {FILTER_SOURCE} = {CRATE}::helpers::FmtCell::new(\
                 |writer: &mut ::core::fmt::Formatter<'_>| -> {CRATE}::Result<()> {{"
         ));
-        self.locals.push();
-        self.prepare_ws(filter.ws1);
-        let size_hint = self.handle(ctx, &filter.nodes, buf, AstLevel::Nested)?;
-        self.flush_ws(filter.ws2);
-        self.write_buf_writable(ctx, buf)?;
-        self.locals.pop();
+        let size_hint = self.push_locals(|this| {
+            this.prepare_ws(filter.ws1);
+            let size_hint = this.handle(ctx, &filter.nodes, buf, AstLevel::Nested)?;
+            this.flush_ws(filter.ws2);
+            this.write_buf_writable(ctx, buf)?;
+            Ok(size_hint)
+        })?;
         buf.write(format_args!("{CRATE}::Result::Ok(())"));
         buf.write("});");
 
@@ -2634,15 +2661,6 @@ where
         V: Default,
     {
         self.insert(key, V::default());
-    }
-
-    fn push(&mut self) {
-        self.scopes.push(HashMap::default());
-    }
-
-    fn pop(&mut self) {
-        self.scopes.pop().unwrap();
-        assert!(!self.scopes.is_empty());
     }
 }
 
