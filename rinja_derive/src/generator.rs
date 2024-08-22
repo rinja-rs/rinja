@@ -778,6 +778,7 @@ impl<'a> Generator<'a> {
         }
 
         buf.write('}');
+        self.locals.pop();
 
         Ok(flushed + ((size_hint1 * 3) + size_hint2) / 2)
     }

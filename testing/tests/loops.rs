@@ -435,3 +435,28 @@ fn test_for_in_if() {
     let t = ForInIf { limit: 1 };
     assert_eq!(t.render().unwrap(), ":(");
 }
+
+// This is a regression test for <https://github.com/rinja-rs/rinja/issues/150>.
+// The loop didn't drop its locals context, creating a bug where a field could
+// not be retrieved although it existed.
+#[derive(Template)]
+#[template(
+    source = r#"
+{%- macro mac(bla) -%}
+{% for x in &[1] -%}
+{% endfor -%}
+{% endmacro -%}
+
+{% call mac(bla=bla) %}
+{{- bla }}"#,
+    ext = "txt"
+)]
+struct LoopLocalsContext {
+    bla: u8,
+}
+
+#[test]
+fn test_loop_locals() {
+    let t = LoopLocalsContext { bla: 10 };
+    assert_eq!(t.render().unwrap(), "10");
+}
