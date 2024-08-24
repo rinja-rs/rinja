@@ -1010,6 +1010,26 @@ fn test_parse_array() {
             }))
         )],
     );
+
+    let n = || {
+        Node::Expr(
+            Ws(None, None),
+            WithSpan::no_span(Expr::Array(vec![WithSpan::no_span(Expr::NumLit(
+                "1",
+                Num::Int("1", None),
+            ))])),
+        )
+    };
+    assert_eq!(
+        Ast::from_str(
+            "{{ [1,] }}{{ [1 ,] }}{{ [1, ] }}{{ [1 , ] }}",
+            None,
+            &syntax
+        )
+        .unwrap()
+        .nodes,
+        vec![n(), n(), n(), n()],
+    );
 }
 
 #[test]

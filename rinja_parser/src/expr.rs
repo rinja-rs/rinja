@@ -7,7 +7,7 @@ use nom::character::complete::{char, digit1};
 use nom::combinator::{consumed, cut, fail, map, not, opt, peek, recognize, value};
 use nom::error::ErrorKind;
 use nom::error_position;
-use nom::multi::{fold_many0, many0, separated_list0};
+use nom::multi::{fold_many0, many0, separated_list0, separated_list1};
 use nom::sequence::{pair, preceded, terminated, tuple};
 
 use crate::{
@@ -327,18 +327,22 @@ impl<'a> Expr<'a> {
     }
 
     fn array(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let (_, level) = level.nest(i)?;
         let start = i;
-        preceded(
+        let (i, level) = level.nest(i)?;
+        let (i, array) = preceded(
             ws(char('[')),
             cut(terminated(
-                map(
-                    separated_list0(char(','), ws(move |i| Self::parse(i, level))),
-                    |i| WithSpan::new(Self::Array(i), start),
-                ),
+                opt(terminated(
+                    separated_list1(char(','), ws(move |i| Self::parse(i, level))),
+                    ws(opt(char(','))),
+                )),
                 char(']'),
             )),
-        )(i)
+        )(i)?;
+        Ok((
+            i,
+            WithSpan::new(Self::Array(array.unwrap_or_default()), start),
+        ))
     }
 
     fn path_var_bool(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
