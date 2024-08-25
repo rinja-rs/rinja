@@ -1,6 +1,6 @@
 [package]
 name = "rinja_parser"
-version = "0.3.1"
+version = "0.3.2"
 description = "Parser for Rinja templates"
 documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
