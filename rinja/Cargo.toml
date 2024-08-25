@@ -1,6 +1,6 @@
 [package]
 name = "rinja"
-version = "0.3.1"
+version = "0.3.2"
 description = "Type-safe, compiled Jinja-like templates for Rust"
 documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
@@ -37,7 +37,7 @@ with-rocket = ["rinja_derive/with-rocket"]
 with-warp = ["rinja_derive/with-warp"]
 
 [dependencies]
-rinja_derive = { version = "=0.3.1", path = "../rinja_derive" }
+rinja_derive = { version = "=0.3.2", path = "../rinja_derive" }
 
 humansize = { version = "2", optional = true }
 num-traits = { version = "0.2.6", optional = true }

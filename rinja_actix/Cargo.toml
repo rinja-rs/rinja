@@ -1,6 +1,6 @@
 [package]
 name = "rinja_actix"
-version = "0.3.1"
+version = "0.3.2"
 description = "Actix-Web integration for Rinja templates"
 documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
@@ -17,7 +17,7 @@ all-features = true
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
 [dependencies]
-rinja = { version = "0.3.1", path = "../rinja", default-features = false, features = ["with-actix-web"] }
+rinja = { version = "0.3.2", path = "../rinja", default-features = false, features = ["with-actix-web"] }
 
 actix-web = { version = "4", default-features = false }
 
