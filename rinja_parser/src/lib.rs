@@ -762,14 +762,14 @@ impl Default for InnerSyntax<'static> {
     }
 }
 
-impl<'a> fmt::Debug for InnerSyntax<'a> {
+impl<'a> fmt::Debug for Syntax<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt_syntax("Syntax", self, f)
     }
 }
 
-impl<'a> fmt::Debug for Syntax<'a> {
+impl<'a> fmt::Debug for InnerSyntax<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt_syntax("InnerSyntax", self, f)
