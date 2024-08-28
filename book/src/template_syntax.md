@@ -743,10 +743,10 @@ let t = RenderInPlace { s1: SectionOne { a: "a", b: "b" } };
 assert_eq!(t.render().unwrap(), "Section 1: A=a\nB=b")
 ```
 
-**Note that if your inner template** like `SectionOne` **renders HTML content, you may want to
-disable escaping** when injecting it into an outer template, e.g. `{{ s1|safe }}`.
+Note that if your inner template like `SectionOne` renders HTML content, then you may want to
+disable escaping when injecting it into an outer template, e.g. `{{ s1|safe }}`.
 Otherwise it will render the HTML content literally, because
-Askama [escapes HTML variables](#html-escaping) by default.
+rinja [escapes HTML variables](#html-escaping) by default.
 
 See the example
 [render in place](https://github.com/rinja-rs/rinja/blob/master/testing/tests/render_in_place.rs)
