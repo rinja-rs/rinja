@@ -7,6 +7,10 @@ on:
   schedule:
     - cron: "32 4 * * 5"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Test:
     strategy:
@@ -151,3 +155,27 @@ jobs:
             cargo sort --check --check-format --grouped
             cd - > /dev/null
           done
+
+  Fuzz:
+    strategy:
+      matrix:
+        fuzz_target:
+          - all
+          - filters
+          - html
+          - parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rust-src
+      - run: curl --location --silent --show-error --fail https://github.com/cargo-bins/cargo-quickinstall/releases/download/cargo-fuzz-0.12.0/cargo-fuzz-0.12.0-x86_64-unknown-linux-gnu.tar.gz | tar -xzvvf - -C $HOME/.cargo/bin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fuzz run ${{ matrix.fuzz_target }} --jobs 4 -- -max_total_time=90
+        working-directory: fuzzing
+        env:
+          RUSTFLAGS: '-Ctarget-feature=-crt-static'
