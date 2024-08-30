@@ -433,7 +433,7 @@ impl TemplateArgs {
     }
 }
 
-/// Try to find the souce in the comment, in a `rinja` code block.
+/// Try to find the source in the comment, in a `rinja` code block.
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
 fn source_from_docs(

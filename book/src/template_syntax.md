@@ -196,7 +196,7 @@ struct MyTemplate {
 
 However, since we'll need to define this function every time we create an
 instance of `MyTemplate`, it's probably not the most ideal way to associate
-some behaviour for our template.
+some behavior for our template.
 
 ### Static functions
 
