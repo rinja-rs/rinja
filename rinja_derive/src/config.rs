@@ -337,7 +337,7 @@ impl RawConfig<'_> {
 #[cfg_attr(feature = "config", derive(Deserialize))]
 #[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
 pub(crate) enum WhitespaceHandling {
-    /// The default behaviour. It will leave the whitespace characters "as is".
+    /// The default behavior. It will leave the whitespace characters "as is".
     #[default]
     Preserve,
     /// It'll remove all the whitespace characters before and after the jinja block.

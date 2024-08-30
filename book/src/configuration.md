@@ -54,7 +54,7 @@ Hello
 To be noted, if one of the trimmed characters is a newline, then the only
 character remaining will be a newline.
 
-If you want this to be the default behaviour, you can set `whitespace` to
+If you want this to be the default behavior, you can set `whitespace` to
 `"minimize"`.
 
 To be noted: you can also configure `whitespace` directly into the `template`

@@ -179,3 +179,9 @@ jobs:
         working-directory: fuzzing
         env:
           RUSTFLAGS: '-Ctarget-feature=-crt-static'
+
+  Typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@master

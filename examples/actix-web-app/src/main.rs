@@ -55,7 +55,7 @@ enum Error {
 ///
 /// The same type is used by actix-web as part of the URL, and in rinja to select what content to
 /// show, and also as an HTML attribute in `<html lang=`. To make it possible to use the same type
-/// for three diffent use cases, we use a few derive macros:
+/// for three different use cases, we use a few derive macros:
 ///
 ///  * `Default` to have a default/fallback language.
 ///  * `Debug` is not strictly needed, but it might aid debugging.
@@ -105,7 +105,7 @@ async fn not_found_handler(req: HttpRequest) -> Result<impl Responder> {
     }
 }
 
-/// The is first page your user hits does not contain language infomation, so we redirect them
+/// The is first page your user hits does not contain language information, so we redirect them
 /// to a URL that does contain the default language.
 #[get("/")]
 async fn start_handler(req: HttpRequest) -> Result<impl Responder> {
@@ -139,7 +139,7 @@ async fn index_handler(
     // `{% if lang !=`, the former to select the text of a specific language, e.g. in the `<title>`;
     // and the latter to display references to all other available languages except the currently
     // selected one.
-    // The field `name` will contain the value of the query paramater of the same name.
+    // The field `name` will contain the value of the query parameter of the same name.
     // In `IndexHandlerQuery` we annotated the field with `#[serde(default)]`, so if the value is
     // absent, an empty string is selected by default, which is visible to the user an empty
     // `<input type="text" />` element.
