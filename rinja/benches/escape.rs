@@ -11,7 +11,7 @@ fn functions(c: &mut Criterion) {
 fn escaping(b: &mut criterion::Bencher<'_>) {
     b.iter(|| {
         for &s in black_box(STRINGS) {
-            format!("{}", escape(s, Html).unwrap());
+            let _ = black_box(format!("{}", escape(s, Html).unwrap()));
         }
     });
 }
