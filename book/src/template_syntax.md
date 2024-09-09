@@ -619,6 +619,24 @@ You can also match against multiple alternative patterns at once:
 {% endmatch %}
 ```
 
+For better interoperability with linters and auto-formatters like [djLint],
+you can also use a optional `{% endwhen %}` node to close a `{% when %}` case:
+
+```jinja
+{% match number %}
+  {% when 0 | 2 | 4 | 6 | 8 %}
+    even
+  {% endwhen %}
+  {% when 1 | 3 | 5 | 7 | 9 %}
+    odd
+  {% endwhen %}
+  {% else }
+    unknown
+{% endmatch %}
+```
+
+[djLint]: <https://github.com/djlint/djlint>
+
 ### Referencing and dereferencing variables
 
 If you need to put something behind a reference or to dereference it, you
