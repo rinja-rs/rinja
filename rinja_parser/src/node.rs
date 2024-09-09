@@ -204,6 +204,33 @@ impl<'a> When<'a> {
     #[allow(clippy::self_named_constructors)]
     fn when(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
+        let endwhen = map(
+            consumed(ws(pair(
+                delimited(
+                    |i| s.tag_block_start(i),
+                    opt(Whitespace::parse),
+                    ws(keyword("endwhen")),
+                ),
+                cut(tuple((
+                    opt(Whitespace::parse),
+                    |i| s.tag_block_end(i),
+                    many0(value((), ws(|i| Comment::parse(i, s)))),
+                ))),
+            ))),
+            |(span, (pws, _))| {
+                // A comment node is used to pass the whitespace suppressing information to the
+                // generator. This way we don't have to fix up the next `when` node or the closing
+                // `endmatch`. Any whitespaces after `endwhen` are to be suppressed. Actually, they
+                // don't wind up in the AST anyway.
+                Node::Comment(WithSpan::new(
+                    Comment {
+                        ws: Ws(pws, Some(Whitespace::Suppress)),
+                        content: "",
+                    },
+                    span,
+                ))
+            },
+        );
         let mut p = tuple((
             |i| s.tag_block_start(i),
             opt(Whitespace::parse),
@@ -213,9 +240,13 @@ impl<'a> When<'a> {
                 opt(Whitespace::parse),
                 |i| s.tag_block_end(i),
                 cut(|i| Node::many(i, s)),
+                opt(endwhen),
             ))),
         ));
-        let (i, (_, pws, _, (target, nws, _, nodes))) = p(i)?;
+        let (i, (_, pws, _, (target, nws, _, mut nodes, endwhen))) = p(i)?;
+        if let Some(endwhen) = endwhen {
+            nodes.push(endwhen);
+        }
         Ok((
             i,
             WithSpan::new(
