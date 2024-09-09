@@ -175,7 +175,7 @@ pub struct When<'a> {
 }
 
 impl<'a> When<'a> {
-    fn r#match(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn r#else(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
         let mut p = tuple((
             |i| s.tag_block_start(i),
@@ -658,15 +658,15 @@ impl<'a> Match<'a> {
                 cut(tuple((
                     ws(many0(ws(value((), |i| Comment::parse(i, s))))),
                     many0(|i| When::when(i, s)),
-                    cut(tuple((
-                        opt(|i| When::r#match(i, s)),
+                    cut(pair(
+                        opt(|i| When::r#else(i, s)),
                         cut(tuple((
                             ws(|i| check_block_start(i, start, s, "match", "endmatch")),
                             opt(Whitespace::parse),
                             end_node("match", "endmatch"),
                             opt(Whitespace::parse),
                         ))),
-                    ))),
+                    )),
                 ))),
             ))),
         ));
