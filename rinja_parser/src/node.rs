@@ -318,6 +318,22 @@ impl Whitespace {
     }
 }
 
+fn check_block_start<'a>(
+    i: &'a str,
+    start: &'a str,
+    s: &State<'_>,
+    node: &str,
+    expected: &str,
+) -> ParseResult<'a> {
+    if i.is_empty() {
+        return Err(nom::Err::Failure(ErrorContext::new(
+            format!("expected `{expected}` to terminate `{node}` node, found nothing"),
+            start,
+        )));
+    }
+    s.tag_block_start(i)
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Loop<'a> {
     pub ws1: Ws,
@@ -376,7 +392,7 @@ impl<'a> Loop<'a> {
                     cut(tuple((
                         |i| content(i, s),
                         cut(tuple((
-                            |i| s.tag_block_start(i),
+                            |i| check_block_start(i, start, s, "for", "endfor"),
                             opt(Whitespace::parse),
                             opt(else_block),
                             end_node("for", "endfor"),
@@ -449,7 +465,7 @@ impl<'a> Macro<'a> {
         let mut end = cut(tuple((
             |i| Node::many(i, s),
             cut(tuple((
-                |i| s.tag_block_start(i),
+                |i| check_block_start(i, start_s, s, "macro", "endmacro"),
                 opt(Whitespace::parse),
                 end_node("macro", "endmacro"),
                 cut(preceded(
@@ -525,7 +541,7 @@ impl<'a> FilterBlock<'a> {
         let mut end = cut(tuple((
             |i| Node::many(i, s),
             cut(tuple((
-                |i| s.tag_block_start(i),
+                |i| check_block_start(i, start_s, s, "filter", "endfilter"),
                 opt(Whitespace::parse),
                 end_node("filter", "endfilter"),
                 opt(Whitespace::parse),
@@ -645,7 +661,7 @@ impl<'a> Match<'a> {
                     cut(tuple((
                         opt(|i| When::r#match(i, s)),
                         cut(tuple((
-                            ws(|i| s.tag_block_start(i)),
+                            ws(|i| check_block_start(i, start, s, "match", "endmatch")),
                             opt(Whitespace::parse),
                             end_node("match", "endmatch"),
                             opt(Whitespace::parse),
@@ -704,7 +720,7 @@ impl<'a> BlockDef<'a> {
         let mut end = cut(tuple((
             |i| Node::many(i, s),
             cut(tuple((
-                |i| s.tag_block_start(i),
+                |i| check_block_start(i, start_s, s, "block", "endblock"),
                 opt(Whitespace::parse),
                 end_node("block", "endblock"),
                 cut(tuple((
@@ -893,7 +909,7 @@ impl<'a> If<'a> {
                     |i| Node::many(i, s),
                     many0(|i| Cond::parse(i, s)),
                     cut(tuple((
-                        |i| s.tag_block_start(i),
+                        |i| check_block_start(i, start, s, "if", "endif"),
                         opt(Whitespace::parse),
                         end_node("if", "endif"),
                         opt(Whitespace::parse),
