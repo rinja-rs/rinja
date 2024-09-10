@@ -1,4 +1,4 @@
-error: failed to parse template source
+error: unknown node `fail`
  --> <source attribute>:2:6
        " fail %}\n{% endif %}"
  --> tests/ui/rinja-block.rs:5:1

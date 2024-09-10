@@ -13,10 +13,10 @@ use std::{fmt, str};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
 use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, recognize, value};
+use nom::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
 use nom::error::{ErrorKind, FromExternalError};
 use nom::multi::{many0_count, many1};
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::sequence::{delimited, pair, preceded, tuple};
 use nom::{AsChar, InputTakeAtPosition};
 
 pub mod expr;
@@ -110,21 +110,18 @@ impl<'a> Ast<'a> {
         file_path: Option<Arc<Path>>,
         syntax: &Syntax<'_>,
     ) -> Result<Self, ParseError> {
-        let parse = |i: &'a str| Node::many(i, &State::new(syntax));
-        let (input, message) = match complete(terminated(parse, cut(eof)))(src) {
-            Ok(("", nodes)) => return Ok(Self { nodes }),
-            Ok(_) => unreachable!("eof() is not eof?"),
-            Err(nom::Err::Incomplete(_)) => unreachable!("complete() is not complete?"),
+        match Node::parse_template(src, &State::new(syntax)) {
+            Ok(("", nodes)) => Ok(Self { nodes }),
+            Ok(_) | Err(nom::Err::Incomplete(_)) => unreachable!(),
             Err(
                 nom::Err::Error(ErrorContext { input, message, .. })
                 | nom::Err::Failure(ErrorContext { input, message, .. }),
-            ) => (input, message),
-        };
-        Err(ParseError {
-            message,
-            offset: src.len() - input.len(),
-            file_path,
-        })
+            ) => Err(ParseError {
+                message,
+                offset: src.len() - input.len(),
+                file_path,
+            }),
+        }
     }
 
     pub fn nodes(&self) -> &[Node<'a>] {
