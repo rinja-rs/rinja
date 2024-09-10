@@ -620,7 +620,7 @@ You can also match against multiple alternative patterns at once:
 ```
 
 For better interoperability with linters and auto-formatters like [djLint],
-you can also use a optional `{% endwhen %}` node to close a `{% when %}` case:
+you can also use an optional `{% endwhen %}` node to close a `{% when %}` case:
 
 ```jinja
 {% match number %}
