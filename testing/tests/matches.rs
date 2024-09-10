@@ -265,3 +265,38 @@ fn test_match_with_patterns() {
     let s = MatchPatterns { n: 12 };
     assert_eq!(s.render().unwrap(), "12");
 }
+
+#[derive(Template)]
+#[template(in_doc = true, ext = "html")]
+/// ```rinja
+/// {% match result %}
+///     {% when Some(Ok(s)) -%}
+///         good: {{s}}
+///     {%- endwhen +%}
+///     {# This is not good: #}
+///     {%+ when Some(Err(s)) -%}
+///         bad: {{s}}
+///     {%- endwhen +%}
+///     {%+ else -%}
+///         unprocessed
+/// {% endmatch %}
+/// ```
+struct EndWhen<'a> {
+    result: Option<Result<&'a str, &'a str>>,
+}
+
+#[test]
+fn test_end_when() {
+    let tmpl = EndWhen {
+        result: Some(Ok("msg")),
+    };
+    assert_eq!(tmpl.to_string(), "good: msg");
+
+    let tmpl = EndWhen {
+        result: Some(Err("msg")),
+    };
+    assert_eq!(tmpl.to_string(), "bad: msg");
+
+    let tmpl = EndWhen { result: None };
+    assert_eq!(tmpl.to_string(), "unprocessed\n");
+}
