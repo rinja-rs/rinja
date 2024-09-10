@@ -721,6 +721,7 @@ fn test_odd_calls() {
 
 #[test]
 fn test_parse_comments() {
+    #[track_caller]
     fn one_comment_ws(source: &str, ws: Ws) {
         let s = &Syntax::default();
         let mut nodes = Ast::from_str(source, None, s).unwrap().nodes;

@@ -2,8 +2,10 @@ use std::str;
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till};
-use nom::character::complete::char;
-use nom::combinator::{complete, consumed, cut, eof, fail, map, not, opt, peek, recognize, value};
+use nom::character::complete::{anychar, char};
+use nom::combinator::{
+    complete, consumed, cut, eof, fail, map, map_opt, not, opt, peek, recognize, value,
+};
 use nom::multi::{many0, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded, tuple};
 
@@ -426,11 +428,16 @@ pub enum Whitespace {
 
 impl Whitespace {
     fn parse(i: &str) -> ParseResult<'_, Self> {
-        alt((
-            value(Self::Preserve, char('+')),
-            value(Self::Suppress, char('-')),
-            value(Self::Minimize, char('~')),
-        ))(i)
+        map_opt(anychar, Self::parse_char)(i)
+    }
+
+    fn parse_char(c: char) -> Option<Self> {
+        match c {
+            '+' => Some(Self::Preserve),
+            '-' => Some(Self::Suppress),
+            '~' => Some(Self::Minimize),
+            _ => None,
+        }
     }
 }
 
@@ -1226,12 +1233,12 @@ impl<'a> Comment<'a> {
             ))(i)
         }
 
-        fn content<'a>(mut i: &'a str, s: &State<'_>) -> ParseResult<'a, ()> {
+        fn content<'a>(mut i: &'a str, s: &State<'_>) -> ParseResult<'a> {
             let mut depth = 0usize;
+            let start = i;
             loop {
-                let start = i;
                 let splitter = Splitter2::new(s.syntax.comment_start, s.syntax.comment_end);
-                let (_, tag) = opt(skip_till(splitter, |i| tag(i, s)))(i)?;
+                let (k, tag) = opt(skip_till(splitter, |i| tag(i, s)))(i)?;
                 let Some((j, tag)) = tag else {
                     return Err(
                         ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),
@@ -1249,7 +1256,7 @@ impl<'a> Comment<'a> {
                     },
                     Tag::Close => match depth.checked_sub(1) {
                         Some(new_depth) => depth = new_depth,
-                        None => return Ok((j, ())),
+                        None => return Ok((j, &start[..start.len() - k.len()])),
                     },
                 }
                 i = j;
@@ -1257,31 +1264,28 @@ impl<'a> Comment<'a> {
         }
 
         let start = i;
-        let (i, (pws, content)) = pair(
-            preceded(|i| s.tag_comment_start(i), opt(Whitespace::parse)),
-            recognize(cut_node(Some("comment"), |i| content(i, s))),
+        let (i, content) = preceded(
+            |i| s.tag_comment_start(i),
+            cut_node(Some("comment"), |i| content(i, s)),
         )(i)?;
 
-        let mut nws = None;
-        if let Some(content) = content.strip_suffix(s.syntax.comment_end) {
-            nws = match content.chars().last() {
-                Some('-') => Some(Whitespace::Suppress),
-                Some('+') => Some(Whitespace::Preserve),
-                Some('~') => Some(Whitespace::Minimize),
-                _ => None,
-            }
-        };
-
-        Ok((
-            i,
-            WithSpan::new(
-                Self {
-                    ws: Ws(pws, nws),
-                    content,
-                },
+        let mut ws = Ws(None, None);
+        if content.len() == 1 && matches!(content, "-" | "+" | "~") {
+            return Err(nom::Err::Failure(ErrorContext::new(
+                format!(
+                    "ambiguous whitespace stripping\n\
+                     use `{}{content} {content}{}` to apply the same whitespace stripping on both \
+                     sides",
+                    s.syntax.comment_start, s.syntax.comment_end,
+                ),
                 start,
-            ),
-        ))
+            )));
+        } else if content.len() >= 2 {
+            ws.0 = Whitespace::parse_char(content.chars().next().unwrap_or_default());
+            ws.1 = Whitespace::parse_char(content.chars().next_back().unwrap_or_default());
+        }
+
+        Ok((i, WithSpan::new(Self { ws, content }, start)))
     }
 }
 
