@@ -35,6 +35,7 @@ Enable it with Cargo features (see below for more information).
   * [`linebreaksbr`][#linebreaksbr]
   * [`lower|lowercase`][#lower]
   * [`paragraphbreaks`][#paragraphbreaks]
+  * [`pluralize`][#pluralize]
   * [`ref`][#ref]
   * [`safe`][#safe]
   * [`title`][#title]
@@ -310,6 +311,33 @@ Output:
 ```text
 hello
 ```
+
+### `pluralize`
+[#pluralize]: #pluralize
+
+Select a singular or plural version of a word, depending on the input value.
+
+If the value of `self.count` is +1 or -1, then "cat" is returned, otherwise "cats":
+
+```jinja
+cat{{ count|pluralize }}
+```
+
+You can override the default empty singular suffix, e.g. to spell "doggo" for a single dog:
+
+```jinja
+dog{{ count|pluralize("go") }}
+```
+
+If the word cannot be declined by simply adding a suffix,
+then you can also override singular and the plural, too:
+
+```jinja
+{{ count|pluralize("mouse", "mice") }}
+```
+
+More complex languages that know multiple plurals might be impossible to implement with this filter,
+though.
 
 ### ref
 [#ref]: #ref

@@ -1538,6 +1538,7 @@ impl<'a> Generator<'a> {
             "linebreaks" | "linebreaksbr" | "paragraphbreaks" => {
                 return self._visit_linebreaks_filter(ctx, buf, name, args, filter);
             }
+            "pluralize" => return self._visit_pluralize_filter(ctx, buf, args, filter),
             "ref" => return self._visit_ref_filter(ctx, buf, args, filter),
             "safe" => return self._visit_safe_filter(ctx, buf, args, filter),
             _ => {}
@@ -1549,6 +1550,29 @@ impl<'a> Generator<'a> {
             buf.write(format_args!("filters::{name}("));
         }
         self._visit_args(ctx, buf, args)?;
+        buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_pluralize_filter<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(format_args!("{CRATE}::filters::pluralize("));
+        self._visit_args(ctx, buf, args)?;
+        match args.len() {
+            1 => buf.write(r#", "", "s""#),
+            2 => buf.write(r#", "s""#),
+            3 => {}
+            _ => {
+                return Err(
+                    ctx.generate_error("unexpected argument(s) in `pluralize` filter", node)
+                );
+            }
+        }
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
     }
