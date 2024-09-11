@@ -1,6 +1,6 @@
 [package]
 name = "rinja_testing"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["rinja-rs developers"]
 workspace = ".."
 edition = "2021"
@@ -13,12 +13,12 @@ code-in-doc = ["rinja/code-in-doc"]
 serde_json = ["dep:serde_json", "rinja/serde_json"]
 
 [dependencies]
-rinja = { path = "../rinja", version = "0.3.2" }
+rinja = { path = "../rinja", version = "0.3.3" }
 
 serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
-rinja = { path = "../rinja", version = "0.3.2", features = ["code-in-doc", "serde_json"] }
+rinja = { path = "../rinja", version = "0.3.3", features = ["code-in-doc", "serde_json"] }
 
 criterion = "0.5"
 phf = { version = "0.11", features = ["macros" ] }
