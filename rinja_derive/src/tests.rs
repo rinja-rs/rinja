@@ -411,6 +411,22 @@ match (
         &[("y", "bool")],
         3,
     );
+    compare(
+        "{% if y is not defined || !y %}bla{% endif %}",
+        r#"if *(&(!self.y) as &::core::primitive::bool) {
+    writer.write_str("bla")?;
+}"#,
+        &[("y", "bool")],
+        3,
+    );
+    compare(
+        "{% if y is not defined || !(y) %}bla{% endif %}",
+        r#"if *(&(!(self.y)) as &::core::primitive::bool) {
+    writer.write_str("bla")?;
+}"#,
+        &[("y", "bool")],
+        3,
+    );
 }
 
 #[test]
