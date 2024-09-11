@@ -445,7 +445,10 @@ impl<'a> Generator<'a> {
                         EvaluatedResult::AlwaysTrue,
                         WithSpan::new(Expr::BoolLit(true), ""),
                     ),
-                    EvaluatedResult::Unknown => (EvaluatedResult::Unknown, expr),
+                    EvaluatedResult::Unknown => (
+                        EvaluatedResult::Unknown,
+                        WithSpan::new(Expr::Unary("!", Box::new(expr)), span),
+                    ),
                 }
             }
             Expr::Unary(_, _) => (EvaluatedResult::Unknown, WithSpan::new(expr, span)),
