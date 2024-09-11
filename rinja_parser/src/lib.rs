@@ -309,7 +309,7 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'_> {
+fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'a> {
     move |i: &'a str| -> ParseResult<'a> {
         let (j, v) = identifier(i)?;
         if k == v { Ok((j, v)) } else { fail(i) }

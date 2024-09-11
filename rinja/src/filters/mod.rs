@@ -21,7 +21,7 @@ pub use builtin::filesizeformat;
 pub use builtin::{abs, into_f64, into_isize};
 pub use builtin::{
     capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower, lowercase,
-    paragraphbreaks, title, trim, truncate, upper, uppercase, wordcount,
+    paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount, PluralizeCount,
 };
 #[cfg(feature = "urlencode")]
 pub use builtin::{urlencode, urlencode_strict};

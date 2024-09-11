@@ -182,7 +182,7 @@ pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::E
 
 /// Converts all newlines in a piece of plain text to HTML line breaks
 ///
-/// ```rust
+/// ```
 /// # #[cfg(feature = "code-in-doc")] {
 /// # use rinja::Template;
 /// /// ```jinja
@@ -526,6 +526,215 @@ pub fn title(s: impl fmt::Display) -> Result<String, fmt::Error> {
         }
     }
     Ok(output)
+}
+
+/// For a value of `±1` by default an empty string `""` is returned, otherwise `"s"`.
+///
+/// # Examples
+///
+/// ## With default arguments
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// I have {{dogs}} dog{{dogs|pluralize}} and {{cats}} cat{{cats|pluralize}}.
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Pets {
+///     dogs: i8,
+///     cats: i8,
+/// }
+///
+/// assert_eq!(
+///     Pets { dogs: 0, cats: 0 }.to_string(),
+///     "I have 0 dogs and 0 cats."
+/// );
+/// assert_eq!(
+///     Pets { dogs: 1, cats: 1 }.to_string(),
+///     "I have 1 dog and 1 cat."
+/// );
+/// assert_eq!(
+///     Pets { dogs: -1, cats: 99 }.to_string(),
+///     "I have -1 dog and 99 cats."
+/// );
+/// # }
+/// ```
+///
+/// ## Overriding the singular case
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// I have {{dogs}} dog{{ dogs|pluralize("go") }}.
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Dog {
+///     dogs: i8,
+/// }
+///
+/// assert_eq!(
+///     Dog { dogs: 0 }.to_string(),
+///     "I have 0 dogs."
+/// );
+/// assert_eq!(
+///     Dog { dogs: 1 }.to_string(),
+///     "I have 1 doggo."
+/// );
+/// # }
+/// ```
+///
+/// ## Overriding singular and plural cases
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// I have {{mice}} {{ mice|pluralize("mouse", "mice") }}.
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Mice {
+///     mice: i8,
+/// }
+///
+/// assert_eq!(
+///     Mice { mice: 42 }.to_string(),
+///     "I have 42 mice."
+/// );
+/// assert_eq!(
+///     Mice { mice: 1 }.to_string(),
+///     "I have 1 mouse."
+/// );
+/// # }
+/// ```
+#[inline]
+pub fn pluralize<C, S, P>(count: C, singular: S, plural: P) -> Result<Pluralize<S, P>, C::Error>
+where
+    C: PluralizeCount,
+{
+    match count.is_singular()? {
+        true => Ok(Pluralize::Singular(singular)),
+        false => Ok(Pluralize::Plural(plural)),
+    }
+}
+
+/// An integer that can have the value `+1` and maybe `-1`.
+pub trait PluralizeCount {
+    /// A possible error that can occur while checking the value.
+    type Error: Into<Error>;
+
+    /// Returns `true` if and only if the value is `±1`.
+    fn is_singular(&self) -> Result<bool, Self::Error>;
+}
+
+const _: () = {
+    // implement PluralizeCount for a list of reference wrapper types to PluralizeCount
+    macro_rules! impl_pluralize_count_for_ref {
+        ($T:ident => $($ty:ty)*) => { $(
+            impl<T: PluralizeCount + ?Sized> PluralizeCount for $ty {
+                type Error = <T as PluralizeCount>::Error;
+
+                #[inline]
+                fn is_singular(&self) -> Result<bool, Self::Error> {
+                    <T as PluralizeCount>::is_singular(self)
+                }
+            }
+        )* };
+    }
+
+    impl_pluralize_count_for_ref! {
+        T =>
+        &T
+        Box<T>
+        std::cell::Ref<'_, T>
+        std::cell::RefMut<'_, T>
+        std::pin::Pin<&T>
+        std::rc::Rc<T>
+        std::sync::Arc<T>
+        std::sync::MutexGuard<'_, T>
+        std::sync::RwLockReadGuard<'_, T>
+        std::sync::RwLockWriteGuard<'_, T>
+    }
+
+    /// implement PluralizeCount for unsigned integer types
+    macro_rules! impl_pluralize_for_unsigned_int {
+        ($($ty:ty)*) => { $(
+            impl PluralizeCount for $ty {
+                type Error = Infallible;
+
+                #[inline]
+                fn is_singular(&self) -> Result<bool, Self::Error> {
+                    Ok(*self == 1)
+                }
+            }
+        )* };
+    }
+
+    impl_pluralize_for_unsigned_int!(u8 u16 u32 u64 u128 usize);
+
+    /// implement PluralizeCount for signed integer types
+    macro_rules! impl_pluralize_for_signed_int {
+        ($($ty:ty)*) => { $(
+            impl PluralizeCount for $ty {
+                type Error = Infallible;
+
+                #[inline]
+                fn is_singular(&self) -> Result<bool, Self::Error> {
+                    Ok(*self == 1 || *self == -1)
+                }
+            }
+        )* };
+    }
+
+    impl_pluralize_for_signed_int!(i8 i16 i32 i64 i128 isize);
+
+    /// implement PluralizeCount for non-zero integer types
+    macro_rules! impl_pluralize_for_non_zero {
+        ($($ty:ident)*) => { $(
+            impl PluralizeCount for std::num::$ty {
+                type Error = Infallible;
+
+                #[inline]
+                fn is_singular(&self) -> Result<bool, Self::Error> {
+                    self.get().is_singular()
+                }
+            }
+        )* };
+    }
+
+    impl_pluralize_for_non_zero! {
+        NonZeroI8 NonZeroI16 NonZeroI32 NonZeroI64 NonZeroI128 NonZeroIsize
+        NonZeroU8 NonZeroU16 NonZeroU32 NonZeroU64 NonZeroU128 NonZeroUsize
+    }
+};
+
+pub enum Pluralize<S, P> {
+    Singular(S),
+    Plural(P),
+}
+
+impl<S: fmt::Display, P: fmt::Display> fmt::Display for Pluralize<S, P> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Pluralize::Singular(value) => write!(f, "{value}"),
+            Pluralize::Plural(value) => write!(f, "{value}"),
+        }
+    }
+}
+
+impl<S: FastWritable, P: FastWritable> FastWritable for Pluralize<S, P> {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        match self {
+            Pluralize::Singular(value) => value.write_into(dest),
+            Pluralize::Plural(value) => value.write_into(dest),
+        }
+    }
 }
 
 fn try_to_string(s: impl fmt::Display) -> Result<String, fmt::Error> {
