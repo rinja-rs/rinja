@@ -393,6 +393,24 @@ match (
         &[("y", "u32")],
         3,
     );
+
+    // Ensure that the `!` is kept .
+    compare(
+        "{% if y is defined && !y %}bla{% endif %}",
+        r#"if *(&(!self.y) as &::core::primitive::bool) {
+    writer.write_str("bla")?;
+}"#,
+        &[("y", "bool")],
+        3,
+    );
+    compare(
+        "{% if y is defined && !(y) %}bla{% endif %}",
+        r#"if *(&(!(self.y)) as &::core::primitive::bool) {
+    writer.write_str("bla")?;
+}"#,
+        &[("y", "bool")],
+        3,
+    );
 }
 
 #[test]
