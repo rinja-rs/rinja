@@ -1809,34 +1809,62 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         args: &[WithSpan<'_, Expr<'_>>],
     ) -> Result<(), CompileError> {
-        if args.is_empty() {
-            return Ok(());
-        }
-
         for (i, arg) in args.iter().enumerate() {
             if i > 0 {
                 buf.write(',');
             }
+            self._visit_arg(ctx, buf, arg)?;
+        }
+        Ok(())
+    }
 
-            let borrow = !is_copyable(arg);
-            if borrow {
-                buf.write("&(");
+    fn _visit_arg(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        arg: &WithSpan<'_, Expr<'_>>,
+    ) -> Result<(), CompileError> {
+        let borrow = !is_copyable(arg);
+        if borrow {
+            buf.write("&(");
+        }
+        match **arg {
+            Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
+                buf.write('{');
+                self.visit_expr(ctx, buf, arg)?;
+                buf.write('}');
             }
-
-            match **arg {
-                Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
-                    buf.write('{');
-                    self.visit_expr(ctx, buf, arg)?;
-                    buf.write('}');
-                }
-                _ => {
-                    self.visit_expr(ctx, buf, arg)?;
-                }
+            _ => {
+                self.visit_expr(ctx, buf, arg)?;
             }
+        }
+        if borrow {
+            buf.write(')');
+        }
+        Ok(())
+    }
 
-            if borrow {
+    fn _visit_auto_escaped_arg(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        arg: &WithSpan<'_, Expr<'_>>,
+    ) -> Result<(), CompileError> {
+        if let Some(Writable::Lit(arg)) = compile_time_escape(arg, self.input.escaper) {
+            if !arg.is_empty() {
+                buf.write(format_args!("{CRATE}::filters::Safe("));
+                buf.write_escaped_str(&arg);
                 buf.write(')');
+            } else {
+                buf.write(format_args!("{CRATE}::helpers::Empty"));
             }
+        } else {
+            buf.write(format_args!("(&&::rinja::filters::AutoEscaper::new("));
+            self._visit_arg(ctx, buf, arg)?;
+            buf.write(format_args!(
+                ", {})).rinja_auto_escape()?",
+                self.input.escaper
+            ));
         }
         Ok(())
     }
@@ -2433,6 +2461,14 @@ impl Buffer {
         if !self.discard {
             src.append_to(&mut self.buf);
             self.last_was_write_str = false;
+        }
+    }
+
+    fn write_escaped_str(&mut self, s: &str) {
+        if !self.discard {
+            self.buf.push('"');
+            string_escape(&mut self.buf, s);
+            self.buf.push('"');
         }
     }
 
