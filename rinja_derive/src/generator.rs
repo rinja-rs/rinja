@@ -1596,7 +1596,7 @@ impl<'a> Generator<'a> {
             buf.write(format_args!("{CRATE}::filters::pluralize("));
             self._visit_arg(ctx, buf, count)?;
             for value in [sg, pl] {
-                buf.write(", ");
+                buf.write(',');
                 self._visit_auto_escaped_arg(ctx, buf, value)?;
             }
             buf.write(format_args!(")?"));
