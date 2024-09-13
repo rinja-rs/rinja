@@ -611,6 +611,31 @@ pub fn title(s: impl fmt::Display) -> Result<String, fmt::Error> {
 /// );
 /// # }
 /// ```
+///
+/// ## Arguments get escaped
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// You are number {{ number|pluralize("<b>ONE</b>", number) }}!
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Number {
+///     number: usize
+/// }
+///
+/// assert_eq!(
+///     Number { number: 1 }.to_string(),
+///     "You are number &#60;b&#62;ONE&#60;/b&#62;!",
+/// );
+/// assert_eq!(
+///     Number { number: 9000 }.to_string(),
+///     "You are number 9000!",
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn pluralize<C, S, P>(count: C, singular: S, plural: P) -> Result<Pluralize<S, P>, C::Error>
 where

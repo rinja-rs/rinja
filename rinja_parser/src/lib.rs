@@ -137,7 +137,7 @@ pub struct WithSpan<'a, T> {
 }
 
 impl<'a, T> WithSpan<'a, T> {
-    pub fn new(inner: T, span: &'a str) -> Self {
+    pub const fn new(inner: T, span: &'a str) -> Self {
         Self { inner, span }
     }
 

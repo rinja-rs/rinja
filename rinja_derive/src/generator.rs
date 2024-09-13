@@ -1564,20 +1564,44 @@ impl<'a> Generator<'a> {
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write(format_args!("{CRATE}::filters::pluralize("));
-        self._visit_args(ctx, buf, args)?;
-        match args.len() {
-            1 => buf.write(r#", "", "s""#),
-            2 => buf.write(r#", "s""#),
-            3 => {}
+        const SINGULAR: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
+            Expr::StrLit(StrLit {
+                prefix: None,
+                content: "",
+            }),
+            "",
+        );
+        const PLURAL: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
+            Expr::StrLit(StrLit {
+                prefix: None,
+                content: "s",
+            }),
+            "",
+        );
+
+        let (count, sg, pl) = match args {
+            [count] => (count, SINGULAR, PLURAL),
+            [count, sg] => (count, sg, PLURAL),
+            [count, sg, pl] => (count, sg, pl),
             _ => {
                 return Err(
                     ctx.generate_error("unexpected argument(s) in `pluralize` filter", node)
                 );
             }
+        };
+        if let Some(is_singular) = expr_is_int_lit_plus_minus_one(count) {
+            let value = if is_singular { sg } else { pl };
+            self._visit_auto_escaped_arg(ctx, buf, value)?;
+        } else {
+            buf.write(format_args!("{CRATE}::filters::pluralize("));
+            self._visit_arg(ctx, buf, count)?;
+            for value in [sg, pl] {
+                buf.write(',');
+                self._visit_auto_escaped_arg(ctx, buf, value)?;
+            }
+            buf.write(format_args!(")?"));
         }
-        buf.write(")?");
-        Ok(DisplayWrap::Unwrapped)
+        Ok(DisplayWrap::Wrapped)
     }
 
     fn _visit_linebreaks_filter<T>(
@@ -1809,34 +1833,62 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         args: &[WithSpan<'_, Expr<'_>>],
     ) -> Result<(), CompileError> {
-        if args.is_empty() {
-            return Ok(());
-        }
-
         for (i, arg) in args.iter().enumerate() {
             if i > 0 {
                 buf.write(',');
             }
+            self._visit_arg(ctx, buf, arg)?;
+        }
+        Ok(())
+    }
 
-            let borrow = !is_copyable(arg);
-            if borrow {
-                buf.write("&(");
+    fn _visit_arg(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        arg: &WithSpan<'_, Expr<'_>>,
+    ) -> Result<(), CompileError> {
+        let borrow = !is_copyable(arg);
+        if borrow {
+            buf.write("&(");
+        }
+        match **arg {
+            Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
+                buf.write('{');
+                self.visit_expr(ctx, buf, arg)?;
+                buf.write('}');
             }
-
-            match **arg {
-                Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
-                    buf.write('{');
-                    self.visit_expr(ctx, buf, arg)?;
-                    buf.write('}');
-                }
-                _ => {
-                    self.visit_expr(ctx, buf, arg)?;
-                }
+            _ => {
+                self.visit_expr(ctx, buf, arg)?;
             }
+        }
+        if borrow {
+            buf.write(')');
+        }
+        Ok(())
+    }
 
-            if borrow {
+    fn _visit_auto_escaped_arg(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        arg: &WithSpan<'_, Expr<'_>>,
+    ) -> Result<(), CompileError> {
+        if let Some(Writable::Lit(arg)) = compile_time_escape(arg, self.input.escaper) {
+            if !arg.is_empty() {
+                buf.write(format_args!("{CRATE}::filters::Safe("));
+                buf.write_escaped_str(&arg);
                 buf.write(')');
+            } else {
+                buf.write(format_args!("{CRATE}::helpers::Empty"));
             }
+        } else {
+            buf.write(format_args!("(&&::rinja::filters::AutoEscaper::new("));
+            self._visit_arg(ctx, buf, arg)?;
+            buf.write(format_args!(
+                ", {})).rinja_auto_escape()?",
+                self.input.escaper
+            ));
         }
         Ok(())
     }
@@ -2265,6 +2317,88 @@ impl<'a> Generator<'a> {
     }
 }
 
+#[cfg(target_pointer_width = "16")]
+type TargetIsize = i16;
+#[cfg(target_pointer_width = "32")]
+type TargetIsize = i32;
+#[cfg(target_pointer_width = "64")]
+type TargetIsize = i64;
+
+#[cfg(target_pointer_width = "16")]
+type TargetUsize = u16;
+#[cfg(target_pointer_width = "32")]
+type TargetUsize = u32;
+#[cfg(target_pointer_width = "64")]
+type TargetUsize = u64;
+
+#[cfg(not(any(
+    target_pointer_width = "16",
+    target_pointer_width = "32",
+    target_pointer_width = "64"
+)))]
+const _: () = {
+    panic!("unknown cfg!(target_pointer_width)");
+};
+
+fn expr_is_int_lit_plus_minus_one(expr: &WithSpan<'_, Expr<'_>>) -> Option<bool> {
+    fn is_signed_singular<T: Eq + Default, E>(
+        from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
+        value: &str,
+        plus_one: T,
+        minus_one: T,
+    ) -> Option<bool> {
+        Some([plus_one, minus_one].contains(&from_str_radix(value, 10).ok()?))
+    }
+
+    fn is_unsigned_singular<T: Eq + Default, E>(
+        from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
+        value: &str,
+        plus_one: T,
+    ) -> Option<bool> {
+        Some(from_str_radix(value, 10).ok()? == plus_one)
+    }
+
+    macro_rules! impl_match {
+        (
+            $kind:ident $value:ident;
+            $($svar:ident => $sty:ident),*;
+            $($uvar:ident => $uty:ident),*;
+        ) => {
+            match $kind {
+                $(
+                    Some(IntKind::$svar) => is_signed_singular($sty::from_str_radix, $value, 1, -1),
+                )*
+                $(
+                    Some(IntKind::$uvar) => is_unsigned_singular($sty::from_str_radix, $value, 1),
+                )*
+                None => match $value.starts_with('-') {
+                    true => is_signed_singular(i128::from_str_radix, $value, 1, -1),
+                    false => is_unsigned_singular(u128::from_str_radix, $value, 1),
+                },
+            }
+        };
+    }
+
+    let Expr::NumLit(_, Num::Int(value, kind)) = **expr else {
+        return None;
+    };
+    impl_match! {
+        kind value;
+        I8 => i8,
+        I16 => i16,
+        I32 => i32,
+        I64 => i64,
+        I128 => i128,
+        Isize => TargetIsize;
+        U8 => u8,
+        U16 => u16,
+        U32 => u32,
+        U64 => u64,
+        U128 => u128,
+        Usize => TargetUsize;
+    }
+}
+
 /// In here, we inspect in the expression if it is a literal, and if it is, whether it
 /// can be escaped at compile time.
 fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a>> {
@@ -2341,33 +2475,13 @@ fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a
                 NumKind::Int(Some(IntKind::I32)) => int(i32::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I64)) => int(i64::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I128)) => int(i128::from_str_radix, &value)?,
-                NumKind::Int(Some(IntKind::Isize)) => {
-                    if cfg!(target_pointer_width = "16") {
-                        int(i16::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "32") {
-                        int(i32::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "64") {
-                        int(i64::from_str_radix, &value)?
-                    } else {
-                        unreachable!("unexpected `cfg!(target_pointer_width)`")
-                    }
-                }
+                NumKind::Int(Some(IntKind::Isize)) => int(TargetIsize::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U8)) => int(u8::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U16)) => int(u16::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U32)) => int(u32::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U64)) => int(u64::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U128)) => int(u128::from_str_radix, &value)?,
-                NumKind::Int(Some(IntKind::Usize)) => {
-                    if cfg!(target_pointer_width = "16") {
-                        int(u16::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "32") {
-                        int(u32::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "64") {
-                        int(u64::from_str_radix, &value)?
-                    } else {
-                        unreachable!("unexpected `cfg!(target_pointer_width)`")
-                    }
-                }
+                NumKind::Int(Some(IntKind::Usize)) => int(TargetUsize::from_str_radix, &value)?,
                 NumKind::Int(None) => match value.starts_with('-') {
                     true => int(i128::from_str_radix, &value)?,
                     false => int(u128::from_str_radix, &value)?,
@@ -2433,6 +2547,14 @@ impl Buffer {
         if !self.discard {
             src.append_to(&mut self.buf);
             self.last_was_write_str = false;
+        }
+    }
+
+    fn write_escaped_str(&mut self, s: &str) {
+        if !self.discard {
+            self.buf.push('"');
+            string_escape(&mut self.buf, s);
+            self.buf.push('"');
         }
     }
 
