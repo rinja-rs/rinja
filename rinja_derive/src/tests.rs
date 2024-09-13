@@ -731,3 +731,187 @@ fn test_code_in_comment() {
     let generated = build_template(&ast).unwrap();
     assert!(!generated.contains("compile_error"));
 }
+
+#[test]
+fn test_pluralize() {
+    compare(
+        r#"{{dogs}} dog{{dogs|pluralize}}"#,
+        r#"
+        match (
+            &((&&::rinja::filters::AutoEscaper::new(
+                &(self.dogs),
+                ::rinja::filters::Text,
+            ))
+                .rinja_auto_escape()?),
+            &(::rinja::filters::pluralize(
+                &(self.dogs),
+                ::rinja::helpers::Empty,
+                ::rinja::filters::Safe("s"),
+            )?),
+        ) {
+            (expr0, expr3) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                writer.write_str(" dog")?;
+                (&&::rinja::filters::Writable(expr3)).rinja_write(writer)?;
+            }
+        }"#,
+        &[("dogs", "i8")],
+        10,
+    );
+    compare(
+        r#"{{dogs}} dog{{dogs|pluralize("go")}}"#,
+        r#"
+        match (
+            &((&&::rinja::filters::AutoEscaper::new(
+                &(self.dogs),
+                ::rinja::filters::Text,
+            ))
+                .rinja_auto_escape()?),
+            &(::rinja::filters::pluralize(
+                &(self.dogs),
+                ::rinja::filters::Safe("go"),
+                ::rinja::filters::Safe("s"),
+            )?),
+        ) {
+            (expr0, expr3) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                writer.write_str(" dog")?;
+                (&&::rinja::filters::Writable(expr3)).rinja_write(writer)?;
+            }
+        }"#,
+        &[("dogs", "i8")],
+        10,
+    );
+    compare(
+        r#"{{mice}} {{mice|pluralize("mouse", "mice")}}"#,
+        r#"
+        match (
+            &((&&::rinja::filters::AutoEscaper::new(
+                &(self.mice),
+                ::rinja::filters::Text,
+            ))
+                .rinja_auto_escape()?),
+            &(::rinja::filters::pluralize(
+                &(self.mice),
+                ::rinja::filters::Safe("mouse"),
+                ::rinja::filters::Safe("mice"),
+            )?),
+        ) {
+            (expr0, expr2) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                writer.write_str(" ")?;
+                (&&::rinja::filters::Writable(expr2)).rinja_write(writer)?;
+            }
+        }"#,
+        &[("dogs", "i8")],
+        7,
+    );
+
+    compare(
+        r#"{{count|pluralize(one, count)}}"#,
+        r#"
+        match (
+            &(::rinja::filters::pluralize(
+                &(self.count),
+                (&&::rinja::filters::AutoEscaper::new(
+                    &(self.one),
+                    ::rinja::filters::Text,
+                ))
+                    .rinja_auto_escape()?,
+                (&&::rinja::filters::AutoEscaper::new(
+                    &(self.count),
+                    ::rinja::filters::Text,
+                ))
+                    .rinja_auto_escape()?,
+            )?),
+        ) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[("count", "i8"), ("one", "&'static str")],
+        3,
+    );
+
+    compare(
+        r#"{{0|pluralize(sg, pl)}}"#,
+        r#"
+        match (
+            &((&&::rinja::filters::AutoEscaper::new(&(self.pl), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+        ) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[("sg", "&'static str"), ("pl", "&'static str")],
+        3,
+    );
+    compare(
+        r#"{{1|pluralize(sg, pl)}}"#,
+        r#"
+        match (
+            &((&&::rinja::filters::AutoEscaper::new(&(self.sg), ::rinja::filters::Text))
+                .rinja_auto_escape()?),
+        ) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[("sg", "&'static str"), ("pl", "&'static str")],
+        3,
+    );
+
+    compare(
+        r#"{{0|pluralize("sg", "pl")}}"#,
+        r#"
+        match (&(::rinja::filters::Safe("pl")),) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[],
+        3,
+    );
+    compare(
+        r#"{{1|pluralize("sg", "pl")}}"#,
+        r#"
+        match (&(::rinja::filters::Safe("sg")),) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[],
+        3,
+    );
+
+    compare(
+        r#"{{0|pluralize}}"#,
+        r#"
+        match (&(::rinja::filters::Safe("s")),) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[],
+        3,
+    );
+    compare(
+        r#"{{1|pluralize}}"#,
+        r#"
+        match (&(::rinja::helpers::Empty),) {
+            (expr0,) => {
+                (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            }
+        }
+        "#,
+        &[],
+        3,
+    );
+}

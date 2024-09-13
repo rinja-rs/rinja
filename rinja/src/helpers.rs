@@ -4,6 +4,8 @@ use std::cell::Cell;
 use std::fmt;
 use std::iter::{Enumerate, Peekable};
 
+use crate::filters::FastWritable;
+
 pub struct TemplateLoop<I>
 where
     I: Iterator,
@@ -127,4 +129,22 @@ primitive_type! {
     f32, f64,
     i8, i16, i32, i64, i128, isize,
     u8, u16, u32, u64, u128, usize,
+}
+
+/// An empty element, so nothing will be written.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Empty;
+
+impl fmt::Display for Empty {
+    #[inline]
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl FastWritable for Empty {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, _: &mut W) -> fmt::Result {
+        Ok(())
+    }
 }

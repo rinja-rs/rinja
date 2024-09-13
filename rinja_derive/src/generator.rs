@@ -1564,20 +1564,44 @@ impl<'a> Generator<'a> {
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write(format_args!("{CRATE}::filters::pluralize("));
-        self._visit_args(ctx, buf, args)?;
-        match args.len() {
-            1 => buf.write(r#", "", "s""#),
-            2 => buf.write(r#", "s""#),
-            3 => {}
+        const SINGULAR: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
+            Expr::StrLit(StrLit {
+                prefix: None,
+                content: "",
+            }),
+            "",
+        );
+        const PLURAL: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
+            Expr::StrLit(StrLit {
+                prefix: None,
+                content: "s",
+            }),
+            "",
+        );
+
+        let (count, sg, pl) = match args {
+            [count] => (count, SINGULAR, PLURAL),
+            [count, sg] => (count, sg, PLURAL),
+            [count, sg, pl] => (count, sg, pl),
             _ => {
                 return Err(
                     ctx.generate_error("unexpected argument(s) in `pluralize` filter", node)
                 );
             }
+        };
+        if let Some(is_singular) = expr_is_int_lit_plus_minus_one(count) {
+            let value = if is_singular { sg } else { pl };
+            self._visit_auto_escaped_arg(ctx, buf, value)?;
+        } else {
+            buf.write(format_args!("{CRATE}::filters::pluralize("));
+            self._visit_arg(ctx, buf, count)?;
+            for value in [sg, pl] {
+                buf.write(", ");
+                self._visit_auto_escaped_arg(ctx, buf, value)?;
+            }
+            buf.write(format_args!(")?"));
         }
-        buf.write(")?");
-        Ok(DisplayWrap::Unwrapped)
+        Ok(DisplayWrap::Wrapped)
     }
 
     fn _visit_linebreaks_filter<T>(
@@ -2290,6 +2314,67 @@ impl<'a> Generator<'a> {
     // next literal.
     fn prepare_ws(&mut self, ws: Ws) {
         self.skip_ws = self.should_trim_ws(ws.1);
+    }
+}
+
+fn expr_is_int_lit_plus_minus_one(expr: &WithSpan<'_, Expr<'_>>) -> Option<bool> {
+    fn is_signed_singular<T: Eq + Default, E>(
+        from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
+        value: &str,
+        plus_one: T,
+        minus_one: T,
+    ) -> Option<bool> {
+        Some([plus_one, minus_one].contains(&from_str_radix(value, 10).ok()?))
+    }
+
+    fn is_unsigned_singular<T: Eq + Default, E>(
+        from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
+        value: &str,
+        plus_one: T,
+    ) -> Option<bool> {
+        Some(from_str_radix(value, 10).ok()? == plus_one)
+    }
+
+    let Expr::NumLit(_, Num::Int(value, kind)) = **expr else {
+        return None;
+    };
+    match kind {
+        Some(IntKind::I8) => is_signed_singular(i8::from_str_radix, value, 1, -1),
+        Some(IntKind::I16) => is_signed_singular(i16::from_str_radix, value, 1, -1),
+        Some(IntKind::I32) => is_signed_singular(i32::from_str_radix, value, 1, -1),
+        Some(IntKind::I64) => is_signed_singular(i64::from_str_radix, value, 1, -1),
+        Some(IntKind::I128) => is_signed_singular(i128::from_str_radix, value, 1, -1),
+        Some(IntKind::Isize) => {
+            if cfg!(target_pointer_width = "16") {
+                is_signed_singular(i16::from_str_radix, value, 1, -1)
+            } else if cfg!(target_pointer_width = "32") {
+                is_signed_singular(i32::from_str_radix, value, 1, -1)
+            } else if cfg!(target_pointer_width = "64") {
+                is_signed_singular(i64::from_str_radix, value, 1, -1)
+            } else {
+                unreachable!("unexpected `cfg!(target_pointer_width)`")
+            }
+        }
+        Some(IntKind::U8) => is_unsigned_singular(u8::from_str_radix, value, 1),
+        Some(IntKind::U16) => is_unsigned_singular(u16::from_str_radix, value, 1),
+        Some(IntKind::U32) => is_unsigned_singular(u32::from_str_radix, value, 1),
+        Some(IntKind::U64) => is_unsigned_singular(u64::from_str_radix, value, 1),
+        Some(IntKind::U128) => is_unsigned_singular(u128::from_str_radix, value, 1),
+        Some(IntKind::Usize) => {
+            if cfg!(target_pointer_width = "16") {
+                is_unsigned_singular(u16::from_str_radix, value, 1)
+            } else if cfg!(target_pointer_width = "32") {
+                is_unsigned_singular(u32::from_str_radix, value, 1)
+            } else if cfg!(target_pointer_width = "64") {
+                is_unsigned_singular(u64::from_str_radix, value, 1)
+            } else {
+                unreachable!("unexpected `cfg!(target_pointer_width)`")
+            }
+        }
+        None => match value.starts_with('-') {
+            true => is_signed_singular(i128::from_str_radix, value, 1, -1),
+            false => is_unsigned_singular(u128::from_str_radix, value, 1),
+        },
     }
 }
 
