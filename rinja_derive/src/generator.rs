@@ -2317,6 +2317,29 @@ impl<'a> Generator<'a> {
     }
 }
 
+#[cfg(target_pointer_width = "16")]
+type TargetIsize = i16;
+#[cfg(target_pointer_width = "32")]
+type TargetIsize = i32;
+#[cfg(target_pointer_width = "64")]
+type TargetIsize = i64;
+
+#[cfg(target_pointer_width = "16")]
+type TargetUsize = u16;
+#[cfg(target_pointer_width = "32")]
+type TargetUsize = u32;
+#[cfg(target_pointer_width = "64")]
+type TargetUsize = u64;
+
+#[cfg(not(any(
+    target_pointer_width = "16",
+    target_pointer_width = "32",
+    target_pointer_width = "64"
+)))]
+const _: () = {
+    panic!("unknown cfg!(target_pointer_width)");
+};
+
 fn expr_is_int_lit_plus_minus_one(expr: &WithSpan<'_, Expr<'_>>) -> Option<bool> {
     fn is_signed_singular<T: Eq + Default, E>(
         from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
@@ -2335,46 +2358,44 @@ fn expr_is_int_lit_plus_minus_one(expr: &WithSpan<'_, Expr<'_>>) -> Option<bool>
         Some(from_str_radix(value, 10).ok()? == plus_one)
     }
 
+    macro_rules! impl_match {
+        (
+            $kind:ident $value:ident;
+            $($svar:ident => $sty:ident),*;
+            $($uvar:ident => $uty:ident),*;
+        ) => {
+            match $kind {
+                $(
+                    Some(IntKind::$svar) => is_signed_singular($sty::from_str_radix, $value, 1, -1),
+                )*
+                $(
+                    Some(IntKind::$uvar) => is_unsigned_singular($sty::from_str_radix, $value, 1),
+                )*
+                None => match $value.starts_with('-') {
+                    true => is_signed_singular(i128::from_str_radix, $value, 1, -1),
+                    false => is_unsigned_singular(u128::from_str_radix, $value, 1),
+                },
+            }
+        };
+    }
+
     let Expr::NumLit(_, Num::Int(value, kind)) = **expr else {
         return None;
     };
-    match kind {
-        Some(IntKind::I8) => is_signed_singular(i8::from_str_radix, value, 1, -1),
-        Some(IntKind::I16) => is_signed_singular(i16::from_str_radix, value, 1, -1),
-        Some(IntKind::I32) => is_signed_singular(i32::from_str_radix, value, 1, -1),
-        Some(IntKind::I64) => is_signed_singular(i64::from_str_radix, value, 1, -1),
-        Some(IntKind::I128) => is_signed_singular(i128::from_str_radix, value, 1, -1),
-        Some(IntKind::Isize) => {
-            if cfg!(target_pointer_width = "16") {
-                is_signed_singular(i16::from_str_radix, value, 1, -1)
-            } else if cfg!(target_pointer_width = "32") {
-                is_signed_singular(i32::from_str_radix, value, 1, -1)
-            } else if cfg!(target_pointer_width = "64") {
-                is_signed_singular(i64::from_str_radix, value, 1, -1)
-            } else {
-                unreachable!("unexpected `cfg!(target_pointer_width)`")
-            }
-        }
-        Some(IntKind::U8) => is_unsigned_singular(u8::from_str_radix, value, 1),
-        Some(IntKind::U16) => is_unsigned_singular(u16::from_str_radix, value, 1),
-        Some(IntKind::U32) => is_unsigned_singular(u32::from_str_radix, value, 1),
-        Some(IntKind::U64) => is_unsigned_singular(u64::from_str_radix, value, 1),
-        Some(IntKind::U128) => is_unsigned_singular(u128::from_str_radix, value, 1),
-        Some(IntKind::Usize) => {
-            if cfg!(target_pointer_width = "16") {
-                is_unsigned_singular(u16::from_str_radix, value, 1)
-            } else if cfg!(target_pointer_width = "32") {
-                is_unsigned_singular(u32::from_str_radix, value, 1)
-            } else if cfg!(target_pointer_width = "64") {
-                is_unsigned_singular(u64::from_str_radix, value, 1)
-            } else {
-                unreachable!("unexpected `cfg!(target_pointer_width)`")
-            }
-        }
-        None => match value.starts_with('-') {
-            true => is_signed_singular(i128::from_str_radix, value, 1, -1),
-            false => is_unsigned_singular(u128::from_str_radix, value, 1),
-        },
+    impl_match! {
+        kind value;
+        I8 => i8,
+        I16 => i16,
+        I32 => i32,
+        I64 => i64,
+        I128 => i128,
+        Isize => TargetIsize;
+        U8 => u8,
+        U16 => u16,
+        U32 => u32,
+        U64 => u64,
+        U128 => u128,
+        Usize => TargetUsize;
     }
 }
 
@@ -2454,33 +2475,13 @@ fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a
                 NumKind::Int(Some(IntKind::I32)) => int(i32::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I64)) => int(i64::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::I128)) => int(i128::from_str_radix, &value)?,
-                NumKind::Int(Some(IntKind::Isize)) => {
-                    if cfg!(target_pointer_width = "16") {
-                        int(i16::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "32") {
-                        int(i32::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "64") {
-                        int(i64::from_str_radix, &value)?
-                    } else {
-                        unreachable!("unexpected `cfg!(target_pointer_width)`")
-                    }
-                }
+                NumKind::Int(Some(IntKind::Isize)) => int(TargetIsize::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U8)) => int(u8::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U16)) => int(u16::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U32)) => int(u32::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U64)) => int(u64::from_str_radix, &value)?,
                 NumKind::Int(Some(IntKind::U128)) => int(u128::from_str_radix, &value)?,
-                NumKind::Int(Some(IntKind::Usize)) => {
-                    if cfg!(target_pointer_width = "16") {
-                        int(u16::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "32") {
-                        int(u32::from_str_radix, &value)?
-                    } else if cfg!(target_pointer_width = "64") {
-                        int(u64::from_str_radix, &value)?
-                    } else {
-                        unreachable!("unexpected `cfg!(target_pointer_width)`")
-                    }
-                }
+                NumKind::Int(Some(IntKind::Usize)) => int(TargetUsize::from_str_radix, &value)?,
                 NumKind::Int(None) => match value.starts_with('-') {
                     true => int(i128::from_str_radix, &value)?,
                     false => int(u128::from_str_radix, &value)?,
