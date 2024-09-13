@@ -21,10 +21,21 @@ struct Foo {{ {} }}"##,
             .collect::<Vec<_>>()
             .join(","),
     );
-    let generated = build_template(&syn::parse_str::<syn::DeriveInput>(&jinja).unwrap())
-        .unwrap()
-        .parse()
-        .unwrap();
+
+    let generated = build_template(&syn::parse_str::<syn::DeriveInput>(&jinja).unwrap()).unwrap();
+    let generated = match generated.parse() {
+        Ok(generated) => generated,
+        Err(err) => panic!(
+            "\n\
+            === Invalid code generated ===\n\
+            \n\
+            {generated}\n\
+            \n\
+            === Error ===\n\
+            \n\
+            {err}"
+        ),
+    };
     let generated: syn::File = syn::parse2(generated).unwrap();
 
     let size_hint = proc_macro2::Literal::usize_unsuffixed(size_hint);
