@@ -88,9 +88,30 @@ pub trait Template: fmt::Display {
     fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()>;
 
     /// Renders the template to the given `writer` io buffer
-    #[inline]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
-        writer.write_fmt(format_args!("{self}"))
+        struct Wrapped<W: io::Write> {
+            writer: W,
+            err: Option<io::Error>,
+        }
+
+        impl<W: io::Write> fmt::Write for Wrapped<W> {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                if let Err(err) = self.writer.write_all(s.as_bytes()) {
+                    self.err = Some(err);
+                    Err(fmt::Error)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+
+        let mut wrapped = Wrapped { writer, err: None };
+        if self.render_into(&mut wrapped).is_ok() {
+            Ok(())
+        } else {
+            let err = wrapped.err.take();
+            Err(err.unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, fmt::Error)))
+        }
     }
 
     /// The template's extension, if provided
