@@ -55,6 +55,9 @@ struct Foo {{ {} }}"##,
             const SIZE_HINT: ::core::primitive::usize = #size_hint;
             const MIME_TYPE: &'static ::core::primitive::str = "text/plain; charset=utf-8";
         }
+        /// Implement the [`format!()`][::std::format] trait for [`Foo`]
+        ///
+        /// Please be aware of the rendering performance notice in the [`Template`][::rinja::Template] trait.
         impl ::core::fmt::Display for Foo {
             #[inline]
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
