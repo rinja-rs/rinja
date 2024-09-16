@@ -75,6 +75,24 @@ pub use crate::error::{Error, Result};
 /// Main `Template` trait; implementations are generally derived
 ///
 /// If you need an object-safe template, use [`DynTemplate`].
+///
+/// ## Rendering performance
+///
+/// When rendering a rinja template, you should prefer the methods
+///
+/// * [`.render()`][Template::render] (to render the content into a new string),
+/// * [`.render_into()`][Template::render_into] (to render the content into an [`fmt::Write`]
+///   object, e.g. [`String`]) or
+/// * [`.write_into()`][Template::write_into] (to render the content into an [`io::Write`] object,
+///   e.g. [`Vec<u8>`])
+///
+/// over [`.to_string()`][std::string::ToString::to_string] or [`format!()`].
+/// While `.to_string()` and `format!()` give you the same result, they generally perform much worse
+/// than rinja's own methods, because [`fmt::Write`] uses [dynamic methods calls] instead of
+/// monomorphised code. On average, expect `.to_string()` to be 100% to 200% slower than
+/// `.render()`.
+///
+/// [dynamic methods calls]: <https://doc.rust-lang.org/stable/std/keyword.dyn.html>
 pub trait Template: fmt::Display {
     /// Helper method which allocates a new `String` and renders into it
     fn render(&self) -> Result<String> {

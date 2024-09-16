@@ -174,6 +174,16 @@ impl<'a> Generator<'a> {
 
     // Implement `Display` for the given context struct.
     fn impl_display(&mut self, buf: &mut Buffer) {
+        let ident = &self.input.ast.ident;
+        buf.write(format_args!(
+            "\
+            /// Implement the [`format!()`][::std::format] trait for [`{}`]\n\
+            ///\n\
+            /// Please be aware of the rendering performance notice in the \
+                [`Template`][{CRATE}::Template] trait.\n\
+            ",
+            quote!(#ident),
+        ));
         self.write_header(buf, "::core::fmt::Display", None);
         buf.write(format_args!(
             "\
