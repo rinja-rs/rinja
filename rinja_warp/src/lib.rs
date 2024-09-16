@@ -9,6 +9,7 @@ pub use warp;
 use warp::reply::Response;
 
 /// Render a [`Template`] into a [`Response`], or render an error page.
+#[must_use]
 pub fn into_response<T: ?Sized + rinja::Template>(tmpl: &T) -> Response {
     match try_into_response(tmpl) {
         Ok(response) => response,

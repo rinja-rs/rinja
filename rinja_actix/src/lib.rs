@@ -14,6 +14,7 @@ use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 pub use rinja::*;
 
 /// Render a [`Template`] into a [`HttpResponse`], or render an error page.
+#[must_use]
 pub fn into_response<T: ?Sized + rinja::Template>(tmpl: &T) -> HttpResponse<BoxBody> {
     try_into_response(tmpl).unwrap_or_else(|err| HttpResponse::from_error(ActixError(err)))
 }
@@ -28,7 +29,7 @@ pub fn try_into_response<T: ?Sized + rinja::Template>(
         .body(value))
 }
 
-/// Newtype to let rinja::Error implement actix_web::ResponseError.
+/// Newtype to let `rinja::Error` implement `actix_web::ResponseError`.
 struct ActixError(Error);
 
 impl fmt::Debug for ActixError {

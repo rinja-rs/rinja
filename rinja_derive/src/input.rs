@@ -93,7 +93,8 @@ impl TemplateInput<'_> {
 
         let escaping = escaping
             .as_deref()
-            .unwrap_or_else(|| path.extension().map(|s| s.to_str().unwrap()).unwrap_or(""));
+            .or_else(|| path.extension().and_then(|s| s.to_str()))
+            .unwrap_or_default();
 
         let escaper = config
             .escapers
@@ -406,7 +407,7 @@ impl TemplateArgs {
                 set_template_str_attr(ident, value, &mut args.syntax)?;
             } else if ident == "config" {
                 set_template_str_attr(ident, value, &mut args.config)?;
-                args.config_span = Some(value.span())
+                args.config_span = Some(value.span());
             } else if ident == "whitespace" {
                 set_template_str_attr(ident, value, &mut args.whitespace)?;
             } else {
@@ -771,7 +772,7 @@ pub(crate) fn get_template_source(
         tpl_path,
         (),
         Arc::clone,
-        |_, tpl_path| match read_to_string(tpl_path) {
+        |(), tpl_path| match read_to_string(tpl_path) {
             Ok(mut source) => {
                 if source.ends_with('\n') {
                     let _ = source.pop();
@@ -789,7 +790,7 @@ pub(crate) fn get_template_source(
                 }),
             )),
         },
-        |_, _, cached| Arc::clone(cached),
+        |(), _, cached| Arc::clone(cached),
     )
 }
 

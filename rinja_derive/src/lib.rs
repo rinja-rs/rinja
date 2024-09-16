@@ -64,7 +64,7 @@ use syn::parse_quote_spanned;
 /// web framework integrations use it to determine the content type.
 /// Cannot be used together with `path`.
 ///
-/// ### in_doc
+/// ### `in_doc`
 ///
 /// E.g. `in_doc = true`
 ///
@@ -113,6 +113,7 @@ use syn::parse_quote_spanned;
     not(feature = "__standalone"),
     proc_macro_derive(Template, attributes(template))
 )]
+#[must_use]
 pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     let ast = match syn::parse2(input.into()) {
         Ok(ast) => ast,
@@ -207,7 +208,7 @@ fn build_template_inner(
         if let Some(block_name) = input.block {
             if !heritage.blocks.contains_key(&block_name) {
                 return Err(CompileError::no_file_info(
-                    format!("cannot find block {}", block_name),
+                    format!("cannot find block {block_name}"),
                     None,
                 ));
             }
@@ -310,24 +311,21 @@ impl<'a> FileInfo<'a> {
 
 impl fmt::Display for FileInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (self.source, self.node_source) {
-            (Some(source), Some(node_source)) => {
-                let (error_info, file_path) = generate_error_info(source, node_source, self.path);
-                write!(
-                    f,
-                    "\n  --> {file_path}:{row}:{column}\n{source_after}",
-                    row = error_info.row,
-                    column = error_info.column,
-                    source_after = &error_info.source_after,
-                )
-            }
-            _ => {
-                let file_path = match std::env::current_dir() {
-                    Ok(cwd) => strip_common(&cwd, self.path),
-                    Err(_) => self.path.display().to_string(),
-                };
-                write!(f, "\n --> {file_path}")
-            }
+        if let (Some(source), Some(node_source)) = (self.source, self.node_source) {
+            let (error_info, file_path) = generate_error_info(source, node_source, self.path);
+            write!(
+                f,
+                "\n  --> {file_path}:{row}:{column}\n{source_after}",
+                row = error_info.row,
+                column = error_info.column,
+                source_after = &error_info.source_after,
+            )
+        } else {
+            let file_path = match std::env::current_dir() {
+                Ok(cwd) => strip_common(&cwd, self.path),
+                Err(_) => self.path.display().to_string(),
+            };
+            write!(f, "\n --> {file_path}")
         }
     }
 }

@@ -344,7 +344,7 @@ struct JsonAttribute2Template<'a> {
 #[test]
 fn test_json_attribute2() {
     let t = JsonAttribute2Template {
-        name: r#"'><button>Hacked!</button>"#,
+        name: r"'><button>Hacked!</button>",
     };
     assert_eq!(
         t.render().unwrap(),
@@ -366,7 +366,7 @@ struct JsonScriptTemplate<'a> {
 #[test]
 fn test_json_script() {
     let t = JsonScriptTemplate {
-        name: r#"</script><button>Hacked!</button>"#,
+        name: r"</script><button>Hacked!</button>",
     };
     assert_eq!(
         t.render().unwrap(),
@@ -390,7 +390,7 @@ fn test_let_borrow() {
     let template = LetBorrow {
         s: "hello".to_owned(),
     };
-    assert_eq!(template.render().unwrap(), "hello1")
+    assert_eq!(template.render().unwrap(), "hello1");
 }
 
 #[test]

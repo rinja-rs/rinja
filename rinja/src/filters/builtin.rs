@@ -685,7 +685,7 @@ const _: () = {
         std::sync::RwLockWriteGuard<'_, T>
     }
 
-    /// implement PluralizeCount for unsigned integer types
+    /// implement `PluralizeCount` for unsigned integer types
     macro_rules! impl_pluralize_for_unsigned_int {
         ($($ty:ty)*) => { $(
             impl PluralizeCount for $ty {
@@ -701,7 +701,7 @@ const _: () = {
 
     impl_pluralize_for_unsigned_int!(u8 u16 u32 u64 u128 usize);
 
-    /// implement PluralizeCount for signed integer types
+    /// implement `PluralizeCount` for signed integer types
     macro_rules! impl_pluralize_for_signed_int {
         ($($ty:ty)*) => { $(
             impl PluralizeCount for $ty {
@@ -717,7 +717,7 @@ const _: () = {
 
     impl_pluralize_for_signed_int!(i8 i16 i32 i64 i128 isize);
 
-    /// implement PluralizeCount for non-zero integer types
+    /// implement `PluralizeCount` for non-zero integer types
     macro_rules! impl_pluralize_for_non_zero {
         ($($ty:ident)*) => { $(
             impl PluralizeCount for std::num::$ty {
@@ -1009,7 +1009,7 @@ mod tests {
         assert_eq!(capitalize("foo").unwrap().to_string(), "Foo".to_string());
         assert_eq!(capitalize("f").unwrap().to_string(), "F".to_string());
         assert_eq!(capitalize("fO").unwrap().to_string(), "Fo".to_string());
-        assert_eq!(capitalize("").unwrap().to_string(), "".to_string());
+        assert_eq!(capitalize("").unwrap().to_string(), String::new());
         assert_eq!(capitalize("FoO").unwrap().to_string(), "Foo".to_string());
         assert_eq!(
             capitalize("foO BAR").unwrap().to_string(),

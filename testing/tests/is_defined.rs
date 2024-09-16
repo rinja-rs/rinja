@@ -22,13 +22,13 @@ fn is_defined_in_expr() {
     let s = IsDefined { y: 0 };
     assert_eq!(
         s.render().unwrap(),
-        r#"<script>
+        r"<script>
 const x = false;
 const y = false;
 const z = true;
 const w = true;
 const v = 0;
-</script>"#
+</script>"
     );
 }
 
@@ -42,5 +42,5 @@ struct IsDefinedChaining;
 // This test ensures that if the variable is not defined, it will not generate following code.
 #[test]
 fn is_defined_chaining() {
-    assert_eq!(IsDefinedChaining.render().unwrap(), r#"bla"#);
+    assert_eq!(IsDefinedChaining.render().unwrap(), r"bla");
 }

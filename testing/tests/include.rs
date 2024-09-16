@@ -10,7 +10,7 @@ struct IncludeTemplate<'a> {
 fn test_include() {
     let strs = vec!["foo", "bar"];
     let s = IncludeTemplate { strs: &strs };
-    assert_eq!(s.render().unwrap(), "\n  INCLUDED: foo\n  INCLUDED: bar")
+    assert_eq!(s.render().unwrap(), "\n  INCLUDED: foo\n  INCLUDED: bar");
 }
 
 #[derive(Template)]

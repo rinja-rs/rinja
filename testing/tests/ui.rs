@@ -31,13 +31,12 @@ fn ui() {
         let target = target_crate_root.join(name);
         if !target.exists() {
             let original = manifest_dir.join(name);
-            if symlink(&original, &target).is_err() {
-                panic!(
-                    "failed to create to create link on `{}` as `{}`",
-                    original.display(),
-                    target.display(),
-                );
-            }
+            assert!(
+                symlink(&original, &target).is_ok(),
+                "failed to create to create link on `{}` as `{}`",
+                original.display(),
+                target.display(),
+            );
         }
     };
 

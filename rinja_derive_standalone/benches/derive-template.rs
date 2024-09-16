@@ -20,7 +20,7 @@ fn hello_world(c: &mut Criterion) {
             || ts.clone(),
             rinja_derive_standalone::derive_template,
             BatchSize::LargeInput,
-        )
+        );
     });
 }
 

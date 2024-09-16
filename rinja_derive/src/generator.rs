@@ -757,17 +757,17 @@ impl<'a> Generator<'a> {
                 // an iterator. If not then the user can explicitly add the needed
                 // call without issues.
                 Expr::Call(..) | Expr::Index(..) => {
-                    buf.write(format_args!("let _iter = ({expr_code}).into_iter();"))
+                    buf.write(format_args!("let _iter = ({expr_code}).into_iter();"));
                 }
                 // If accessing `self` then it most likely needs to be
                 // borrowed, to prevent an attempt of moving.
                 _ if expr_code.starts_with("self.") => {
-                    buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"))
+                    buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"));
                 }
                 // If accessing a field then it most likely needs to be
                 // borrowed, to prevent an attempt of moving.
                 Expr::Attr(..) => {
-                    buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"))
+                    buf.write(format_args!("let _iter = (&{expr_code}).into_iter();"));
                 }
                 // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
                 _ => buf.write(format_args!("let _iter = ({expr_code}).into_iter();")),
@@ -837,25 +837,23 @@ impl<'a> Generator<'a> {
             return self.write_block(ctx, buf, None, ws, call);
         }
 
-        let (def, own_ctx) = match scope {
-            Some(s) => {
-                let path = ctx.imports.get(s).ok_or_else(|| {
-                    ctx.generate_error(&format!("no import found for scope {s:?}"), call)
-                })?;
-                let mctx = self.contexts.get(path).ok_or_else(|| {
-                    ctx.generate_error(&format!("context for {path:?} not found"), call)
-                })?;
-                let def = mctx.macros.get(name).ok_or_else(|| {
-                    ctx.generate_error(&format!("macro {name:?} not found in scope {s:?}"), call)
-                })?;
-                (def, mctx)
-            }
-            None => {
-                let def = ctx.macros.get(name).ok_or_else(|| {
-                    ctx.generate_error(&format!("macro {name:?} not found"), call)
-                })?;
-                (def, ctx)
-            }
+        let (def, own_ctx) = if let Some(s) = scope {
+            let path = ctx.imports.get(s).ok_or_else(|| {
+                ctx.generate_error(&format!("no import found for scope {s:?}"), call)
+            })?;
+            let mctx = self.contexts.get(path).ok_or_else(|| {
+                ctx.generate_error(&format!("context for {path:?} not found"), call)
+            })?;
+            let def = mctx.macros.get(name).ok_or_else(|| {
+                ctx.generate_error(&format!("macro {name:?} not found in scope {s:?}"), call)
+            })?;
+            (def, mctx)
+        } else {
+            let def = ctx
+                .macros
+                .get(name)
+                .ok_or_else(|| ctx.generate_error(&format!("macro {name:?} not found"), call))?;
+            (def, ctx)
         };
 
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
@@ -906,25 +904,22 @@ impl<'a> Generator<'a> {
             //   anything since named arguments are always last).
             let mut allow_positional = true;
             for (index, arg) in def.args.iter().enumerate() {
-                let expr = match named_arguments.get(&Cow::Borrowed(arg)) {
-                    Some(expr) => {
-                        allow_positional = false;
-                        expr
+                let expr = if let Some(expr) = named_arguments.get(&Cow::Borrowed(arg)) {
+                    allow_positional = false;
+                    expr
+                } else {
+                    if !allow_positional {
+                        // If there is already at least one named argument, then it's not allowed
+                        // to use unnamed ones at this point anymore.
+                        return Err(ctx.generate_error(
+                            &format!(
+                            "cannot have unnamed argument (`{arg}`) after named argument in macro \
+                             {name:?}"
+                        ),
+                            call,
+                        ));
                     }
-                    None => {
-                        if !allow_positional {
-                            // If there is already at least one named argument, then it's not allowed
-                            // to use unnamed ones at this point anymore.
-                            return Err(ctx.generate_error(
-                                &format!(
-                                "cannot have unnamed argument (`{arg}`) after named argument in macro \
-                                 {name:?}"
-                            ),
-                                call,
-                            ));
-                        }
-                        &args[index]
-                    }
+                    &args[index]
                 };
                 match &**expr {
                     // If `expr` is already a form of variable then
@@ -949,7 +944,7 @@ impl<'a> Generator<'a> {
                     // parameters being used multiple times.
                     _ => {
                         if is_first_variable {
-                            is_first_variable = false
+                            is_first_variable = false;
                         } else {
                             names.write(',');
                             values.write(',');
@@ -1407,7 +1402,7 @@ impl<'a> Generator<'a> {
                     self.next_ws = Some(lws);
                 }
                 WhitespaceHandling::Preserve => {
-                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(lws)))
+                    self.buf_writable.push(Writable::Lit(Cow::Borrowed(lws)));
                 }
                 WhitespaceHandling::Minimize => {
                     self.buf_writable.push(Writable::Lit(Cow::Borrowed(
@@ -2176,7 +2171,7 @@ impl<'a> Generator<'a> {
         match target {
             Target::Placeholder(s) => buf.write(s),
             Target::Rest(s) => {
-                if let Some(var_name) = s.deref() {
+                if let Some(var_name) = &**s {
                     self.locals
                         .insert(Cow::Borrowed(var_name), LocalMeta::initialized());
                     buf.write(var_name);
@@ -2578,7 +2573,7 @@ impl Buffer {
                 self.buf.push_str(OPEN);
             } else {
                 // strip trailing `")?;`, leaving an unterminated string
-                self.buf.truncate(self.buf.len() - CLOSE.len())
+                self.buf.truncate(self.buf.len() - CLOSE.len());
             }
             string_escape(&mut self.buf, s);
             self.buf.push_str(CLOSE);
@@ -2593,7 +2588,7 @@ trait BufferFmt {
 
 impl<T: BufferFmt + ?Sized> BufferFmt for &T {
     fn append_to(&self, buf: &mut String) {
-        T::append_to(self, buf)
+        T::append_to(self, buf);
     }
 }
 
@@ -3028,9 +3023,9 @@ pub(crate) fn string_escape(dest: &mut String, src: &str) {
     for x in memchr::memchr3_iter(b'\\', b'"', b'\r', src) {
         dest.extend(&src[last..x]);
         dest.extend(match src[x] {
-            b'\\' => br#"\\"#,
+            b'\\' => br"\\",
             b'\"' => br#"\""#,
-            _ => br#"\r"#,
+            _ => br"\r",
         });
         last = x + 1;
     }
