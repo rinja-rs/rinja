@@ -300,12 +300,9 @@ impl<'a> Expr<'a> {
         let (_, level) = level.nest(i)?;
         let start = i;
         let (i, expr) = preceded(ws(char('(')), opt(|i| Self::parse(i, level)))(i)?;
-        let expr = match expr {
-            Some(expr) => expr,
-            None => {
-                let (i, _) = char(')')(i)?;
-                return Ok((i, WithSpan::new(Self::Tuple(vec![]), start)));
-            }
+        let Some(expr) = expr else {
+            let (i, _) = char(')')(i)?;
+            return Ok((i, WithSpan::new(Self::Tuple(vec![]), start)));
         };
 
         let (i, comma) = ws(opt(peek(char(','))))(i)?;
@@ -315,10 +312,10 @@ impl<'a> Expr<'a> {
         }
 
         let mut exprs = vec![expr];
-        let (i, _) = fold_many0(
+        let (i, ()) = fold_many0(
             preceded(char(','), ws(|i| Self::parse(i, level))),
             || (),
-            |_, expr| {
+            |(), expr| {
                 exprs.push(expr);
             },
         )(i)?;
@@ -372,6 +369,7 @@ impl<'a> Expr<'a> {
         map(char_lit, |i| WithSpan::new(Self::CharLit(i), start))(i)
     }
 
+    #[must_use]
     pub fn contains_bool_lit_or_is_defined(&self) -> bool {
         match self {
             Self::BoolLit(_) | Self::IsDefined(_) | Self::IsNotDefined(_) => true,
@@ -459,7 +457,7 @@ impl<'a> Suffix<'a> {
             match suffix {
                 Some(Self::Attr(attr)) => expr = WithSpan::new(Expr::Attr(expr.into(), attr), i),
                 Some(Self::Index(index)) => {
-                    expr = WithSpan::new(Expr::Index(expr.into(), index.into()), i)
+                    expr = WithSpan::new(Expr::Index(expr.into(), index.into()), i);
                 }
                 Some(Self::Call(args)) => expr = WithSpan::new(Expr::Call(expr.into(), args), i),
                 Some(Self::Try) => expr = WithSpan::new(Expr::Try(expr.into()), i),

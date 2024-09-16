@@ -415,7 +415,7 @@ fn test_for_cycle_empty() {
         values: &[1, 2, 3, 4, 5, 6, 7, 8, 9],
         cycle: &[],
     };
-    assert!(t.render().is_err())
+    assert!(t.render().is_err());
 }
 
 #[derive(Template)]

@@ -133,7 +133,7 @@ fn check_if_let() {
     // In this test, we ensure that `query` never is `self.query`.
     compare(
         "{% if let Some(query) = s && !query.is_empty() %}{{query}}{% endif %}",
-        r#"if let Some(query,) = &self.s && !query.is_empty() {
+        r"if let Some(query,) = &self.s && !query.is_empty() {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(query), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -141,7 +141,7 @@ fn check_if_let() {
             (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
         }
     }
-}"#,
+}",
         &[],
         3,
     );
@@ -150,7 +150,7 @@ fn check_if_let() {
     // condition.
     compare(
         "{% if let Some(s) = s %}{{ s }}{% endif %}",
-        r#"if let Some(s,) = &self.s {
+        r"if let Some(s,) = &self.s {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -158,7 +158,7 @@ fn check_if_let() {
             (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
         }
     }
-}"#,
+}",
         &[],
         3,
     );
@@ -167,7 +167,7 @@ fn check_if_let() {
     // condition.
     compare(
         "{% if let Some(s) = s && !s.is_empty() %}{{s}}{% endif %}",
-        r#"if let Some(s,) = &self.s && !s.is_empty() {
+        r"if let Some(s,) = &self.s && !s.is_empty() {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(s), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -175,7 +175,7 @@ fn check_if_let() {
             (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
         }
     }
-}"#,
+}",
         &[],
         3,
     );
@@ -299,7 +299,7 @@ writer.write_str("12")?;
     // are present.
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(self.x == 12) as &::core::primitive::bool) {
+        r"if *(&(self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -308,26 +308,26 @@ writer.write_str("12")?;
         }
     }
 }
-"#,
+",
         &[("x", "u32")],
         3,
     );
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r#"match (
+        r"match (
     &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
 ) {
     (expr0,) => {
         (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
     }
 }
-"#,
+",
         &[("y", "u32"), ("x", "u32")],
         3,
     );
     compare(
         "{% if y is defined && y == 12 %}{{x}}{% endif %}",
-        r#""#,
+        r"",
         &[],
         0,
     );
@@ -362,7 +362,7 @@ if *(&(self.y == 12) as &::core::primitive::bool) {
     // Since the first `if` is always `true`, the `else` should not be generated.
     compare(
         "{% if y is defined %}{{y}}{% else %}bli{% endif %}",
-        r#"
+        r"
 match (
     &((&&::rinja::filters::AutoEscaper::new(
         &(self.y),
@@ -374,7 +374,7 @@ match (
         (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
     }
 }
-"#,
+",
         &[("y", "u32")],
         3,
     );
@@ -487,20 +487,20 @@ fn check_bool_conditions() {
 
     compare(
         "{% if true || x == 12 %}{{x}}{% endif %}",
-        r#"match (
+        r"match (
     &((&&::rinja::filters::AutoEscaper::new(&(self.x), ::rinja::filters::Text)).rinja_auto_escape()?),
 ) {
     (expr0,) => {
         (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
     }
 }
-"#,
+",
         &[("x", "u32")],
         3,
     );
     compare(
         "{% if false || x == 12 %}{{x}}{% endif %}",
-        r#"if *(&(self.x == 12) as &::core::primitive::bool) {
+        r"if *(&(self.x == 12) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(
             &(self.x),
@@ -513,7 +513,7 @@ fn check_bool_conditions() {
         }
     }
 }
-"#,
+",
         &[("x", "u32")],
         3,
     );
@@ -524,7 +524,7 @@ fn check_bool_conditions() {
     // condition.
     compare(
         "{% if y == 3 || (true || x == 12) %}{{x}}{% endif %}",
-        r#"if *(&(self.y == 3 || (true)) as &::core::primitive::bool) {
+        r"if *(&(self.y == 3 || (true)) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(
             &(self.x),
@@ -537,7 +537,7 @@ fn check_bool_conditions() {
         }
     }
 }
-"#,
+",
         &[],
         3,
     );
@@ -545,7 +545,7 @@ fn check_bool_conditions() {
     // be evaluated so the whole code is removed.
     compare(
         "{% if (true || x == 12) || y == 3 %}{{x}}{% endif %}",
-        r#"match (
+        r"match (
     &((&&::rinja::filters::AutoEscaper::new(
         &(self.x),
         ::rinja::filters::Text,
@@ -556,13 +556,13 @@ fn check_bool_conditions() {
         (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
     }
 }
-"#,
+",
         &[],
         3,
     );
     compare(
         "{% if y == 3 || (x == 12 || true) %}{{x}}{% endif %}",
-        r#"if *(&(self.y == 3 || (self.x == 12 || true)) as &::core::primitive::bool) {
+        r"if *(&(self.y == 3 || (self.x == 12 || true)) as &::core::primitive::bool) {
     match (
         &((&&::rinja::filters::AutoEscaper::new(
             &(self.x),
@@ -575,7 +575,7 @@ fn check_bool_conditions() {
         }
     }
 }
-"#,
+",
         &[],
         3,
     );
@@ -630,7 +630,7 @@ A
     );
 
     compare(
-        r#"{{ 1_2_3_4 }} {{ 4e3 }} {{ false }}"#,
+        r"{{ 1_2_3_4 }} {{ 4e3 }} {{ false }}",
         r#"writer.write_str("1234 4000 false")?;"#,
         &[],
         15,
@@ -738,7 +738,7 @@ fn test_code_in_comment() {
 #[test]
 fn test_pluralize() {
     compare(
-        r#"{{dogs}} dog{{dogs|pluralize}}"#,
+        r"{{dogs}} dog{{dogs|pluralize}}",
         r#"
         match (
             &((&&::rinja::filters::AutoEscaper::new(
@@ -811,8 +811,8 @@ fn test_pluralize() {
     );
 
     compare(
-        r#"{{count|pluralize(one, count)}}"#,
-        r#"
+        r"{{count|pluralize(one, count)}}",
+        r"
         match (
             &(::rinja::filters::pluralize(
                 &(self.count),
@@ -832,14 +832,14 @@ fn test_pluralize() {
                 (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
             }
         }
-        "#,
+        ",
         &[("count", "i8"), ("one", "&'static str")],
         3,
     );
 
     compare(
-        r#"{{0|pluralize(sg, pl)}}"#,
-        r#"
+        r"{{0|pluralize(sg, pl)}}",
+        r"
         match (
             &((&&::rinja::filters::AutoEscaper::new(&(self.pl), ::rinja::filters::Text))
                 .rinja_auto_escape()?),
@@ -848,13 +848,13 @@ fn test_pluralize() {
                 (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
             }
         }
-        "#,
+        ",
         &[("sg", "&'static str"), ("pl", "&'static str")],
         3,
     );
     compare(
-        r#"{{1|pluralize(sg, pl)}}"#,
-        r#"
+        r"{{1|pluralize(sg, pl)}}",
+        r"
         match (
             &((&&::rinja::filters::AutoEscaper::new(&(self.sg), ::rinja::filters::Text))
                 .rinja_auto_escape()?),
@@ -863,7 +863,7 @@ fn test_pluralize() {
                 (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
             }
         }
-        "#,
+        ",
         &[("sg", "&'static str"), ("pl", "&'static str")],
         3,
     );
@@ -894,7 +894,7 @@ fn test_pluralize() {
     );
 
     compare(
-        r#"{{0|pluralize}}"#,
+        r"{{0|pluralize}}",
         r#"
         match (&(::rinja::filters::Safe("s")),) {
             (expr0,) => {
@@ -906,14 +906,14 @@ fn test_pluralize() {
         3,
     );
     compare(
-        r#"{{1|pluralize}}"#,
-        r#"
+        r"{{1|pluralize}}",
+        r"
         match (&(::rinja::helpers::Empty),) {
             (expr0,) => {
                 (&&::rinja::filters::Writable(expr0)).rinja_write(writer)?;
             }
         }
-        "#,
+        ",
         &[],
         3,
     );

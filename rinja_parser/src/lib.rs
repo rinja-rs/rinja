@@ -62,10 +62,12 @@ mod _parsed {
         }
 
         // The return value's lifetime must be limited to `self` to uphold the unsafe invariant.
+        #[must_use]
         pub fn nodes(&self) -> &[Node<'_>] {
             &self.ast.nodes
         }
 
+        #[must_use]
         pub fn source(&self) -> &str {
             &self.source
         }
@@ -124,6 +126,7 @@ impl<'a> Ast<'a> {
         }
     }
 
+    #[must_use]
     pub fn nodes(&self) -> &[Node<'a>] {
         &self.nodes
     }
@@ -205,7 +208,7 @@ impl fmt::Display for ParseError {
         } = self;
 
         if let Some(message) = message {
-            writeln!(f, "{}", message)?;
+            writeln!(f, "{message}")?;
         }
 
         let path = file_path
@@ -400,7 +403,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
             }
         })(i)?;
         match (has_dot, has_exp) {
-            (Some(_), _) | (_, Some(_)) => Ok((i, ())),
+            (Some(_), _) | (_, Some(())) => Ok((i, ())),
             _ => fail(start),
         }
     };
@@ -450,6 +453,7 @@ pub enum StrPrefix {
 }
 
 impl StrPrefix {
+    #[must_use]
     pub fn to_char(self) -> char {
         match self {
             Self::Binary => 'b',
@@ -549,7 +553,7 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
         Char::UnicodeEscape(nb) => (
             nb,
             // `0x10FFFF` is the maximum value for a `\u` escaped character.
-            0x10FFFF,
+            0x0010_FFFF,
             "invalid character in unicode escape",
             "unicode escape must be at most 10FFFF",
         ),
@@ -646,7 +650,7 @@ fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
             path.extend(rest);
             Ok((i, PathOrIdentifier::Path(path)))
         }
-        (None, name, []) if name.chars().next().map_or(true, |c| c.is_lowercase()) => {
+        (None, name, []) if name.chars().next().map_or(true, char::is_lowercase) => {
             Ok((i, PathOrIdentifier::Identifier(name)))
         }
         (None, start, tail) => {
@@ -821,7 +825,7 @@ impl<'a> SyntaxBuilder<'a> {
                     "delimiters must be at least two characters long. \
                         The {k} delimiter ({s:?}) is too short",
                 ));
-            } else if s.chars().any(|c| c.is_whitespace()) {
+            } else if s.chars().any(char::is_whitespace) {
                 return Err(format!(
                     "delimiters may not contain white spaces. \
                         The {k} delimiter ({s:?}) contains white spaces",
@@ -934,6 +938,7 @@ fn filter<'a>(
 /// ```
 ///
 /// `strip_common` will return `d/e.txt`.
+#[must_use]
 pub fn strip_common(base: &Path, path: &Path) -> String {
     let path = match path.canonicalize() {
         Ok(path) => path,
@@ -1067,7 +1072,7 @@ mod test {
         let entry = cwd
             .read_dir()
             .expect("read_dir failed")
-            .filter_map(|f| f.ok())
+            .filter_map(std::result::Result::ok)
             .find(|f| f.path().is_file())
             .expect("no entry");
 

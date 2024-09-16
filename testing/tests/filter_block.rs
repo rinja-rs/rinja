@@ -22,7 +22,7 @@ where
 #[test]
 fn filter_block_basic() {
     let template = A { t: "a", u: "B" };
-    assert_eq!(template.render().unwrap(), "\n    a / hello / b\n\n\nb\n")
+    assert_eq!(template.render().unwrap(), "\n    a / hello / b\n\n\nb\n");
 }
 
 // This test ensures that we don't have variable shadowing when we have more than one
@@ -58,7 +58,7 @@ fn filter_block_shadowing() {
     let template = B { t: "a", u: "B" };
     assert_eq!(
         template.render().unwrap(),
-        r#"
+        r"
     a / hello / b
 
 
@@ -70,7 +70,7 @@ B + TADAM + A
     a - check - a
 
 
-B"#
+B"
     );
 }
 
@@ -102,8 +102,8 @@ fn filter_block_whitespace_control() {
     let template = C { t: "a", u: "B" };
     assert_eq!(
         template.render().unwrap(),
-        r#"a / hello / b
-B + TADAM + A++b"#
+        r"a / hello / b
+B + TADAM + A++b"
     );
 }
 
@@ -115,7 +115,7 @@ struct D;
 #[test]
 fn filter_block_html_escape() {
     let template = D;
-    assert_eq!(template.render().unwrap(), r#"&#60;block&#62;"#);
+    assert_eq!(template.render().unwrap(), r"&#60;block&#62;");
 }
 
 // This test ensures that it is not escaped if it is not HTML.
@@ -126,7 +126,7 @@ struct E;
 #[test]
 fn filter_block_not_html_escape() {
     let template = E;
-    assert_eq!(template.render().unwrap(), r#"<block>"#);
+    assert_eq!(template.render().unwrap(), r"<block>");
 }
 
 // This test checks that the filter chaining is working as expected.
@@ -182,7 +182,7 @@ fn filter_block_chaining_paren_followed_by_whitespace() {
     let template = G { v: "pIKA" };
     assert_eq!(
         template.render().unwrap(),
-        r#"hello
+        r"hello
   pika
 
 hello
@@ -194,7 +194,7 @@ hello
 
 
   hello
-  pika"#
+  pika"
     );
 }
 
@@ -302,12 +302,12 @@ fn filter_nested_filter_blocks() {
     };
     assert_eq!(
         template.render().unwrap(),
-        r#"[
+        r"[
 &#60;P&#62;HELLO &#38;#38;&#60;/P&#62;&#60;P&#62;GOODBYE!
 &#60;/P&#62;
 &#60;P&#62;HELLO &#38;#38;&#60;/P&#62;&#60;P&#62;GOODBYE!
 &#60;/P&#62;]
-2"#
+2"
     );
 }
 

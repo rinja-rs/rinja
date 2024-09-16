@@ -1,5 +1,5 @@
 {
-    const STRING_LONG: &str = r#"
+    const STRING_LONG: &str = r"
     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris consequat tellus sit
     amet ornare fermentum. Etiam nec erat ante. In at metus a orci mollis scelerisque.
     Sed eget ultrices turpis, at sollicitudin erat. Integer hendrerit nec magna quis
@@ -36,7 +36,7 @@
     suscipit leo, lacinia dignissim lacus. Sed eget volutpat mi. In eu bibendum neque. Pellentesque
     finibus velit a fermentum rhoncus. Maecenas leo purus, eleifend eu lacus a, condimentum sagittis
     justo.
-</p>"#;
+</p>";
 
     const STRING_SHORT: &str = "Lorem ipsum dolor sit amet,<foo>bar&foo\"bar\\foo/bar";
 
@@ -44,7 +44,7 @@
 
     const NO_ESCAPE: &str = "Lorem ipsum dolor sit amet,";
 
-    const NO_ESCAPE_LONG: &str = r#"
+    const NO_ESCAPE_LONG: &str = r"
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin scelerisque eu urna in aliquet.
 Phasellus ac nulla a urna sagittis consequat id quis est. Nullam eu ex eget erat accumsan dictum
 ac lobortis urna. Etiam fermentum ut quam at dignissim. Curabitur vestibulum luctus tellus, sit
@@ -56,7 +56,7 @@ lacus ipsum eget quam. Vivamus orci lorem, maximus ac mi eget, bibendum vulputat
 vestibulum dui hendrerit, vestibulum lacus sit amet, posuere erat. Vivamus euismod massa diam,
 vulputate euismod lectus vestibulum nec. Donec sit amet massa magna. Nunc ipsum nulla, euismod
 quis lacus at, gravida maximus elit. Duis tristique, nisl nullam.
-    "#;
+    ";
 
     const STRINGS: &[&str] = &[
         STRING_LONG,

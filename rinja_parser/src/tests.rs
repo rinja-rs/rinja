@@ -728,7 +728,7 @@ fn test_parse_comments() {
         assert_eq!(nodes.len(), 1, "expected to parse one node");
         match nodes.pop().unwrap() {
             Node::Comment(comment) => assert_eq!(comment.ws, ws),
-            node => panic!("expected a comment not, but parsed {:?}", node),
+            node => panic!("expected a comment not, but parsed {node:?}"),
         }
     }
 

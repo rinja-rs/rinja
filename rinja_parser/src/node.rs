@@ -177,6 +177,7 @@ impl<'a> Node<'a> {
         }
     }
 
+    #[must_use]
     pub fn span(&self) -> &str {
         match self {
             Self::Lit(span) => span.span,
@@ -678,7 +679,7 @@ impl<'a> FilterBlock<'a> {
                 )),
             ),
         ));
-        let (i, (pws1, _, (filter_name, params, extra_filters, _, nws1, _))) = start(i)?;
+        let (i, (pws1, _, (filter_name, params, extra_filters, (), nws1, _))) = start(i)?;
 
         let mut arguments = params.unwrap_or_default();
         arguments.insert(0, WithSpan::new(Expr::FilterSource, start_s));
@@ -976,7 +977,7 @@ pub struct Lit<'a> {
 impl<'a> Lit<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, _) = not(eof)(i)?;
+        let (i, ()) = not(eof)(i)?;
 
         let candidate_finder = Splitter3::new(
             s.syntax.block_start,
@@ -1418,9 +1419,7 @@ mod kws_tests {
     fn ensure_utf8_inner(entry: &[&[[u8; MAX_REPL_LEN]]]) {
         for kws in entry {
             for kw in *kws {
-                if std::str::from_utf8(kw).is_err() {
-                    panic!("not UTF-8: {:?}", kw);
-                }
+                assert!(std::str::from_utf8(kw).is_ok(), "not UTF-8: {kw:?}");
             }
         }
     }

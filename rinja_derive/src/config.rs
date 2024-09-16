@@ -396,7 +396,7 @@ pub(crate) fn read_config_file(
             span,
         ))
     } else {
-        Ok("".to_string())
+        Ok(String::new())
     }
 }
 
@@ -767,7 +767,7 @@ mod tests {
 
     #[test]
     fn test_config_whitespace_error() {
-        let config = Config::new(r#""#, None, Some("trim"), None);
+        let config = Config::new(r"", None, Some("trim"), None);
         if let Err(err) = config {
             assert_eq!(err.msg, "invalid value for `whitespace`: \"trim\"");
         } else {

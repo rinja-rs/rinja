@@ -507,7 +507,7 @@ struct MixedCase {
 /// variable names (`foo`). Previously, this test would fail because any
 /// name containing uppercase characters would be considered a path.
 ///
-/// https://github.com/rinja-rs/rinja/issues/924
+/// <https://github.com/rinja-rs/rinja/issues/924>
 #[test]
 fn test_mixed_case() {
     let template = MixedCase { xY: "foo" };
@@ -558,5 +558,5 @@ struct SplitTemplateDeclaration;
 
 #[test]
 fn test_split_template_declaration() {
-    assert_eq!(SplitTemplateDeclaration.to_string(), "🙂")
+    assert_eq!(SplitTemplateDeclaration.to_string(), "🙂");
 }
