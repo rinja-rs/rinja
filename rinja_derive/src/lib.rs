@@ -391,8 +391,6 @@ const BUILT_IN_FILTERS: &[&str] = &[
     "trim",
     "truncate",
     "upper",
-    "uppercase",
-    "urlencode_strict",
     "urlencode",
     "wordcount",
 ];

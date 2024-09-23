@@ -1555,6 +1555,9 @@ impl<'a> Generator<'a> {
             "pluralize" => return self._visit_pluralize_filter(ctx, buf, args, filter),
             "ref" => return self._visit_ref_filter(ctx, buf, args, filter),
             "safe" => return self._visit_safe_filter(ctx, buf, args, filter),
+            "uppercase" | "urlencode_strict" => {
+                return self._visit_urlencode(ctx, buf, name, args, filter);
+            }
             _ => {}
         }
 
@@ -1565,6 +1568,30 @@ impl<'a> Generator<'a> {
         }
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_urlencode<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if cfg!(not(feature = "urlencode")) {
+            return Err(ctx.generate_error(
+                &format!("the `{name}` filter requires the `urlencode` feature to be enabled"),
+                node,
+            ));
+        }
+
+        // Both filters return HTML-safe strings.
+        buf.write(format_args!(
+            "{CRATE}::filters::HtmlSafeOutput({CRATE}::filters::{name}(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?)");
         Ok(DisplayWrap::Unwrapped)
     }
 

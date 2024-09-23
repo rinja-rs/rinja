@@ -18,13 +18,13 @@ mod humansize;
 mod json;
 #[cfg(feature = "num-traits")]
 mod num_traits;
+#[cfg(feature = "urlencode")]
+mod urlencode;
 
 pub use builtin::{
     capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower, lowercase,
     paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount, PluralizeCount,
 };
-#[cfg(feature = "urlencode")]
-pub use builtin::{urlencode, urlencode_strict};
 pub use escape::{
     e, escape, safe, AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe,
     HtmlSafeOutput, MaybeSafe, Safe, Text, Unsafe, Writable, WriteWritable,
@@ -35,3 +35,5 @@ pub use humansize::filesizeformat;
 pub use json::{json, json_pretty, AsIndent};
 #[cfg(feature = "num-traits")]
 pub use num_traits::{abs, into_f64, into_isize};
+#[cfg(feature = "urlencode")]
+pub use urlencode::{urlencode, urlencode_strict};
