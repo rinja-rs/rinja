@@ -384,7 +384,6 @@ impl fmt::Display for MsgValidEscapers<'_> {
 const BUILT_IN_FILTERS: &[&str] = &[
     "capitalize",
     "center",
-    "filesizeformat",
     "indent",
     "lower",
     "lowercase",

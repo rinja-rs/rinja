@@ -2,8 +2,6 @@ use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
 
-#[cfg(feature = "humansize")]
-use humansize::{ISizeFormatter, ToF64, DECIMAL};
 #[cfg(feature = "urlencode")]
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 
@@ -26,40 +24,6 @@ const URLENCODE_SET: &AsciiSet = &URLENCODE_STRICT_SET.remove(b'/');
 
 // MAX_LEN is maximum allowed length for filters.
 const MAX_LEN: usize = 10_000;
-
-#[cfg(feature = "humansize")]
-/// Returns adequate string representation (in KB, ..) of number of bytes
-///
-/// ## Example
-/// ```
-/// # use rinja::Template;
-/// #[derive(Template)]
-/// #[template(
-///     source = "Filesize: {{ size_in_bytes|filesizeformat }}.",
-///     ext = "html"
-/// )]
-/// struct Example {
-///     size_in_bytes: u64,
-/// }
-///
-/// let tmpl = Example { size_in_bytes: 1_234_567 };
-/// assert_eq!(tmpl.to_string(),  "Filesize: 1.23 MB.");
-/// ```
-#[inline]
-pub fn filesizeformat(b: &impl ToF64) -> Result<FilesizeFormatFilter, Infallible> {
-    Ok(FilesizeFormatFilter(b.to_f64()))
-}
-
-#[cfg(feature = "humansize")]
-#[derive(Debug, Clone, Copy)]
-pub struct FilesizeFormatFilter(f64);
-
-#[cfg(feature = "humansize")]
-impl fmt::Display for FilesizeFormatFilter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("{}", ISizeFormatter::new(self.0, &DECIMAL)))
-    }
-}
 
 #[cfg(feature = "urlencode")]
 /// Percent-encodes the argument for safe use in URI; does not encode `/`.
@@ -742,16 +706,6 @@ fn try_to_string(s: impl fmt::Display) -> Result<String, fmt::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg(feature = "humansize")]
-    #[test]
-    fn test_filesizeformat() {
-        assert_eq!(filesizeformat(&0).unwrap().to_string(), "0 B");
-        assert_eq!(filesizeformat(&999u64).unwrap().to_string(), "999 B");
-        assert_eq!(filesizeformat(&1000i32).unwrap().to_string(), "1 kB");
-        assert_eq!(filesizeformat(&1023).unwrap().to_string(), "1.02 kB");
-        assert_eq!(filesizeformat(&1024usize).unwrap().to_string(), "1.02 kB");
-    }
 
     #[cfg(feature = "urlencode")]
     #[test]

@@ -1542,6 +1542,9 @@ impl<'a> Generator<'a> {
             }
             "deref" => return self._visit_deref_filter(ctx, buf, args, filter),
             "escape" | "e" => return self._visit_escape_filter(ctx, buf, args, filter),
+            "filesizeformat" => {
+                return self._visit_humansize(ctx, buf, name, args, filter);
+            }
             "fmt" => return self._visit_fmt_filter(ctx, buf, args, filter),
             "format" => return self._visit_format_filter(ctx, buf, args, filter),
             "join" => return self._visit_join_filter(ctx, buf, args),
@@ -1562,6 +1565,30 @@ impl<'a> Generator<'a> {
         }
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_humansize<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if cfg!(not(feature = "humansize")) {
+            return Err(ctx.generate_error(
+                &format!("the `{name}` filter requires the `humansize` feature to be enabled"),
+                node,
+            ));
+        }
+
+        // All filters return numbers, and any default formatted number is HTML safe.
+        buf.write(format_args!(
+            "{CRATE}::filters::HtmlSafeOutput({CRATE}::filters::{name}(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?)");
         Ok(DisplayWrap::Unwrapped)
     }
 

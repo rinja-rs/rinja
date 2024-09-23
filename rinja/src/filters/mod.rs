@@ -12,13 +12,13 @@
 
 mod builtin;
 mod escape;
+#[cfg(feature = "humansize")]
+mod humansize;
 #[cfg(feature = "serde_json")]
 mod json;
 #[cfg(feature = "num-traits")]
 mod num_traits;
 
-#[cfg(feature = "humansize")]
-pub use builtin::filesizeformat;
 pub use builtin::{
     capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower, lowercase,
     paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount, PluralizeCount,
@@ -29,6 +29,8 @@ pub use escape::{
     e, escape, safe, AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe,
     HtmlSafeOutput, MaybeSafe, Safe, Text, Unsafe, Writable, WriteWritable,
 };
+#[cfg(feature = "humansize")]
+pub use humansize::filesizeformat;
 #[cfg(feature = "serde_json")]
 pub use json::{json, json_pretty, AsIndent};
 #[cfg(feature = "num-traits")]
