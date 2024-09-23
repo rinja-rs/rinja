@@ -4,8 +4,6 @@ use std::fmt::{self, Write};
 
 #[cfg(feature = "humansize")]
 use humansize::{ISizeFormatter, ToF64, DECIMAL};
-#[cfg(feature = "num-traits")]
-use num_traits::{cast::NumCast, Signed};
 #[cfg(feature = "urlencode")]
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 
@@ -381,24 +379,6 @@ pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> 
     indent(try_to_string(s)?, width)
 }
 
-#[cfg(feature = "num-traits")]
-/// Casts number to f64
-pub fn into_f64<T>(number: T) -> Result<f64>
-where
-    T: NumCast,
-{
-    number.to_f64().ok_or(Error::Fmt)
-}
-
-#[cfg(feature = "num-traits")]
-/// Casts number to isize
-pub fn into_isize<T>(number: T) -> Result<isize>
-where
-    T: NumCast,
-{
-    number.to_isize().ok_or(Error::Fmt)
-}
-
 /// Joins iterable into a string separated by provided argument
 #[inline]
 pub fn join<I, S>(input: I, separator: S) -> Result<JoinFilter<I, S>, Infallible>
@@ -442,15 +422,6 @@ where
         }
         Ok(())
     }
-}
-
-#[cfg(feature = "num-traits")]
-/// Absolute value
-pub fn abs<T>(number: T) -> Result<T>
-where
-    T: Signed,
-{
-    Ok(number.abs())
 }
 
 /// Capitalize a value. The first character will be uppercase, all others lowercase.
@@ -932,31 +903,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "num-traits")]
-    #[test]
-    #[allow(clippy::float_cmp)]
-    fn test_into_f64() {
-        assert_eq!(into_f64(1).unwrap(), 1.0_f64);
-        assert_eq!(into_f64(1.9).unwrap(), 1.9_f64);
-        assert_eq!(into_f64(-1.9).unwrap(), -1.9_f64);
-        assert_eq!(into_f64(f32::INFINITY).unwrap(), f64::INFINITY);
-        assert_eq!(into_f64(-f32::INFINITY).unwrap(), -f64::INFINITY);
-    }
-
-    #[cfg(feature = "num-traits")]
-    #[test]
-    fn test_into_isize() {
-        assert_eq!(into_isize(1).unwrap(), 1_isize);
-        assert_eq!(into_isize(1.9).unwrap(), 1_isize);
-        assert_eq!(into_isize(-1.9).unwrap(), -1_isize);
-        assert_eq!(into_isize(1.5_f64).unwrap(), 1_isize);
-        assert_eq!(into_isize(-1.5_f64).unwrap(), -1_isize);
-        match into_isize(f64::INFINITY) {
-            Err(Error::Fmt) => {}
-            _ => panic!("Should return error of type Err(Error::Fmt)"),
-        };
-    }
-
     #[allow(clippy::needless_borrow)]
     #[test]
     fn test_join() {
@@ -990,18 +936,6 @@ mod tests {
                 .to_string(),
             "foo, bar"
         );
-    }
-
-    #[cfg(feature = "num-traits")]
-    #[test]
-    #[allow(clippy::float_cmp)]
-    fn test_abs() {
-        assert_eq!(abs(1).unwrap(), 1);
-        assert_eq!(abs(-1).unwrap(), 1);
-        assert_eq!(abs(1.0).unwrap(), 1.0);
-        assert_eq!(abs(-1.0).unwrap(), 1.0);
-        assert_eq!(abs(1.0_f64).unwrap(), 1.0_f64);
-        assert_eq!(abs(-1.0_f64).unwrap(), 1.0_f64);
     }
 
     #[test]

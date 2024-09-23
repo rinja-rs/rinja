@@ -1537,6 +1537,9 @@ impl<'a> Generator<'a> {
         filter: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         match name {
+            "abs" | "into_f64" | "into_isize" => {
+                return self._visit_num_traits(ctx, buf, name, args, filter);
+            }
             "deref" => return self._visit_deref_filter(ctx, buf, args, filter),
             "escape" | "e" => return self._visit_escape_filter(ctx, buf, args, filter),
             "fmt" => return self._visit_fmt_filter(ctx, buf, args, filter),
@@ -1559,6 +1562,30 @@ impl<'a> Generator<'a> {
         }
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_num_traits<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if cfg!(not(feature = "num-traits")) {
+            return Err(ctx.generate_error(
+                &format!("the `{name}` filter requires the `num-traits` feature to be enabled"),
+                node,
+            ));
+        }
+
+        // All filters return numbers, and any default formatted number is HTML safe.
+        buf.write(format_args!(
+            "{CRATE}::filters::HtmlSafeOutput({CRATE}::filters::{name}(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?)");
         Ok(DisplayWrap::Unwrapped)
     }
 

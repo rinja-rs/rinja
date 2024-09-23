@@ -382,13 +382,10 @@ impl fmt::Display for MsgValidEscapers<'_> {
 // This is used by the code generator to decide whether a named filter is part of
 // Rinja or should refer to a local `filters` module.
 const BUILT_IN_FILTERS: &[&str] = &[
-    "abs",
     "capitalize",
     "center",
     "filesizeformat",
     "indent",
-    "into_f64",
-    "into_isize",
     "lower",
     "lowercase",
     "title",
