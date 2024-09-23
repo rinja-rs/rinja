@@ -380,28 +380,17 @@ impl fmt::Display for MsgValidEscapers<'_> {
 }
 
 // This is used by the code generator to decide whether a named filter is part of
-// Rinja or should refer to a local `filters` module. It should contain all the
-// filters shipped with Rinja, even the optional ones (since optional inclusion
-// in the const vector based on features seems impossible right now).
+// Rinja or should refer to a local `filters` module.
 const BUILT_IN_FILTERS: &[&str] = &[
     "abs",
     "capitalize",
     "center",
-    "e",
-    "escape",
     "filesizeformat",
-    "fmt",
-    "format",
     "indent",
     "into_f64",
     "into_isize",
-    "join",
-    "linebreaks",
-    "linebreaksbr",
     "lower",
     "lowercase",
-    "paragraphbreaks",
-    "safe",
     "title",
     "trim",
     "truncate",
@@ -410,8 +399,6 @@ const BUILT_IN_FILTERS: &[&str] = &[
     "urlencode_strict",
     "urlencode",
     "wordcount",
-    // optional features, reserve the names anyway:
-    "json",
 ];
 
 const CRATE: &str = if cfg!(feature = "with-actix-web") {
