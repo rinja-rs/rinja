@@ -1538,34 +1538,50 @@ impl<'a> Generator<'a> {
     ) -> Result<DisplayWrap, CompileError> {
         match name {
             "abs" | "into_f64" | "into_isize" => {
-                return self._visit_num_traits(ctx, buf, name, args, filter);
+                self._visit_num_traits(ctx, buf, name, args, filter)
             }
-            "deref" => return self._visit_deref_filter(ctx, buf, args, filter),
-            "escape" | "e" => return self._visit_escape_filter(ctx, buf, args, filter),
-            "filesizeformat" => {
-                return self._visit_humansize(ctx, buf, name, args, filter);
-            }
-            "fmt" => return self._visit_fmt_filter(ctx, buf, args, filter),
-            "format" => return self._visit_format_filter(ctx, buf, args, filter),
-            "join" => return self._visit_join_filter(ctx, buf, args),
-            "json" | "tojson" => return self._visit_json_filter(ctx, buf, args, filter),
+            "deref" => self._visit_deref_filter(ctx, buf, args, filter),
+            "escape" | "e" => self._visit_escape_filter(ctx, buf, args, filter),
+            "filesizeformat" => self._visit_humansize(ctx, buf, name, args, filter),
+            "fmt" => self._visit_fmt_filter(ctx, buf, args, filter),
+            "format" => self._visit_format_filter(ctx, buf, args, filter),
+            "join" => self._visit_join_filter(ctx, buf, args),
+            "json" | "tojson" => self._visit_json_filter(ctx, buf, args, filter),
             "linebreaks" | "linebreaksbr" | "paragraphbreaks" => {
-                return self._visit_linebreaks_filter(ctx, buf, name, args, filter);
+                self._visit_linebreaks_filter(ctx, buf, name, args, filter)
             }
-            "pluralize" => return self._visit_pluralize_filter(ctx, buf, args, filter),
-            "ref" => return self._visit_ref_filter(ctx, buf, args, filter),
-            "safe" => return self._visit_safe_filter(ctx, buf, args, filter),
-            "uppercase" | "urlencode_strict" => {
-                return self._visit_urlencode(ctx, buf, name, args, filter);
+            "pluralize" => self._visit_pluralize_filter(ctx, buf, args, filter),
+            "ref" => self._visit_ref_filter(ctx, buf, args, filter),
+            "safe" => self._visit_safe_filter(ctx, buf, args, filter),
+            "uppercase" | "urlencode_strict" => self._visit_urlencode(ctx, buf, name, args, filter),
+            name if crate::BUILT_IN_FILTERS.contains(&name) => {
+                self._visit_builtin_filter(ctx, buf, name, args)
             }
-            _ => {}
+            name => self._visit_custom_filter(ctx, buf, name, args),
         }
+    }
 
-        if crate::BUILT_IN_FILTERS.contains(&name) {
-            buf.write(format_args!("{CRATE}::filters::{name}("));
-        } else {
-            buf.write(format_args!("filters::{name}("));
-        }
+    fn _visit_custom_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(format_args!("filters::{name}("));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_builtin_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(format_args!("{CRATE}::filters::{name}("));
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
