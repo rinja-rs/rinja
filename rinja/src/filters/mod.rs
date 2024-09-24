@@ -21,19 +21,19 @@ mod num_traits;
 #[cfg(feature = "urlencode")]
 mod urlencode;
 
-pub use builtin::{
+pub use self::builtin::{
     PluralizeCount, capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower,
     lowercase, paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount,
 };
-pub use escape::{
+pub use self::escape::{
     AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
     Safe, Text, Unsafe, Writable, WriteWritable, e, escape, safe,
 };
 #[cfg(feature = "humansize")]
-pub use humansize::filesizeformat;
+pub use self::humansize::filesizeformat;
 #[cfg(feature = "serde_json")]
-pub use json::{AsIndent, json, json_pretty};
+pub use self::json::{AsIndent, json, json_pretty};
 #[cfg(feature = "num-traits")]
-pub use num_traits::{abs, into_f64, into_isize};
+pub use self::num_traits::{abs, into_f64, into_isize};
 #[cfg(feature = "urlencode")]
-pub use urlencode::{urlencode, urlencode_strict};
+pub use self::urlencode::{urlencode, urlencode_strict};
