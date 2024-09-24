@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::fmt;
 
-use humansize::{ISizeFormatter, ToF64, DECIMAL};
+use humansize::{DECIMAL, ISizeFormatter, ToF64};
 
 /// Returns adequate string representation (in KB, ..) of number of bytes
 ///

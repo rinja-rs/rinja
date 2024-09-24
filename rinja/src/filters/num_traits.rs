@@ -1,5 +1,5 @@
-use num_traits::cast::NumCast;
 use num_traits::Signed;
+use num_traits::cast::NumCast;
 
 use crate::{Error, Result};
 

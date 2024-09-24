@@ -34,14 +34,11 @@ where
     #[inline]
     fn next(&mut self) -> Option<(<I as Iterator>::Item, LoopItem)> {
         self.iter.next().map(|(index, item)| {
-            (
-                item,
-                LoopItem {
-                    index,
-                    first: index == 0,
-                    last: self.iter.peek().is_none(),
-                },
-            )
+            (item, LoopItem {
+                index,
+                first: index == 0,
+                last: self.iter.peek().is_none(),
+            })
         })
     }
 }

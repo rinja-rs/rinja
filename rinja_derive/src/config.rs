@@ -14,7 +14,7 @@ use rustc_hash::FxBuildHasher;
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
-use crate::{CompileError, FileInfo, CRATE};
+use crate::{CRATE, CompileError, FileInfo};
 
 #[derive(Debug)]
 pub(crate) struct Config {
@@ -682,22 +682,19 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(
-            config.escapers,
-            vec![
-                (str_set(&["js"]), "::my_filters::Js".into()),
-                (
-                    str_set(&[
-                        "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml"
-                    ]),
-                    "::rinja::filters::Html".into()
-                ),
-                (
-                    str_set(&["md", "none", "txt", "yml", ""]),
-                    "::rinja::filters::Text".into()
-                ),
-            ]
-        );
+        assert_eq!(config.escapers, vec![
+            (str_set(&["js"]), "::my_filters::Js".into()),
+            (
+                str_set(&[
+                    "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml"
+                ]),
+                "::rinja::filters::Html".into()
+            ),
+            (
+                str_set(&["md", "none", "txt", "yml", ""]),
+                "::rinja::filters::Text".into()
+            ),
+        ]);
     }
 
     #[cfg(feature = "config")]

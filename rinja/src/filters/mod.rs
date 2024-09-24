@@ -22,17 +22,17 @@ mod num_traits;
 mod urlencode;
 
 pub use builtin::{
-    capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower, lowercase,
-    paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount, PluralizeCount,
+    PluralizeCount, capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower,
+    lowercase, paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount,
 };
 pub use escape::{
-    e, escape, safe, AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe,
-    HtmlSafeOutput, MaybeSafe, Safe, Text, Unsafe, Writable, WriteWritable,
+    AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
+    Safe, Text, Unsafe, Writable, WriteWritable, e, escape, safe,
 };
 #[cfg(feature = "humansize")]
 pub use humansize::filesizeformat;
 #[cfg(feature = "serde_json")]
-pub use json::{json, json_pretty, AsIndent};
+pub use json::{AsIndent, json, json_pretty};
 #[cfg(feature = "num-traits")]
 pub use num_traits::{abs, into_f64, into_isize};
 #[cfg(feature = "urlencode")]

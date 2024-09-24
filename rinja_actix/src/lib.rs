@@ -7,8 +7,8 @@ use std::fmt;
 #[doc(no_inline)]
 pub use actix_web;
 use actix_web::body::BoxBody;
-use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
+use actix_web::http::header::HeaderValue;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 #[doc(no_inline)]
 pub use rinja::*;

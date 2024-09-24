@@ -15,11 +15,11 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
-use config::{read_config_file, Config};
+use config::{Config, read_config_file};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
-use parser::{strip_common, Parsed, WithSpan};
+use parser::{Parsed, WithSpan, strip_common};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]

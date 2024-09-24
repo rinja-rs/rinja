@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rinja::filters::{escape, Html};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use rinja::filters::{Html, escape};
 
 criterion_main!(benches);
 criterion_group!(benches, functions);

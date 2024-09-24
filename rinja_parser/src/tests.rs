@@ -112,13 +112,9 @@ fn test_parse_numbers() {
 fn test_parse_var() {
     let s = Syntax::default();
 
-    assert_eq!(
-        Ast::from_str("{{ foo }}", None, &s).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::Var("foo"))
-        )],
-    );
+    assert_eq!(Ast::from_str("{{ foo }}", None, &s).unwrap().nodes, vec![
+        Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("foo")))
+    ],);
     assert_eq!(
         Ast::from_str("{{ foo_bar }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
@@ -127,26 +123,18 @@ fn test_parse_var() {
         )],
     );
 
-    assert_eq!(
-        Ast::from_str("{{ none }}", None, &s).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::Var("none"))
-        )],
-    );
+    assert_eq!(Ast::from_str("{{ none }}", None, &s).unwrap().nodes, vec![
+        Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("none")))
+    ],);
 }
 
 #[test]
 fn test_parse_const() {
     let s = Syntax::default();
 
-    assert_eq!(
-        Ast::from_str("{{ FOO }}", None, &s).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::Path(vec!["FOO"]))
-        )],
-    );
+    assert_eq!(Ast::from_str("{{ FOO }}", None, &s).unwrap().nodes, vec![
+        Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Path(vec!["FOO"])))
+    ],);
     assert_eq!(
         Ast::from_str("{{ FOO_BAR }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
@@ -155,26 +143,18 @@ fn test_parse_const() {
         )],
     );
 
-    assert_eq!(
-        Ast::from_str("{{ NONE }}", None, &s).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::Path(vec!["NONE"]))
-        )],
-    );
+    assert_eq!(Ast::from_str("{{ NONE }}", None, &s).unwrap().nodes, vec![
+        Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Path(vec!["NONE"])))
+    ],);
 }
 
 #[test]
 fn test_parse_path() {
     let s = Syntax::default();
 
-    assert_eq!(
-        Ast::from_str("{{ None }}", None, &s).unwrap().nodes,
-        vec![Node::Expr(
-            Ws(None, None),
-            WithSpan::no_span(Expr::Path(vec!["None"]))
-        )],
-    );
+    assert_eq!(Ast::from_str("{{ None }}", None, &s).unwrap().nodes, vec![
+        Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Path(vec!["None"])))
+    ],);
     assert_eq!(
         Ast::from_str("{{ Some(123) }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
@@ -328,41 +308,36 @@ fn test_rust_macro() {
             WithSpan::no_span(Expr::RustMacro(vec!["alloc", "vec"], "1, 2, 3")),
         )],
     );
-    assert_eq!(
-        Ast::from_str("{{a!()}}", None, &syntax).unwrap().nodes,
-        [Node::Expr(
+    assert_eq!(Ast::from_str("{{a!()}}", None, &syntax).unwrap().nodes, [
+        Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{a !()}}", None, &syntax).unwrap().nodes,
-        [Node::Expr(
+        )
+    ],);
+    assert_eq!(Ast::from_str("{{a !()}}", None, &syntax).unwrap().nodes, [
+        Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{a! ()}}", None, &syntax).unwrap().nodes,
-        [Node::Expr(
+        )
+    ],);
+    assert_eq!(Ast::from_str("{{a! ()}}", None, &syntax).unwrap().nodes, [
+        Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{a ! ()}}", None, &syntax).unwrap().nodes,
-        [Node::Expr(
+        )
+    ],);
+    assert_eq!(Ast::from_str("{{a ! ()}}", None, &syntax).unwrap().nodes, [
+        Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
-        )],
-    );
-    assert_eq!(
-        Ast::from_str("{{A!()}}", None, &syntax).unwrap().nodes,
-        [Node::Expr(
+        )
+    ],);
+    assert_eq!(Ast::from_str("{{A!()}}", None, &syntax).unwrap().nodes, [
+        Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["A"], ""))
-        )],
-    );
+        )
+    ],);
     assert_eq!(
         &*Ast::from_str("{{a.b.c!( hello )}}", None, &syntax)
             .unwrap_err()

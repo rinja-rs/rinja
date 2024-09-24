@@ -20,7 +20,7 @@ use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
-use crate::{CompileError, FileInfo, MsgValidEscapers, BUILT_IN_FILTERS, CRATE};
+use crate::{BUILT_IN_FILTERS, CRATE, CompileError, FileInfo, MsgValidEscapers};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum EvaluatedResult {

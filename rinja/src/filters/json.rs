@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::{fmt, io, str};
 
 use serde::Serialize;
-use serde_json::ser::{to_writer, PrettyFormatter, Serializer};
+use serde_json::ser::{PrettyFormatter, Serializer, to_writer};
 
 use super::FastWritable;
 
