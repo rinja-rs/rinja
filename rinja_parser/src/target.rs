@@ -6,8 +6,8 @@ use nom::multi::separated_list1;
 use nom::sequence::{pair, preceded, tuple};
 
 use crate::{
-    bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws, CharLit,
-    ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
+    CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
+    bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
 };
 
 #[derive(Clone, Debug, PartialEq)]

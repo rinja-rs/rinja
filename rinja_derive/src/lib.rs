@@ -15,11 +15,11 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
-use config::{read_config_file, Config};
+use config::{Config, read_config_file};
 use generator::{Generator, MapChain};
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
-use parser::{strip_common, Parsed, WithSpan};
+use parser::{Parsed, WithSpan, strip_common};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
@@ -380,38 +380,19 @@ impl fmt::Display for MsgValidEscapers<'_> {
 }
 
 // This is used by the code generator to decide whether a named filter is part of
-// Rinja or should refer to a local `filters` module. It should contain all the
-// filters shipped with Rinja, even the optional ones (since optional inclusion
-// in the const vector based on features seems impossible right now).
+// Rinja or should refer to a local `filters` module.
 const BUILT_IN_FILTERS: &[&str] = &[
-    "abs",
     "capitalize",
     "center",
-    "e",
-    "escape",
-    "filesizeformat",
-    "fmt",
-    "format",
     "indent",
-    "into_f64",
-    "into_isize",
-    "join",
-    "linebreaks",
-    "linebreaksbr",
     "lower",
     "lowercase",
-    "paragraphbreaks",
-    "safe",
     "title",
     "trim",
     "truncate",
     "upper",
-    "uppercase",
-    "urlencode_strict",
     "urlencode",
     "wordcount",
-    // optional features, reserve the names anyway:
-    "json",
 ];
 
 const CRATE: &str = if cfg!(feature = "with-actix-web") {

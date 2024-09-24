@@ -1,7 +1,7 @@
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::routing::get;
-use axum::Router;
 use http_body_util::BodyExt;
 use rinja_axum::Template;
 use tower::util::ServiceExt;

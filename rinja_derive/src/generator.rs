@@ -20,7 +20,7 @@ use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
-use crate::{CompileError, FileInfo, MsgValidEscapers, CRATE};
+use crate::{BUILT_IN_FILTERS, CRATE, CompileError, FileInfo, MsgValidEscapers};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum EvaluatedResult {
@@ -1534,31 +1534,125 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        filter: &WithSpan<'_, T>,
+        node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
-        match name {
-            "deref" => return self._visit_deref_filter(ctx, buf, args, filter),
-            "escape" | "e" => return self._visit_escape_filter(ctx, buf, args, filter),
-            "fmt" => return self._visit_fmt_filter(ctx, buf, args, filter),
-            "format" => return self._visit_format_filter(ctx, buf, args, filter),
-            "join" => return self._visit_join_filter(ctx, buf, args),
-            "json" | "tojson" => return self._visit_json_filter(ctx, buf, args, filter),
-            "linebreaks" | "linebreaksbr" | "paragraphbreaks" => {
-                return self._visit_linebreaks_filter(ctx, buf, name, args, filter);
-            }
-            "pluralize" => return self._visit_pluralize_filter(ctx, buf, args, filter),
-            "ref" => return self._visit_ref_filter(ctx, buf, args, filter),
-            "safe" => return self._visit_safe_filter(ctx, buf, args, filter),
-            _ => {}
-        }
+        let filter = match name {
+            "abs" | "into_f64" | "into_isize" => Self::_visit_num_traits,
+            "deref" => Self::_visit_deref_filter,
+            "escape" | "e" => Self::_visit_escape_filter,
+            "filesizeformat" => Self::_visit_humansize,
+            "fmt" => Self::_visit_fmt_filter,
+            "format" => Self::_visit_format_filter,
+            "join" => Self::_visit_join_filter,
+            "json" | "tojson" => Self::_visit_json_filter,
+            "linebreaks" | "linebreaksbr" | "paragraphbreaks" => Self::_visit_linebreaks_filter,
+            "pluralize" => Self::_visit_pluralize_filter,
+            "ref" => Self::_visit_ref_filter,
+            "safe" => Self::_visit_safe_filter,
+            "uppercase" | "urlencode_strict" => Self::_visit_urlencode,
+            name if BUILT_IN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
+            _ => Self::_visit_custom_filter,
+        };
+        filter(self, ctx, buf, name, args, node)
+    }
 
-        if crate::BUILT_IN_FILTERS.contains(&name) {
-            buf.write(format_args!("{CRATE}::filters::{name}("));
-        } else {
-            buf.write(format_args!("filters::{name}("));
-        }
+    fn _visit_custom_filter<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        _node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(format_args!("filters::{name}("));
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_builtin_filter<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        _node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(format_args!("{CRATE}::filters::{name}("));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_urlencode<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if cfg!(not(feature = "urlencode")) {
+            return Err(ctx.generate_error(
+                &format!("the `{name}` filter requires the `urlencode` feature to be enabled"),
+                node,
+            ));
+        }
+
+        // Both filters return HTML-safe strings.
+        buf.write(format_args!(
+            "{CRATE}::filters::HtmlSafeOutput({CRATE}::filters::{name}(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?)");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_humansize<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if cfg!(not(feature = "humansize")) {
+            return Err(ctx.generate_error(
+                &format!("the `{name}` filter requires the `humansize` feature to be enabled"),
+                node,
+            ));
+        }
+
+        // All filters return numbers, and any default formatted number is HTML safe.
+        buf.write(format_args!(
+            "{CRATE}::filters::HtmlSafeOutput({CRATE}::filters::{name}(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?)");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn _visit_num_traits<T>(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'_>>],
+        node: &WithSpan<'_, T>,
+    ) -> Result<DisplayWrap, CompileError> {
+        if cfg!(not(feature = "num-traits")) {
+            return Err(ctx.generate_error(
+                &format!("the `{name}` filter requires the `num-traits` feature to be enabled"),
+                node,
+            ));
+        }
+
+        // All filters return numbers, and any default formatted number is HTML safe.
+        buf.write(format_args!(
+            "{CRATE}::filters::HtmlSafeOutput({CRATE}::filters::{name}(",
+        ));
+        self._visit_args(ctx, buf, args)?;
+        buf.write(")?)");
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -1566,6 +1660,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1638,6 +1733,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1654,6 +1750,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1670,6 +1767,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1696,6 +1794,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1712,6 +1811,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1772,6 +1872,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1794,6 +1895,7 @@ impl<'a> Generator<'a> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -1811,11 +1913,13 @@ impl<'a> Generator<'a> {
     }
 
     // Force type coercion on first argument to `join` filter (see #39).
-    fn _visit_join_filter(
+    fn _visit_join_filter<T>(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
+        _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
+        _node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write(CRATE);
         buf.write("::filters::join((&");

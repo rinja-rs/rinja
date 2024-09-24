@@ -11,8 +11,8 @@ use nom::multi::{fold_many0, many0, separated_list0, separated_list1};
 use nom::sequence::{pair, preceded, terminated, tuple};
 
 use crate::{
-    char_lit, filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws,
-    CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan,
+    CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
+    filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {

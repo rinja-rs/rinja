@@ -2,141 +2,11 @@ use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
 
-#[cfg(feature = "humansize")]
-use humansize::{ISizeFormatter, ToF64, DECIMAL};
-#[cfg(feature = "num-traits")]
-use num_traits::{cast::NumCast, Signed};
-#[cfg(feature = "urlencode")]
-use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
-
 use super::escape::{FastWritable, HtmlSafeOutput};
 use crate::{Error, Result};
 
-#[cfg(feature = "urlencode")]
-// Urlencode char encoding set. Only the characters in the unreserved set don't
-// have any special purpose in any part of a URI and can be safely left
-// unencoded as specified in https://tools.ietf.org/html/rfc3986.html#section-2.3
-const URLENCODE_STRICT_SET: &AsciiSet = &NON_ALPHANUMERIC
-    .remove(b'_')
-    .remove(b'.')
-    .remove(b'-')
-    .remove(b'~');
-
-#[cfg(feature = "urlencode")]
-// Same as URLENCODE_STRICT_SET, but preserves forward slashes for encoding paths
-const URLENCODE_SET: &AsciiSet = &URLENCODE_STRICT_SET.remove(b'/');
-
 // MAX_LEN is maximum allowed length for filters.
 const MAX_LEN: usize = 10_000;
-
-#[cfg(feature = "humansize")]
-/// Returns adequate string representation (in KB, ..) of number of bytes
-///
-/// ## Example
-/// ```
-/// # use rinja::Template;
-/// #[derive(Template)]
-/// #[template(
-///     source = "Filesize: {{ size_in_bytes|filesizeformat }}.",
-///     ext = "html"
-/// )]
-/// struct Example {
-///     size_in_bytes: u64,
-/// }
-///
-/// let tmpl = Example { size_in_bytes: 1_234_567 };
-/// assert_eq!(tmpl.to_string(),  "Filesize: 1.23 MB.");
-/// ```
-#[inline]
-pub fn filesizeformat(b: &impl ToF64) -> Result<FilesizeFormatFilter, Infallible> {
-    Ok(FilesizeFormatFilter(b.to_f64()))
-}
-
-#[cfg(feature = "humansize")]
-#[derive(Debug, Clone, Copy)]
-pub struct FilesizeFormatFilter(f64);
-
-#[cfg(feature = "humansize")]
-impl fmt::Display for FilesizeFormatFilter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("{}", ISizeFormatter::new(self.0, &DECIMAL)))
-    }
-}
-
-#[cfg(feature = "urlencode")]
-/// Percent-encodes the argument for safe use in URI; does not encode `/`.
-///
-/// This should be safe for all parts of URI (paths segments, query keys, query
-/// values). In the rare case that the server can't deal with forward slashes in
-/// the query string, use [`urlencode_strict`], which encodes them as well.
-///
-/// Encodes all characters except ASCII letters, digits, and `_.-~/`. In other
-/// words, encodes all characters which are not in the unreserved set,
-/// as specified by [RFC3986](https://tools.ietf.org/html/rfc3986#section-2.3),
-/// with the exception of `/`.
-///
-/// ```none,ignore
-/// <a href="/metro{{ "/stations/Château d'Eau"|urlencode }}">Station</a>
-/// <a href="/page?text={{ "look, unicode/emojis ✨"|urlencode }}">Page</a>
-/// ```
-///
-/// To encode `/` as well, see [`urlencode_strict`](./fn.urlencode_strict.html).
-///
-/// [`urlencode_strict`]: ./fn.urlencode_strict.html
-#[inline]
-pub fn urlencode<T>(s: T) -> Result<HtmlSafeOutput<UrlencodeFilter<T>>, Infallible> {
-    Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_SET)))
-}
-
-#[cfg(feature = "urlencode")]
-/// Percent-encodes the argument for safe use in URI; encodes `/`.
-///
-/// Use this filter for encoding query keys and values in the rare case that
-/// the server can't process them unencoded.
-///
-/// Encodes all characters except ASCII letters, digits, and `_.-~`. In other
-/// words, encodes all characters which are not in the unreserved set,
-/// as specified by [RFC3986](https://tools.ietf.org/html/rfc3986#section-2.3).
-///
-/// ```none,ignore
-/// <a href="/page?text={{ "look, unicode/emojis ✨"|urlencode_strict }}">Page</a>
-/// ```
-///
-/// If you want to preserve `/`, see [`urlencode`](./fn.urlencode.html).
-#[inline]
-pub fn urlencode_strict<T>(s: T) -> Result<HtmlSafeOutput<UrlencodeFilter<T>>, Infallible> {
-    Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_STRICT_SET)))
-}
-
-#[cfg(feature = "urlencode")]
-pub struct UrlencodeFilter<T>(pub T, pub &'static AsciiSet);
-
-#[cfg(feature = "urlencode")]
-impl<T: fmt::Display> fmt::Display for UrlencodeFilter<T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(UrlencodeWriter(f, self.1), "{}", self.0)
-    }
-}
-
-#[cfg(feature = "urlencode")]
-impl<T: FastWritable> FastWritable for UrlencodeFilter<T> {
-    #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> fmt::Result {
-        self.0.write_into(&mut UrlencodeWriter(f, self.1))
-    }
-}
-
-#[cfg(feature = "urlencode")]
-struct UrlencodeWriter<W>(W, &'static AsciiSet);
-
-#[cfg(feature = "urlencode")]
-impl<W: fmt::Write> fmt::Write for UrlencodeWriter<W> {
-    #[inline]
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        write!(self.0, "{}", utf8_percent_encode(s, self.1))
-    }
-}
 
 /// Formats arguments according to the specified format
 ///
@@ -381,24 +251,6 @@ pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> 
     indent(try_to_string(s)?, width)
 }
 
-#[cfg(feature = "num-traits")]
-/// Casts number to f64
-pub fn into_f64<T>(number: T) -> Result<f64>
-where
-    T: NumCast,
-{
-    number.to_f64().ok_or(Error::Fmt)
-}
-
-#[cfg(feature = "num-traits")]
-/// Casts number to isize
-pub fn into_isize<T>(number: T) -> Result<isize>
-where
-    T: NumCast,
-{
-    number.to_isize().ok_or(Error::Fmt)
-}
-
 /// Joins iterable into a string separated by provided argument
 #[inline]
 pub fn join<I, S>(input: I, separator: S) -> Result<JoinFilter<I, S>, Infallible>
@@ -442,15 +294,6 @@ where
         }
         Ok(())
     }
-}
-
-#[cfg(feature = "num-traits")]
-/// Absolute value
-pub fn abs<T>(number: T) -> Result<T>
-where
-    T: Signed,
-{
-    Ok(number.abs())
 }
 
 /// Capitalize a value. The first character will be uppercase, all others lowercase.
@@ -772,62 +615,6 @@ fn try_to_string(s: impl fmt::Display) -> Result<String, fmt::Error> {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "humansize")]
-    #[test]
-    fn test_filesizeformat() {
-        assert_eq!(filesizeformat(&0).unwrap().to_string(), "0 B");
-        assert_eq!(filesizeformat(&999u64).unwrap().to_string(), "999 B");
-        assert_eq!(filesizeformat(&1000i32).unwrap().to_string(), "1 kB");
-        assert_eq!(filesizeformat(&1023).unwrap().to_string(), "1.02 kB");
-        assert_eq!(filesizeformat(&1024usize).unwrap().to_string(), "1.02 kB");
-    }
-
-    #[cfg(feature = "urlencode")]
-    #[test]
-    fn test_urlencoding() {
-        // Unreserved (https://tools.ietf.org/html/rfc3986.html#section-2.3)
-        // alpha / digit
-        assert_eq!(urlencode("AZaz09").unwrap().to_string(), "AZaz09");
-        assert_eq!(urlencode_strict("AZaz09").unwrap().to_string(), "AZaz09");
-        // other
-        assert_eq!(urlencode("_.-~").unwrap().to_string(), "_.-~");
-        assert_eq!(urlencode_strict("_.-~").unwrap().to_string(), "_.-~");
-
-        // Reserved (https://tools.ietf.org/html/rfc3986.html#section-2.2)
-        // gen-delims
-        assert_eq!(
-            urlencode(":/?#[]@").unwrap().to_string(),
-            "%3A/%3F%23%5B%5D%40"
-        );
-        assert_eq!(
-            urlencode_strict(":/?#[]@").unwrap().to_string(),
-            "%3A%2F%3F%23%5B%5D%40"
-        );
-        // sub-delims
-        assert_eq!(
-            urlencode("!$&'()*+,;=").unwrap().to_string(),
-            "%21%24%26%27%28%29%2A%2B%2C%3B%3D"
-        );
-        assert_eq!(
-            urlencode_strict("!$&'()*+,;=").unwrap().to_string(),
-            "%21%24%26%27%28%29%2A%2B%2C%3B%3D"
-        );
-
-        // Other
-        assert_eq!(
-            urlencode("žŠďŤňĚáÉóŮ").unwrap().to_string(),
-            "%C5%BE%C5%A0%C4%8F%C5%A4%C5%88%C4%9A%C3%A1%C3%89%C3%B3%C5%AE"
-        );
-        assert_eq!(
-            urlencode_strict("žŠďŤňĚáÉóŮ").unwrap().to_string(),
-            "%C5%BE%C5%A0%C4%8F%C5%A4%C5%88%C4%9A%C3%A1%C3%89%C3%B3%C5%AE"
-        );
-
-        // Ferris
-        assert_eq!(urlencode("🦀").unwrap().to_string(), "%F0%9F%A6%80");
-        assert_eq!(urlencode_strict("🦀").unwrap().to_string(), "%F0%9F%A6%80");
-    }
-
     #[test]
     fn test_linebreaks() {
         assert_eq!(
@@ -932,31 +719,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "num-traits")]
-    #[test]
-    #[allow(clippy::float_cmp)]
-    fn test_into_f64() {
-        assert_eq!(into_f64(1).unwrap(), 1.0_f64);
-        assert_eq!(into_f64(1.9).unwrap(), 1.9_f64);
-        assert_eq!(into_f64(-1.9).unwrap(), -1.9_f64);
-        assert_eq!(into_f64(f32::INFINITY).unwrap(), f64::INFINITY);
-        assert_eq!(into_f64(-f32::INFINITY).unwrap(), -f64::INFINITY);
-    }
-
-    #[cfg(feature = "num-traits")]
-    #[test]
-    fn test_into_isize() {
-        assert_eq!(into_isize(1).unwrap(), 1_isize);
-        assert_eq!(into_isize(1.9).unwrap(), 1_isize);
-        assert_eq!(into_isize(-1.9).unwrap(), -1_isize);
-        assert_eq!(into_isize(1.5_f64).unwrap(), 1_isize);
-        assert_eq!(into_isize(-1.5_f64).unwrap(), -1_isize);
-        match into_isize(f64::INFINITY) {
-            Err(Error::Fmt) => {}
-            _ => panic!("Should return error of type Err(Error::Fmt)"),
-        };
-    }
-
     #[allow(clippy::needless_borrow)]
     #[test]
     fn test_join() {
@@ -990,18 +752,6 @@ mod tests {
                 .to_string(),
             "foo, bar"
         );
-    }
-
-    #[cfg(feature = "num-traits")]
-    #[test]
-    #[allow(clippy::float_cmp)]
-    fn test_abs() {
-        assert_eq!(abs(1).unwrap(), 1);
-        assert_eq!(abs(-1).unwrap(), 1);
-        assert_eq!(abs(1.0).unwrap(), 1.0);
-        assert_eq!(abs(-1.0).unwrap(), 1.0);
-        assert_eq!(abs(1.0_f64).unwrap(), 1.0_f64);
-        assert_eq!(abs(-1.0_f64).unwrap(), 1.0_f64);
     }
 
     #[test]

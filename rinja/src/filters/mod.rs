@@ -12,22 +12,28 @@
 
 mod builtin;
 mod escape;
+#[cfg(feature = "humansize")]
+mod humansize;
 #[cfg(feature = "serde_json")]
 mod json;
-
-#[cfg(feature = "humansize")]
-pub use builtin::filesizeformat;
 #[cfg(feature = "num-traits")]
-pub use builtin::{abs, into_f64, into_isize};
-pub use builtin::{
-    capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower, lowercase,
-    paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount, PluralizeCount,
-};
+mod num_traits;
 #[cfg(feature = "urlencode")]
-pub use builtin::{urlencode, urlencode_strict};
-pub use escape::{
-    e, escape, safe, AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe,
-    HtmlSafeOutput, MaybeSafe, Safe, Text, Unsafe, Writable, WriteWritable,
+mod urlencode;
+
+pub use self::builtin::{
+    PluralizeCount, capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower,
+    lowercase, paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount,
 };
+pub use self::escape::{
+    AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
+    Safe, Text, Unsafe, Writable, WriteWritable, e, escape, safe,
+};
+#[cfg(feature = "humansize")]
+pub use self::humansize::filesizeformat;
 #[cfg(feature = "serde_json")]
-pub use json::{json, json_pretty, AsIndent};
+pub use self::json::{AsIndent, json, json_pretty};
+#[cfg(feature = "num-traits")]
+pub use self::num_traits::{abs, into_f64, into_isize};
+#[cfg(feature = "urlencode")]
+pub use self::urlencode::{urlencode, urlencode_strict};

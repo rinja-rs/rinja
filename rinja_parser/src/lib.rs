@@ -535,13 +535,10 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
 
     let (nb, max_value, err1, err2) = match c {
         Char::Literal | Char::Escaped => {
-            return Ok((
-                i,
-                CharLit {
-                    prefix: b_prefix.map(|_| CharPrefix::Binary),
-                    content: s,
-                },
-            ));
+            return Ok((i, CharLit {
+                prefix: b_prefix.map(|_| CharPrefix::Binary),
+                content: s,
+            }));
         }
         Char::AsciiEscape(nb) => (
             nb,
@@ -566,13 +563,10 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
         return Err(nom::Err::Failure(ErrorContext::new(err2, start)));
     }
 
-    Ok((
-        i,
-        CharLit {
-            prefix: b_prefix.map(|_| CharPrefix::Binary),
-            content: s,
-        },
-    ))
+    Ok((i, CharLit {
+        prefix: b_prefix.map(|_| CharPrefix::Binary),
+        content: s,
+    }))
 }
 
 /// Represents the different kinds of char declarations:
@@ -1161,13 +1155,10 @@ mod test {
         // Check with `b` prefix.
         assert_eq!(
             char_lit("b'a'").unwrap(),
-            (
-                "",
-                crate::CharLit {
-                    prefix: Some(crate::CharPrefix::Binary),
-                    content: "a"
-                }
-            )
+            ("", crate::CharLit {
+                prefix: Some(crate::CharPrefix::Binary),
+                content: "a"
+            })
         );
 
         // Should fail.
@@ -1185,23 +1176,17 @@ mod test {
     fn test_str_lit() {
         assert_eq!(
             str_lit(r#"b"hello""#).unwrap(),
-            (
-                "",
-                StrLit {
-                    prefix: Some(StrPrefix::Binary),
-                    content: "hello"
-                }
-            )
+            ("", StrLit {
+                prefix: Some(StrPrefix::Binary),
+                content: "hello"
+            })
         );
         assert_eq!(
             str_lit(r#"c"hello""#).unwrap(),
-            (
-                "",
-                StrLit {
-                    prefix: Some(StrPrefix::CLike),
-                    content: "hello"
-                }
-            )
+            ("", StrLit {
+                prefix: Some(StrPrefix::CLike),
+                content: "hello"
+            })
         );
         assert!(str_lit(r#"d"hello""#).is_err());
     }

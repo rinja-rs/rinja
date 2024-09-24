@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::iter::FusedIterator;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 criterion_main!(benches);
 criterion_group!(benches, functions);

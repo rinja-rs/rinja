@@ -11,8 +11,8 @@ use nom::sequence::{delimited, pair, preceded, tuple};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
-    filter, identifier, is_ws, keyword, not_ws, skip_till, str_lit_without_prefix, ws,
-    ErrorContext, Expr, Filter, ParseResult, State, Target, WithSpan,
+    ErrorContext, Expr, Filter, ParseResult, State, Target, WithSpan, filter, identifier, is_ws,
+    keyword, not_ws, skip_till, str_lit_without_prefix, ws,
 };
 
 #[derive(Debug, PartialEq)]
@@ -409,14 +409,11 @@ impl<'a> CondTest<'a> {
             ws(|i| Expr::parse(i, s.level.get())),
         )(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
-        Ok((
-            i,
-            Self {
-                target,
-                expr,
-                contains_bool_lit_or_is_defined,
-            },
-        ))
+        Ok((i, Self {
+            target,
+            expr,
+            contains_bool_lit_or_is_defined,
+        }))
     }
 }
 
@@ -1414,7 +1411,7 @@ fn is_rust_keyword(ident: &str) -> bool {
 
 #[cfg(test)]
 mod kws_tests {
-    use super::{is_rust_keyword, KWS, KWS_EXTRA, MAX_REPL_LEN};
+    use super::{KWS, KWS_EXTRA, MAX_REPL_LEN, is_rust_keyword};
 
     fn ensure_utf8_inner(entry: &[&[[u8; MAX_REPL_LEN]]]) {
         for kws in entry {
