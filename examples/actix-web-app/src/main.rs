@@ -1,6 +1,6 @@
-use actix_web::http::{header, Method};
+use actix_web::http::{Method, header};
 use actix_web::{
-    get, middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder, Result,
+    App, HttpRequest, HttpResponse, HttpServer, Responder, Result, get, middleware, web,
 };
 use rinja_actix::Template;
 use serde::Deserialize;

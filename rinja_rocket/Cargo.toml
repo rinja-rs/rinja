@@ -1,3 +1,6 @@
+[workspace]
+members = ["."]
+
 [package]
 name = "rinja_rocket"
 version = "0.3.4"
@@ -16,14 +19,6 @@ rust-version = "1.71"
 all-features = true
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
-[dependencies]
-rinja = { version = "0.3.4", path = "../rinja", default-features = false, features = ["with-rocket"] }
-
-rocket = { version = "0.5", default-features = false }
-
-[dev-dependencies]
-tokio = { version = "1.0", features = ["macros", "rt"] }
-
 [features]
 default = ["rinja/default"]
 code-in-doc = ["rinja/code-in-doc"]
@@ -33,5 +28,10 @@ num-traits = ["rinja/num-traits"]
 serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
 
-[workspace]
-members = ["."]
+[dependencies]
+rinja = { version = "0.3.4", path = "../rinja", default-features = false, features = ["with-rocket"] }
+
+rocket = { version = "0.5", default-features = false }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["macros", "rt"] }

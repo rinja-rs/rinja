@@ -1,3 +1,6 @@
+[workspace]
+members = ["."]
+
 [package]
 name = "rinja_actix"
 version = "0.3.4"
@@ -16,16 +19,6 @@ rust-version = "1.71"
 all-features = true
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
-[dependencies]
-rinja = { version = "0.3.4", path = "../rinja", default-features = false, features = ["with-actix-web"] }
-
-actix-web = { version = "4", default-features = false }
-
-[dev-dependencies]
-actix-rt = { version = "2", default-features = false }
-actix-test = "0.1"
-bytes = { version = "1" }
-
 [features]
 default = ["rinja/default"]
 code-in-doc = ["rinja/code-in-doc"]
@@ -35,5 +28,12 @@ num-traits = ["rinja/num-traits"]
 serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
 
-[workspace]
-members = ["."]
+[dependencies]
+rinja = { version = "0.3.4", path = "../rinja", default-features = false, features = ["with-actix-web"] }
+
+actix-web = { version = "4", default-features = false }
+
+[dev-dependencies]
+actix-rt = { version = "2", default-features = false }
+actix-test = "0.1"
+bytes = { version = "1" }
