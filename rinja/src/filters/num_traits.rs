@@ -4,6 +4,24 @@ use num_traits::cast::NumCast;
 use crate::{Error, Result};
 
 /// Absolute value
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ -2|abs }}</div>
+/// /// ```
+///
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example;
+///
+/// assert_eq!(
+///     Example.to_string(),
+///     "<div>2</div>"
+/// );
+/// # }
+/// ```
 pub fn abs<T: Signed>(number: T) -> Result<T> {
     Ok(number.abs())
 }

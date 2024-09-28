@@ -20,6 +20,25 @@ const MAX_LEN: usize = 10_000;
 /// {{ value|fmt("{:?}") }}
 /// ```
 ///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ value|fmt("{:?}") }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example {
+///     value: (usize, usize),
+/// }
+///
+/// assert_eq!(
+///     Example { value: (3, 4) }.to_string(),
+///     "<div>(3, 4)</div>"
+/// );
+/// # }
+/// ```
+///
 /// Compare with [format](./fn.format.html).
 pub fn fmt() {}
 
@@ -34,6 +53,25 @@ pub fn fmt() {}
 /// {{ "{:?}{:?}"|format(value, other_value) }}
 /// ```
 ///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ "{:?}"|format(value) }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example {
+///     value: (usize, usize),
+/// }
+///
+/// assert_eq!(
+///     Example { value: (3, 4) }.to_string(),
+///     "<div>(3, 4)</div>"
+/// );
+/// # }
+/// ```
+///
 /// Compare with [fmt](./fn.fmt.html).
 pub fn format() {}
 
@@ -41,6 +79,25 @@ pub fn format() {}
 ///
 /// A single newline becomes an HTML line break `<br>` and a new line
 /// followed by a blank line becomes a paragraph break `<p>`.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|linebreaks }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "Foo\nBar\n\nBaz" }.to_string(),
+///     "<div><p>Foo<br/>Bar</p><p>Baz</p></div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn linebreaks(s: String) -> String {
@@ -83,6 +140,25 @@ pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt:
 /// A new line followed by a blank line becomes a paragraph break `<p>`.
 /// Paragraph tags only wrap content; empty paragraphs are removed.
 /// No `<br/>` tags are added.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// {{ lines|paragraphbreaks }}
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     lines: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { lines: "Foo\nBar\n\nBaz" }.to_string(),
+///     "<p>Foo\nBar</p><p>Baz</p>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn paragraphbreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn paragraphbreaks(s: String) -> String {
@@ -93,6 +169,30 @@ pub fn paragraphbreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, f
 }
 
 /// Converts to lowercase
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ word|lower }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     word: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { word: "FOO" }.to_string(),
+///     "<div>foo</div>"
+/// );
+///
+/// assert_eq!(
+///     Example { word: "FooBar" }.to_string(),
+///     "<div>foobar</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn lower(s: impl fmt::Display) -> Result<String, fmt::Error> {
     fn lower(s: String) -> Result<String, fmt::Error> {
@@ -102,12 +202,61 @@ pub fn lower(s: impl fmt::Display) -> Result<String, fmt::Error> {
 }
 
 /// Alias for the `lower()` filter
+/// Converts to lowercase
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ word|lowercase }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     word: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { word: "FOO" }.to_string(),
+///     "<div>foo</div>"
+/// );
+///
+/// assert_eq!(
+///     Example { word: "FooBar" }.to_string(),
+///     "<div>foobar</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn lowercase(s: impl fmt::Display) -> Result<String, fmt::Error> {
     lower(s)
 }
 
 /// Converts to uppercase
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ word|upper }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     word: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { word: "foo" }.to_string(),
+///     "<div>FOO</div>"
+/// );
+///
+/// assert_eq!(
+///     Example { word: "FooBar" }.to_string(),
+///     "<div>FOOBAR</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn upper(s: impl fmt::Display) -> Result<String, fmt::Error> {
     fn upper(s: String) -> Result<String, fmt::Error> {
@@ -117,12 +266,56 @@ pub fn upper(s: impl fmt::Display) -> Result<String, fmt::Error> {
 }
 
 /// Alias for the `upper()` filter
+/// Converts to uppercase
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ word|upper }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     word: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { word: "foo" }.to_string(),
+///     "<div>FOO</div>"
+/// );
+///
+/// assert_eq!(
+///     Example { word: "FooBar" }.to_string(),
+///     "<div>FOOBAR</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn uppercase(s: impl fmt::Display) -> Result<String, fmt::Error> {
     upper(s)
 }
 
 /// Strip leading and trailing whitespace
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|trim }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: " Hello\tworld\t" }.to_string(),
+///     "<div>Hello\tworld</div>"
+/// );
+/// # }
+/// ```
 pub fn trim<T: fmt::Display>(s: T) -> Result<String> {
     struct Collector(String);
 
@@ -143,6 +336,25 @@ pub fn trim<T: fmt::Display>(s: T) -> Result<String> {
 }
 
 /// Limit string length, appends '...' if truncated
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|truncate(2) }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "hello" }.to_string(),
+///     "<div>he...</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn truncate<S: fmt::Display>(
     source: S,
@@ -230,6 +442,25 @@ impl<W: fmt::Write> fmt::Write for TruncateWriter<W> {
 }
 
 /// Indent lines with `width` spaces
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|indent(4) }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "hello\nfoo\nbar" }.to_string(),
+///     "<div>hello\n    foo\n    bar</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> {
     fn indent(s: String, width: usize) -> Result<String, fmt::Error> {
@@ -252,6 +483,25 @@ pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> 
 }
 
 /// Joins iterable into a string separated by provided argument
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|join(", ") }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a [&'a str],
+/// }
+///
+/// assert_eq!(
+///     Example { example: &["foo", "bar", "bazz"] }.to_string(),
+///     "<div>foo, bar, bazz</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn join<I, S>(input: I, separator: S) -> Result<JoinFilter<I, S>, Infallible>
 where
@@ -297,6 +547,30 @@ where
 }
 
 /// Capitalize a value. The first character will be uppercase, all others lowercase.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|capitalize }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "hello" }.to_string(),
+///     "<div>Hello</div>"
+/// );
+///
+/// assert_eq!(
+///     Example { example: "hElLO" }.to_string(),
+///     "<div>Hello</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn capitalize(s: impl fmt::Display) -> Result<String, fmt::Error> {
     fn capitalize(s: String) -> Result<String, fmt::Error> {
@@ -313,6 +587,25 @@ pub fn capitalize(s: impl fmt::Display) -> Result<String, fmt::Error> {
 }
 
 /// Centers the value in a field of a given width
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>-{{ example|center(5) }}-</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "a" }.to_string(),
+///     "<div>-  a  -</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn center<T: fmt::Display>(src: T, width: usize) -> Result<Center<T>, Infallible> {
     Ok(Center { src, width })
@@ -334,6 +627,25 @@ impl<T: fmt::Display> fmt::Display for Center<T> {
 }
 
 /// Count the words in that string.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|wordcount }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "rinja is sort of cool" }.to_string(),
+///     "<div>5</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn wordcount(s: impl fmt::Display) -> Result<usize, fmt::Error> {
     fn wordcount(s: String) -> Result<usize, fmt::Error> {
@@ -344,6 +656,25 @@ pub fn wordcount(s: impl fmt::Display) -> Result<usize, fmt::Error> {
 
 /// Return a title cased version of the value. Words will start with uppercase letters, all
 /// remaining characters are lowercase.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|title }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "hello WORLD" }.to_string(),
+///     "<div>Hello World</div>"
+/// );
+/// # }
+/// ```
 pub fn title(s: impl fmt::Display) -> Result<String, fmt::Error> {
     let s = try_to_string(s)?;
     let mut need_capitalization = true;

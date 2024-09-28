@@ -10,6 +10,25 @@ use std::{borrow, str};
 /// Rinja will automatically insert the first (`Escaper`) argument,
 /// so this filter only takes a single argument of any type that implements
 /// `Display`.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|safe }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "<p>I'm Safe</p>" }.to_string(),
+///     "<div><p>I'm Safe</p></div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn safe<T, E>(text: T, escaper: E) -> Result<Safe<T>, Infallible> {
     let _ = escaper; // it should not be part of the interface that the `escaper` is unused
@@ -24,6 +43,25 @@ pub fn safe<T, E>(text: T, escaper: E) -> Result<Safe<T>, Infallible> {
 ///
 /// It is possible to optionally specify an escaper other than the default for
 /// the template's extension, like `{{ val|escape("txt") }}`.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|escape }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "Escape <>&" }.to_string(),
+///     "<div>Escape &#60;&#62;&#38;</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn escape<T, E>(text: T, escaper: E) -> Result<Safe<EscapeDisplay<T, E>>, Infallible> {
     Ok(Safe(EscapeDisplay(text, escaper)))
@@ -60,6 +98,25 @@ impl<W: Write, E: Escaper> Write for EscapeWriter<W, E> {
 }
 
 /// Alias for [`escape()`]
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|e }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "Escape <>&" }.to_string(),
+///     "<div>Escape &#60;&#62;&#38;</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn e<T, E>(text: T, escaper: E) -> Result<Safe<EscapeDisplay<T, E>>, Infallible> {
     escape(text, escaper)
