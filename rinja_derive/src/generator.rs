@@ -1965,8 +1965,8 @@ impl<'a> Generator<'a> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         arg: &WithSpan<'_, Expr<'_>>,
-        // This variable is needed because `Expr::Unary` is not copyable but since we might
-        // skip a few levels.
+        // This parameter is needed because even though Expr::Unary is not copyable, we might still
+        // be able to skip a few levels.
         need_borrow: bool,
     ) -> Result<(), CompileError> {
         if let Expr::Unary(expr @ ("*" | "&"), ref arg) = **arg {
