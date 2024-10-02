@@ -239,9 +239,9 @@ fn test_for_vec_attr_slice_shadowing() {
     assert_eq!(t.render().unwrap(), "1 2 3 4 5 6 ");
 }
 
-struct NotClonable<T: fmt::Display>(T);
+struct NotCloneable<T: fmt::Display>(T);
 
-impl<T: fmt::Display> fmt::Display for NotClonable<T> {
+impl<T: fmt::Display> fmt::Display for NotCloneable<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }
@@ -253,15 +253,15 @@ impl<T: fmt::Display> fmt::Display for NotClonable<T> {
     ext = "txt"
 )]
 struct ForDestructoringRefTupleTemplate<'a> {
-    v: &'a [(((char,), NotClonable<char>), &'a char)],
+    v: &'a [(((char,), NotCloneable<char>), &'a char)],
 }
 
 #[test]
 fn test_for_destructoring_ref_tuple() {
     let v = [
-        ((('a',), NotClonable('b')), &'c'),
-        ((('d',), NotClonable('e')), &'f'),
-        ((('g',), NotClonable('h')), &'i'),
+        ((('a',), NotCloneable('b')), &'c'),
+        ((('d',), NotCloneable('e')), &'f'),
+        ((('g',), NotCloneable('h')), &'i'),
     ];
     let t = ForDestructoringRefTupleTemplate { v: &v };
     assert_eq!(t.render().unwrap(), "abc-def-ghi-");
@@ -273,16 +273,16 @@ fn test_for_destructoring_ref_tuple() {
     ext = "txt"
 )]
 struct ForDestructoringTupleTemplate<'a, const N: usize> {
-    v: [(((char,), NotClonable<char>), &'a char); N],
+    v: [(((char,), NotCloneable<char>), &'a char); N],
 }
 
 #[test]
 fn test_for_destructoring_tuple() {
     let t = ForDestructoringTupleTemplate {
         v: [
-            ((('a',), NotClonable('b')), &'c'),
-            ((('d',), NotClonable('e')), &'f'),
-            ((('g',), NotClonable('h')), &'i'),
+            ((('a',), NotCloneable('b')), &'c'),
+            ((('d',), NotCloneable('e')), &'f'),
+            ((('g',), NotCloneable('h')), &'i'),
         ],
     };
     assert_eq!(t.render().unwrap(), "abc-def-ghi-");
