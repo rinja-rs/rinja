@@ -1957,7 +1957,23 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         arg: &WithSpan<'_, Expr<'_>>,
     ) -> Result<(), CompileError> {
-        let borrow = !is_copyable(arg);
+        self._visit_arg_inner(ctx, buf, arg, false)
+    }
+
+    fn _visit_arg_inner(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        arg: &WithSpan<'_, Expr<'_>>,
+        // This variable is needed because `Expr::Unary` is not copyable but since we might
+        // skip a few levels.
+        need_borrow: bool,
+    ) -> Result<(), CompileError> {
+        if let Expr::Unary(expr @ ("*" | "&"), ref arg) = **arg {
+            buf.write(expr);
+            return self._visit_arg_inner(ctx, buf, arg, true);
+        }
+        let borrow = need_borrow || !is_copyable(arg);
         if borrow {
             buf.write("&(");
         }
