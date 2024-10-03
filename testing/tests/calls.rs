@@ -170,3 +170,46 @@ struct NotMethod;
 fn test_not_method() {
     assert_eq!(NotMethod.render().unwrap(), "a6");
 }
+
+#[derive(Template)]
+#[template(
+    source = "
+{{- bar(x) -}}
+{{- bar(&*x) -}}
+{{- foo(*x) -}}
+{{- foo(*&*x) -}}
+{# #} {{+ extra_fn::bar(x) -}}
+{{- extra_fn::bar(&*x) -}}
+{{- extra_fn::foo(*x) -}}
+{{- extra_fn::foo(*&*x) -}}
+",
+    ext = "txt"
+)]
+struct DerefMethodArg {
+    x: u32,
+}
+
+mod extra_fn {
+    pub fn bar(x: &u32) -> u32 {
+        *x + 4
+    }
+    pub fn foo(x: u32) -> u32 {
+        x + 5
+    }
+}
+
+impl DerefMethodArg {
+    fn bar(&self, x: &u32) -> u32 {
+        *x + 1
+    }
+    fn foo(&self, x: u32) -> u32 {
+        x
+    }
+}
+
+// This test ensures that the `*`/`&` operators are correctly placed on method/function arguments.
+#[test]
+fn test_deref_method_arg() {
+    let x = DerefMethodArg { x: 2 };
+    assert_eq!(x.render().unwrap(), "3322 6677");
+}
