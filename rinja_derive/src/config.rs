@@ -6,15 +6,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::{env, fs};
 
-use once_map::sync::OnceMap;
 use parser::node::Whitespace;
 use parser::{ParseError, Parsed, Syntax, SyntaxBuilder};
 use proc_macro2::Span;
-use rustc_hash::FxBuildHasher;
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
-use crate::{CRATE, CompileError, FileInfo};
+use crate::{CRATE, CompileError, FileInfo, OnceMap};
 
 #[derive(Debug)]
 pub(crate) struct Config {
@@ -77,23 +75,20 @@ impl Config {
         template_whitespace: Option<&str>,
         config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
-        static CACHE: ManuallyDrop<
-            OnceLock<OnceMap<OwnedConfigKey, &'static Config, FxBuildHasher>>,
-        > = ManuallyDrop::new(OnceLock::new());
-        CACHE.get_or_init(OnceMap::default).get_or_try_insert_ref(
+        static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, &'static Config>>> =
+            ManuallyDrop::new(OnceLock::new());
+        CACHE.get_or_init(OnceMap::default).get_or_try_insert(
             &ConfigKey {
                 source: source.into(),
                 config_path: config_path.map(Cow::Borrowed),
                 template_whitespace: template_whitespace.map(Cow::Borrowed),
             },
-            config_span,
-            ConfigKey::to_owned,
-            |config_span, key| {
-                let config = Config::new_uncached(*key, config_span)?;
+            |key| {
+                let config = Config::new_uncached(key.to_owned(), config_span)?;
                 let config = &*Box::leak(Box::new(config));
-                Ok((config, config))
+                Ok((config._key, config))
             },
-            |_, _, config| config,
+            |config| *config,
         )
     }
 }
@@ -234,7 +229,7 @@ impl Config {
 #[derive(Debug, Default)]
 pub(crate) struct SyntaxAndCache<'a> {
     syntax: Syntax<'a>,
-    cache: OnceMap<OwnedSyntaxAndCacheKey, Arc<Parsed>, FxBuildHasher>,
+    cache: OnceMap<OwnedSyntaxAndCacheKey, Arc<Parsed>>,
 }
 
 impl<'a> Deref for SyntaxAndCache<'a> {
@@ -281,28 +276,27 @@ impl<'a> SyntaxAndCache<'a> {
         source: Arc<str>,
         source_path: Option<Arc<Path>>,
     ) -> Result<Arc<Parsed>, ParseError> {
-        self.cache.get_or_try_insert_ref(
+        self.cache.get_or_try_insert(
             &SyntaxAndCacheKey {
                 source: Cow::Owned(source),
                 source_path: source_path.map(Cow::Owned),
             },
-            &self.syntax,
             |key| {
-                OwnedSyntaxAndCacheKey(SyntaxAndCacheKey {
+                let key = OwnedSyntaxAndCacheKey(SyntaxAndCacheKey {
                     source: Cow::Owned(Arc::clone(key.source.as_ref())),
                     source_path: key
                         .source_path
                         .as_deref()
                         .map(|v| Cow::Owned(Arc::clone(v))),
-                })
+                });
+                let parsed = Parsed::new(
+                    Arc::clone(key.source.as_ref()),
+                    key.source_path.as_deref().map(Arc::clone),
+                    &self.syntax,
+                )?;
+                Ok((key, Arc::new(parsed)))
             },
-            |syntax, key| {
-                let source = Arc::clone(key.source.as_ref());
-                let source_path = key.source_path.as_deref().map(Arc::clone);
-                let parsed = Arc::new(Parsed::new(source, source_path, syntax)?);
-                Ok((Arc::clone(&parsed), parsed))
-            },
-            |_, _, cached| Arc::clone(cached),
+            Arc::clone,
         )
     }
 }
