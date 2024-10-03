@@ -10,10 +10,12 @@ mod input;
 #[cfg(test)]
 mod tests;
 
-use std::borrow::Cow;
-use std::collections::HashMap;
+use std::borrow::{Borrow, Cow};
+use std::collections::hash_map::{Entry, HashMap};
 use std::fmt;
+use std::hash::{BuildHasher, Hash};
 use std::path::Path;
+use std::sync::Mutex;
 
 use config::{Config, read_config_file};
 use generator::{Generator, MapChain};
@@ -25,6 +27,7 @@ use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
 use proc_macro2::TokenStream as TokenStream12;
 use proc_macro2::{Span, TokenStream};
+use rustc_hash::FxBuildHasher;
 use syn::parse_quote_spanned;
 
 /// The `Template` derive macro and its `template()` attribute.
@@ -376,6 +379,42 @@ impl fmt::Display for MsgValidEscapers<'_> {
             .collect::<Vec<_>>();
         exts.sort();
         write!(f, "The available extensions are: {}", exts.join(", "))
+    }
+}
+
+#[derive(Debug)]
+struct OnceMap<K, V>([Mutex<HashMap<K, V, FxBuildHasher>>; 8]);
+
+impl<K, V> Default for OnceMap<K, V> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<K: Hash + Eq, V> OnceMap<K, V> {
+    // The API of this function was copied, and adapted from the `once_map` crate
+    // <https://crates.io/crates/once_map/0.4.18>.
+    fn get_or_try_insert<T, Q, E>(
+        &self,
+        key: &Q,
+        make_key_value: impl FnOnce(&Q) -> Result<(K, V), E>,
+        to_value: impl FnOnce(&V) -> T,
+    ) -> Result<T, E>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let shard_idx = (FxBuildHasher.hash_one(key) % self.0.len() as u64) as usize;
+        let mut shard = self.0[shard_idx].lock().unwrap();
+        Ok(to_value(if let Some(v) = shard.get(key) {
+            v
+        } else {
+            let (k, v) = make_key_value(key)?;
+            match shard.entry(k) {
+                Entry::Vacant(entry) => entry.insert(v),
+                Entry::Occupied(_) => unreachable!("key in map when it should not have been"),
+            }
+        }))
     }
 }
 

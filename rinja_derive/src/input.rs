@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
-use once_map::OnceMap;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
 use rustc_hash::FxBuildHasher;
@@ -14,7 +13,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
 use crate::config::{Config, SyntaxAndCache};
-use crate::{CompileError, FileInfo, MsgValidEscapers};
+use crate::{CompileError, FileInfo, MsgValidEscapers, OnceMap};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
@@ -766,19 +765,16 @@ pub(crate) fn get_template_source(
     tpl_path: &Arc<Path>,
     import_from: Option<(&Arc<Path>, &str, &str)>,
 ) -> Result<Arc<str>, CompileError> {
-    static CACHE: OnceLock<OnceMap<Arc<Path>, Arc<str>, FxBuildHasher>> = OnceLock::new();
+    static CACHE: OnceLock<OnceMap<Arc<Path>, Arc<str>>> = OnceLock::new();
 
-    CACHE.get_or_init(OnceMap::default).get_or_try_insert_ref(
+    CACHE.get_or_init(OnceMap::default).get_or_try_insert(
         tpl_path,
-        (),
-        Arc::clone,
-        |(), tpl_path| match read_to_string(tpl_path) {
+        |tpl_path| match read_to_string(tpl_path) {
             Ok(mut source) => {
                 if source.ends_with('\n') {
                     let _ = source.pop();
                 }
-                let source = Arc::from(source);
-                Ok((Arc::clone(&source), source))
+                Ok((Arc::clone(tpl_path), Arc::from(source)))
             }
             Err(err) => Err(CompileError::new(
                 format_args!(
@@ -790,7 +786,7 @@ pub(crate) fn get_template_source(
                 }),
             )),
         },
-        |(), _, cached| Arc::clone(cached),
+        Arc::clone,
     )
 }
 
