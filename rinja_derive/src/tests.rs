@@ -38,7 +38,6 @@ struct Foo {{ {} }}"##,
     };
     let generated: syn::File = syn::parse2(generated).unwrap();
 
-    let size_hint = proc_macro2::Literal::usize_unsuffixed(size_hint);
     let expected: proc_macro2::TokenStream = expected.parse().unwrap();
     let expected: syn::File = syn::parse_quote! {
         const _: () = {
@@ -54,7 +53,8 @@ struct Foo {{ {} }}"##,
                     #expected
                     rinja::Result::Ok(())
                 }
-                const EXTENSION: ::core::option::Option<&'static ::core::primitive::str> = Some("txt");
+                const EXTENSION: ::core::option::Option<&'static ::core::primitive::str> =
+                    ::core::option::Option::Some("txt");
                 const SIZE_HINT: ::core::primitive::usize = #size_hint;
                 const MIME_TYPE: &'static ::core::primitive::str = "text/plain; charset=utf-8";
             }
