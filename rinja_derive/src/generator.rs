@@ -136,15 +136,15 @@ impl<'a> Generator<'a> {
 
     // Implement `Template` for the given context struct.
     fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, format_args!("rinja::Template"), None);
-        buf.write(format_args!(
+        self.write_header(buf, "rinja::Template", None);
+        buf.write(
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
             where \
                 RinjaW: ::core::fmt::Write + ?::core::marker::Sized\
-            {{\
-                use rinja::filters::{{AutoEscape as _, WriteWritable as _}};\
+            {\
+                use rinja::filters::{AutoEscape as _, WriteWritable as _};\
                 use ::core::fmt::Write as _;",
-        ));
+        );
 
         buf.set_discard(self.buf_writable.discard);
         // Make sure the compiler understands that the generated code depends on the template files.
@@ -205,30 +205,30 @@ impl<'a> Generator<'a> {
             quote!(#ident),
         ));
         self.write_header(buf, "::core::fmt::Display", None);
-        buf.write(format_args!(
+        buf.write(
             "\
                 #[inline]\
-                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {{\
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {\
                     rinja::Template::render_into(self, f).map_err(|_| ::core::fmt::Error)\
-                }}\
-            }}"
-        ));
+                }\
+            }",
+        );
     }
 
     // Implement `FastWritable` for the given context struct.
     fn impl_fast_writable(&mut self, buf: &mut Buffer) {
-        self.write_header(buf, format_args!("rinja::filters::FastWritable"), None);
-        buf.write(format_args!(
+        self.write_header(buf, "rinja::filters::FastWritable", None);
+        buf.write(
             "\
                 #[inline]\
                 fn write_into<RinjaW: ::core::fmt::Write + ?::core::marker::Sized>(\
                     &self,\
                     dest: &mut RinjaW,\
-                ) -> ::core::fmt::Result {{\
+                ) -> ::core::fmt::Result {\
                     rinja::Template::render_into(self, dest).map_err(|_| ::core::fmt::Error)\
-                }}\
-            }}"
-        ));
+                }\
+            }",
+        );
     }
 
     // Implement Actix-web's `Responder`.
@@ -319,12 +319,12 @@ impl<'a> Generator<'a> {
             self.input.ast.generics.split_for_impl()
         };
 
+        let ident = &self.input.ast.ident;
         buf.write(format_args!(
-            "{} {} for {}{} {{",
-            quote!(impl #impl_generics),
+            "impl {} {} for {} {{",
+            quote!(#impl_generics),
             target,
-            self.input.ast.ident,
-            quote!(#orig_ty_generics #where_clause),
+            quote!(#ident #orig_ty_generics #where_clause),
         ));
     }
 
@@ -1020,8 +1020,11 @@ impl<'a> Generator<'a> {
             this.write_buf_writable(ctx, buf)?;
             Ok(size_hint)
         })?;
-        buf.write(format_args!("rinja::Result::Ok(())"));
-        buf.write("});");
+        buf.write(
+            "\
+                rinja::Result::Ok(())\
+            });",
+        );
 
         // display the `FmtCell`
         let mut filter_buf = Buffer::new();
@@ -1517,7 +1520,7 @@ impl<'a> Generator<'a> {
         expr: &WithSpan<'_, Expr<'_>>,
         target: &str,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write(format_args!("rinja::helpers::get_primitive_value(&("));
+        buf.write("rinja::helpers::get_primitive_value(&(");
         self.visit_expr(ctx, buf, expr)?;
         buf.write(format_args!(")) as ::core::primitive::{target}"));
         Ok(DisplayWrap::Unwrapped)
@@ -1709,13 +1712,13 @@ impl<'a> Generator<'a> {
             let value = if is_singular { sg } else { pl };
             self._visit_auto_escaped_arg(ctx, buf, value)?;
         } else {
-            buf.write(format_args!("rinja::filters::pluralize("));
+            buf.write("rinja::filters::pluralize(");
             self._visit_arg(ctx, buf, count)?;
             for value in [sg, pl] {
                 buf.write(',');
                 self._visit_auto_escaped_arg(ctx, buf, value)?;
             }
-            buf.write(format_args!(")?"));
+            buf.write(")?");
         }
         Ok(DisplayWrap::Wrapped)
     }
@@ -1738,9 +1741,7 @@ impl<'a> Generator<'a> {
         ));
         self._visit_args(ctx, buf, args)?;
         // The input is always HTML escaped, regardless of the selected escaper:
-        buf.write(format_args!(
-            "), rinja::filters::Html)).rinja_auto_escape()?)?",
-        ));
+        buf.write("), rinja::filters::Html)).rinja_auto_escape()?)?");
         // The output is marked as HTML safe, not safe in all contexts:
         Ok(DisplayWrap::Unwrapped)
     }
@@ -1817,7 +1818,7 @@ impl<'a> Generator<'a> {
         if args.len() != 1 {
             return Err(ctx.generate_error("unexpected argument(s) in `safe` filter", node));
         }
-        buf.write(format_args!("rinja::filters::safe("));
+        buf.write("rinja::filters::safe(");
         self._visit_args(ctx, buf, args)?;
         buf.write(format_args!(", {})?", self.input.escaper));
         Ok(DisplayWrap::Wrapped)
@@ -1878,7 +1879,7 @@ impl<'a> Generator<'a> {
                 })?,
             None => self.input.escaper,
         };
-        buf.write(format_args!("rinja::filters::escape("));
+        buf.write("rinja::filters::escape(");
         self._visit_args(ctx, buf, &args[..1])?;
         buf.write(format_args!(", {escaper})?"));
         Ok(DisplayWrap::Wrapped)
@@ -2016,14 +2017,14 @@ impl<'a> Generator<'a> {
     ) -> Result<(), CompileError> {
         if let Some(Writable::Lit(arg)) = compile_time_escape(arg, self.input.escaper) {
             if !arg.is_empty() {
-                buf.write(format_args!("rinja::filters::Safe("));
+                buf.write("rinja::filters::Safe(");
                 buf.write_escaped_str(&arg);
                 buf.write(')');
             } else {
-                buf.write(format_args!("rinja::helpers::Empty"));
+                buf.write("rinja::helpers::Empty");
             }
         } else {
-            buf.write(format_args!("(&&rinja::filters::AutoEscaper::new("));
+            buf.write("(&&rinja::filters::AutoEscaper::new(");
             self._visit_arg(ctx, buf, arg)?;
             buf.write(format_args!(
                 ", {})).rinja_auto_escape()?",
@@ -2101,16 +2102,16 @@ impl<'a> Generator<'a> {
                                 let _cycle = &(",
                         );
                         self.visit_expr(ctx, buf, arg)?;
-                        buf.write(format_args!(
+                        buf.write(
                             "\
                                 );\
                                 let _len = _cycle.len();\
-                                if _len == 0 {{\
+                                if _len == 0 {\
                                     return ::core::result::Result::Err(rinja::Error::Fmt);\
-                                }}\
+                                }\
                                 _cycle[_loop_item.index % _len]\
-                            }})"
-                        ));
+                            })",
+                        );
                     }
                     _ => {
                         return Err(
