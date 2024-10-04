@@ -67,8 +67,6 @@ mod html;
 use std::{fmt, io};
 
 pub use rinja_derive::Template;
-#[doc(hidden)]
-pub use {core, std};
 
 #[doc(hidden)]
 pub use crate as shared;

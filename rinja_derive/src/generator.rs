@@ -128,10 +128,10 @@ impl<'a> Generator<'a> {
         buf.write(
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
             where \
-                RinjaW: rinja::core::fmt::Write + ?rinja::core::marker::Sized\
+                RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
                 use rinja::filters::{AutoEscape as _, WriteWritable as _};\
-                use rinja::core::fmt::Write as _;",
+                use rinja::helpers::core::fmt::Write as _;",
         );
 
         buf.set_discard(self.buf_writable.discard);
@@ -151,8 +151,8 @@ impl<'a> Generator<'a> {
             if path_is_valid {
                 let path = path.to_str().unwrap();
                 buf.write(format_args!(
-                    "const _: &[rinja::core::primitive::u8] =\
-                        rinja::core::include_bytes!({path:#?});",
+                    "const _: &[rinja::helpers::core::primitive::u8] =\
+                        rinja::helpers::core::include_bytes!({path:#?});",
                 ));
             }
         }
@@ -170,10 +170,11 @@ impl<'a> Generator<'a> {
             "\
                 rinja::Result::Ok(())\
             }}\
-            const EXTENSION: rinja::core::option::Option<&'static rinja::core::primitive::str> =\
-                rinja::core::option::Option::{:?};\
-            const SIZE_HINT: rinja::core::primitive::usize = {size_hint}usize;\
-            const MIME_TYPE: &'static rinja::core::primitive::str = {:?};",
+            const EXTENSION:\
+                rinja::helpers::core::option::Option<&'static rinja::helpers::core::primitive::str> =\
+                rinja::helpers::core::option::Option::{:?};\
+            const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;\
+            const MIME_TYPE: &'static rinja::helpers::core::primitive::str = {:?};",
             self.input.extension(),
             self.input.mime_type,
         ));
@@ -187,19 +188,23 @@ impl<'a> Generator<'a> {
         let ident = &self.input.ast.ident;
         buf.write(format_args!(
             "\
-            /// Implement the [`format!()`][rinja::std::format] trait for [`{}`]\n\
+            /// Implement the [`format!()`][rinja::helpers::std::format] trait for [`{}`]\n\
             ///\n\
             /// Please be aware of the rendering performance notice in the \
                 [`Template`][rinja::Template] trait.\n\
             ",
             quote!(#ident),
         ));
-        self.write_header(buf, "rinja::core::fmt::Display", None);
+        self.write_header(buf, "rinja::helpers::core::fmt::Display", None);
         buf.write(
             "\
                 #[inline]\
-                fn fmt(&self, f: &mut rinja::core::fmt::Formatter<'_>) -> rinja::core::fmt::Result {\
-                    rinja::Template::render_into(self, f).map_err(|_| rinja::core::fmt::Error)\
+                fn fmt(\
+                    &self,\
+                    f: &mut rinja::helpers::core::fmt::Formatter<'_>\
+                ) -> rinja::helpers::core::fmt::Result {\
+                    rinja::Template::render_into(self, f)\
+                        .map_err(|_| rinja::helpers::core::fmt::Error)\
                 }\
             }",
         );
@@ -211,11 +216,12 @@ impl<'a> Generator<'a> {
         buf.write(
             "\
                 #[inline]\
-                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::core::fmt::Result \
+                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::helpers::core::fmt::Result \
                 where \
-                    RinjaW: rinja::core::fmt::Write + ?rinja::core::marker::Sized,\
+                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,\
                 {\
-                    rinja::Template::render_into(self, dest).map_err(|_| rinja::core::fmt::Error)\
+                    rinja::Template::render_into(self, dest)\
+                        .map_err(|_| rinja::helpers::core::fmt::Error)\
                 }\
             }",
         );
@@ -646,7 +652,7 @@ impl<'a> Generator<'a> {
                         // finally dereferences it to `bool`.
                         buf.write("*(&(");
                         buf.write(this.visit_expr_root(ctx, expr)?);
-                        buf.write(") as &rinja::core::primitive::bool) {");
+                        buf.write(") as &rinja::helpers::core::primitive::bool) {");
                     }
                 } else if pos != 0 {
                     buf.write("} else {");
@@ -1001,7 +1007,7 @@ impl<'a> Generator<'a> {
         // build `FmtCell` that contains the inner block
         buf.write(format_args!(
             "let {FILTER_SOURCE} = rinja::helpers::FmtCell::new(\
-                |writer: &mut rinja::core::fmt::Formatter<'_>| -> rinja::Result<()> {{"
+                |writer: &mut rinja::helpers::core::fmt::Formatter<'_>| -> rinja::Result<()> {{"
         ));
         let size_hint = self.push_locals(|this| {
             this.prepare_ws(filter.ws1);
@@ -1033,7 +1039,7 @@ impl<'a> Generator<'a> {
             ),
         };
         buf.write(format_args!(
-            "if rinja::core::write!(writer, \"{{}}\", {filter_buf}).is_err() {{\
+            "if rinja::helpers::core::write!(writer, \"{{}}\", {filter_buf}).is_err() {{\
                 return {FILTER_SOURCE}.take_err();\
             }}"
         ));
@@ -1512,7 +1518,9 @@ impl<'a> Generator<'a> {
     ) -> Result<DisplayWrap, CompileError> {
         buf.write("rinja::helpers::get_primitive_value(&(");
         self.visit_expr(ctx, buf, expr)?;
-        buf.write(format_args!(")) as rinja::core::primitive::{target}"));
+        buf.write(format_args!(
+            ")) as rinja::helpers::core::primitive::{target}"
+        ));
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -1522,9 +1530,9 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         expr: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write("rinja::core::result::Result::map_err(");
+        buf.write("rinja::helpers::core::result::Result::map_err(");
         self.visit_expr(ctx, buf, expr)?;
-        buf.write(", |err| rinja::shared::Error::Custom(rinja::core::convert::Into::into(err)))?");
+        buf.write(", |err| rinja::shared::Error::Custom(rinja::helpers::core::convert::Into::into(err)))?");
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -1885,7 +1893,7 @@ impl<'a> Generator<'a> {
     ) -> Result<DisplayWrap, CompileError> {
         if !args.is_empty() {
             if let Expr::StrLit(ref fmt) = *args[0] {
-                buf.write("rinja::std::format!(");
+                buf.write("rinja::helpers::std::format!(");
                 self.visit_str_lit(buf, fmt);
                 if args.len() > 1 {
                     buf.write(',');
@@ -1908,7 +1916,7 @@ impl<'a> Generator<'a> {
     ) -> Result<DisplayWrap, CompileError> {
         if let [_, arg2] = args {
             if let Expr::StrLit(ref fmt) = **arg2 {
-                buf.write("rinja::std::format!(");
+                buf.write("rinja::helpers::std::format!(");
                 self.visit_str_lit(buf, fmt);
                 buf.write(',');
                 self._visit_args(ctx, buf, &args[..1])?;
@@ -2097,7 +2105,7 @@ impl<'a> Generator<'a> {
                                 );\
                                 let _len = _cycle.len();\
                                 if _len == 0 {\
-                                    return rinja::core::result::Result::Err(rinja::Error::Fmt);\
+                                    return rinja::helpers::core::result::Result::Err(rinja::Error::Fmt);\
                                 }\
                                 _cycle[_loop_item.index % _len]\
                             })",

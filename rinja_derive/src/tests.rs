@@ -46,36 +46,37 @@ struct Foo {{ {} }}"##,
             impl rinja::Template for Foo {
                 fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>
                 where
-                    RinjaW: rinja::core::fmt::Write + ?rinja::core::marker::Sized,
+                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
                 {
                     use rinja::filters::{AutoEscape as _, WriteWritable as _};
-                    use rinja::core::fmt::Write as _;
+                    use rinja::helpers::core::fmt::Write as _;
                     #expected
                     rinja::Result::Ok(())
                 }
-                const EXTENSION: rinja::core::option::Option<&'static rinja::core::primitive::str> =
-                    rinja::core::option::Option::Some("txt");
-                const SIZE_HINT: rinja::core::primitive::usize = #size_hint;
-                const MIME_TYPE: &'static rinja::core::primitive::str = "text/plain; charset=utf-8";
+                const EXTENSION:
+                    rinja::helpers::core::option::Option<&'static rinja::helpers::core::primitive::str> =
+                    rinja::helpers::core::option::Option::Some("txt");
+                const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
+                const MIME_TYPE: &'static rinja::helpers::core::primitive::str = "text/plain; charset=utf-8";
             }
 
-            /// Implement the [`format!()`][rinja::std::format] trait for [`Foo`]
+            /// Implement the [`format!()`][rinja::helpers::std::format] trait for [`Foo`]
             ///
             /// Please be aware of the rendering performance notice in the [`Template`][rinja::Template] trait.
-            impl rinja::core::fmt::Display for Foo {
+            impl rinja::helpers::core::fmt::Display for Foo {
                 #[inline]
-                fn fmt(&self, f: &mut rinja::core::fmt::Formatter<'_>) -> rinja::core::fmt::Result {
-                    rinja::Template::render_into(self, f).map_err(|_| rinja::core::fmt::Error)
+                fn fmt(&self, f: &mut rinja::helpers::core::fmt::Formatter<'_>) -> rinja::helpers::core::fmt::Result {
+                    rinja::Template::render_into(self, f).map_err(|_| rinja::helpers::core::fmt::Error)
                 }
             }
 
             impl rinja::filters::FastWritable for Foo {
                 #[inline]
-                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::core::fmt::Result
+                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::helpers::core::fmt::Result
                 where
-                    RinjaW: rinja::core::fmt::Write + ?rinja::core::marker::Sized,
+                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
                 {
-                    rinja::Template::render_into(self, dest).map_err(|_| rinja::core::fmt::Error)
+                    rinja::Template::render_into(self, dest).map_err(|_| rinja::helpers::core::fmt::Error)
                 }
             }
         };
@@ -194,9 +195,9 @@ fn check_if_let() {
     compare(
         r#"{% include "include1.html" %}"#,
         &format!(
-            r#"const _: &[rinja::core::primitive::u8] = rinja::core::include_bytes!({path1:#?});
-            const _: &[rinja::core::primitive::u8] = rinja::core::include_bytes!({path2:#?});
-            const _: &[rinja::core::primitive::u8] = rinja::core::include_bytes!({path3:#?});
+            r#"const _: &[rinja::helpers::core::primitive::u8] = rinja::helpers::core::include_bytes!({path1:#?});
+            const _: &[rinja::helpers::core::primitive::u8] = rinja::helpers::core::include_bytes!({path2:#?});
+            const _: &[rinja::helpers::core::primitive::u8] = rinja::helpers::core::include_bytes!({path3:#?});
             writer.write_str("3333")?;"#
         ),
         &[],
@@ -292,7 +293,7 @@ writer.write_str("bla")?;"#,
         "{% if x == 12 %}bli
          {%- else if x is defined %}12
          {%- else %}nope{% endif %}",
-        r#"if *(&(self.x == 12) as &rinja::core::primitive::bool) {
+        r#"if *(&(self.x == 12) as &rinja::helpers::core::primitive::bool) {
 writer.write_str("bli")?;
 } else {
 writer.write_str("12")?;
@@ -305,7 +306,7 @@ writer.write_str("12")?;
     // are present.
     compare(
         "{% if y is defined || x == 12 %}{{x}}{% endif %}",
-        r"if *(&(self.x == 12) as &rinja::core::primitive::bool) {
+        r"if *(&(self.x == 12) as &rinja::helpers::core::primitive::bool) {
     match (
         &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
@@ -346,7 +347,7 @@ writer.write_str("12")?;
     compare(
         "{% if y is defined && y == 12 %}{{y}}{% else %}bli{% endif %}",
         r#"
-if *(&(self.y == 12) as &rinja::core::primitive::bool) {
+if *(&(self.y == 12) as &rinja::helpers::core::primitive::bool) {
     match (
         &((&&rinja::filters::AutoEscaper::new(
             &(self.y),
@@ -417,7 +418,7 @@ match (
     // Ensure that the `!` is kept .
     compare(
         "{% if y is defined && !y %}bla{% endif %}",
-        r#"if *(&(!self.y) as &rinja::core::primitive::bool) {
+        r#"if *(&(!self.y) as &rinja::helpers::core::primitive::bool) {
     writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
@@ -425,7 +426,7 @@ match (
     );
     compare(
         "{% if y is defined && !(y) %}bla{% endif %}",
-        r#"if *(&(!(self.y)) as &rinja::core::primitive::bool) {
+        r#"if *(&(!(self.y)) as &rinja::helpers::core::primitive::bool) {
     writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
@@ -433,7 +434,7 @@ match (
     );
     compare(
         "{% if y is not defined || !y %}bla{% endif %}",
-        r#"if *(&(!self.y) as &rinja::core::primitive::bool) {
+        r#"if *(&(!self.y) as &rinja::helpers::core::primitive::bool) {
     writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
@@ -441,7 +442,7 @@ match (
     );
     compare(
         "{% if y is not defined || !(y) %}bla{% endif %}",
-        r#"if *(&(!(self.y)) as &rinja::core::primitive::bool) {
+        r#"if *(&(!(self.y)) as &rinja::helpers::core::primitive::bool) {
     writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
@@ -506,7 +507,7 @@ fn check_bool_conditions() {
     );
     compare(
         "{% if false || x == 12 %}{{x}}{% endif %}",
-        r"if *(&(self.x == 12) as &rinja::core::primitive::bool) {
+        r"if *(&(self.x == 12) as &rinja::helpers::core::primitive::bool) {
     match (
         &((&&rinja::filters::AutoEscaper::new(
             &(self.x),
@@ -530,7 +531,7 @@ fn check_bool_conditions() {
     // condition.
     compare(
         "{% if y == 3 || (true || x == 12) %}{{x}}{% endif %}",
-        r"if *(&(self.y == 3 || (true)) as &rinja::core::primitive::bool) {
+        r"if *(&(self.y == 3 || (true)) as &rinja::helpers::core::primitive::bool) {
     match (
         &((&&rinja::filters::AutoEscaper::new(
             &(self.x),
@@ -568,7 +569,7 @@ fn check_bool_conditions() {
     );
     compare(
         "{% if y == 3 || (x == 12 || true) %}{{x}}{% endif %}",
-        r"if *(&(self.y == 3 || (self.x == 12 || true)) as &rinja::core::primitive::bool) {
+        r"if *(&(self.y == 3 || (self.x == 12 || true)) as &rinja::helpers::core::primitive::bool) {
     match (
         &((&&rinja::filters::AutoEscaper::new(
             &(self.x),

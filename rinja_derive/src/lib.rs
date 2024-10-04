@@ -148,7 +148,7 @@ fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream 
         span =>
         const _: () = {
             extern crate #crate_ as rinja;
-            #(rinja::core::compile_error!(#msgs);)*
+            #(rinja::helpers::core::compile_error!(#msgs);)*
         };
     }
 }
