@@ -12,7 +12,7 @@ use proc_macro2::Span;
 #[cfg(feature = "config")]
 use serde::Deserialize;
 
-use crate::{CRATE, CompileError, FileInfo, OnceMap};
+use crate::{CompileError, FileInfo, OnceMap};
 
 #[derive(Debug)]
 pub(crate) struct Config {
@@ -182,7 +182,7 @@ impl Config {
         for (extensions, name) in DEFAULT_ESCAPERS {
             escapers.push((
                 str_set(extensions),
-                format!("{CRATE}::filters::{name}").into(),
+                format!("rinja::filters::{name}").into(),
             ));
         }
 
@@ -682,11 +682,11 @@ mod tests {
                 str_set(&[
                     "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml"
                 ]),
-                "::rinja::filters::Html".into()
+                "rinja::filters::Html".into()
             ),
             (
                 str_set(&["md", "none", "txt", "yml", ""]),
-                "::rinja::filters::Text".into()
+                "rinja::filters::Text".into()
             ),
         ]);
     }

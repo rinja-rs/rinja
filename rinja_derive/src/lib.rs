@@ -433,15 +433,3 @@ const BUILT_IN_FILTERS: &[&str] = &[
     "urlencode",
     "wordcount",
 ];
-
-const CRATE: &str = if cfg!(feature = "with-actix-web") {
-    "::rinja_actix"
-} else if cfg!(feature = "with-axum") {
-    "::rinja_axum"
-} else if cfg!(feature = "with-rocket") {
-    "::rinja_rocket"
-} else if cfg!(feature = "with-warp") {
-    "::rinja_warp"
-} else {
-    "::rinja"
-};
