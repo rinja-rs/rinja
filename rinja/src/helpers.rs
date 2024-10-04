@@ -1,5 +1,3 @@
-#![doc(hidden)]
-
 use std::cell::Cell;
 use std::fmt;
 use std::iter::{Enumerate, Peekable};

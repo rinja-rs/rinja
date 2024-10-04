@@ -61,6 +61,7 @@
 
 mod error;
 pub mod filters;
+#[doc(hidden)]
 pub mod helpers;
 mod html;
 
