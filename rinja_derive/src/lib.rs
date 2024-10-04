@@ -27,8 +27,8 @@ use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
 use proc_macro2::TokenStream as TokenStream12;
 use proc_macro2::{Span, TokenStream};
+use quote::quote_spanned;
 use rustc_hash::FxBuildHasher;
-use syn::parse_quote_spanned;
 
 /// The `Template` derive macro and its `template()` attribute.
 ///
@@ -120,7 +120,10 @@ use syn::parse_quote_spanned;
 pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     let ast = match syn::parse2(input.into()) {
         Ok(ast) => ast,
-        Err(err) => return err.to_compile_error().into(),
+        Err(err) => {
+            let msgs = err.into_iter().map(|err| err.to_string());
+            return compile_error(msgs, Span::call_site()).into();
+        }
     };
     match build_template(&ast) {
         Ok(source) => source.parse().unwrap(),
@@ -129,16 +132,24 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
             span,
             rendered: _rendered,
         }) => {
-            let mut ts: TokenStream = parse_quote_spanned! {
-                span.unwrap_or(ast.ident.span()) =>
-                ::core::compile_error!(#msg);
-            };
+            let mut ts = compile_error(std::iter::once(msg), span.unwrap_or(ast.ident.span()));
             if let Ok(source) = build_skeleton(&ast) {
                 let source: TokenStream = source.parse().unwrap();
                 ts.extend(source);
             }
             ts.into()
         }
+    }
+}
+
+fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream {
+    let crate_ = syn::Ident::new(CRATE, Span::call_site());
+    quote_spanned! {
+        span =>
+        const _: () = {
+            extern crate #crate_ as rinja;
+            #(rinja::core::compile_error!(#msgs);)*
+        };
     }
 }
 
@@ -433,3 +444,15 @@ const BUILT_IN_FILTERS: &[&str] = &[
     "urlencode",
     "wordcount",
 ];
+
+const CRATE: &str = if cfg!(feature = "with-actix-web") {
+    "rinja_actix"
+} else if cfg!(feature = "with-axum") {
+    "rinja_axum"
+} else if cfg!(feature = "with-rocket") {
+    "rinja_rocket"
+} else if cfg!(feature = "with-warp") {
+    "rinja_warp"
+} else {
+    "rinja"
+};

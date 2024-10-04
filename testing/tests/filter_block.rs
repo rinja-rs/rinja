@@ -207,7 +207,7 @@ hello
         {% set y = 12 %}
 
     {% filter wordcount %}
-        {%- include "../Cargo.toml" +%}
+        {%- include "../test_trim.toml" +%}
         y is {{ y }}
     {% endfilter %}
 {%- endblock body %}
@@ -233,7 +233,7 @@ fn filter_block_include() {
     <body class=""><h1>Metadata</h1>
         
 
-    105</body>
+    7</body>
 </html>"#
     );
 }
