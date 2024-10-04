@@ -221,10 +221,10 @@ impl<'a> Generator<'a> {
         buf.write(
             "\
                 #[inline]\
-                fn write_into<RinjaW: ::core::fmt::Write + ?::core::marker::Sized>(\
-                    &self,\
-                    dest: &mut RinjaW,\
-                ) -> ::core::fmt::Result {\
+                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> ::core::fmt::Result \
+                where \
+                    RinjaW: ::core::fmt::Write + ?::core::marker::Sized,\
+                {\
                     rinja::Template::render_into(self, dest).map_err(|_| ::core::fmt::Error)\
                 }\
             }",
