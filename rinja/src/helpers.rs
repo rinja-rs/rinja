@@ -1,8 +1,10 @@
-#![doc(hidden)]
-
 use std::cell::Cell;
 use std::fmt;
 use std::iter::{Enumerate, Peekable};
+
+// The re-exports are used in the generated code for macro hygiene. Even if the paths `::core` or
+// `::std` are shadowed, the generated code will still be able to access the crates.
+pub use {core, std};
 
 use crate::filters::FastWritable;
 
