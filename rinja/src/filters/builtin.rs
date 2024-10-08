@@ -201,8 +201,7 @@ pub fn lower(s: impl fmt::Display) -> Result<String, fmt::Error> {
     lower(try_to_string(s)?)
 }
 
-/// Alias for the `lower()` filter
-/// Converts to lowercase
+/// Converts to lowercase, alias for the `|lower` filter
 ///
 /// ```
 /// # #[cfg(feature = "code-in-doc")] {
@@ -265,8 +264,7 @@ pub fn upper(s: impl fmt::Display) -> Result<String, fmt::Error> {
     upper(try_to_string(s)?)
 }
 
-/// Alias for the `upper()` filter
-/// Converts to uppercase
+/// Converts to uppercase, alias for the `|upper` filter
 ///
 /// ```
 /// # #[cfg(feature = "code-in-doc")] {
