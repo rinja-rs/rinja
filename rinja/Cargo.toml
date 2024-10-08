@@ -14,7 +14,7 @@ edition = "2021"
 rust-version = "1.71"
 
 [package.metadata.docs.rs]
-features = ["default", "serde_json"]
+features = ["full"]
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
 [badges]
@@ -22,6 +22,7 @@ maintenance = { status = "actively-developed" }
 
 [features]
 default = ["config", "humansize", "urlencode"]
+full = ["default", "code-in-doc", "serde_json"]
 code-in-doc = ["rinja_derive/code-in-doc"]
 config = ["rinja_derive/config"]
 humansize = ["rinja_derive/humansize", "dep:humansize"]

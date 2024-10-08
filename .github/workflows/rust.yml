@@ -32,8 +32,8 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --all-targets
-      - run: cargo nextest run
+      - run: cargo build --all-targets --features full
+      - run: cargo nextest run --all-targets --features full
 
   Package:
     strategy:
