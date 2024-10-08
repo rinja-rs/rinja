@@ -16,8 +16,6 @@ mod escape;
 mod humansize;
 #[cfg(feature = "serde_json")]
 mod json;
-#[cfg(feature = "num-traits")]
-mod num_traits;
 #[cfg(feature = "urlencode")]
 mod urlencode;
 
@@ -33,7 +31,5 @@ pub use self::escape::{
 pub use self::humansize::filesizeformat;
 #[cfg(feature = "serde_json")]
 pub use self::json::{AsIndent, json, json_pretty};
-#[cfg(feature = "num-traits")]
-pub use self::num_traits::{abs, into_f64, into_isize};
 #[cfg(feature = "urlencode")]
 pub use self::urlencode::{urlencode, urlencode_strict};

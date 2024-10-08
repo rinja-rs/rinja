@@ -1554,7 +1554,6 @@ impl<'a> Generator<'a> {
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         let filter = match name {
-            "abs" | "into_f64" | "into_isize" => Self::_visit_num_traits,
             "deref" => Self::_visit_deref_filter,
             "escape" | "e" => Self::_visit_escape_filter,
             "filesizeformat" => Self::_visit_humansize,
@@ -1636,30 +1635,6 @@ impl<'a> Generator<'a> {
         if cfg!(not(feature = "humansize")) {
             return Err(ctx.generate_error(
                 &format!("the `{name}` filter requires the `humansize` feature to be enabled"),
-                node,
-            ));
-        }
-
-        // All filters return numbers, and any default formatted number is HTML safe.
-        buf.write(format_args!(
-            "rinja::filters::HtmlSafeOutput(rinja::filters::{name}(",
-        ));
-        self._visit_args(ctx, buf, args)?;
-        buf.write(")?)");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_num_traits<T>(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
-    ) -> Result<DisplayWrap, CompileError> {
-        if cfg!(not(feature = "num-traits")) {
-            return Err(ctx.generate_error(
-                &format!("the `{name}` filter requires the `num-traits` feature to be enabled"),
                 node,
             ));
         }
