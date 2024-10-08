@@ -20,6 +20,26 @@ use super::FastWritable;
 /// To use it in HTML attributes, you can either use it in quotation marks `"{{data|json}}"` as is,
 /// or in apostrophes with the (optional) safe filter `'{{data|json|safe}}'`.
 /// In HTML texts the output of e.g. `<pre>{{data|json|safe}}</pre>` is safe, too.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div><li data-extra='{{data|json|safe}}'>Example</li></div>
+/// /// ```
+///
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     data: Vec<&'a str>,
+/// }
+///
+/// assert_eq!(
+///     Example { data: vec!["foo", "bar"] }.to_string(),
+///     "<div><li data-extra='[\"foo\",\"bar\"]'>Example</li></div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn json(value: impl Serialize) -> Result<impl fmt::Display, Infallible> {
     Ok(ToJson { value })
@@ -36,6 +56,29 @@ pub fn json(value: impl Serialize) -> Result<impl fmt::Display, Infallible> {
 ///
 /// In rinja's template language, this filter is called `|json`, too. The right function is
 /// automatically selected depending on whether an `indent` argument was provided or not.
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{data|json(4)|safe}}</div>
+/// /// ```
+///
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     data: Vec<&'a str>,
+/// }
+///
+/// assert_eq!(
+///     Example { data: vec!["foo", "bar"] }.to_string(),
+///     "<div>[
+///     \"foo\",
+///     \"bar\"
+/// ]</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn json_pretty(
     value: impl Serialize,

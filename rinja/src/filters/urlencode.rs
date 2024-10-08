@@ -37,6 +37,25 @@ const URLENCODE_SET: &AsciiSet = &URLENCODE_STRICT_SET.remove(b'/');
 /// To encode `/` as well, see [`urlencode_strict`](./fn.urlencode_strict.html).
 ///
 /// [`urlencode_strict`]: ./fn.urlencode_strict.html
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <div>{{ example|urlencode }}</div>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "hello?world" }.to_string(),
+///     "<div>hello%3Fworld</div>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn urlencode<T>(s: T) -> Result<HtmlSafeOutput<UrlencodeFilter<T>>, Infallible> {
     Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_SET)))
@@ -56,6 +75,25 @@ pub fn urlencode<T>(s: T) -> Result<HtmlSafeOutput<UrlencodeFilter<T>>, Infallib
 /// ```
 ///
 /// If you want to preserve `/`, see [`urlencode`](./fn.urlencode.html).
+///
+/// ```
+/// # #[cfg(feature = "code-in-doc")] {
+/// # use rinja::Template;
+/// /// ```jinja
+/// /// <a href='{{ example|urlencode_strict }}'>Example</a>
+/// /// ```
+/// #[derive(Template)]
+/// #[template(ext = "html", in_doc = true)]
+/// struct Example<'a> {
+///     example: &'a str,
+/// }
+///
+/// assert_eq!(
+///     Example { example: "/hello/world" }.to_string(),
+///     "<a href='%2Fhello%2Fworld'>Example</a>"
+/// );
+/// # }
+/// ```
 #[inline]
 pub fn urlencode_strict<T>(s: T) -> Result<HtmlSafeOutput<UrlencodeFilter<T>>, Infallible> {
     Ok(HtmlSafeOutput(UrlencodeFilter(s, URLENCODE_STRICT_SET)))
