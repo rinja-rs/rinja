@@ -21,7 +21,6 @@ Enable it with Cargo features (see below for more information).
 
 * **[Built-in filters][#built-in-filters]:**  
 
-  * [`abs`][#abs]
   * [`capitalize`][#capitalize]
   * [`center`][#center]
   * [`deref`][#deref]
@@ -56,21 +55,6 @@ Enable it with Cargo features (see below for more information).
 
 ## Built-In Filters
 [#built-in-filters]: #built-in-filters
-
-### abs
-[#abs]: #abs
-
-Returns the absolute value.
-
-```jinja
-{{ -2|abs }}
-```
-
-Output:
-
-```text
-2
-```
 
 ### capitalize
 [#capitalize]: #capitalize

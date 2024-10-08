@@ -21,11 +21,10 @@ rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["config", "humansize", "num-traits", "urlencode"]
+default = ["config", "humansize", "urlencode"]
 code-in-doc = ["rinja_derive/code-in-doc"]
 config = ["rinja_derive/config"]
 humansize = ["rinja_derive/humansize", "dep:humansize"]
-num-traits = ["rinja_derive/num-traits", "dep:num-traits"]
 serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
 urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
 
