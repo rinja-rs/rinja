@@ -272,7 +272,7 @@ pub fn upper(s: impl fmt::Display) -> Result<String, fmt::Error> {
 /// # #[cfg(feature = "code-in-doc")] {
 /// # use rinja::Template;
 /// /// ```jinja
-/// /// <div>{{ word|upper }}</div>
+/// /// <div>{{ word|uppercase }}</div>
 /// /// ```
 /// #[derive(Template)]
 /// #[template(ext = "html", in_doc = true)]
