@@ -175,9 +175,11 @@ impl<T: Template + ?Sized> Template for &T {
     const MIME_TYPE: &'static str = T::MIME_TYPE;
 }
 
-/// Object-safe wrapper trait around [`Template`] implementers
+/// [`dyn`-compatible] wrapper trait around [`Template`] implementers
 ///
-/// This trades reduced performance (mostly due to writing into `dyn Write`) for object safety.
+/// This trades reduced performance (mostly due to writing into `dyn Write`) for dyn-compatibility.
+///
+/// [`dyn`-compatible]: <https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility>
 pub trait DynTemplate {
     /// Helper method which allocates a new `String` and renders into it
     fn dyn_render(&self) -> Result<String>;
