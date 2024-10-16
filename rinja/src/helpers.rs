@@ -147,3 +147,8 @@ impl FastWritable for Empty {
         Ok(())
     }
 }
+
+#[inline]
+pub fn as_bool<T: PrimitiveType<Value = bool>>(value: T) -> bool {
+    value.get()
+}

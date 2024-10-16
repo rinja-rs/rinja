@@ -645,14 +645,9 @@ impl<'a> Generator<'a> {
                         }
                         buf.write(format_args!("= &{} {{", expr_buf.buf));
                     } else if cond_info.generate_condition {
-                        // The following syntax `*(&(...) as &bool)` is used to
-                        // trigger Rust's automatic dereferencing, to coerce
-                        // e.g. `&&&&&bool` to `bool`. First `&(...) as &bool`
-                        // coerces e.g. `&&&bool` to `&bool`. Then `*(&bool)`
-                        // finally dereferences it to `bool`.
-                        buf.write("*(&(");
+                        buf.write("rinja::helpers::as_bool(&(");
                         buf.write(this.visit_expr_root(ctx, expr)?);
-                        buf.write(") as &rinja::helpers::core::primitive::bool) {");
+                        buf.write(")) {");
                     }
                 } else if pos != 0 {
                     buf.write("} else {");
