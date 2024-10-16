@@ -829,32 +829,15 @@ pub trait PluralizeCount {
 }
 
 const _: () = {
-    // implement PluralizeCount for a list of reference wrapper types to PluralizeCount
-    macro_rules! impl_pluralize_count_for_ref {
-        ($T:ident => $($ty:ty)*) => { $(
-            impl<T: PluralizeCount + ?Sized> PluralizeCount for $ty {
-                type Error = <T as PluralizeCount>::Error;
+    crate::impl_for_ref! {
+        impl PluralizeCount for T {
+            type Error = T::Error;
 
-                #[inline]
-                fn is_singular(&self) -> Result<bool, Self::Error> {
-                    <T as PluralizeCount>::is_singular(self)
-                }
+            #[inline]
+            fn is_singular(&self) -> Result<bool, Self::Error> {
+                <T>::is_singular(self)
             }
-        )* };
-    }
-
-    impl_pluralize_count_for_ref! {
-        T =>
-        &T
-        Box<T>
-        std::cell::Ref<'_, T>
-        std::cell::RefMut<'_, T>
-        std::pin::Pin<&T>
-        std::rc::Rc<T>
-        std::sync::Arc<T>
-        std::sync::MutexGuard<'_, T>
-        std::sync::RwLockReadGuard<'_, T>
-        std::sync::RwLockWriteGuard<'_, T>
+        }
     }
 
     /// implement `PluralizeCount` for unsigned integer types

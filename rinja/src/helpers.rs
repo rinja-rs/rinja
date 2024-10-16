@@ -95,19 +95,10 @@ pub fn get_primitive_value<T: PrimitiveType>(value: &T) -> T::Value {
     value.get()
 }
 
-pub trait PrimitiveType: Copy {
-    type Value: Copy;
+pub trait PrimitiveType {
+    type Value;
 
-    fn get(self) -> Self::Value;
-}
-
-impl<T: PrimitiveType> PrimitiveType for &T {
-    type Value = T::Value;
-
-    #[inline]
-    fn get(self) -> Self::Value {
-        T::get(*self)
-    }
+    fn get(&self) -> Self::Value;
 }
 
 macro_rules! primitive_type {
@@ -116,8 +107,8 @@ macro_rules! primitive_type {
             type Value = $ty;
 
             #[inline]
-            fn get(self) -> Self::Value {
-                self
+            fn get(&self) -> Self::Value {
+                *self
             }
         }
     )*};
@@ -128,6 +119,17 @@ primitive_type! {
     f32, f64,
     i8, i16, i32, i64, i128, isize,
     u8, u16, u32, u64, u128, usize,
+}
+
+crate::impl_for_ref! {
+    impl PrimitiveType for T {
+        type Value = T::Value;
+
+        #[inline]
+        fn get(&self) -> Self::Value {
+            <T>::get(self)
+        }
+    }
 }
 
 /// An empty element, so nothing will be written.
