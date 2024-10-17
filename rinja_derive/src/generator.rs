@@ -636,7 +636,7 @@ impl<'a> Generator<'a> {
                                 this.visit_expr(ctx, &mut expr_buf, left)?;
                                 this.visit_target(buf, true, true, target);
                                 expr_buf.write(format_args!(" {op} "));
-                                this.visit_expr(ctx, &mut expr_buf, right)?;
+                                this.visit_condition(ctx, &mut expr_buf, right)?;
                             }
                             _ => {
                                 this.visit_expr(ctx, &mut expr_buf, expr)?;
@@ -645,9 +645,8 @@ impl<'a> Generator<'a> {
                         }
                         buf.write(format_args!("= &{} {{", expr_buf.buf));
                     } else if cond_info.generate_condition {
-                        buf.write("rinja::helpers::as_bool(&(");
-                        buf.write(this.visit_expr_root(ctx, expr)?);
-                        buf.write(")) {");
+                        this.visit_condition(ctx, buf, expr)?;
+                        buf.write('{');
                     }
                 } else if pos != 0 {
                     buf.write("} else {");
@@ -1489,6 +1488,39 @@ impl<'a> Generator<'a> {
             Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
             Expr::As(ref expr, target) => self.visit_as(ctx, buf, expr, target)?,
         })
+    }
+
+    fn visit_condition(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        expr: &WithSpan<'_, Expr<'_>>,
+    ) -> Result<(), CompileError> {
+        match &**expr {
+            Expr::BoolLit(_) | Expr::IsDefined(_) | Expr::IsNotDefined(_) => {
+                self.visit_expr(ctx, buf, expr)?;
+            }
+            Expr::Unary("!", expr) => {
+                buf.write('!');
+                self.visit_condition(ctx, buf, expr)?;
+            }
+            Expr::BinOp(op @ ("&&" | "||"), left, right) => {
+                self.visit_condition(ctx, buf, left)?;
+                buf.write(format_args!(" {op} "));
+                self.visit_condition(ctx, buf, right)?;
+            }
+            Expr::Group(expr) => {
+                buf.write('(');
+                self.visit_condition(ctx, buf, expr)?;
+                buf.write(')');
+            }
+            _ => {
+                buf.write("rinja::helpers::as_bool(&(");
+                self.visit_expr(ctx, buf, expr)?;
+                buf.write("))");
+            }
+        }
+        Ok(())
     }
 
     fn visit_is_defined(
