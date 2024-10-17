@@ -132,6 +132,28 @@ crate::impl_for_ref! {
     }
 }
 
+/// Implement [`PrimitiveType`] for [`Cell<T>`]
+///
+/// ```
+/// # use std::cell::Cell;
+/// # use rinja::Template;
+/// #[derive(Template)]
+/// #[template(ext = "txt", source = "{{ value as u16 }}")]
+/// struct Test<'a> {
+///     value: &'a Cell<i16>
+/// }
+///
+/// assert_eq!(Test { value: &Cell::new(-1) }.to_string(), "65535");
+/// ```
+impl<T: PrimitiveType + Copy> PrimitiveType for Cell<T> {
+    type Value = T::Value;
+
+    #[inline]
+    fn get(&self) -> Self::Value {
+        self.get().get()
+    }
+}
+
 /// An empty element, so nothing will be written.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Empty;
