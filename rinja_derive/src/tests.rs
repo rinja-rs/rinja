@@ -600,6 +600,17 @@ fn check_bool_conditions() {
         &[],
         3,
     );
+
+    // Complex condition
+    compare(
+        "{% if (a || !b) && !(c || !d) %}x{% endif %}",
+        r#"
+            if rinja::helpers::as_bool(&((self.a || !self.b) && !(self.c || !self.d))) {
+                writer.write_str("x")?;
+            }"#,
+        &[("a", "i32"), ("b", "i32"), ("c", "i32"), ("d", "i32")],
+        1,
+    );
 }
 
 #[test]
