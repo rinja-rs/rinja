@@ -568,17 +568,30 @@ impl<'a> Loop<'a> {
 pub struct Macro<'a> {
     pub ws1: Ws,
     pub name: &'a str,
-    pub args: Vec<&'a str>,
+    pub args: Vec<(&'a str, Option<WithSpan<'a, Expr<'a>>>)>,
     pub nodes: Vec<Node<'a>>,
     pub ws2: Ws,
 }
 
 impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        fn parameters(i: &str) -> ParseResult<'_, Vec<&str>> {
+        #[allow(clippy::type_complexity)]
+        fn parameters(i: &str) -> ParseResult<'_, Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>> {
             delimited(
                 ws(char('(')),
-                separated_list0(char(','), ws(identifier)),
+                separated_list0(
+                    char(','),
+                    tuple((
+                        ws(identifier),
+                        opt(map(
+                            tuple((
+                                ws(char('=')),
+                                ws(|i| Expr::parse(i, crate::Level::default())),
+                            )),
+                            |(_, value)| value,
+                        )),
+                    )),
+                ),
                 tuple((opt(ws(char(','))), char(')'))),
             )(i)
         }
@@ -603,6 +616,26 @@ impl<'a> Macro<'a> {
                 format!("'{name}' is not a valid name for a macro"),
                 i,
             )));
+        }
+
+        if let Some(ref params) = params {
+            let mut iter = params.iter();
+            #[allow(clippy::while_let_on_iterator)]
+            while let Some((arg_name, default_value)) = iter.next() {
+                if default_value.is_some() {
+                    while let Some((new_arg_name, default_value)) = iter.next() {
+                        if default_value.is_none() {
+                            return Err(nom::Err::Failure(ErrorContext::new(
+                                format!(
+                                    "all arguments following `{arg_name}` should have a default \
+                                         value, `{new_arg_name}` doesn't have a default value"
+                                ),
+                                i,
+                            )));
+                        }
+                    }
+                }
+            }
         }
 
         let mut end = cut_node(
