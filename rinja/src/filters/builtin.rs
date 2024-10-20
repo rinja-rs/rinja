@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
+use std::ops::Deref;
+use std::pin::Pin;
 
 use super::escape::{FastWritable, HtmlSafeOutput};
 use crate::{Error, Result};
@@ -837,6 +839,19 @@ const _: () = {
             fn is_singular(&self) -> Result<bool, Self::Error> {
                 <T>::is_singular(self)
             }
+        }
+    }
+
+    impl<T> PluralizeCount for Pin<T>
+    where
+        T: Deref,
+        <T as Deref>::Target: PluralizeCount,
+    {
+        type Error = <<T as Deref>::Target as PluralizeCount>::Error;
+
+        #[inline]
+        fn is_singular(&self) -> Result<bool, Self::Error> {
+            self.as_ref().get_ref().is_singular()
         }
     }
 

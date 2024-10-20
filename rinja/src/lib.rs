@@ -240,8 +240,6 @@ macro_rules! impl_for_ref {
                 Box<T>
                 std::cell::Ref<'_, T>
                 std::cell::RefMut<'_, T>
-                std::pin::Pin<&T>
-                std::pin::Pin<&mut T>
                 std::rc::Rc<T>
                 std::sync::Arc<T>
                 std::sync::MutexGuard<'_, T>
@@ -250,9 +248,9 @@ macro_rules! impl_for_ref {
             ] $body
         }
     };
-    (impl<$T:ident> $Trait:ident for [$($ty:ty)*] $body:tt) => { $(
-        impl<$T: $Trait + ?Sized> $Trait for $ty $body
-    )+ }
+    (impl<$T:ident> $Trait:ident for [$($ty:ty)*] $body:tt) => {
+        $(impl<$T: $Trait + ?Sized> $Trait for $ty $body)*
+    }
 }
 
 pub(crate) use impl_for_ref;

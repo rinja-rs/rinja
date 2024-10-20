@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::fmt;
 use std::iter::{Enumerate, Peekable};
+use std::ops::Deref;
+use std::pin::Pin;
 
 // The re-exports are used in the generated code for macro hygiene. Even if the paths `::core` or
 // `::std` are shadowed, the generated code will still be able to access the crates.
@@ -91,7 +93,8 @@ where
     }
 }
 
-pub fn get_primitive_value<T: PrimitiveType>(value: &T) -> T::Value {
+#[inline]
+pub fn get_primitive_value<T: PrimitiveType>(value: T) -> T::Value {
     value.get()
 }
 
@@ -132,18 +135,36 @@ crate::impl_for_ref! {
     }
 }
 
+impl<T> PrimitiveType for Pin<T>
+where
+    T: Deref,
+    <T as Deref>::Target: PrimitiveType,
+{
+    type Value = <<T as Deref>::Target as PrimitiveType>::Value;
+
+    #[inline]
+    fn get(&self) -> Self::Value {
+        self.as_ref().get_ref().get()
+    }
+}
+
 /// Implement [`PrimitiveType`] for [`Cell<T>`]
 ///
 /// ```
 /// # use std::cell::Cell;
+/// # use std::rc::Rc;
+/// # use std::pin::Pin;
 /// # use rinja::Template;
 /// #[derive(Template)]
 /// #[template(ext = "txt", source = "{{ value as u16 }}")]
 /// struct Test<'a> {
-///     value: &'a Cell<i16>
+///     value: &'a Pin<Rc<Cell<i16>>>
 /// }
 ///
-/// assert_eq!(Test { value: &Cell::new(-1) }.to_string(), "65535");
+/// assert_eq!(
+///     Test { value: &Rc::pin(Cell::new(-1)) }.to_string(),
+///     "65535",
+/// );
 /// ```
 impl<T: PrimitiveType + Copy> PrimitiveType for Cell<T> {
     type Value = T::Value;

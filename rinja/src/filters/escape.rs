@@ -1,5 +1,7 @@
 use std::convert::Infallible;
 use std::fmt::{self, Formatter, Write};
+use std::ops::Deref;
+use std::pin::Pin;
 use std::{borrow, str};
 
 /// Marks a string (or other `Display` type) as safe
@@ -508,6 +510,17 @@ const _: () = {
             fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
                 <T>::write_into(self, dest)
             }
+        }
+    }
+
+    impl<T> FastWritable for Pin<T>
+    where
+        T: Deref,
+        <T as Deref>::Target: FastWritable,
+    {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            self.as_ref().get_ref().write_into(dest)
         }
     }
 

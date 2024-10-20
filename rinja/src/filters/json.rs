@@ -1,4 +1,6 @@
 use std::convert::Infallible;
+use std::ops::Deref;
+use std::pin::Pin;
 use std::{fmt, io, str};
 
 use serde::Serialize;
@@ -150,6 +152,17 @@ crate::impl_for_ref! {
         fn as_indent(&self) -> &str {
             <T>::as_indent(self)
         }
+    }
+}
+
+impl<T> AsIndent for Pin<T>
+where
+    T: Deref,
+    <T as Deref>::Target: AsIndent,
+{
+    #[inline]
+    fn as_indent(&self) -> &str {
+        self.as_ref().get_ref().as_indent()
     }
 }
 
