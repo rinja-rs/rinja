@@ -16,4 +16,12 @@ struct DelimClash;
 #[template(source = "", ext = "txt", config = "delim-too-short.toml")]
 struct DelimTooShort;
 
+#[derive(Template)]
+#[template(source = "<+a+> and <+b+>", config = "operator-plus-config.toml", syntax = "plus", ext = "txt")]
+struct PlusOperator;
+
+#[derive(Template)]
+#[template(source = "<)a(> and <)b(>", config = "operator-paren-config.toml", syntax = "paren", ext = "txt")]
+struct ParenOperator;
+
 fn main() {}

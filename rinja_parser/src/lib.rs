@@ -806,13 +806,13 @@ impl<'a> SyntaxBuilder<'a> {
             comment_end: self.comment_end.unwrap_or(default.comment_end),
         });
 
-        for (s, k) in [
-            (syntax.block_start, "opening block"),
-            (syntax.block_end, "closing block"),
-            (syntax.expr_start, "opening expression"),
-            (syntax.expr_end, "closing expression"),
-            (syntax.comment_start, "opening comment"),
-            (syntax.comment_end, "closing comment"),
+        for (s, k, is_closing) in [
+            (syntax.block_start, "opening block", false),
+            (syntax.block_end, "closing block", true),
+            (syntax.expr_start, "opening expression", false),
+            (syntax.expr_end, "closing expression", true),
+            (syntax.comment_start, "opening comment", false),
+            (syntax.comment_end, "closing comment", true),
         ] {
             if s.len() < 2 {
                 return Err(format!(
@@ -823,6 +823,15 @@ impl<'a> SyntaxBuilder<'a> {
                 return Err(format!(
                     "delimiters may not contain white spaces. \
                         The {k} delimiter ({s:?}) contains white spaces",
+                ));
+            } else if is_closing
+                && ['(', '-', '+', '~', '.', '>', '<', '&', '|', '!']
+                    .contains(&s.chars().next().unwrap())
+            {
+                return Err(format!(
+                    "closing delimiters may not start with operators. \
+                        The {k} delimiter ({s:?}) starts with operator `{}`",
+                    s.chars().next().unwrap(),
                 ));
             }
         }
@@ -850,29 +859,6 @@ impl<'a> SyntaxBuilder<'a> {
                     "an opening delimiter may not be the prefix of another delimiter. \
                         The {k1} delimiter ({s1:?}) clashes with the {k2} delimiter ({s2:?})",
                 ));
-            }
-        }
-
-        for (end, kind) in [
-            (syntax.block_end, "block"),
-            (syntax.expr_end, "expression"),
-            (syntax.comment_end, "comment"),
-        ] {
-            for prefix in ["<<", ">>", "&&", "..", "||"] {
-                if end.starts_with(prefix) {
-                    let msg = if end == prefix {
-                        format!(
-                            "a closing delimiter must not start with an operator. \
-                             The {kind} delimiter ({end:?}) is also an operator",
-                        )
-                    } else {
-                        format!(
-                            "a closing delimiter must not start an with operator. \
-                             The {kind} delimiter ({end:?}) starts with the {prefix:?} operator",
-                        )
-                    };
-                    return Err(msg);
-                }
             }
         }
 
