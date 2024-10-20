@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::str;
 
 use winnow::Parser;
@@ -586,6 +587,17 @@ pub struct Macro<'a> {
     pub ws2: Ws,
 }
 
+macro_rules! check_duplicated_name {
+    ($names:ident, $arg_name:ident, $i:ident) => {
+        if !$names.insert($arg_name) {
+            return Err(nom::Err::Failure(ErrorContext::new(
+                format!("duplicated argument `{}`", $arg_name),
+                $i,
+            )));
+        }
+    };
+}
+
 impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         #[allow(clippy::type_complexity)]
@@ -632,11 +644,15 @@ impl<'a> Macro<'a> {
         }
 
         if let Some(ref params) = params {
+            let mut names = HashSet::new();
+
             let mut iter = params.iter();
             #[allow(clippy::while_let_on_iterator)]
             while let Some((arg_name, default_value)) = iter.next() {
+                check_duplicated_name!(names, arg_name, i);
                 if default_value.is_some() {
                     while let Some((new_arg_name, default_value)) = iter.next() {
+                        check_duplicated_name!(names, new_arg_name, i);
                         if default_value.is_none() {
                             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 format!(
