@@ -3007,11 +3007,13 @@ fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
 }
 
 /// Returns `true` if this is an `Attr` where the `obj` is `"self"`.
-pub(crate) fn is_attr_self(expr: &Expr<'_>) -> bool {
-    match expr {
-        Expr::Attr(obj, _) if matches!(***obj, Expr::Var("self")) => true,
-        Expr::Attr(obj, _) if matches!(***obj, Expr::Attr(..)) => is_attr_self(obj),
-        _ => false,
+pub(crate) fn is_attr_self(mut expr: &Expr<'_>) -> bool {
+    loop {
+        match expr {
+            Expr::Attr(obj, _) if matches!(***obj, Expr::Var("self")) => return true,
+            Expr::Attr(obj, _) if matches!(***obj, Expr::Attr(..)) => expr = obj,
+            _ => return false,
+        }
     }
 }
 
