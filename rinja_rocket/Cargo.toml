@@ -3,7 +3,7 @@ members = ["."]
 
 [package]
 name = "rinja_rocket"
-version = "0.3.4"
+version = "0.3.5"
 description = "Rocket integration for Rinja templates"
 documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
@@ -29,7 +29,7 @@ serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
 
 [dependencies]
-rinja = { version = "0.3.4", path = "../rinja", default-features = false, features = ["with-rocket"] }
+rinja = { version = "0.3.5", path = "../rinja", default-features = false, features = ["with-rocket"] }
 
 rocket = { version = "0.5", default-features = false }
 
