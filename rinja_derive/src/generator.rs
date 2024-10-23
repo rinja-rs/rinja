@@ -873,13 +873,19 @@ impl<'a> Generator<'a> {
             let mut names = Buffer::new();
             let mut values = Buffer::new();
             let mut is_first_variable = true;
-            if args.len() != def.args.len() {
+            if args.len() > def.args.len() || (args.len() < def.args.len() && !def.args.iter().skip(args.len()).all(|(_, default_value)| default_value.is_some())) {
+                let nb_default_args = def.args.iter().filter(|(_, default_value)| default_value.is_some()).count();
+                let (expected_args, extra) = if nb_default_args != 0 {
+                    (nb_default_args, "at least ")
+                } else {
+                    (def.args.len(), "")
+                };
+
                 return Err(ctx.generate_error(
                     &format!(
-                        "macro {name:?} expected {} argument{}, found {}",
-                        def.args.len(),
-                        if def.args.len() != 1 { "s" } else { "" },
-                        args.len()
+                        "macro {name:?} expected {extra}{expected_args} argument{}, found {}",
+                        if expected_args != 1 { "s" } else { "" },
+                        args.len(),
                     ),
                     call,
                 ));
@@ -889,17 +895,17 @@ impl<'a> Generator<'a> {
             // is a named one.
             if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
                 // First we check that all named arguments actually exist in the called item.
-                for arg in args.iter().rev() {
+                for (index, arg) in args.iter().enumerate().rev() {
                     let Expr::NamedArgument(arg_name, _) = &**arg else {
                         break;
                     };
-                    if !def.args.iter().any(|arg| arg == arg_name) {
+                    if !def.args.iter().any(|(arg, _)| arg == arg_name) {
                         return Err(ctx.generate_error(
                             &format!("no argument named `{arg_name}` in macro {name:?}"),
                             call,
                         ));
                     }
-                    named_arguments.insert(Cow::Borrowed(arg_name), arg);
+                    named_arguments.insert(Cow::Borrowed(arg_name), (index, arg));
                 }
             }
 
@@ -911,23 +917,43 @@ impl<'a> Generator<'a> {
             // * If there isn't one, then we pick the next argument (we can do it without checking
             //   anything since named arguments are always last).
             let mut allow_positional = true;
-            for (index, arg) in def.args.iter().enumerate() {
-                let expr = if let Some(expr) = named_arguments.get(&Cow::Borrowed(arg)) {
+            let mut used_named_args = std::collections::HashSet::with_capacity(named_arguments.len());
+            for (index, (arg, default_value)) in def.args.iter().enumerate() {
+                let expr = if let Some((index, expr)) = named_arguments.get(&Cow::Borrowed(arg)) {
+                    used_named_args.insert(*index);
                     allow_positional = false;
                     expr
                 } else {
-                    if !allow_positional {
-                        // If there is already at least one named argument, then it's not allowed
-                        // to use unnamed ones at this point anymore.
-                        return Err(ctx.generate_error(
-                            &format!(
-                            "cannot have unnamed argument (`{arg}`) after named argument in macro \
-                             {name:?}"
-                        ),
-                            call,
-                        ));
+                    match args.get(index) {
+                        Some(arg_expr) if !matches!(**arg_expr, Expr::NamedArgument(_, _)) => {
+                            // If there is already at least one named argument, then it's not allowed
+                            // to use unnamed ones at this point anymore.
+                            if !allow_positional {
+                                return Err(ctx.generate_error(
+                                    &format!(
+                                        "cannot have unnamed argument (`{arg}`) after named argument in \
+                                         macro {name:?}"
+                                    ),
+                                    call,
+                                ));
+                            }
+                            arg_expr
+                        }
+                        Some(arg_expr) if used_named_args.contains(&index) => {
+                            let Expr::NamedArgument(name, _) = **arg_expr else { unreachable!() };
+                            return Err(ctx.generate_error(
+                                &format!("`{name}` is passed more than once"),
+                                call,
+                            ));
+                        }
+                        _ => {
+                            if let Some(default_value) = default_value {
+                                default_value
+                            } else {
+                                return Err(ctx.generate_error(&format!("missing `{arg}` argument"), call));
+                            }
+                        }
                     }
-                    &args[index]
                 };
                 match &**expr {
                     // If `expr` is already a form of variable then

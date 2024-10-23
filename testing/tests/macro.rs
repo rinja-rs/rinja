@@ -170,3 +170,44 @@ struct TrailingComma;
 fn test_trailing_comma() {
     assert_eq!(TrailingComma.render().unwrap(), "hihihihihi");
 }
+
+#[derive(Template)]
+#[template(
+    source = "{%- macro thrice(param1=0, param2=1) -%}
+{{ param1 }} {{ param2 }}
+{% endmacro -%}
+
+{%- call thrice() -%}
+{%- call thrice(param1=4) -%}
+{%- call thrice(param2=4) -%}
+{%- call thrice(param2=4, param1=5) -%}
+{%- call thrice(4) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue;
+
+#[test]
+fn test_default_value() {
+    assert_eq!(
+        MacroDefaultValue.render().unwrap(),
+        "0 1\n4 1\n0 4\n5 4\n4 1\n"
+    );
+}
+
+#[derive(Template)]
+#[template(
+    source = "{%- macro thrice(param1=0, param2=1, param3=2) -%}
+{{ param1 }} {{ param2 }} {{ param3 }}
+{% endmacro -%}
+
+{%- call thrice(4, param3=5) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue2;
+
+#[test]
+fn test_default_value2() {
+    assert_eq!(MacroDefaultValue2.render().unwrap(), "4 1 5\n");
+}
