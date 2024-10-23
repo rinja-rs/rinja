@@ -230,6 +230,31 @@ impl fmt::Display for dyn DynTemplate {
     }
 }
 
+/// Implement the trait `$Trait` for a list of reference (wrapper) types to `$T: $Trait + ?Sized`
+macro_rules! impl_for_ref {
+    (impl $Trait:ident for $T:ident $body:tt) => {
+        crate::impl_for_ref! {
+            impl<$T> $Trait for [
+                &T
+                &mut T
+                Box<T>
+                std::cell::Ref<'_, T>
+                std::cell::RefMut<'_, T>
+                std::rc::Rc<T>
+                std::sync::Arc<T>
+                std::sync::MutexGuard<'_, T>
+                std::sync::RwLockReadGuard<'_, T>
+                std::sync::RwLockWriteGuard<'_, T>
+            ] $body
+        }
+    };
+    (impl<$T:ident> $Trait:ident for [$($ty:ty)*] $body:tt) => {
+        $(impl<$T: $Trait + ?Sized> $Trait for $ty $body)*
+    }
+}
+
+pub(crate) use impl_for_ref;
+
 #[cfg(test)]
 mod tests {
     use std::fmt;

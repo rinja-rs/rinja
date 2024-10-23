@@ -1,4 +1,6 @@
 use std::convert::Infallible;
+use std::ops::Deref;
+use std::pin::Pin;
 use std::{fmt, io, str};
 
 use serde::Serialize;
@@ -144,30 +146,24 @@ impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
     }
 }
 
-// implement AsIdent for a list of reference wrapper types to AsIdent
-macro_rules! impl_as_ident_for_ref {
-    ($T:ident => $($ty:ty)*) => { $(
-        impl<T: AsIndent + ?Sized> AsIndent for $ty {
-            #[inline]
-            fn as_indent(&self) -> &str {
-                <T>::as_indent(self)
-            }
+crate::impl_for_ref! {
+    impl AsIndent for T {
+        #[inline]
+        fn as_indent(&self) -> &str {
+            <T>::as_indent(self)
         }
-    )* };
+    }
 }
 
-impl_as_ident_for_ref! {
-    T =>
-    &T
-    Box<T>
-    std::cell::Ref<'_, T>
-    std::cell::RefMut<'_, T>
-    std::pin::Pin<&T>
-    std::rc::Rc<T>
-    std::sync::Arc<T>
-    std::sync::MutexGuard<'_, T>
-    std::sync::RwLockReadGuard<'_, T>
-    std::sync::RwLockWriteGuard<'_, T>
+impl<T> AsIndent for Pin<T>
+where
+    T: Deref,
+    <T as Deref>::Target: AsIndent,
+{
+    #[inline]
+    fn as_indent(&self) -> &str {
+        self.as_ref().get_ref().as_indent()
+    }
 }
 
 impl<S: Serialize> FastWritable for ToJson<S> {

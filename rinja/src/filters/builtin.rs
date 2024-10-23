@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::convert::Infallible;
 use std::fmt::{self, Write};
+use std::ops::Deref;
+use std::pin::Pin;
 
 use super::escape::{FastWritable, HtmlSafeOutput};
 use crate::{Error, Result};
@@ -829,32 +831,28 @@ pub trait PluralizeCount {
 }
 
 const _: () = {
-    // implement PluralizeCount for a list of reference wrapper types to PluralizeCount
-    macro_rules! impl_pluralize_count_for_ref {
-        ($T:ident => $($ty:ty)*) => { $(
-            impl<T: PluralizeCount + ?Sized> PluralizeCount for $ty {
-                type Error = <T as PluralizeCount>::Error;
+    crate::impl_for_ref! {
+        impl PluralizeCount for T {
+            type Error = T::Error;
 
-                #[inline]
-                fn is_singular(&self) -> Result<bool, Self::Error> {
-                    <T as PluralizeCount>::is_singular(self)
-                }
+            #[inline]
+            fn is_singular(&self) -> Result<bool, Self::Error> {
+                <T>::is_singular(self)
             }
-        )* };
+        }
     }
 
-    impl_pluralize_count_for_ref! {
-        T =>
-        &T
-        Box<T>
-        std::cell::Ref<'_, T>
-        std::cell::RefMut<'_, T>
-        std::pin::Pin<&T>
-        std::rc::Rc<T>
-        std::sync::Arc<T>
-        std::sync::MutexGuard<'_, T>
-        std::sync::RwLockReadGuard<'_, T>
-        std::sync::RwLockWriteGuard<'_, T>
+    impl<T> PluralizeCount for Pin<T>
+    where
+        T: Deref,
+        <T as Deref>::Target: PluralizeCount,
+    {
+        type Error = <<T as Deref>::Target as PluralizeCount>::Error;
+
+        #[inline]
+        fn is_singular(&self) -> Result<bool, Self::Error> {
+            self.as_ref().get_ref().is_singular()
+        }
     }
 
     /// implement `PluralizeCount` for unsigned integer types

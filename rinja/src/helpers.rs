@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::fmt;
 use std::iter::{Enumerate, Peekable};
+use std::ops::Deref;
+use std::pin::Pin;
 
 // The re-exports are used in the generated code for macro hygiene. Even if the paths `::core` or
 // `::std` are shadowed, the generated code will still be able to access the crates.
@@ -91,23 +93,15 @@ where
     }
 }
 
-pub fn get_primitive_value<T: PrimitiveType>(value: &T) -> T::Value {
+#[inline]
+pub fn get_primitive_value<T: PrimitiveType>(value: T) -> T::Value {
     value.get()
 }
 
-pub trait PrimitiveType: Copy {
-    type Value: Copy;
+pub trait PrimitiveType {
+    type Value;
 
-    fn get(self) -> Self::Value;
-}
-
-impl<T: PrimitiveType> PrimitiveType for &T {
-    type Value = T::Value;
-
-    #[inline]
-    fn get(self) -> Self::Value {
-        T::get(*self)
-    }
+    fn get(&self) -> Self::Value;
 }
 
 macro_rules! primitive_type {
@@ -116,8 +110,8 @@ macro_rules! primitive_type {
             type Value = $ty;
 
             #[inline]
-            fn get(self) -> Self::Value {
-                self
+            fn get(&self) -> Self::Value {
+                *self
             }
         }
     )*};
@@ -128,6 +122,57 @@ primitive_type! {
     f32, f64,
     i8, i16, i32, i64, i128, isize,
     u8, u16, u32, u64, u128, usize,
+}
+
+crate::impl_for_ref! {
+    impl PrimitiveType for T {
+        type Value = T::Value;
+
+        #[inline]
+        fn get(&self) -> Self::Value {
+            <T>::get(self)
+        }
+    }
+}
+
+impl<T> PrimitiveType for Pin<T>
+where
+    T: Deref,
+    <T as Deref>::Target: PrimitiveType,
+{
+    type Value = <<T as Deref>::Target as PrimitiveType>::Value;
+
+    #[inline]
+    fn get(&self) -> Self::Value {
+        self.as_ref().get_ref().get()
+    }
+}
+
+/// Implement [`PrimitiveType`] for [`Cell<T>`]
+///
+/// ```
+/// # use std::cell::Cell;
+/// # use std::rc::Rc;
+/// # use std::pin::Pin;
+/// # use rinja::Template;
+/// #[derive(Template)]
+/// #[template(ext = "txt", source = "{{ value as u16 }}")]
+/// struct Test<'a> {
+///     value: &'a Pin<Rc<Cell<i16>>>
+/// }
+///
+/// assert_eq!(
+///     Test { value: &Rc::pin(Cell::new(-1)) }.to_string(),
+///     "65535",
+/// );
+/// ```
+impl<T: PrimitiveType + Copy> PrimitiveType for Cell<T> {
+    type Value = T::Value;
+
+    #[inline]
+    fn get(&self) -> Self::Value {
+        self.get().get()
+    }
 }
 
 /// An empty element, so nothing will be written.

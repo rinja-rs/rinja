@@ -1,5 +1,7 @@
 use std::convert::Infallible;
 use std::fmt::{self, Formatter, Write};
+use std::ops::Deref;
+use std::pin::Pin;
 use std::{borrow, str};
 
 /// Marks a string (or other `Display` type) as safe
@@ -502,30 +504,24 @@ pub trait FastWritable {
 }
 
 const _: () = {
-    // implement FastWritable for a list of reference wrapper types to FastWritable+?Sized
-    macro_rules! impl_for_ref {
-        ($T:ident => $($ty:ty)*) => { $(
-            impl<$T: FastWritable + ?Sized> FastWritable for $ty {
-                #[inline]
-                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-                    <$T>::write_into(self, dest)
-                }
+    crate::impl_for_ref! {
+        impl FastWritable for T {
+            #[inline]
+            fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+                <T>::write_into(self, dest)
             }
-        )* };
+        }
     }
 
-    impl_for_ref! {
-        T =>
-        &T
-        Box<T>
-        std::cell::Ref<'_, T>
-        std::cell::RefMut<'_, T>
-        std::pin::Pin<&T>
-        std::rc::Rc<T>
-        std::sync::Arc<T>
-        std::sync::MutexGuard<'_, T>
-        std::sync::RwLockReadGuard<'_, T>
-        std::sync::RwLockWriteGuard<'_, T>
+    impl<T> FastWritable for Pin<T>
+    where
+        T: Deref,
+        <T as Deref>::Target: FastWritable,
+    {
+        #[inline]
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            self.as_ref().get_ref().write_into(dest)
+        }
     }
 
     impl<T: FastWritable + ToOwned> FastWritable for borrow::Cow<'_, T> {
