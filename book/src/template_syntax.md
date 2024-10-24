@@ -863,7 +863,7 @@ You can mix named and non-named arguments when calling a macro:
 {% call heading("title", bold="something") %}
 ```
 
-However please note than named arguments must always come **last**.
+However please note that named arguments must always come **last**.
 
 Another thing to note, if a named argument is referring to an argument that would
 be used for a non-named argument, it will error:
@@ -882,6 +882,24 @@ In here it's invalid because `arg2` is the second argument and would be used by
 {% call heading("something", arg3="b", arg4="ah", arg2="title") %}
 {# Equivalent of: #}
 {% call heading("something", "title", "b", arg4="ah") %}
+```
+
+### Default value
+
+You can specify default values for your macro arguments:
+
+```jinja
+{% macro heading(arg1, arg2 = "something") %}
+{% endmacro %}
+```
+
+Then if you don't pass a value for this argument, its default value will be used:
+
+```jinja
+{# We only specify `arg1`, so `arg2` will be "something" #}
+{% call heading(1) %}
+{# We specify both `arg1` and `arg2` so no default value is used #}
+{% call heading(1, 2) %}
 ```
 
 ## Calling Rust macros

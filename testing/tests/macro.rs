@@ -170,3 +170,115 @@ struct TrailingComma;
 fn test_trailing_comma() {
     assert_eq!(TrailingComma.render().unwrap(), "hihihihihi");
 }
+
+#[derive(Template)]
+#[template(
+    source = "{%- macro thrice(param1=0, param2=1) -%}
+{{ param1 }} {{ param2 }}
+{% endmacro -%}
+
+{%- call thrice() -%}
+{%- call thrice(param1=4) -%}
+{%- call thrice(param2=4) -%}
+{%- call thrice(param2=4, param1=5) -%}
+{%- call thrice(4) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue;
+
+#[test]
+fn test_default_value() {
+    assert_eq!(
+        MacroDefaultValue.render().unwrap(),
+        "0 1\n4 1\n0 4\n5 4\n4 1\n"
+    );
+}
+
+// This test ensures that the mix of named argument and default value generates
+// the expected result.
+#[derive(Template)]
+#[template(
+    source = "{%- macro thrice(param1=0, param2=1, param3=2) -%}
+{{ param1 }} {{ param2 }} {{ param3 }}
+{% endmacro -%}
+
+{%- call thrice(4, param3=5) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue2;
+
+#[test]
+fn test_default_value2() {
+    assert_eq!(MacroDefaultValue2.render().unwrap(), "4 1 5\n");
+}
+
+// This test ensures that we can use the macro arguments as default value.
+#[derive(Template)]
+#[template(
+    source = "{%- macro thrice(a=1, b=a + 1, c=a + b + 2) -%}
+{{ a }} {{ b }} {{ c }}
+{% endmacro -%}
+
+{%- call thrice() -%}
+{%- call thrice(b=6) -%}
+{%- call thrice(c=3) -%}
+{%- call thrice(a=3) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue3;
+
+#[test]
+fn test_default_value3() {
+    assert_eq!(
+        MacroDefaultValue3.render().unwrap(),
+        "1 2 5\n1 6 9\n1 2 3\n3 4 9\n"
+    );
+}
+
+// This test ensures that we can use declared variables as default value for
+// macro arguments.
+#[derive(Template)]
+#[template(
+    source = "{% let x = 12 %}
+{%- macro thrice(a=x, b=y) -%}
+{{ a }} {{ b }}
+{% endmacro -%}
+
+{%- let y = 4 -%}
+{%- call thrice() -%}
+{%- call thrice(1) -%}
+{%- call thrice(b=1) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue4;
+
+#[test]
+fn test_default_value4() {
+    assert_eq!(MacroDefaultValue4.render().unwrap(), "12 4\n1 4\n12 1\n");
+}
+
+// This test ensures that we can macro arguments take precedence over declared
+// variables when a macro argument default value is using a variable.
+#[derive(Template)]
+#[template(
+    source = "{% let a = 12 %}
+{%- macro thrice(a=3, b=a) -%}
+{{ a }} {{ b }}
+{% endmacro -%}
+
+{%- call thrice() -%}
+{%- call thrice(1) -%}
+{%- call thrice(1, 2) -%}
+",
+    ext = "html"
+)]
+struct MacroDefaultValue5;
+
+#[test]
+fn test_default_value5() {
+    assert_eq!(MacroDefaultValue5.render().unwrap(), "3 3\n1 1\n1 2\n");
+}
