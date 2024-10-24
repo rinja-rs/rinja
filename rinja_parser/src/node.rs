@@ -590,7 +590,7 @@ pub struct Macro<'a> {
 macro_rules! check_duplicated_name {
     ($names:ident, $arg_name:ident, $i:ident) => {
         if !$names.insert($arg_name) {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("duplicated argument `{}`", $arg_name),
                 $i,
             )));
@@ -607,14 +607,10 @@ impl<'a> Macro<'a> {
                 separated0(
                     (
                         ws(identifier),
-                        opt(
-                            (
-                                ws('='),
-                                ws(|i| Expr::parse(i, crate::Level::default())),
-                            ).map(|(_, value)| value),
-                        ),
+                        opt((ws('='), ws(|i| Expr::parse(i, crate::Level::default())))
+                            .map(|(_, value)| value)),
                     ),
-                    ','
+                    ',',
                 ),
                 (opt(ws(',')), ')'),
             )
@@ -647,11 +643,10 @@ impl<'a> Macro<'a> {
             let mut names = HashSet::new();
 
             let mut iter = params.iter();
-            #[allow(clippy::while_let_on_iterator)]
             while let Some((arg_name, default_value)) = iter.next() {
                 check_duplicated_name!(names, arg_name, i);
                 if default_value.is_some() {
-                    while let Some((new_arg_name, default_value)) = iter.next() {
+                    for (new_arg_name, default_value) in iter.by_ref() {
                         check_duplicated_name!(names, new_arg_name, i);
                         if default_value.is_none() {
                             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(

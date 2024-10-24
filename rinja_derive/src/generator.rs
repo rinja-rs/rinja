@@ -870,9 +870,6 @@ impl<'a> Generator<'a> {
             buf.write('{');
             this.prepare_ws(def.ws1);
 
-            let mut names = Buffer::new();
-            let mut values = Buffer::new();
-            let mut is_first_variable = true;
             if args.len() > def.args.len() || (args.len() < def.args.len() && !def.args.iter().skip(args.len()).all(|(_, default_value)| default_value.is_some())) {
                 let nb_default_args = def.args.iter().filter(|(_, default_value)| default_value.is_some()).count();
                 let (expected_args, extra) = if nb_default_args != 0 {
@@ -908,6 +905,8 @@ impl<'a> Generator<'a> {
                     named_arguments.insert(Cow::Borrowed(arg_name), (index, arg));
                 }
             }
+
+            let mut value = Buffer::new();
 
             // Handling both named and unnamed arguments requires to be careful of the named arguments
             // order. To do so, we iterate through the macro defined arguments and then check if we have
@@ -977,28 +976,17 @@ impl<'a> Generator<'a> {
                     // multiple times, e.g. in the case of macro
                     // parameters being used multiple times.
                     _ => {
-                        if is_first_variable {
-                            is_first_variable = false;
+                        value.clear();
+                        let (before, after) = if !is_copyable(expr) {
+                            ("&(", ")")
                         } else {
-                            names.write(',');
-                            values.write(',');
-                        }
-                        names.write(arg);
-
-                        values.write('(');
-                        if !is_copyable(expr) {
-                            values.write('&');
-                        }
-                        values.write(this.visit_expr_root(ctx, expr)?);
-                        values.write(')');
+                            ("", "")
+                        };
+                        value.write(this.visit_expr_root(ctx, expr)?);
+                        buf.write(format_args!("let {arg} = {before}{}{after};", value.buf));
                         this.locals.insert_with_default(Cow::Borrowed(arg));
                     }
                 }
-            }
-
-            debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
-            if !names.buf.is_empty() {
-                buf.write(format_args!("let ({}) = ({});", names.buf, values.buf));
             }
 
             let mut size_hint = this.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
@@ -2742,6 +2730,11 @@ impl Buffer {
         }
         s.len()
     }
+
+    fn clear(&mut self) {
+        self.buf.clear();
+        self.last_was_write_str = false;
+    }
 }
 
 trait BufferFmt {
@@ -3012,11 +3005,12 @@ fn is_copyable(expr: &Expr<'_>) -> bool {
 
 fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
     match expr {
-        Expr::BoolLit(_) | Expr::NumLit(_, _) | Expr::StrLit(_) | Expr::CharLit(_) => true,
+        Expr::BoolLit(_)
+        | Expr::NumLit(_, _)
+        | Expr::StrLit(_)
+        | Expr::CharLit(_)
+        | Expr::BinOp(_, _, _) => true,
         Expr::Unary(.., expr) => is_copyable_within_op(expr, true),
-        Expr::BinOp(_, lhs, rhs) => {
-            is_copyable_within_op(lhs, true) && is_copyable_within_op(rhs, true)
-        }
         Expr::Range(..) => true,
         // The result of a call likely doesn't need to be borrowed,
         // as in that case the call is more likely to return a
