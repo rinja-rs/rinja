@@ -1313,7 +1313,7 @@ pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
 fn end_node<'a, 'g: 'a>(
     node: &'g str,
     expected: &'g str,
-) -> impl Fn(&'a str) -> ParseResult<'a> + 'g {
+) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
     move |start| {
         let (i, actual) = ws(identifier).parse_next(start)?;
         if actual == expected {
