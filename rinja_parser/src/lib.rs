@@ -10,14 +10,15 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, str};
 
-use nom::branch::alt;
-use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while_m_n};
-use nom::character::complete::{anychar, char, one_of, satisfy};
-use nom::combinator::{consumed, cut, fail, map, not, opt, recognize, value};
-use nom::error::{ErrorKind, FromExternalError};
-use nom::multi::{many0_count, many1};
-use nom::sequence::{delimited, pair, preceded, tuple};
-use nom::{AsChar, InputTakeAtPosition};
+use winnow::Parser;
+use winnow::branch::alt;
+use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
+use winnow::character::escaped;
+use winnow::combinator::{cut_err, fail, not, opt};
+use winnow::error::{ErrorKind, FromExternalError};
+use winnow::multi::{many0, many1};
+use winnow::sequence::{delimited, preceded};
+use winnow::stream::AsChar;
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -114,10 +115,10 @@ impl<'a> Ast<'a> {
     ) -> Result<Self, ParseError> {
         match Node::parse_template(src, &State::new(syntax)) {
             Ok(("", nodes)) => Ok(Self { nodes }),
-            Ok(_) | Err(nom::Err::Incomplete(_)) => unreachable!(),
+            Ok(_) | Err(winnow::error::ErrMode::Incomplete(_)) => unreachable!(),
             Err(
-                nom::Err::Error(ErrorContext { input, message, .. })
-                | nom::Err::Failure(ErrorContext { input, message, .. }),
+                winnow::error::ErrMode::Backtrack(ErrorContext { input, message, .. })
+                | winnow::error::ErrMode::Cut(ErrorContext { input, message, .. }),
             ) => Err(ParseError {
                 message,
                 offset: src.len() - input.len(),
@@ -221,7 +222,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-pub(crate) type ParseErr<'a> = nom::Err<ErrorContext<'a>>;
+pub(crate) type ParseErr<'a> = winnow::error::ErrMode<ErrorContext<'a>>;
 pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
@@ -248,7 +249,7 @@ impl<'a> ErrorContext<'a> {
     }
 }
 
-impl<'a> nom::error::ParseError<&'a str> for ErrorContext<'a> {
+impl<'a> winnow::error::ParseError<&'a str> for ErrorContext<'a> {
     fn from_error_kind(input: &'a str, _code: ErrorKind) -> Self {
         Self {
             input,
@@ -256,8 +257,8 @@ impl<'a> nom::error::ParseError<&'a str> for ErrorContext<'a> {
         }
     }
 
-    fn append(_: &'a str, _: ErrorKind, other: Self) -> Self {
-        other
+    fn append(self, _: &'a str, _: ErrorKind) -> Self {
+        self
     }
 }
 
@@ -270,9 +271,9 @@ impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a
     }
 }
 
-impl<'a> From<ErrorContext<'a>> for nom::Err<ErrorContext<'a>> {
+impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
     fn from(cx: ErrorContext<'a>) -> Self {
-        Self::Failure(cx)
+        Self::Cut(cx)
     }
 }
 
@@ -285,26 +286,31 @@ fn not_ws(c: char) -> bool {
 }
 
 fn ws<'a, O>(
-    inner: impl FnMut(&'a str) -> ParseResult<'a, O>,
-) -> impl FnMut(&'a str) -> ParseResult<'a, O> {
-    delimited(take_till(not_ws), inner, take_till(not_ws))
+    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
+) -> impl Parser<&'a str, O, ErrorContext<'a>> {
+    delimited(take_till0(not_ws), inner, take_till0(not_ws))
 }
 
 /// Skips input until `end` was found, but does not consume it.
 /// Returns tuple that would be returned when parsing `end`.
 fn skip_till<'a, 'b, O>(
     candidate_finder: impl crate::memchr_splitter::Splitter,
-    end: impl FnMut(&'a str) -> ParseResult<'a, O>,
-) -> impl FnMut(&'a str) -> ParseResult<'a, (&'a str, O)> {
-    let mut next = alt((map(end, Some), map(anychar, |_| None)));
+    end: impl Parser<&'a str, O, ErrorContext<'a>>,
+) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
+    let mut next = alt((end.map(Some), any.map(|_| None)));
     move |start: &'a str| {
         let mut i = start;
         loop {
             i = match candidate_finder.split(i) {
                 Some((_, j)) => j,
-                None => return Err(nom::Err::Error(ErrorContext::new("`end` not found`", i))),
+                None => {
+                    return Err(winnow::error::ErrMode::Backtrack(ErrorContext::new(
+                        "`end` not found`",
+                        i,
+                    )));
+                }
             };
-            i = match next(i)? {
+            i = match next.parse_next(i)? {
                 (j, Some(lookahead)) => return Ok((i, (j, lookahead))),
                 (j, None) => j,
             };
@@ -312,33 +318,27 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'a> {
+fn keyword<'a>(k: &'a str) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
     move |i: &'a str| -> ParseResult<'a> {
-        let (j, v) = identifier(i)?;
+        let (j, v) = identifier.parse_next(i)?;
         if k == v { Ok((j, v)) } else { fail(i) }
     }
 }
 
 fn identifier(input: &str) -> ParseResult<'_> {
     fn start(s: &str) -> ParseResult<'_> {
-        s.split_at_position1_complete(
-            |c| !(c.is_alpha() || c == '_' || c >= '\u{0080}'),
-            nom::error::ErrorKind::Alpha,
-        )
+        take_while1(|c: char| c.is_alpha() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
     fn tail(s: &str) -> ParseResult<'_> {
-        s.split_at_position1_complete(
-            |c| !(c.is_alphanum() || c == '_' || c >= '\u{0080}'),
-            nom::error::ErrorKind::Alpha,
-        )
+        take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
     }
 
-    recognize(pair(start, opt(tail)))(input)
+    (start, opt(tail)).recognize().parse_next(input)
 }
 
 fn bool_lit(i: &str) -> ParseResult<'_> {
-    alt((keyword("false"), keyword("true")))(i)
+    alt((keyword("false"), keyword("true"))).parse_next(i)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -362,7 +362,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         {
             Ok((i, value))
         } else {
-            Err(nom::Err::Failure(ErrorContext::new(
+            Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("unknown {kind} suffix `{suffix}`"),
                 start,
             )))
@@ -370,18 +370,20 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     }
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
-    let int_with_base = pair(opt(char('-')), |i| {
-        let (i, (kind, base)) = consumed(preceded(
-            char('0'),
+    let int_with_base = (opt('-'), |i| {
+        let (i, (base, kind)) = preceded(
+            '0',
             alt((
-                value(2, char('b')),
-                value(8, char('o')),
-                value(16, char('x')),
+                one_of('b').value(2),
+                one_of('o').value(8),
+                one_of('x').value(16),
             )),
-        ))(i)?;
-        match opt(separated_digits(base, false))(i)? {
+        )
+        .with_recognized()
+        .parse_next(i)?;
+        match opt(separated_digits(base, false)).parse_next(i)? {
             (i, Some(_)) => Ok((i, ())),
-            (_, None) => Err(nom::Err::Failure(ErrorContext::new(
+            (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("expected digits after `{kind}`"),
                 start,
             ))),
@@ -391,36 +393,39 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
     let float = |i: &'a str| -> ParseResult<'a, ()> {
-        let (i, has_dot) = opt(pair(char('.'), separated_digits(10, true)))(i)?;
+        let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
-            let (i, (kind, op)) = pair(one_of("eE"), opt(one_of("+-")))(i)?;
-            match opt(separated_digits(10, op.is_none()))(i)? {
+            let (i, (kind, op)) = (one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
+            match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 (i, Some(_)) => Ok((i, ())),
-                (_, None) => Err(nom::Err::Failure(ErrorContext::new(
+                (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
                     start,
                 ))),
             }
-        })(i)?;
+        })
+        .parse_next(i)?;
         match (has_dot, has_exp) {
             (Some(_), _) | (_, Some(())) => Ok((i, ())),
             _ => fail(start),
         }
     };
 
-    let (i, num) = if let Ok((i, Some(num))) = opt(recognize(int_with_base))(start) {
-        let (i, suffix) = opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i))(i)?;
+    let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_next(start) {
+        let (i, suffix) =
+            opt(|i| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
         (i, Num::Int(num, suffix))
     } else {
-        let (i, (num, float)) = consumed(preceded(
-            pair(opt(char('-')), separated_digits(10, true)),
-            opt(float),
-        ))(start)?;
+        let (i, (float, num)) = preceded((opt('-'), separated_digits(10, true)), opt(float))
+            .with_recognized()
+            .parse_next(start)?;
         if float.is_some() {
-            let (i, suffix) = opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i))(i)?;
+            let (i, suffix) =
+                opt(|i| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_next(i)?;
             (i, Num::Float(num, suffix))
         } else {
-            let (i, suffix) = opt(|i| num_lit_suffix("number", NUM_TYPES, start, i))(i)?;
+            let (i, suffix) =
+                opt(|i| num_lit_suffix("number", NUM_TYPES, start, i)).parse_next(i)?;
             match suffix {
                 Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
                 Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
@@ -435,14 +440,16 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 /// with an underscore.
 fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_> {
     move |i| {
-        recognize(tuple((
+        (
             |i| match start {
-                true => Ok((i, 0)),
-                false => many0_count(char('_'))(i),
+                true => Ok((i, ())),
+                false => many0('_').parse_next(i),
             },
-            satisfy(|ch| ch.is_digit(radix)),
-            many0_count(satisfy(|ch| ch == '_' || ch.is_digit(radix))),
-        )))(i)
+            one_of(|ch: char| ch.is_digit(radix)),
+            many0(one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
+        )
+            .recognize()
+            .parse_next(i)
     }
 }
 
@@ -477,17 +484,12 @@ pub struct StrLit<'a> {
 }
 
 fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
-    let (i, s) = delimited(
-        char('"'),
-        opt(escaped(is_not("\\\""), '\\', anychar)),
-        char('"'),
-    )(i)?;
+    let (i, s) = delimited('"', opt(escaped(take_till1("\\\""), '\\', any)), '"').parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
 fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
-    let (i, (prefix, content)) =
-        tuple((opt(alt((char('b'), char('c')))), str_lit_without_prefix))(i)?;
+    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
@@ -511,23 +513,20 @@ pub struct CharLit<'a> {
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
 fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
-    let (i, (b_prefix, s)) = tuple((
-        opt(char('b')),
-        delimited(
-            char('\''),
-            opt(escaped(is_not("\\\'"), '\\', anychar)),
-            char('\''),
-        ),
-    ))(i)?;
+    let (i, (b_prefix, s)) = (
+        opt('b'),
+        delimited('\'', opt(escaped(take_till1("\\\'"), '\\', any)), '\''),
+    )
+        .parse_next(i)?;
 
     let Some(s) = s else {
-        return Err(nom::Err::Failure(ErrorContext::new(
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "empty character literal",
             start,
         )));
     };
     let Ok(("", c)) = Char::parse(s) else {
-        return Err(nom::Err::Failure(ErrorContext::new(
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "invalid character",
             start,
         )));
@@ -557,10 +556,10 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     };
 
     let Ok(nb) = u32::from_str_radix(nb, 16) else {
-        return Err(nom::Err::Failure(ErrorContext::new(err1, start)));
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err1, start)));
     };
     if nb > max_value {
-        return Err(nom::Err::Failure(ErrorContext::new(err2, start)));
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err2, start)));
     }
 
     Ok((i, CharLit {
@@ -570,6 +569,7 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
 }
 
 /// Represents the different kinds of char declarations:
+#[derive(Copy, Clone)]
 enum Char<'a> {
     /// Any character that is not escaped.
     Literal,
@@ -586,37 +586,29 @@ impl<'a> Char<'a> {
         if i.chars().count() == 1 {
             return Ok(("", Self::Literal));
         }
-        map(
-            tuple((
-                char('\\'),
-                alt((
-                    map(char('n'), |_| Self::Escaped),
-                    map(char('r'), |_| Self::Escaped),
-                    map(char('t'), |_| Self::Escaped),
-                    map(char('\\'), |_| Self::Escaped),
-                    map(char('0'), |_| Self::Escaped),
-                    map(char('\''), |_| Self::Escaped),
-                    // Not useful but supported by rust.
-                    map(char('"'), |_| Self::Escaped),
-                    map(
-                        tuple((
-                            char('x'),
-                            take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()),
-                        )),
-                        |(_, s)| Self::AsciiEscape(s),
-                    ),
-                    map(
-                        tuple((
-                            tag("u{"),
-                            take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-                            char('}'),
-                        )),
-                        |(_, s, _)| Self::UnicodeEscape(s),
-                    ),
-                )),
+        (
+            '\\',
+            alt((
+                one_of('n').value(Self::Escaped),
+                one_of('r').value(Self::Escaped),
+                one_of('t').value(Self::Escaped),
+                one_of('\\').value(Self::Escaped),
+                one_of('0').value(Self::Escaped),
+                one_of('\'').value(Self::Escaped),
+                // Not useful but supported by rust.
+                one_of('"').value(Self::Escaped),
+                ('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()))
+                    .map(|(_, s)| Self::AsciiEscape(s)),
+                (
+                    "u{",
+                    take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
+                    '}',
+                )
+                    .map(|(_, s, _)| Self::UnicodeEscape(s)),
             )),
-            |(_, ch)| ch,
-        )(i)
+        )
+            .map(|(_, ch)| ch)
+            .parse_next(i)
     }
 }
 
@@ -626,10 +618,10 @@ enum PathOrIdentifier<'a> {
 }
 
 fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
-    let root = ws(opt(tag("::")));
-    let tail = opt(many1(preceded(ws(tag("::")), identifier)));
+    let root = ws(opt("::"));
+    let tail = opt(many1(preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = tuple((root, identifier, tail))(i)?;
+    let (i, (root, start, rest)) = (root, identifier, tail).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:
@@ -685,27 +677,27 @@ impl<'a> State<'a> {
     }
 
     fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_start)(i)
+        tag(self.syntax.block_start).parse_next(i)
     }
 
     fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_end)(i)
+        tag(self.syntax.block_end).parse_next(i)
     }
 
     fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_start)(i)
+        tag(self.syntax.comment_start).parse_next(i)
     }
 
     fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_end)(i)
+        tag(self.syntax.comment_end).parse_next(i)
     }
 
     fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_start)(i)
+        tag(self.syntax.expr_start).parse_next(i)
     }
 
     fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_end)(i)
+        tag(self.syntax.expr_end).parse_next(i)
     }
 
     fn enter_loop(&self) {
@@ -872,7 +864,7 @@ pub(crate) struct Level(u8);
 impl Level {
     fn nest(self, i: &str) -> ParseResult<'_, Level> {
         if self.0 >= Self::MAX_DEPTH {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "your template code is too deeply nested, or last expression is too complex",
                 i,
             )));
@@ -888,18 +880,15 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = take_till(not_ws)(i)?;
+    let (j, _) = take_till0(not_ws).parse_next(i)?;
     let had_spaces = i.len() != j.len();
-    let (j, _) = pair(char('|'), not(char('|')))(j)?;
+    let (j, _) = ('|', not('|')).parse_next(j)?;
 
     if !had_spaces {
         *level = level.nest(i)?.1;
-        cut(pair(
-            ws(identifier),
-            opt(|i| Expr::arguments(i, *level, false)),
-        ))(j)
+        cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
     } else {
-        Err(nom::Err::Failure(ErrorContext::new(
+        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the filter operator `|` must not be preceded by any whitespace characters\n\
             the binary OR operator is called `bitor` in rinja",
             i,

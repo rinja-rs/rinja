@@ -1,9 +1,9 @@
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::{char, one_of};
-use nom::combinator::{consumed, map, map_res, opt};
-use nom::multi::separated_list1;
-use nom::sequence::{pair, preceded, tuple};
+use winnow::Parser;
+use winnow::branch::alt;
+use winnow::bytes::one_of;
+use winnow::combinator::opt;
+use winnow::multi::separated1;
+use winnow::sequence::preceded;
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
@@ -30,28 +30,28 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        map(
-            separated_list1(ws(tag("or")), |i| s.nest(i, |i| Self::parse_one(i, s))),
-            |mut opts| match opts.len() {
+        separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
+            .map(|v: Vec<_>| v)
+            .map(|mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
-            },
-        )(i)
+            })
+            .parse_next(i)
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
     fn parse_one(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let mut opt_opening_paren = map(opt(ws(char('('))), |o| o.is_some());
-        let mut opt_opening_brace = map(opt(ws(char('{'))), |o| o.is_some());
-        let mut opt_opening_bracket = map(opt(ws(char('['))), |o| o.is_some());
+        let mut opt_opening_paren = opt(ws('(')).map(|o| o.is_some());
+        let mut opt_opening_brace = opt(ws('{')).map(|o| o.is_some());
+        let mut opt_opening_bracket = opt(ws('[')).map(|o| o.is_some());
 
-        let (i, lit) = opt(Self::lit)(i)?;
+        let (i, lit) = opt(Self::lit).parse_next(i)?;
         if let Some(lit) = lit {
             return Ok((i, lit));
         }
 
         // match tuples and unused parentheses
-        let (i, target_is_tuple) = opt_opening_paren(i)?;
+        let (i, target_is_tuple) = opt_opening_paren.parse_next(i)?;
         if target_is_tuple {
             let (i, (singleton, mut targets)) = collect_targets(i, s, ')', Self::unnamed)?;
             if singleton {
@@ -62,7 +62,7 @@ impl<'a> Target<'a> {
                 Self::Tuple(Vec::new(), only_one_rest_pattern(targets, false, "tuple")?),
             ));
         }
-        let (i, target_is_array) = opt_opening_bracket(i)?;
+        let (i, target_is_array) = opt_opening_bracket.parse_next(i)?;
         if target_is_array {
             let (i, (singleton, mut targets)) = collect_targets(i, s, ']', Self::unnamed)?;
             if singleton {
@@ -75,19 +75,21 @@ impl<'a> Target<'a> {
         }
 
         let path = |i| {
-            map_res(path_or_identifier, |v| match v {
-                PathOrIdentifier::Path(v) => Ok(v),
-                PathOrIdentifier::Identifier(v) => Err(v),
-            })(i)
+            path_or_identifier
+                .map_res(|v| match v {
+                    PathOrIdentifier::Path(v) => Ok(v),
+                    PathOrIdentifier::Identifier(v) => Err(v),
+                })
+                .parse_next(i)
         };
 
         // match structs
-        let (i, path) = opt(path)(i)?;
+        let (i, path) = opt(path).parse_next(i)?;
         if let Some(path) = path {
             let i_before_matching_with = i;
-            let (i, _) = opt(ws(keyword("with")))(i)?;
+            let (i, _) = opt(ws(keyword("with"))).parse_next(i)?;
 
-            let (i, is_unnamed_struct) = opt_opening_paren(i)?;
+            let (i, is_unnamed_struct) = opt_opening_paren.parse_next(i)?;
             if is_unnamed_struct {
                 let (i, (_, targets)) = collect_targets(i, s, ')', Self::unnamed)?;
                 return Ok((
@@ -96,7 +98,7 @@ impl<'a> Target<'a> {
                 ));
             }
 
-            let (i, is_named_struct) = opt_opening_brace(i)?;
+            let (i, is_named_struct) = opt_opening_brace.parse_next(i)?;
             if is_named_struct {
                 let (i, (_, targets)) = collect_targets(i, s, '}', Self::named)?;
                 return Ok((i, Self::Struct(path, targets)));
@@ -116,23 +118,26 @@ impl<'a> Target<'a> {
 
     fn lit(i: &'a str) -> ParseResult<'a, Self> {
         alt((
-            map(str_lit, Self::StrLit),
-            map(char_lit, Self::CharLit),
-            map(consumed(num_lit), |(full, num)| Target::NumLit(full, num)),
-            map(bool_lit, Self::BoolLit),
-        ))(i)
+            str_lit.map(Self::StrLit),
+            char_lit.map(Self::CharLit),
+            num_lit
+                .with_recognized()
+                .map(|(num, full)| Target::NumLit(full, num)),
+            bool_lit.map(Self::BoolLit),
+        ))
+        .parse_next(i)
     }
 
     fn unnamed(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        alt((Self::rest, |i| Self::parse(i, s)))(i)
+        alt((Self::rest, |i| Self::parse(i, s))).parse_next(i)
     }
 
     fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
-        let (i, rest) = opt(consumed(Self::rest))(init_i)?;
+        let (i, rest) = opt(Self::rest.with_recognized()).parse_next(init_i)?;
         if let Some(rest) = rest {
-            let (_, chr) = ws(opt(one_of(",:")))(i)?;
+            let (_, chr) = ws(opt(one_of(",:"))).parse_next(i)?;
             if let Some(chr) = chr {
-                return Err(nom::Err::Failure(ErrorContext::new(
+                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!(
                         "unexpected `{chr}` character after `..`\n\
                          note that in a named struct, `..` must come last to ignore other members"
@@ -140,24 +145,22 @@ impl<'a> Target<'a> {
                     i,
                 )));
             }
-            if let Target::Rest(ref s) = rest.1 {
+            if let Target::Rest(ref s) = rest.0 {
                 if s.inner.is_some() {
-                    return Err(nom::Err::Failure(ErrorContext::new(
+                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         "`@ ..` cannot be used in struct",
                         s.span,
                     )));
                 }
             }
-            return Ok((i, rest));
+            return Ok((i, (rest.1, rest.0)));
         }
 
-        let (i, (src, target)) = pair(
-            identifier,
-            opt(preceded(ws(char(':')), |i| Self::parse(i, s))),
-        )(init_i)?;
+        let (i, (src, target)) =
+            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(init_i)?;
 
         if src == "_" {
-            return Err(nom::Err::Failure(ErrorContext::new(
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot use placeholder `_` as source in named struct",
                 init_i,
             )));
@@ -171,7 +174,7 @@ impl<'a> Target<'a> {
     }
 
     fn rest(start: &'a str) -> ParseResult<'a, Self> {
-        let (i, (ident, _)) = tuple((opt(tuple((identifier, ws(char('@'))))), tag("..")))(start)?;
+        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(start)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
@@ -182,9 +185,9 @@ impl<'a> Target<'a> {
 fn verify_name<'a>(
     input: &'a str,
     name: &'a str,
-) -> Result<Target<'a>, nom::Err<ErrorContext<'a>>> {
+) -> Result<Target<'a>, winnow::error::ErrMode<ErrorContext<'a>>> {
     match name {
-        "self" | "writer" => Err(nom::Err::Failure(ErrorContext::new(
+        "self" | "writer" => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             format!("cannot use `{name}` as a name"),
             input,
         ))),
@@ -198,29 +201,29 @@ fn collect_targets<'a, T>(
     delim: char,
     mut one: impl FnMut(&'a str, &State<'_>) -> ParseResult<'a, T>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
-    let opt_comma = |i| map(ws(opt(char(','))), |o| o.is_some())(i);
-    let opt_end = |i| map(ws(opt(char(delim))), |o| o.is_some())(i);
+    let opt_comma = |i| ws(opt(',')).map(|o| o.is_some()).parse_next(i);
+    let mut opt_end = |i| ws(opt(one_of(delim))).map(|o| o.is_some()).parse_next(i);
 
-    let (i, has_end) = opt_end(i)?;
+    let (i, has_end) = opt_end.parse_next(i)?;
     if has_end {
         return Ok((i, (false, Vec::new())));
     }
 
-    let (i, targets) = opt(separated_list1(ws(char(',')), |i| one(i, s)))(i)?;
+    let (i, targets) = opt(separated1(|i| one(i, s), ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
     let Some(targets) = targets else {
-        return Err(nom::Err::Failure(ErrorContext::new(
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "expected comma separated list of members",
             i,
         )));
     };
 
-    let (i, (has_comma, has_end)) = pair(opt_comma, opt_end)(i)?;
+    let (i, (has_comma, has_end)) = (opt_comma, opt_end).parse_next(i)?;
     if !has_end {
         let msg = match has_comma {
             true => format!("expected member, or `{delim}` as terminator"),
             false => format!("expected `,` for more members, or `{delim}` as terminator"),
         };
-        return Err(nom::Err::Failure(ErrorContext::new(msg, i)));
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(msg, i)));
     }
 
     let singleton = !has_comma && targets.len() == 1;
@@ -237,13 +240,13 @@ fn only_one_rest_pattern<'a>(
     for target in &targets {
         if let Target::Rest(s) = target {
             if !allow_named_rest && s.inner.is_some() {
-                return Err(nom::Err::Failure(ErrorContext::new(
+                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     "`@ ..` is only allowed in slice patterns",
                     s.span,
                 )));
             }
             if found_rest {
-                return Err(nom::Err::Failure(ErrorContext::new(
+                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!("`..` can only be used once per {type_kind} pattern"),
                     s.span,
                 )));
