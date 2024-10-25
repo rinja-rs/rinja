@@ -587,15 +587,18 @@ pub struct Macro<'a> {
     pub ws2: Ws,
 }
 
-macro_rules! check_duplicated_name {
-    ($names:ident, $arg_name:ident, $i:ident) => {
-        if !$names.insert($arg_name) {
-            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                format!("duplicated argument `{}`", $arg_name),
-                $i,
-            )));
-        }
-    };
+fn check_duplicated_name<'a>(
+    names: &mut HashSet<&'a str>,
+    arg_name: &'a str,
+    i: &'a str,
+) -> Result<(), crate::ParseErr<'a>> {
+    if !names.insert(arg_name) {
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+            format!("duplicated argument `{arg_name}`"),
+            i,
+        )));
+    }
+    Ok(())
 }
 
 impl<'a> Macro<'a> {
@@ -644,10 +647,10 @@ impl<'a> Macro<'a> {
 
             let mut iter = params.iter();
             while let Some((arg_name, default_value)) = iter.next() {
-                check_duplicated_name!(names, arg_name, i);
+                check_duplicated_name(&mut names, arg_name, i)?;
                 if default_value.is_some() {
                     for (new_arg_name, default_value) in iter.by_ref() {
-                        check_duplicated_name!(names, new_arg_name, i);
+                        check_duplicated_name(&mut names, new_arg_name, i)?;
                         if default_value.is_none() {
                             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 format!(
