@@ -210,8 +210,8 @@ impl<'a> Node<'a> {
 
 fn cut_node<'a, O>(
     kind: Option<&'static str>,
-    inner: impl FnMut(&'a str) -> ParseResult<'a, O>,
-) -> impl FnMut(&'a str) -> ParseResult<'a, O> {
+    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
+) -> impl Parser<&'a str, O, ErrorContext<'a>> {
     let mut inner = cut(inner);
     move |i: &'a str| {
         let result = inner.parse_next(i);

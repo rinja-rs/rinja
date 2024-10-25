@@ -286,8 +286,8 @@ fn not_ws(c: char) -> bool {
 }
 
 fn ws<'a, O>(
-    inner: impl FnMut(&'a str) -> ParseResult<'a, O>,
-) -> impl FnMut(&'a str) -> ParseResult<'a, O> {
+    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
+) -> impl Parser<&'a str, O, ErrorContext<'a>> {
     delimited(take_till(not_ws), inner, take_till(not_ws))
 }
 
@@ -295,8 +295,8 @@ fn ws<'a, O>(
 /// Returns tuple that would be returned when parsing `end`.
 fn skip_till<'a, 'b, O>(
     candidate_finder: impl crate::memchr_splitter::Splitter,
-    end: impl FnMut(&'a str) -> ParseResult<'a, O>,
-) -> impl FnMut(&'a str) -> ParseResult<'a, (&'a str, O)> {
+    end: impl Parser<&'a str, O, ErrorContext<'a>>,
+) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
     let mut next = alt((map(end, Some), map(anychar, |_| None)));
     move |start: &'a str| {
         let mut i = start;
@@ -318,7 +318,7 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword<'a>(k: &'a str) -> impl FnMut(&'a str) -> ParseResult<'a> {
+fn keyword<'a>(k: &'a str) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
     move |i: &'a str| -> ParseResult<'a> {
         let (j, v) = identifier.parse_next(i)?;
         if k == v { Ok((j, v)) } else { fail(i) }
