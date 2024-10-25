@@ -23,7 +23,7 @@ config = ["dep:serde"]
 [dependencies]
 memchr = "2"
 serde = { version = "1.0", optional = true, features = ["derive"] }
-winnow = "0.4"
+winnow = "0.6"
 
 [dev-dependencies]
 criterion = "0.5"
