@@ -3,7 +3,7 @@ use std::str;
 use winnow::Parser;
 use winnow::branch::alt;
 use winnow::bytes::{any, tag, take_till0};
-use winnow::combinator::{cut_err, eof, fail, map_opt, not, opt, peek};
+use winnow::combinator::{cut_err, eof, fail, not, opt, peek};
 use winnow::multi::{many0, separated0, separated1};
 use winnow::sequence::{delimited, preceded};
 
@@ -435,7 +435,7 @@ pub enum Whitespace {
 
 impl Whitespace {
     fn parse(i: &str) -> ParseResult<'_, Self> {
-        map_opt(any, Self::parse_char).parse_next(i)
+        any.verify_map(Self::parse_char).parse_next(i)
     }
 
     fn parse_char(c: char) -> Option<Self> {
