@@ -605,7 +605,7 @@ impl<'a> Suffix<'a> {
                     }
                     _ => {
                         return Err(winnow::error::ErrMode::from_error_kind(
-                            before_suffix,
+                            &before_suffix,
                             ErrorKind::Tag,
                         )
                         .cut());

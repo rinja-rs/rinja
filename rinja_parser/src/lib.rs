@@ -304,22 +304,22 @@ impl<'a> ErrorContext<'a> {
 }
 
 impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
-    fn from_error_kind(input: &'a str, _code: ErrorKind) -> Self {
+    fn from_error_kind(input: &&'a str, _code: ErrorKind) -> Self {
         Self {
-            span: input.into(),
+            span: (*input).into(),
             message: None,
         }
     }
 
-    fn append(self, _: &'a str, _: ErrorKind) -> Self {
+    fn append(self, _: &&'a str, _: ErrorKind) -> Self {
         self
     }
 }
 
 impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a> {
-    fn from_external_error(input: &'a str, _kind: ErrorKind, e: E) -> Self {
+    fn from_external_error(input: &&'a str, _kind: ErrorKind, e: E) -> Self {
         Self {
-            span: input.into(),
+            span: (*input).into(),
             message: Some(Cow::Owned(e.to_string())),
         }
     }
