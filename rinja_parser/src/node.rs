@@ -1,11 +1,10 @@
 use std::str;
 
 use winnow::Parser;
-use winnow::branch::alt;
-use winnow::bytes::{any, tag, take_till0};
-use winnow::combinator::{cut_err, eof, fail, not, opt, peek};
-use winnow::multi::{many0, separated0, separated1};
-use winnow::sequence::{delimited, preceded};
+use winnow::combinator::{
+    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated0, separated1,
+};
+use winnow::token::{any, tag, take_till0};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -63,12 +62,15 @@ impl<'a> Node<'a> {
     }
 
     fn many(i: &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
-        many0(alt((
-            (|i| Lit::parse(i, s)).map(Self::Lit),
-            (|i| Comment::parse(i, s)).map(Self::Comment),
-            |i| Self::expr(i, s),
-            |i| Self::parse(i, s),
-        )))
+        repeat(
+            0..,
+            alt((
+                (|i| Lit::parse(i, s)).map(Self::Lit),
+                (|i| Comment::parse(i, s)).map(Self::Comment),
+                |i| Self::expr(i, s),
+                |i| Self::parse(i, s),
+            )),
+        )
         .map(|v: Vec<_>| v)
         .parse_next(i)
     }
@@ -301,7 +303,7 @@ impl<'a> When<'a> {
                 (
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
-                    many0(ws(|i| Comment::parse(i, s))).map(|()| ()),
+                    repeat(0.., ws(|i| Comment::parse(i, s))).map(|()| ()),
                 ),
             ),
         ))
@@ -679,7 +681,7 @@ impl<'a> FilterBlock<'a> {
                 (
                     ws(identifier),
                     opt(|i| Expr::arguments(i, s.level.get(), false)),
-                    many0(|i| {
+                    repeat(0.., |i| {
                         filter(i, &mut level).map(|(j, (name, params))| (j, (name, params, i)))
                     })
                     .map(|v: Vec<_>| v),
@@ -843,8 +845,8 @@ impl<'a> Match<'a> {
                     cut_node(
                         Some("match"),
                         (
-                            ws(many0(ws(|i| Comment::parse(i, s)))).map(|()| ()),
-                            many0(|i| When::when(i, s)).map(|v: Vec<_>| v),
+                            ws(repeat(0.., ws(|i| Comment::parse(i, s)))).map(|()| ()),
+                            repeat(0.., |i| When::when(i, s)).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("match"),
                                 (
@@ -1124,7 +1126,7 @@ impl<'a> If<'a> {
                         Some("if"),
                         (
                             |i| Node::many(i, s),
-                            many0(|i| Cond::parse(i, s)).map(|v: Vec<_>| v),
+                            repeat(0.., |i| Cond::parse(i, s)).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("if"),
                                 (

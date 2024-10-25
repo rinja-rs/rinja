@@ -1,9 +1,6 @@
 use winnow::Parser;
-use winnow::branch::alt;
-use winnow::bytes::one_of;
-use winnow::combinator::opt;
-use winnow::multi::separated1;
-use winnow::sequence::preceded;
+use winnow::combinator::{alt, opt, preceded, separated1};
+use winnow::token::one_of;
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
@@ -76,7 +73,7 @@ impl<'a> Target<'a> {
 
         let path = |i| {
             path_or_identifier
-                .map_res(|v| match v {
+                .try_map(|v| match v {
                     PathOrIdentifier::Path(v) => Ok(v),
                     PathOrIdentifier::Identifier(v) => Err(v),
                 })
@@ -135,7 +132,7 @@ impl<'a> Target<'a> {
     fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
         let (i, rest) = opt(Self::rest.with_recognized()).parse_next(init_i)?;
         if let Some(rest) = rest {
-            let (_, chr) = ws(opt(one_of(",:"))).parse_next(i)?;
+            let (_, chr) = ws(opt(one_of([',', ':']))).parse_next(i)?;
             if let Some(chr) = chr {
                 return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!(

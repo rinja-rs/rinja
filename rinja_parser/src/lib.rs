@@ -11,14 +11,11 @@ use std::sync::Arc;
 use std::{fmt, str};
 
 use winnow::Parser;
-use winnow::branch::alt;
-use winnow::bytes::{any, one_of, tag, take_till0, take_till1, take_while_m_n, take_while1};
-use winnow::character::escaped;
-use winnow::combinator::{cut_err, fail, not, opt};
+use winnow::ascii::escaped;
+use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
-use winnow::multi::{many0, many1};
-use winnow::sequence::{delimited, preceded};
 use winnow::stream::AsChar;
+use winnow::token::{any, one_of, tag, take_till0, take_till1, take_while};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -249,7 +246,7 @@ impl<'a> ErrorContext<'a> {
     }
 }
 
-impl<'a> winnow::error::ParseError<&'a str> for ErrorContext<'a> {
+impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
     fn from_error_kind(input: &'a str, _code: ErrorKind) -> Self {
         Self {
             input,
@@ -318,21 +315,16 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword<'a>(k: &'a str) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
-    move |i: &'a str| -> ParseResult<'a> {
-        let (j, v) = identifier.parse_next(i)?;
-        if k == v { Ok((j, v)) } else { fail(i) }
-    }
+fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
+    identifier.verify(move |v: &str| v == k)
 }
 
 fn identifier(input: &str) -> ParseResult<'_> {
-    fn start(s: &str) -> ParseResult<'_> {
-        take_while1(|c: char| c.is_alpha() || c == '_' || c >= '\u{0080}').parse_next(s)
-    }
+    let start = take_while(1.., |c: char| c.is_alpha() || c == '_' || c >= '\u{0080}');
 
-    fn tail(s: &str) -> ParseResult<'_> {
-        take_while1(|c: char| c.is_alphanum() || c == '_' || c >= '\u{0080}').parse_next(s)
-    }
+    let tail = take_while(1.., |c: char| {
+        c.is_alphanum() || c == '_' || c >= '\u{0080}'
+    });
 
     (start, opt(tail)).recognize().parse_next(input)
 }
@@ -371,16 +363,9 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
     let int_with_base = (opt('-'), |i| {
-        let (i, (base, kind)) = preceded(
-            '0',
-            alt((
-                one_of('b').value(2),
-                one_of('o').value(8),
-                one_of('x').value(16),
-            )),
-        )
-        .with_recognized()
-        .parse_next(i)?;
+        let (i, (base, kind)) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
+            .with_recognized()
+            .parse_next(i)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
             (i, Some(_)) => Ok((i, ())),
             (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -395,7 +380,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
     let float = |i: &'a str| -> ParseResult<'a, ()> {
         let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_next(i)?;
         let (i, has_exp) = opt(|i| {
-            let (i, (kind, op)) = (one_of("eE"), opt(one_of("+-"))).parse_next(i)?;
+            let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_next(i)?;
             match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 (i, Some(_)) => Ok((i, ())),
                 (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -438,19 +423,19 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
 
 /// Underscore separated digits of the given base, unless `start` is true this may start
 /// with an underscore.
-fn separated_digits(radix: u32, start: bool) -> impl Fn(&str) -> ParseResult<'_> {
-    move |i| {
-        (
-            |i| match start {
-                true => Ok((i, ())),
-                false => many0('_').parse_next(i),
-            },
-            one_of(|ch: char| ch.is_digit(radix)),
-            many0(one_of(|ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
-        )
-            .recognize()
-            .parse_next(i)
-    }
+fn separated_digits<'a>(
+    radix: u32,
+    start: bool,
+) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
+    (
+        move |i: &'a _| match start {
+            true => Ok((i, ())),
+            false => repeat(0.., '_').parse_next(i),
+        },
+        one_of(move |ch: char| ch.is_digit(radix)),
+        repeat(0.., one_of(move |ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
+    )
+        .recognize()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -484,7 +469,8 @@ pub struct StrLit<'a> {
 }
 
 fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
-    let (i, s) = delimited('"', opt(escaped(take_till1("\\\""), '\\', any)), '"').parse_next(i)?;
+    let (i, s) =
+        delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_next(i)?;
     Ok((i, s.unwrap_or_default()))
 }
 
@@ -515,7 +501,11 @@ fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = (
         opt('b'),
-        delimited('\'', opt(escaped(take_till1("\\\'"), '\\', any)), '\''),
+        delimited(
+            '\'',
+            opt(escaped(take_till1(['\\', '\'']), '\\', any)),
+            '\'',
+        ),
     )
         .parse_next(i)?;
 
@@ -584,24 +574,24 @@ enum Char<'a> {
 impl<'a> Char<'a> {
     fn parse(i: &'a str) -> ParseResult<'a, Self> {
         if i.chars().count() == 1 {
-            return Ok(("", Self::Literal));
+            return any.value(Self::Literal).parse_next(i);
         }
         (
             '\\',
             alt((
-                one_of('n').value(Self::Escaped),
-                one_of('r').value(Self::Escaped),
-                one_of('t').value(Self::Escaped),
-                one_of('\\').value(Self::Escaped),
-                one_of('0').value(Self::Escaped),
-                one_of('\'').value(Self::Escaped),
+                'n'.value(Self::Escaped),
+                'r'.value(Self::Escaped),
+                't'.value(Self::Escaped),
+                '\\'.value(Self::Escaped),
+                '0'.value(Self::Escaped),
+                '\''.value(Self::Escaped),
                 // Not useful but supported by rust.
-                one_of('"').value(Self::Escaped),
-                ('x', take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()))
+                '"'.value(Self::Escaped),
+                ('x', take_while(2, |c: char| c.is_ascii_hexdigit()))
                     .map(|(_, s)| Self::AsciiEscape(s)),
                 (
                     "u{",
-                    take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
+                    take_while(1..=6, |c: char| c.is_ascii_hexdigit()),
                     '}',
                 )
                     .map(|(_, s, _)| Self::UnicodeEscape(s)),
@@ -619,7 +609,7 @@ enum PathOrIdentifier<'a> {
 
 fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
     let root = ws(opt("::"));
-    let tail = opt(many1(preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
+    let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
     let (i, (root, start, rest)) = (root, identifier, tail).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();
