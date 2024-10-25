@@ -4,6 +4,7 @@ use std::str::{self, FromStr};
 use winnow::combinator::{
     alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated1, terminated,
 };
+use winnow::stream::Stream as _;
 use winnow::token::{any, tag};
 use winnow::{Parser, unpeek};
 
@@ -1427,17 +1428,20 @@ fn end_node<'a, 'g: 'a>(
     node: &'g str,
     expected: &'g str,
 ) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
-    move |start| {
-        let (i, actual) = ws(unpeek(identifier)).parse_peek(start)?;
+    move |i: &mut &'a str| {
+        let start = i.checkpoint();
+        let actual = ws(unpeek(identifier)).parse_next(i)?;
         if actual == expected {
-            Ok((i, actual))
+            Ok(actual)
         } else if actual.starts_with("end") {
+            i.reset(start);
             Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("expected `{expected}` to terminate `{node}` node, found `{actual}`"),
-                start,
+                *i,
             )))
         } else {
-            fail.parse_peek(start)
+            i.reset(start);
+            fail.parse_next(i)
         }
     }
 }
