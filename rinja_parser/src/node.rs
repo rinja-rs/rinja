@@ -109,7 +109,7 @@ impl<'a> Node<'a> {
             "break" => |i, s| Self::r#break(i, s),
             "continue" => |i, s| Self::r#continue(i, s),
             "filter" => |i, s| wrap(Self::FilterBlock, FilterBlock::parse(i, s)),
-            _ => return fail(start),
+            _ => return fail.parse_next(start),
         };
 
         let (i, node) = s.nest(j, |i| func(i, s))?;
@@ -1008,7 +1008,7 @@ impl<'a> Lit<'a> {
         let (i, content) = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
-                return fail(i);
+                return fail.parse_next(i);
             }
             Some(content) => (i, content),
             None => ("", i), // there is no {block,comment,expr}_start: take everything
@@ -1313,7 +1313,7 @@ pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
 fn end_node<'a, 'g: 'a>(
     node: &'g str,
     expected: &'g str,
-) -> impl Fn(&'a str) -> ParseResult<'a> + 'g {
+) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
     move |start| {
         let (i, actual) = ws(identifier).parse_next(start)?;
         if actual == expected {
@@ -1324,7 +1324,7 @@ fn end_node<'a, 'g: 'a>(
                 start,
             )))
         } else {
-            fail(start)
+            fail.parse_next(start)
         }
     }
 }

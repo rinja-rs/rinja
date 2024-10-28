@@ -130,7 +130,7 @@ impl<'a> Expr<'a> {
         if !is_template_macro {
             // If this is not a template macro, we don't want to parse named arguments so
             // we instead return an error which will allow to continue the parsing.
-            return fail(i);
+            return fail.parse_next(i);
         }
 
         let (_, level) = level.nest(i)?;
@@ -518,7 +518,7 @@ impl<'a> Suffix<'a> {
             if nested == 0 {
                 Ok((&input[last..], ()))
             } else {
-                fail(input)
+                fail.parse_next(input)
             }
         }
 

@@ -346,7 +346,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         start: &'a str,
         i: &'a str,
     ) -> ParseResult<'a, T> {
-        let (i, suffix) = identifier(i)?;
+        let (i, suffix) = identifier.parse_next(i)?;
         if let Some(value) = list
             .iter()
             .copied()
@@ -392,7 +392,7 @@ fn num_lit<'a>(start: &'a str) -> ParseResult<'a, Num<'a>> {
         .parse_next(i)?;
         match (has_dot, has_exp) {
             (Some(_), _) | (_, Some(())) => Ok((i, ())),
-            _ => fail(start),
+            _ => fail.parse_next(start),
         }
     };
 
