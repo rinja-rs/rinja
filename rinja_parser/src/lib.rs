@@ -441,22 +441,25 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
-    let float = |i: &'a str| -> InputParseResult<'a, ()> {
-        let (i, has_dot) = opt(('.', separated_digits(10, true))).parse_peek(i)?;
-        let (i, has_exp) = opt(unpeek(|i| {
-            let (i, (kind, op)) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_peek(i)?;
-            match opt(separated_digits(10, op.is_none())).parse_peek(i)? {
-                (i, Some(_)) => Ok((i, ())),
-                (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+    let float = |i: &mut &'a str| -> ParseResult<'a, ()> {
+        let has_dot = opt(('.', separated_digits(10, true))).parse_next(i)?;
+        let has_exp = opt(|i: &mut _| {
+            let (kind, op) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_next(i)?;
+            match opt(separated_digits(10, op.is_none())).parse_next(i)? {
+                Some(_) => Ok(()),
+                None => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!("expected decimal digits, `+` or `-` after exponent `{kind}`"),
                     start,
                 ))),
             }
-        }))
-        .parse_peek(i)?;
+        })
+        .parse_next(i)?;
         match (has_dot, has_exp) {
-            (Some(_), _) | (_, Some(())) => Ok((i, ())),
-            _ => fail.parse_peek(start),
+            (Some(_), _) | (_, Some(())) => Ok(()),
+            _ => {
+                *i = start;
+                fail.parse_next(i)
+            }
         }
     };
 
@@ -465,10 +468,9 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
             opt(|i: &mut _| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_peek(i)?;
         (i, Num::Int(num, suffix))
     } else {
-        let (i, (float, num)) =
-            preceded((opt('-'), separated_digits(10, true)), opt(unpeek(float)))
-                .with_recognized()
-                .parse_peek(start)?;
+        let (i, (float, num)) = preceded((opt('-'), separated_digits(10, true)), opt(float))
+            .with_recognized()
+            .parse_peek(start)?;
         if float.is_some() {
             let (i, suffix) =
                 opt(|i: &mut _| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_peek(i)?;
