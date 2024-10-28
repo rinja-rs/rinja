@@ -1049,42 +1049,63 @@ mod test {
     #[test]
     fn test_num_lit() {
         // Should fail.
-        assert!(num_lit(".").is_err());
+        assert!(num_lit.parse_next(".").is_err());
         // Should succeed.
         assert_eq!(
-            num_lit("1.2E-02").unwrap(),
+            num_lit.parse_next("1.2E-02").unwrap(),
             ("", Num::Float("1.2E-02", None))
         );
-        assert_eq!(num_lit("4e3").unwrap(), ("", Num::Float("4e3", None)),);
-        assert_eq!(num_lit("4e+_3").unwrap(), ("", Num::Float("4e+_3", None)),);
+        assert_eq!(
+            num_lit.parse_next("4e3").unwrap(),
+            ("", Num::Float("4e3", None)),
+        );
+        assert_eq!(
+            num_lit.parse_next("4e+_3").unwrap(),
+            ("", Num::Float("4e+_3", None)),
+        );
         // Not supported because Rust wants a number before the `.`.
-        assert!(num_lit(".1").is_err());
-        assert!(num_lit(".1E-02").is_err());
+        assert!(num_lit.parse_next(".1").is_err());
+        assert!(num_lit.parse_next(".1E-02").is_err());
         // A `_` directly after the `.` denotes a field.
-        assert_eq!(num_lit("1._0").unwrap(), ("._0", Num::Int("1", None)));
-        assert_eq!(num_lit("1_.0").unwrap(), ("", Num::Float("1_.0", None)));
+        assert_eq!(
+            num_lit.parse_next("1._0").unwrap(),
+            ("._0", Num::Int("1", None))
+        );
+        assert_eq!(
+            num_lit.parse_next("1_.0").unwrap(),
+            ("", Num::Float("1_.0", None))
+        );
         // Not supported (voluntarily because of `1..` syntax).
-        assert_eq!(num_lit("1.").unwrap(), (".", Num::Int("1", None)));
-        assert_eq!(num_lit("1_.").unwrap(), (".", Num::Int("1_", None)));
-        assert_eq!(num_lit("1_2.").unwrap(), (".", Num::Int("1_2", None)));
+        assert_eq!(
+            num_lit.parse_next("1.").unwrap(),
+            (".", Num::Int("1", None))
+        );
+        assert_eq!(
+            num_lit.parse_next("1_.").unwrap(),
+            (".", Num::Int("1_", None))
+        );
+        assert_eq!(
+            num_lit.parse_next("1_2.").unwrap(),
+            (".", Num::Int("1_2", None))
+        );
         // Numbers with suffixes
         assert_eq!(
-            num_lit("-1usize").unwrap(),
+            num_lit.parse_next("-1usize").unwrap(),
             ("", Num::Int("-1", Some(IntKind::Usize)))
         );
         assert_eq!(
-            num_lit("123_f32").unwrap(),
+            num_lit.parse_next("123_f32").unwrap(),
             ("", Num::Float("123_", Some(FloatKind::F32)))
         );
         assert_eq!(
-            num_lit("1_.2_e+_3_f64|into_isize").unwrap(),
+            num_lit.parse_next("1_.2_e+_3_f64|into_isize").unwrap(),
             (
                 "|into_isize",
                 Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
             )
         );
         assert_eq!(
-            num_lit("4e3f128").unwrap(),
+            num_lit.parse_next("4e3f128").unwrap(),
             ("", Num::Float("4e3", Some(FloatKind::F128))),
         );
     }
@@ -1096,30 +1117,42 @@ mod test {
             content: s,
         };
 
-        assert_eq!(char_lit("'a'").unwrap(), ("", lit("a")));
-        assert_eq!(char_lit("'字'").unwrap(), ("", lit("字")));
+        assert_eq!(char_lit.parse_next("'a'").unwrap(), ("", lit("a")));
+        assert_eq!(char_lit.parse_next("'字'").unwrap(), ("", lit("字")));
 
         // Escaped single characters.
-        assert_eq!(char_lit("'\\\"'").unwrap(), ("", lit("\\\"")));
-        assert_eq!(char_lit("'\\''").unwrap(), ("", lit("\\'")));
-        assert_eq!(char_lit("'\\t'").unwrap(), ("", lit("\\t")));
-        assert_eq!(char_lit("'\\n'").unwrap(), ("", lit("\\n")));
-        assert_eq!(char_lit("'\\r'").unwrap(), ("", lit("\\r")));
-        assert_eq!(char_lit("'\\0'").unwrap(), ("", lit("\\0")));
+        assert_eq!(char_lit.parse_next("'\\\"'").unwrap(), ("", lit("\\\"")));
+        assert_eq!(char_lit.parse_next("'\\''").unwrap(), ("", lit("\\'")));
+        assert_eq!(char_lit.parse_next("'\\t'").unwrap(), ("", lit("\\t")));
+        assert_eq!(char_lit.parse_next("'\\n'").unwrap(), ("", lit("\\n")));
+        assert_eq!(char_lit.parse_next("'\\r'").unwrap(), ("", lit("\\r")));
+        assert_eq!(char_lit.parse_next("'\\0'").unwrap(), ("", lit("\\0")));
         // Escaped ascii characters (up to `0x7F`).
-        assert_eq!(char_lit("'\\x12'").unwrap(), ("", lit("\\x12")));
-        assert_eq!(char_lit("'\\x02'").unwrap(), ("", lit("\\x02")));
-        assert_eq!(char_lit("'\\x6a'").unwrap(), ("", lit("\\x6a")));
-        assert_eq!(char_lit("'\\x7F'").unwrap(), ("", lit("\\x7F")));
+        assert_eq!(char_lit.parse_next("'\\x12'").unwrap(), ("", lit("\\x12")));
+        assert_eq!(char_lit.parse_next("'\\x02'").unwrap(), ("", lit("\\x02")));
+        assert_eq!(char_lit.parse_next("'\\x6a'").unwrap(), ("", lit("\\x6a")));
+        assert_eq!(char_lit.parse_next("'\\x7F'").unwrap(), ("", lit("\\x7F")));
         // Escaped unicode characters (up to `0x10FFFF`).
-        assert_eq!(char_lit("'\\u{A}'").unwrap(), ("", lit("\\u{A}")));
-        assert_eq!(char_lit("'\\u{10}'").unwrap(), ("", lit("\\u{10}")));
-        assert_eq!(char_lit("'\\u{aa}'").unwrap(), ("", lit("\\u{aa}")));
-        assert_eq!(char_lit("'\\u{10FFFF}'").unwrap(), ("", lit("\\u{10FFFF}")));
+        assert_eq!(
+            char_lit.parse_next("'\\u{A}'").unwrap(),
+            ("", lit("\\u{A}"))
+        );
+        assert_eq!(
+            char_lit.parse_next("'\\u{10}'").unwrap(),
+            ("", lit("\\u{10}"))
+        );
+        assert_eq!(
+            char_lit.parse_next("'\\u{aa}'").unwrap(),
+            ("", lit("\\u{aa}"))
+        );
+        assert_eq!(
+            char_lit.parse_next("'\\u{10FFFF}'").unwrap(),
+            ("", lit("\\u{10FFFF}"))
+        );
 
         // Check with `b` prefix.
         assert_eq!(
-            char_lit("b'a'").unwrap(),
+            char_lit.parse_next("b'a'").unwrap(),
             ("", crate::CharLit {
                 prefix: Some(crate::CharPrefix::Binary),
                 content: "a"
@@ -1127,32 +1160,32 @@ mod test {
         );
 
         // Should fail.
-        assert!(char_lit("''").is_err());
-        assert!(char_lit("'\\o'").is_err());
-        assert!(char_lit("'\\x'").is_err());
-        assert!(char_lit("'\\x1'").is_err());
-        assert!(char_lit("'\\x80'").is_err());
-        assert!(char_lit("'\\u'").is_err());
-        assert!(char_lit("'\\u{}'").is_err());
-        assert!(char_lit("'\\u{110000}'").is_err());
+        assert!(char_lit.parse_next("''").is_err());
+        assert!(char_lit.parse_next("'\\o'").is_err());
+        assert!(char_lit.parse_next("'\\x'").is_err());
+        assert!(char_lit.parse_next("'\\x1'").is_err());
+        assert!(char_lit.parse_next("'\\x80'").is_err());
+        assert!(char_lit.parse_next("'\\u'").is_err());
+        assert!(char_lit.parse_next("'\\u{}'").is_err());
+        assert!(char_lit.parse_next("'\\u{110000}'").is_err());
     }
 
     #[test]
     fn test_str_lit() {
         assert_eq!(
-            str_lit(r#"b"hello""#).unwrap(),
+            str_lit.parse_next(r#"b"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::Binary),
                 content: "hello"
             })
         );
         assert_eq!(
-            str_lit(r#"c"hello""#).unwrap(),
+            str_lit.parse_next(r#"c"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::CLike),
                 content: "hello"
             })
         );
-        assert!(str_lit(r#"d"hello""#).is_err());
+        assert!(str_lit.parse_next(r#"d"hello""#).is_err());
     }
 }

@@ -105,7 +105,7 @@ impl<'a> Target<'a> {
         }
 
         // neither literal nor struct nor path
-        let (new_i, name) = identifier(i)?;
+        let (new_i, name) = identifier.parse_next(i)?;
         let target = match name {
             "_" => Self::Placeholder(name),
             _ => verify_name(i, name)?,
