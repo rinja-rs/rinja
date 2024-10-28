@@ -426,21 +426,18 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     }
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
-    let int_with_base = (
-        opt('-'),
-        unpeek(|i| {
-            let (i, (base, kind)) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
-                .with_recognized()
-                .parse_peek(i)?;
-            match opt(separated_digits(base, false)).parse_peek(i)? {
-                (i, Some(_)) => Ok((i, ())),
-                (_, None) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                    format!("expected digits after `{kind}`"),
-                    start,
-                ))),
-            }
-        }),
-    );
+    let int_with_base = (opt('-'), |i: &mut _| {
+        let (base, kind) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
+            .with_recognized()
+            .parse_next(i)?;
+        match opt(separated_digits(base, false)).parse_next(i)? {
+            Some(_) => Ok(()),
+            None => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                format!("expected digits after `{kind}`"),
+                start,
+            ))),
+        }
+    });
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L626-L653>:
     // no `_` directly after the decimal point `.`, or between `e` and `+/-`.
