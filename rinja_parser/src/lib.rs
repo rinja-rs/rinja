@@ -408,15 +408,15 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
         kind: &'a str,
         list: &[(&str, T)],
         start: &'a str,
-        i: &'a str,
-    ) -> InputParseResult<'a, T> {
-        let (i, suffix) = identifier.parse_peek(i)?;
+        i: &mut &'a str,
+    ) -> ParseResult<'a, T> {
+        let suffix = identifier.parse_next(i)?;
         if let Some(value) = list
             .iter()
             .copied()
             .find_map(|(name, value)| (name == suffix).then_some(value))
         {
-            Ok((i, value))
+            Ok(value)
         } else {
             Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("unknown {kind} suffix `{suffix}`"),
@@ -464,10 +464,8 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
     };
 
     let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_peek(start) {
-        let (i, suffix) = opt(unpeek(|i| {
-            num_lit_suffix("integer", INTEGER_TYPES, start, i)
-        }))
-        .parse_peek(i)?;
+        let (i, suffix) =
+            opt(|i: &mut _| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_peek(i)?;
         (i, Num::Int(num, suffix))
     } else {
         let (i, (float, num)) =
@@ -476,11 +474,11 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
                 .parse_peek(start)?;
         if float.is_some() {
             let (i, suffix) =
-                opt(unpeek(|i| num_lit_suffix("float", FLOAT_TYPES, start, i))).parse_peek(i)?;
+                opt(|i: &mut _| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_peek(i)?;
             (i, Num::Float(num, suffix))
         } else {
             let (i, suffix) =
-                opt(unpeek(|i| num_lit_suffix("number", NUM_TYPES, start, i))).parse_peek(i)?;
+                opt(|i: &mut _| num_lit_suffix("number", NUM_TYPES, start, i)).parse_peek(i)?;
             match suffix {
                 Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
                 Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
