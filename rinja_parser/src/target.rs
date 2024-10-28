@@ -119,7 +119,7 @@ impl<'a> Target<'a> {
         alt((
             unpeek(str_lit).map(Self::StrLit),
             unpeek(char_lit).map(Self::CharLit),
-            unpeek(num_lit)
+            num_lit
                 .with_recognized()
                 .map(|(num, full)| Target::NumLit(full, num)),
             bool_lit.map(Self::BoolLit),

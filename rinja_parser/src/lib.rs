@@ -403,7 +403,7 @@ pub enum Num<'a> {
     Float(&'a str, Option<FloatKind>),
 }
 
-fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
+fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
     fn num_lit_suffix<'a, T: Copy>(
         kind: &'a str,
         list: &[(&str, T)],
@@ -424,6 +424,8 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
             )))
         }
     }
+
+    let start = *i;
 
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
     let int_with_base = (opt('-'), |i: &mut _| {
@@ -463,29 +465,29 @@ fn num_lit<'a>(start: &'a str) -> InputParseResult<'a, Num<'a>> {
         }
     };
 
-    let (i, num) = if let Ok((i, Some(num))) = opt(int_with_base.recognize()).parse_peek(start) {
-        let (i, suffix) =
-            opt(|i: &mut _| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_peek(i)?;
-        (i, Num::Int(num, suffix))
+    let num = if let Ok(Some(num)) = opt(int_with_base.recognize()).parse_next(i) {
+        let suffix =
+            opt(|i: &mut _| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
+        Num::Int(num, suffix)
     } else {
-        let (i, (float, num)) = preceded((opt('-'), separated_digits(10, true)), opt(float))
+        let (float, num) = preceded((opt('-'), separated_digits(10, true)), opt(float))
             .with_recognized()
-            .parse_peek(start)?;
+            .parse_next(i)?;
         if float.is_some() {
-            let (i, suffix) =
-                opt(|i: &mut _| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_peek(i)?;
-            (i, Num::Float(num, suffix))
+            let suffix =
+                opt(|i: &mut _| num_lit_suffix("float", FLOAT_TYPES, start, i)).parse_next(i)?;
+            Num::Float(num, suffix)
         } else {
-            let (i, suffix) =
-                opt(|i: &mut _| num_lit_suffix("number", NUM_TYPES, start, i)).parse_peek(i)?;
+            let suffix =
+                opt(|i: &mut _| num_lit_suffix("number", NUM_TYPES, start, i)).parse_next(i)?;
             match suffix {
-                Some(NumKind::Int(kind)) => (i, Num::Int(num, Some(kind))),
-                Some(NumKind::Float(kind)) => (i, Num::Float(num, Some(kind))),
-                None => (i, Num::Int(num, None)),
+                Some(NumKind::Int(kind)) => Num::Int(num, Some(kind)),
+                Some(NumKind::Float(kind)) => Num::Float(num, Some(kind)),
+                None => Num::Int(num, None),
             }
         }
     };
-    Ok((i, num))
+    Ok(num)
 }
 
 /// Underscore separated digits of the given base, unless `start` is true this may start
@@ -1139,65 +1141,63 @@ mod test {
     #[test]
     fn test_num_lit() {
         // Should fail.
-        assert!(unpeek(num_lit).parse_peek(".").is_err());
+        assert!(num_lit.parse_peek(".").is_err());
         // Should succeed.
         assert_eq!(
-            unpeek(num_lit).parse_peek("1.2E-02").unwrap(),
+            num_lit.parse_peek("1.2E-02").unwrap(),
             ("", Num::Float("1.2E-02", None))
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("4e3").unwrap(),
+            num_lit.parse_peek("4e3").unwrap(),
             ("", Num::Float("4e3", None)),
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("4e+_3").unwrap(),
+            num_lit.parse_peek("4e+_3").unwrap(),
             ("", Num::Float("4e+_3", None)),
         );
         // Not supported because Rust wants a number before the `.`.
-        assert!(unpeek(num_lit).parse_peek(".1").is_err());
-        assert!(unpeek(num_lit).parse_peek(".1E-02").is_err());
+        assert!(num_lit.parse_peek(".1").is_err());
+        assert!(num_lit.parse_peek(".1E-02").is_err());
         // A `_` directly after the `.` denotes a field.
         assert_eq!(
-            unpeek(num_lit).parse_peek("1._0").unwrap(),
+            num_lit.parse_peek("1._0").unwrap(),
             ("._0", Num::Int("1", None))
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("1_.0").unwrap(),
+            num_lit.parse_peek("1_.0").unwrap(),
             ("", Num::Float("1_.0", None))
         );
         // Not supported (voluntarily because of `1..` syntax).
         assert_eq!(
-            unpeek(num_lit).parse_peek("1.").unwrap(),
+            num_lit.parse_peek("1.").unwrap(),
             (".", Num::Int("1", None))
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("1_.").unwrap(),
+            num_lit.parse_peek("1_.").unwrap(),
             (".", Num::Int("1_", None))
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("1_2.").unwrap(),
+            num_lit.parse_peek("1_2.").unwrap(),
             (".", Num::Int("1_2", None))
         );
         // Numbers with suffixes
         assert_eq!(
-            unpeek(num_lit).parse_peek("-1usize").unwrap(),
+            num_lit.parse_peek("-1usize").unwrap(),
             ("", Num::Int("-1", Some(IntKind::Usize)))
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("123_f32").unwrap(),
+            num_lit.parse_peek("123_f32").unwrap(),
             ("", Num::Float("123_", Some(FloatKind::F32)))
         );
         assert_eq!(
-            unpeek(num_lit)
-                .parse_peek("1_.2_e+_3_f64|into_isize")
-                .unwrap(),
+            num_lit.parse_peek("1_.2_e+_3_f64|into_isize").unwrap(),
             (
                 "|into_isize",
                 Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
             )
         );
         assert_eq!(
-            unpeek(num_lit).parse_peek("4e3f128").unwrap(),
+            num_lit.parse_peek("4e3f128").unwrap(),
             ("", Num::Float("4e3", Some(FloatKind::F128))),
         );
     }
