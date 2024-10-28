@@ -487,7 +487,7 @@ impl<'a> Expr<'a> {
 
     fn num(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, (num, full)) = unpeek(num_lit).with_recognized().parse_peek(i)?;
+        let (i, (num, full)) = num_lit.with_recognized().parse_peek(i)?;
         Ok((i, WithSpan::new(Expr::NumLit(full, num), start)))
     }
 
