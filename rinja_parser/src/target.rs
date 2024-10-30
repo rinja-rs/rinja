@@ -117,7 +117,7 @@ impl<'a> Target<'a> {
 
     fn lit(i: &'a str) -> InputParseResult<'a, Self> {
         alt((
-            unpeek(str_lit).map(Self::StrLit),
+            str_lit.map(Self::StrLit),
             unpeek(char_lit).map(Self::CharLit),
             num_lit
                 .with_recognized()

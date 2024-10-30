@@ -542,14 +542,14 @@ fn str_lit_without_prefix<'a>(i: &mut &'a str) -> ParseResult<'a> {
     Ok(s.unwrap_or_default())
 }
 
-fn str_lit(i: &str) -> InputParseResult<'_, StrLit<'_>> {
-    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_peek(i)?;
+fn str_lit<'a>(i: &mut &'a str) -> ParseResult<'a, StrLit<'a>> {
+    let (prefix, content) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
         _ => None,
     };
-    Ok((i, StrLit { prefix, content }))
+    Ok(StrLit { prefix, content })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1296,20 +1296,20 @@ mod test {
     #[test]
     fn test_str_lit() {
         assert_eq!(
-            unpeek(str_lit).parse_peek(r#"b"hello""#).unwrap(),
+            str_lit.parse_peek(r#"b"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::Binary),
                 content: "hello"
             })
         );
         assert_eq!(
-            unpeek(str_lit).parse_peek(r#"c"hello""#).unwrap(),
+            str_lit.parse_peek(r#"c"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::CLike),
                 content: "hello"
             })
         );
-        assert!(unpeek(str_lit).parse_peek(r#"d"hello""#).is_err());
+        assert!(str_lit.parse_peek(r#"d"hello""#).is_err());
     }
 }
 
