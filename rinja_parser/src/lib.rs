@@ -474,7 +474,7 @@ fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
     Ok((i, s.unwrap_or_default()))
 }
 
-fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
+fn str_lit(i: &str) -> ParseResult<'_, StrLit<'_>> {
     let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
@@ -497,7 +497,7 @@ pub struct CharLit<'a> {
 
 // Information about allowed character escapes is available at:
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
-fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
+fn char_lit(i: &str) -> ParseResult<'_, CharLit<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = (
         opt('b'),
