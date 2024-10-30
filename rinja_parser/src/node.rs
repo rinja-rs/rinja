@@ -864,7 +864,7 @@ impl<'a> Import<'a> {
             cut_node(
                 Some("import"),
                 (
-                    ws(unpeek(str_lit_without_prefix)),
+                    ws(str_lit_without_prefix),
                     ws(keyword("as")),
                     cut_node(
                         Some("import"),
@@ -1295,10 +1295,7 @@ impl<'a> Include<'a> {
             ws(keyword("include")),
             cut_node(
                 Some("include"),
-                (
-                    ws(unpeek(str_lit_without_prefix)),
-                    opt(unpeek(Whitespace::parse)),
-                ),
+                (ws(str_lit_without_prefix), opt(unpeek(Whitespace::parse))),
             ),
         );
         let (i, (pws, _, (path, nws))) = p.parse_peek(i)?;
@@ -1327,10 +1324,7 @@ impl<'a> Extends<'a> {
             (opt(unpeek(Whitespace::parse)), ws(keyword("extends"))),
             cut_node(
                 Some("extends"),
-                terminated(
-                    ws(unpeek(str_lit_without_prefix)),
-                    opt(unpeek(Whitespace::parse)),
-                ),
+                terminated(ws(str_lit_without_prefix), opt(unpeek(Whitespace::parse))),
             ),
         )
         .map(|path| WithSpan::new(Self { path }, start))
