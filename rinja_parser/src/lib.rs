@@ -537,15 +537,13 @@ pub struct StrLit<'a> {
     pub content: &'a str,
 }
 
-fn str_lit_without_prefix(i: &str) -> InputParseResult<'_> {
-    let (i, s) =
-        delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_peek(i)?;
-    Ok((i, s.unwrap_or_default()))
+fn str_lit_without_prefix<'a>(i: &mut &'a str) -> ParseResult<'a> {
+    let s = delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_next(i)?;
+    Ok(s.unwrap_or_default())
 }
 
 fn str_lit(i: &str) -> InputParseResult<'_, StrLit<'_>> {
-    let (i, (prefix, content)) =
-        (opt(alt(('b', 'c'))), unpeek(str_lit_without_prefix)).parse_peek(i)?;
+    let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_peek(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
         Some('c') => Some(StrPrefix::CLike),
