@@ -493,7 +493,7 @@ impl<'a> Expr<'a> {
 
     fn char(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        unpeek(char_lit)
+        char_lit
             .map(|i| WithSpan::new(Self::CharLit(i), start))
             .parse_peek(i)
     }
