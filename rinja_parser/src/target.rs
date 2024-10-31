@@ -76,7 +76,7 @@ impl<'a> Target<'a> {
             ));
         }
 
-        let path = unpeek(path_or_identifier).try_map(|v| match v {
+        let path = path_or_identifier.try_map(|v| match v {
             PathOrIdentifier::Path(v) => Ok(v),
             PathOrIdentifier::Identifier(v) => Err(v),
         });

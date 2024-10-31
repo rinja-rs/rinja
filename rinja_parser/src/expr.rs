@@ -467,7 +467,7 @@ impl<'a> Expr<'a> {
 
     fn path_var_bool(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        unpeek(path_or_identifier)
+        path_or_identifier
             .map(|v| match v {
                 PathOrIdentifier::Path(v) => Self::Path(v),
                 PathOrIdentifier::Identifier("true") => Self::BoolLit(true),

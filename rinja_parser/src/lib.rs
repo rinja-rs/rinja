@@ -680,11 +680,11 @@ enum PathOrIdentifier<'a> {
     Identifier(&'a str),
 }
 
-fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
+fn path_or_identifier<'a>(i: &mut &'a str) -> ParseResult<'a, PathOrIdentifier<'a>> {
     let root = ws(opt("::"));
     let tail = opt(repeat(1.., preceded(ws("::"), identifier)).map(|v: Vec<_>| v));
 
-    let (i, (root, start, rest)) = (root, identifier, tail).parse_peek(i)?;
+    let (root, start, rest) = (root, identifier, tail).parse_next(i)?;
     let rest = rest.as_deref().unwrap_or_default();
 
     // The returned identifier can be assumed to be path if:
@@ -697,7 +697,7 @@ fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
             path.push("");
             path.push(start);
             path.extend(rest);
-            Ok((i, PathOrIdentifier::Path(path)))
+            Ok(PathOrIdentifier::Path(path))
         }
         (None, name, [])
             if name
@@ -705,13 +705,13 @@ fn path_or_identifier(i: &str) -> InputParseResult<'_, PathOrIdentifier<'_>> {
                 .next()
                 .map_or(true, |c| c == '_' || c.is_lowercase()) =>
         {
-            Ok((i, PathOrIdentifier::Identifier(name)))
+            Ok(PathOrIdentifier::Identifier(name))
         }
         (None, start, tail) => {
             let mut path = Vec::with_capacity(1 + tail.len());
             path.push(start);
             path.extend(rest);
-            Ok((i, PathOrIdentifier::Path(path)))
+            Ok(PathOrIdentifier::Path(path))
         }
     }
 }
