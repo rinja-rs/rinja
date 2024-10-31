@@ -13,7 +13,7 @@ use std::{fmt, str};
 use winnow::ascii::escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
-use winnow::stream::AsChar;
+use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till1, take_while};
 use winnow::{Parser, unpeek};
 
@@ -565,9 +565,9 @@ pub struct CharLit<'a> {
 
 // Information about allowed character escapes is available at:
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
-fn char_lit(i: &str) -> InputParseResult<'_, CharLit<'_>> {
-    let start = i;
-    let (i, (b_prefix, s)) = (
+fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
+    let start = i.checkpoint();
+    let (b_prefix, s) = (
         opt('b'),
         delimited(
             '\'',
@@ -575,27 +575,29 @@ fn char_lit(i: &str) -> InputParseResult<'_, CharLit<'_>> {
             '\'',
         ),
     )
-        .parse_peek(i)?;
+        .parse_next(i)?;
 
     let Some(s) = s else {
+        i.reset(start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "empty character literal",
-            start,
+            *i,
         )));
     };
     let Ok(("", c)) = Char::parse(s) else {
+        i.reset(start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "invalid character",
-            start,
+            *i,
         )));
     };
 
     let (nb, max_value, err1, err2) = match c {
         Char::Literal | Char::Escaped => {
-            return Ok((i, CharLit {
+            return Ok(CharLit {
                 prefix: b_prefix.map(|_| CharPrefix::Binary),
                 content: s,
-            }));
+            });
         }
         Char::AsciiEscape(nb) => (
             nb,
@@ -614,16 +616,18 @@ fn char_lit(i: &str) -> InputParseResult<'_, CharLit<'_>> {
     };
 
     let Ok(nb) = u32::from_str_radix(nb, 16) else {
-        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err1, start)));
+        i.reset(start);
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err1, *i)));
     };
     if nb > max_value {
-        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err2, start)));
+        i.reset(start);
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err2, *i)));
     }
 
-    Ok((i, CharLit {
+    Ok(CharLit {
         prefix: b_prefix.map(|_| CharPrefix::Binary),
         content: s,
-    }))
+    })
 }
 
 /// Represents the different kinds of char declarations:
@@ -1207,75 +1211,42 @@ mod test {
             content: s,
         };
 
-        assert_eq!(unpeek(char_lit).parse_peek("'a'").unwrap(), ("", lit("a")));
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'字'").unwrap(),
-            ("", lit("字"))
-        );
+        assert_eq!(char_lit.parse_peek("'a'").unwrap(), ("", lit("a")));
+        assert_eq!(char_lit.parse_peek("'字'").unwrap(), ("", lit("字")));
 
         // Escaped single characters.
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\\"'").unwrap(),
-            ("", lit("\\\""))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\''").unwrap(),
-            ("", lit("\\'"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\t'").unwrap(),
-            ("", lit("\\t"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\n'").unwrap(),
-            ("", lit("\\n"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\r'").unwrap(),
-            ("", lit("\\r"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\0'").unwrap(),
-            ("", lit("\\0"))
-        );
+        assert_eq!(char_lit.parse_peek("'\\\"'").unwrap(), ("", lit("\\\"")));
+        assert_eq!(char_lit.parse_peek("'\\''").unwrap(), ("", lit("\\'")));
+        assert_eq!(char_lit.parse_peek("'\\t'").unwrap(), ("", lit("\\t")));
+        assert_eq!(char_lit.parse_peek("'\\n'").unwrap(), ("", lit("\\n")));
+        assert_eq!(char_lit.parse_peek("'\\r'").unwrap(), ("", lit("\\r")));
+        assert_eq!(char_lit.parse_peek("'\\0'").unwrap(), ("", lit("\\0")));
         // Escaped ascii characters (up to `0x7F`).
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\x12'").unwrap(),
-            ("", lit("\\x12"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\x02'").unwrap(),
-            ("", lit("\\x02"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\x6a'").unwrap(),
-            ("", lit("\\x6a"))
-        );
-        assert_eq!(
-            unpeek(char_lit).parse_peek("'\\x7F'").unwrap(),
-            ("", lit("\\x7F"))
-        );
+        assert_eq!(char_lit.parse_peek("'\\x12'").unwrap(), ("", lit("\\x12")));
+        assert_eq!(char_lit.parse_peek("'\\x02'").unwrap(), ("", lit("\\x02")));
+        assert_eq!(char_lit.parse_peek("'\\x6a'").unwrap(), ("", lit("\\x6a")));
+        assert_eq!(char_lit.parse_peek("'\\x7F'").unwrap(), ("", lit("\\x7F")));
         // Escaped unicode characters (up to `0x10FFFF`).
         assert_eq!(
-            unpeek(char_lit).parse_peek("'\\u{A}'").unwrap(),
+            char_lit.parse_peek("'\\u{A}'").unwrap(),
             ("", lit("\\u{A}"))
         );
         assert_eq!(
-            unpeek(char_lit).parse_peek("'\\u{10}'").unwrap(),
+            char_lit.parse_peek("'\\u{10}'").unwrap(),
             ("", lit("\\u{10}"))
         );
         assert_eq!(
-            unpeek(char_lit).parse_peek("'\\u{aa}'").unwrap(),
+            char_lit.parse_peek("'\\u{aa}'").unwrap(),
             ("", lit("\\u{aa}"))
         );
         assert_eq!(
-            unpeek(char_lit).parse_peek("'\\u{10FFFF}'").unwrap(),
+            char_lit.parse_peek("'\\u{10FFFF}'").unwrap(),
             ("", lit("\\u{10FFFF}"))
         );
 
         // Check with `b` prefix.
         assert_eq!(
-            unpeek(char_lit).parse_peek("b'a'").unwrap(),
+            char_lit.parse_peek("b'a'").unwrap(),
             ("", crate::CharLit {
                 prefix: Some(crate::CharPrefix::Binary),
                 content: "a"
@@ -1283,14 +1254,14 @@ mod test {
         );
 
         // Should fail.
-        assert!(unpeek(char_lit).parse_peek("''").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\o'").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\x'").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\x1'").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\x80'").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\u'").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\u{}'").is_err());
-        assert!(unpeek(char_lit).parse_peek("'\\u{110000}'").is_err());
+        assert!(char_lit.parse_peek("''").is_err());
+        assert!(char_lit.parse_peek("'\\o'").is_err());
+        assert!(char_lit.parse_peek("'\\x'").is_err());
+        assert!(char_lit.parse_peek("'\\x1'").is_err());
+        assert!(char_lit.parse_peek("'\\x80'").is_err());
+        assert!(char_lit.parse_peek("'\\u'").is_err());
+        assert!(char_lit.parse_peek("'\\u{}'").is_err());
+        assert!(char_lit.parse_peek("'\\u{110000}'").is_err());
     }
 
     #[test]
