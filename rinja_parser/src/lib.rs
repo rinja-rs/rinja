@@ -584,7 +584,8 @@ fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
             *i,
         )));
     };
-    let Ok(("", c)) = Char::parse(s) else {
+    let mut is = s;
+    let Ok(c) = Char::parse(&mut is) else {
         i.reset(start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "invalid character",
@@ -644,9 +645,9 @@ enum Char<'a> {
 }
 
 impl<'a> Char<'a> {
-    fn parse(i: &'a str) -> InputParseResult<'a, Self> {
+    fn parse(i: &mut &'a str) -> ParseResult<'a, Self> {
         if i.chars().count() == 1 {
-            return any.value(Self::Literal).parse_peek(i);
+            return any.value(Self::Literal).parse_next(i);
         }
         (
             '\\',
@@ -670,7 +671,7 @@ impl<'a> Char<'a> {
             )),
         )
             .map(|(_, ch)| ch)
-            .parse_peek(i)
+            .parse_next(i)
     }
 }
 
