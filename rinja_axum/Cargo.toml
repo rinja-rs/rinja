@@ -24,7 +24,6 @@ default = ["rinja/default"]
 full = ["rinja/full"]
 code-in-doc = ["rinja/code-in-doc"]
 config = ["rinja/config"]
-humansize = ["rinja/humansize"]
 serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
 

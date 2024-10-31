@@ -1657,21 +1657,15 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        _node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
-        if cfg!(not(feature = "humansize")) {
-            return Err(ctx.generate_error(
-                &format!("the `{name}` filter requires the `humansize` feature to be enabled"),
-                node,
-            ));
-        }
-
         // All filters return numbers, and any default formatted number is HTML safe.
         buf.write(format_args!(
-            "rinja::filters::HtmlSafeOutput(rinja::filters::{name}(",
+            "rinja::filters::HtmlSafeOutput(rinja::filters::{name}(\
+                 rinja::helpers::get_primitive_value(&("
         ));
         self._visit_args(ctx, buf, args)?;
-        buf.write(")?)");
+        buf.write(")) as rinja::helpers::core::primitive::f32)?)");
         Ok(DisplayWrap::Unwrapped)
     }
 
