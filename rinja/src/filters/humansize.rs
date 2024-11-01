@@ -1,5 +1,9 @@
 use std::convert::Infallible;
 use std::fmt;
+use std::mem::MaybeUninit;
+use std::str::from_utf8_unchecked;
+
+use super::FastWritable;
 
 /// Returns adequate string representation (in KB, ..) of number of bytes
 ///
@@ -26,59 +30,85 @@ pub fn filesizeformat(b: f32) -> Result<FilesizeFormatFilter, Infallible> {
 #[derive(Debug, Clone, Copy)]
 pub struct FilesizeFormatFilter(f32);
 
-struct NbAndDecimal(u32);
-impl NbAndDecimal {
-    fn new(nb: f32) -> Self {
-        // `nb` will never be bigger than 999_999 so we're fine with usize.
-        Self(nb as _)
+impl fmt::Display for FilesizeFormatFilter {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_into(f)
     }
 }
-impl fmt::Display for NbAndDecimal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sub = self.0 % 1_000 / 10;
-        if sub != 0 {
-            if sub < 10 {
-                f.write_fmt(format_args!("{}.0{sub}", self.0 / 1_000))
-            } else {
-                f.write_fmt(format_args!("{}.{sub}", self.0 / 1_000))
-            }
+
+impl FastWritable for FilesizeFormatFilter {
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        if self.0 < 1e3 {
+            (self.0 as u32).write_into(dest)?;
+            dest.write_str(" B")
+        } else if let Some((prefix, factor)) = SI_PREFIXES
+            .iter()
+            .copied()
+            .find_map(|(prefix_factor, max)| (self.0 < max).then_some(prefix_factor))
+        {
+            // u32 is big enough to hold the number 999_999
+            let scaled = (self.0 * factor) as u32;
+            (scaled / 100).write_into(dest)?;
+            dest.write_str(format_frac(&mut MaybeUninit::uninit(), prefix, scaled))
         } else {
-            f.write_fmt(format_args!("{}", self.0 / 1_000))
+            too_big(self.0, dest)
         }
     }
 }
 
-impl fmt::Display for FilesizeFormatFilter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 < 1e3 {
-            return f.write_fmt(format_args!("{} B", self.0));
-        }
-        for (unit, max, divider) in [
-            (" KB", 1e6, 1.),
-            (" MB", 1e9, 1e3),
-            (" GB", 1e12, 1e6),
-            (" TB", 1e15, 1e9),
-            (" PB", 1e18, 1e12),
-            (" EB", 1e21, 1e15),
-            (" ZB", 1e24, 1e18),
-        ] {
-            if self.0 < max {
-                f.write_fmt(format_args!("{}", NbAndDecimal::new(self.0 / divider)))?;
-                return f.write_str(unit);
-            }
-        }
-        f.write_fmt(format_args!("{} YB", NbAndDecimal::new(self.0 / 1e21)))
-    }
+/// Formats `buffer` to contain the decimal point, decimal places and unit
+fn format_frac(buffer: &mut MaybeUninit<[u8; 8]>, prefix: u8, scaled: u32) -> &str {
+    // LLVM generates better byte code for register sized buffers, so we add some NULs
+    let buffer = buffer.write(*b"..0 kB\0\0");
+    buffer[4] = prefix;
+
+    let frac = scaled % 100;
+    let buffer = if frac == 0 {
+        &buffer[3..6]
+    } else if frac % 10 == 0 {
+        // the decimal separator '.' is already contained in buffer[1]
+        buffer[2] = b'0' + (frac / 10) as u8;
+        &buffer[1..6]
+    } else {
+        // the decimal separator '.' is already contained in buffer[0]
+        buffer[1] = b'0' + (frac / 10) as u8;
+        buffer[2] = b'0' + (frac % 10) as u8;
+        &buffer[0..6]
+    };
+    // SAFETY: we know that the buffer contains only ASCII data
+    unsafe { from_utf8_unchecked(buffer) }
 }
+
+#[cold]
+fn too_big<W: fmt::Write + ?Sized>(value: f32, dest: &mut W) -> fmt::Result {
+    // the value exceeds 999 QB, so we omit the decimal places
+    write!(dest, "{:.0} QB", value / 1e30)
+}
+
+/// `((si_prefix, factor), limit)`, the factor is offset by 10**2 to account for 2 decimal places
+const SI_PREFIXES: &[((u8, f32), f32)] = &[
+    ((b'k', 1e-1), 1e6),
+    ((b'M', 1e-4), 1e9),
+    ((b'G', 1e-7), 1e12),
+    ((b'T', 1e-10), 1e15),
+    ((b'P', 1e-13), 1e18),
+    ((b'E', 1e-16), 1e21),
+    ((b'Z', 1e-19), 1e24),
+    ((b'Y', 1e-22), 1e27),
+    ((b'R', 1e-25), 1e30),
+    ((b'Q', 1e-28), 1e33),
+];
 
 #[test]
 #[allow(clippy::needless_borrows_for_generic_args)]
 fn test_filesizeformat() {
     assert_eq!(filesizeformat(0.).unwrap().to_string(), "0 B");
     assert_eq!(filesizeformat(999.).unwrap().to_string(), "999 B");
-    assert_eq!(filesizeformat(1000.).unwrap().to_string(), "1 KB");
-    assert_eq!(filesizeformat(1023.).unwrap().to_string(), "1.02 KB");
-    assert_eq!(filesizeformat(1024.).unwrap().to_string(), "1.02 KB");
+    assert_eq!(filesizeformat(1000.).unwrap().to_string(), "1 kB");
+    assert_eq!(filesizeformat(1023.).unwrap().to_string(), "1.02 kB");
+    assert_eq!(filesizeformat(1024.).unwrap().to_string(), "1.02 kB");
+    assert_eq!(filesizeformat(1100.).unwrap().to_string(), "1.1 kB");
     assert_eq!(filesizeformat(9_499_014.).unwrap().to_string(), "9.49 MB");
     assert_eq!(
         filesizeformat(954_548_589.2).unwrap().to_string(),
