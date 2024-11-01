@@ -20,7 +20,6 @@ proc-macro = true
 [features]
 code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:serde", "dep:basic-toml", "parser/config"]
-humansize = []
 urlencode = []
 serde_json = []
 with-actix-web = []

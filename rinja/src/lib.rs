@@ -72,6 +72,7 @@ pub use rinja_derive::Template;
 #[doc(hidden)]
 pub use crate as shared;
 pub use crate::error::{Error, Result};
+pub use crate::helpers::PrimitiveType;
 
 /// Main `Template` trait; implementations are generally derived
 ///

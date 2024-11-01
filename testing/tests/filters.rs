@@ -427,3 +427,18 @@ fn test_linebreaks() {
         "<p>&#60;script&#62;<br/>alert(&#39;Hello, world!&#39;)<br/>&#60;/script&#62;</p>",
     );
 }
+
+// Regression tests for <https://github.com/rinja-rs/rinja/issues/215>.
+#[test]
+fn test_filesizeformat() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% if let Some(x) = s %}{{x|filesizeformat}}{% endif %}"#,
+        ext = "html"
+    )]
+    struct S {
+        s: Option<u32>,
+    }
+
+    assert_eq!(S { s: Some(12) }.render().unwrap(), "12 B");
+}

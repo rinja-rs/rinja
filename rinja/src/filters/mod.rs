@@ -12,7 +12,6 @@
 
 mod builtin;
 mod escape;
-#[cfg(feature = "humansize")]
 mod humansize;
 #[cfg(feature = "serde_json")]
 mod json;
@@ -27,7 +26,6 @@ pub use self::escape::{
     AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
     Safe, Text, Unsafe, Writable, WriteWritable, e, escape, safe,
 };
-#[cfg(feature = "humansize")]
 pub use self::humansize::filesizeformat;
 #[cfg(feature = "serde_json")]
 pub use self::json::{AsIndent, json, json_pretty};
