@@ -188,7 +188,7 @@ impl fmt::Display for Empty {
 
 impl FastWritable for Empty {
     #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, _: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, _: &mut W) -> crate::Result<()> {
         Ok(())
     }
 }

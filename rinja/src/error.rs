@@ -64,6 +64,13 @@ impl From<fmt::Error> for Error {
     }
 }
 
+impl From<Error> for fmt::Error {
+    #[inline]
+    fn from(_: Error) -> Self {
+        Self
+    }
+}
+
 #[cfg(feature = "serde_json")]
 impl From<serde_json::Error> for Error {
     #[inline]
