@@ -118,9 +118,11 @@ impl<T: FastWritable> FastWritable for UrlencodeFilter<T> {
 struct UrlencodeWriter<W>(W, &'static AsciiSet);
 
 impl<W: fmt::Write> fmt::Write for UrlencodeWriter<W> {
-    #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        write!(self.0, "{}", utf8_percent_encode(s, self.1))
+        for s in utf8_percent_encode(s, self.1) {
+            self.0.write_str(s)?;
+        }
+        Ok(())
     }
 }
 
