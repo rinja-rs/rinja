@@ -216,12 +216,11 @@ impl<'a> Generator<'a> {
         buf.write(
             "\
                 #[inline]\
-                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::helpers::core::fmt::Result \
+                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::Result<()> \
                 where \
                     RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,\
                 {\
                     rinja::Template::render_into(self, dest)\
-                        .map_err(|_| rinja::helpers::core::fmt::Error)\
                 }\
             }",
         );

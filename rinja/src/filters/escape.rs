@@ -80,7 +80,7 @@ impl<T: fmt::Display, E: Escaper> fmt::Display for EscapeDisplay<T, E> {
 
 impl<T: FastWritable, E: Escaper> FastWritable for EscapeDisplay<T, E> {
     #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
         self.0.write_into(&mut EscapeWriter(dest, self.1))
     }
 }
@@ -301,7 +301,7 @@ const _: () = {
     // This is the fallback. The filter is not the last element of the filter chain.
     impl<T: FastWritable> FastWritable for MaybeSafe<T> {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             let inner = match self {
                 MaybeSafe::Safe(inner) => inner,
                 MaybeSafe::NeedsEscaping(inner) => inner,
@@ -336,7 +336,7 @@ const _: () = {
     }
 
     impl<T: FastWritable + ?Sized, E: Escaper> FastWritable for Wrapped<'_, T, E> {
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             match *self {
                 Wrapped::Safe(t) => t.write_into(dest),
                 Wrapped::NeedsEscaping(t, e) => EscapeDisplay(t, e).write_into(dest),
@@ -407,7 +407,7 @@ const _: () = {
     // This is the fallback. The filter is not the last element of the filter chain.
     impl<T: FastWritable> FastWritable for Safe<T> {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             self.0.write_into(dest)
         }
     }
@@ -492,7 +492,7 @@ pub struct Writable<'a, S: ?Sized>(pub &'a S);
 /// Used internally by rinja to select the appropriate [`write!()`] mechanism
 pub trait WriteWritable {
     /// Used internally by rinja to select the appropriate [`write!()`] mechanism
-    fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result;
+    fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()>;
 }
 
 /// Used internally by rinja to speed up writing some types.
@@ -500,14 +500,14 @@ pub trait WriteWritable {
 /// Types implementing this trait can be written without needing to employ an [`fmt::Formatter`].
 pub trait FastWritable {
     /// Used internally by rinja to speed up writing some types.
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result;
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()>;
 }
 
 const _: () = {
     crate::impl_for_ref! {
         impl FastWritable for T {
             #[inline]
-            fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+            fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
                 <T>::write_into(self, dest)
             }
         }
@@ -519,14 +519,14 @@ const _: () = {
         <T as Deref>::Target: FastWritable,
     {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             self.as_ref().get_ref().write_into(dest)
         }
     }
 
     impl<T: FastWritable + ToOwned> FastWritable for borrow::Cow<'_, T> {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             T::write_into(self.as_ref(), dest)
         }
     }
@@ -536,8 +536,8 @@ const _: () = {
         ($($ty:ty)*) => { $(
             impl FastWritable for $ty {
                 #[inline]
-                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-                    dest.write_str(itoa::Buffer::new().format(*self))
+                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+                    itoa::Buffer::new().format(*self).write_into(dest)
                 }
             }
         )* };
@@ -553,8 +553,8 @@ const _: () = {
         ($($id:ident)*) => { $(
             impl FastWritable for core::num::$id {
                 #[inline]
-                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-                    dest.write_str(itoa::Buffer::new().format(self.get()))
+                fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+                    self.get().write_into(dest)
                 }
             }
         )* };
@@ -567,55 +567,55 @@ const _: () = {
 
     impl FastWritable for str {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            dest.write_str(self)
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+            Ok(dest.write_str(self)?)
         }
     }
 
     impl FastWritable for String {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            dest.write_str(self)
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+            self.as_str().write_into(dest)
         }
     }
 
     impl FastWritable for bool {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            dest.write_str(match self {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+            Ok(dest.write_str(match self {
                 true => "true",
                 false => "false",
-            })
+            })?)
         }
     }
 
     impl FastWritable for char {
         #[inline]
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            dest.write_char(*self)
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+            Ok(dest.write_char(*self)?)
         }
     }
 
     impl FastWritable for fmt::Arguments<'_> {
-        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            match self.as_str() {
+        fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+            Ok(match self.as_str() {
                 Some(s) => dest.write_str(s),
                 None => dest.write_fmt(*self),
-            }
+            }?)
         }
     }
 
     impl<'a, S: FastWritable + ?Sized> WriteWritable for &Writable<'a, S> {
         #[inline]
-        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             self.0.write_into(dest)
         }
     }
 
     impl<'a, S: fmt::Display + ?Sized> WriteWritable for &&Writable<'a, S> {
         #[inline]
-        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
-            write!(dest, "{}", self.0)
+        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+            Ok(write!(dest, "{}", self.0)?)
         }
     }
 };

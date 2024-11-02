@@ -377,7 +377,7 @@ impl<S: fmt::Display> fmt::Display for TruncateFilter<S> {
 
 impl<S: FastWritable> FastWritable for TruncateFilter<S> {
     #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
         self.source
             .write_into(&mut TruncateWriter::new(dest, self.remaining))
     }
@@ -924,7 +924,7 @@ impl<S: fmt::Display, P: fmt::Display> fmt::Display for Pluralize<S, P> {
 
 impl<S: FastWritable, P: FastWritable> FastWritable for Pluralize<S, P> {
     #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
         match self {
             Pluralize::Singular(value) => value.write_into(dest),
             Pluralize::Plural(value) => value.write_into(dest),

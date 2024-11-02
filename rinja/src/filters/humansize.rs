@@ -33,15 +33,15 @@ pub struct FilesizeFormatFilter(f32);
 impl fmt::Display for FilesizeFormatFilter {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.write_into(f)
+        Ok(self.write_into(f)?)
     }
 }
 
 impl FastWritable for FilesizeFormatFilter {
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
         if self.0 < 1e3 {
             (self.0 as u32).write_into(dest)?;
-            dest.write_str(" B")
+            Ok(dest.write_str(" B")?)
         } else if let Some((prefix, factor)) = SI_PREFIXES
             .iter()
             .copied()
@@ -50,7 +50,7 @@ impl FastWritable for FilesizeFormatFilter {
             // u32 is big enough to hold the number 999_999
             let scaled = (self.0 * factor) as u32;
             (scaled / 100).write_into(dest)?;
-            dest.write_str(format_frac(&mut MaybeUninit::uninit(), prefix, scaled))
+            format_frac(&mut MaybeUninit::uninit(), prefix, scaled).write_into(dest)
         } else {
             too_big(self.0, dest)
         }
@@ -81,9 +81,9 @@ fn format_frac(buffer: &mut MaybeUninit<[u8; 8]>, prefix: u8, scaled: u32) -> &s
 }
 
 #[cold]
-fn too_big<W: fmt::Write + ?Sized>(value: f32, dest: &mut W) -> fmt::Result {
+fn too_big<W: fmt::Write + ?Sized>(value: f32, dest: &mut W) -> crate::Result<()> {
     // the value exceeds 999 QB, so we omit the decimal places
-    write!(dest, "{:.0} QB", value / 1e30)
+    Ok(write!(dest, "{:.0} QB", value / 1e30)?)
 }
 
 /// `((si_prefix, factor), limit)`, the factor is offset by 10**2 to account for 2 decimal places
