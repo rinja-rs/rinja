@@ -98,8 +98,9 @@ pub fn get_primitive_value<T: PrimitiveType>(value: T) -> T::Value {
     value.get()
 }
 
+/// A type that is, references, or wraps a [primitive][std::primitive] type
 pub trait PrimitiveType {
-    type Value;
+    type Value: Copy + Send + Sync + 'static;
 
     fn get(&self) -> Self::Value;
 }
@@ -152,17 +153,18 @@ where
 ///
 /// ```
 /// # use std::cell::Cell;
+/// # use std::num::NonZeroI16;
 /// # use std::rc::Rc;
 /// # use std::pin::Pin;
 /// # use rinja::Template;
 /// #[derive(Template)]
 /// #[template(ext = "txt", source = "{{ value as u16 }}")]
 /// struct Test<'a> {
-///     value: &'a Pin<Rc<Cell<i16>>>
+///     value: &'a Pin<Rc<Cell<NonZeroI16>>>
 /// }
 ///
 /// assert_eq!(
-///     Test { value: &Rc::pin(Cell::new(-1)) }.to_string(),
+///     Test { value: &Rc::pin(Cell::new(NonZeroI16::new(-1).unwrap())) }.to_string(),
 ///     "65535",
 /// );
 /// ```
@@ -173,6 +175,43 @@ impl<T: PrimitiveType + Copy> PrimitiveType for Cell<T> {
     fn get(&self) -> Self::Value {
         self.get().get()
     }
+}
+
+impl<T: PrimitiveType> PrimitiveType for std::num::Wrapping<T> {
+    type Value = T::Value;
+
+    #[inline]
+    fn get(&self) -> Self::Value {
+        self.0.get()
+    }
+}
+
+macro_rules! primitize_nz {
+    ($($nz:ty => $bare:ident,)+) => { $(
+        impl PrimitiveType for $nz {
+            type Value = $bare;
+
+            #[inline]
+            fn get(&self) -> Self::Value {
+                <$nz>::get(*self).get()
+            }
+        }
+    )+ };
+}
+
+primitize_nz! {
+    std::num::NonZeroI8 => i8,
+    std::num::NonZeroI16 => i16,
+    std::num::NonZeroI32 => i32,
+    std::num::NonZeroI64 => i64,
+    std::num::NonZeroI128 => i128,
+    std::num::NonZeroIsize => isize,
+    std::num::NonZeroU8 => u8,
+    std::num::NonZeroU16 => u16,
+    std::num::NonZeroU32 => u32,
+    std::num::NonZeroU64 => u64,
+    std::num::NonZeroU128 => u128,
+    std::num::NonZeroUsize => usize,
 }
 
 /// An empty element, so nothing will be written.
