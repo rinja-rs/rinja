@@ -129,14 +129,32 @@ impl AsIndent for String {
 impl AsIndent for usize {
     #[inline]
     fn as_indent(&self) -> &str {
-        const MAX_SPACES: usize = 16;
-        const SPACES: &str = match str::from_utf8(&[b' '; MAX_SPACES]) {
-            Ok(spaces) => spaces,
-            Err(_) => panic!(),
-        };
-
-        &SPACES[..(*self).min(SPACES.len())]
+        spaces(*self)
     }
+}
+
+impl AsIndent for std::num::Wrapping<usize> {
+    #[inline]
+    fn as_indent(&self) -> &str {
+        spaces(self.0)
+    }
+}
+
+impl AsIndent for std::num::NonZeroUsize {
+    #[inline]
+    fn as_indent(&self) -> &str {
+        spaces(self.get())
+    }
+}
+
+fn spaces(width: usize) -> &'static str {
+    const MAX_SPACES: usize = 16;
+    const SPACES: &str = match str::from_utf8(&[b' '; MAX_SPACES]) {
+        Ok(spaces) => spaces,
+        Err(_) => panic!(),
+    };
+
+    &SPACES[..width.min(SPACES.len())]
 }
 
 impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
