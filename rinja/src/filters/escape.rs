@@ -466,16 +466,6 @@ mark_html_safe! {
     std::num::NonZeroU64, std::num::NonZeroU128, std::num::NonZeroUsize,
 }
 
-impl<T: HtmlSafe + ?Sized> HtmlSafe for &T {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for Box<T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::Ref<'_, T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::cell::RefMut<'_, T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::rc::Rc<T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::pin::Pin<&T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::Arc<T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::MutexGuard<'_, T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockReadGuard<'_, T> {}
-impl<T: HtmlSafe + ?Sized> HtmlSafe for std::sync::RwLockWriteGuard<'_, T> {}
 impl<T: HtmlSafe> HtmlSafe for std::num::Wrapping<T> {}
 impl<T: fmt::Display> HtmlSafe for HtmlSafeOutput<T> {}
 
@@ -485,6 +475,12 @@ where
     T::Owned: HtmlSafe,
 {
 }
+
+crate::impl_for_ref! {
+    impl HtmlSafe for T {}
+}
+
+impl<T: HtmlSafe> HtmlSafe for Pin<T> {}
 
 /// Used internally by rinja to select the appropriate [`write!()`] mechanism
 pub struct Writable<'a, S: ?Sized>(pub &'a S);

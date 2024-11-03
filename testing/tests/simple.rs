@@ -1,8 +1,13 @@
 #![allow(clippy::disallowed_names)] // For the use of `foo` in test cases
 
+use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
+use std::fmt;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use rinja::Template;
+use rinja::filters::HtmlSafe;
 
 #[derive(Template)]
 #[template(path = "simple.html")]
@@ -559,4 +564,32 @@ struct SplitTemplateDeclaration;
 #[test]
 fn test_split_template_declaration() {
     assert_eq!(SplitTemplateDeclaration.to_string(), "🙂");
+}
+
+#[test]
+fn test_ref_custom_type() {
+    const TEXT: &str = "&this <is >not 'safe";
+
+    struct MySafeType;
+
+    impl HtmlSafe for MySafeType {}
+
+    impl fmt::Display for MySafeType {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(TEXT)
+        }
+    }
+
+    #[derive(Template)]
+    #[template(ext = "html", source = "{{ data }}")]
+    struct MyTemplate<'a, 'b, 'c> {
+        data: &'a mut RefMut<'b, Pin<Arc<MutexGuard<'c, MySafeType>>>>,
+    }
+
+    let mutex = Mutex::new(MySafeType);
+    let cell = RefCell::new(Arc::pin(mutex.try_lock().unwrap()));
+    let tmpl = MyTemplate {
+        data: &mut cell.try_borrow_mut().unwrap(),
+    };
+    assert_eq!(tmpl.render().unwrap(), TEXT);
 }
