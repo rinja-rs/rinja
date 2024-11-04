@@ -653,15 +653,15 @@ impl<'a> State<'a> {
         }
     }
 
-    fn nest<'b, T, F: FnOnce(&'b str) -> ParseResult<'b, T>>(
+    fn nest<'b, T, F: Parser<&'b str, T, ErrorContext<'b>>>(
         &self,
         i: &'b str,
-        callback: F,
+        mut callback: F,
     ) -> ParseResult<'b, T> {
         let prev_level = self.level.get();
         let (_, level) = prev_level.nest(i)?;
         self.level.set(level);
-        let ret = callback(i);
+        let ret = callback.parse_next(i);
         self.level.set(prev_level);
         ret
     }
