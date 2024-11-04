@@ -89,7 +89,7 @@ impl<'a> Node<'a> {
         }
 
         let start = i;
-        let (i, tag) = preceded(
+        let (mut i, tag) = preceded(
             |i: &mut _| s.tag_block_start(i),
             peek(preceded(
                 (opt(unpeek(Whitespace::parse)), unpeek(skip_ws0)),
@@ -116,7 +116,7 @@ impl<'a> Node<'a> {
             _ => return fail.parse_peek(start),
         };
 
-        let (i, node) = s.nest(i, unpeek(|i| func(i, s)))?;
+        let node = s.nest(&mut i, unpeek(|i| func(i, s)))?;
 
         let (i, closed) = cut_node(
             None,
