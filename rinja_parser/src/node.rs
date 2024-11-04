@@ -187,7 +187,7 @@ impl<'a> Node<'a> {
             (
                 opt(unpeek(Whitespace::parse)),
                 alt((
-                    (unpeek(|i| s.tag_expr_end(i))).value(true),
+                    (|i: &mut _| s.tag_expr_end(i)).value(true),
                     ws(eof).value(false),
                 )),
             ),

@@ -778,8 +778,8 @@ impl<'a> State<'a> {
         self.syntax.expr_start.value(()).parse_next(i)
     }
 
-    fn tag_expr_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.expr_end.value(()).parse_peek(i)
+    fn tag_expr_end<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
+        self.syntax.expr_end.value(()).parse_next(i)
     }
 
     fn enter_loop(&self) {
