@@ -28,7 +28,7 @@ impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         separated1(
-            unpeek(|i| s.nest(i, unpeek(|i| Self::parse_one(i, s)))),
+            |i: &mut _| s.nest(i, unpeek(|i| Self::parse_one(i, s))),
             ws("or"),
         )
         .map(|v: Vec<_>| v)

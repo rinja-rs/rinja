@@ -733,13 +733,13 @@ impl<'a> State<'a> {
 
     fn nest<'b, T, F: Parser<&'b str, T, ErrorContext<'b>>>(
         &self,
-        i: &'b str,
+        i: &mut &'b str,
         mut callback: F,
-    ) -> InputParseResult<'b, T> {
+    ) -> ParseResult<'b, T> {
         let prev_level = self.level.get();
         let (_, level) = prev_level.nest(i)?;
         self.level.set(level);
-        let ret = callback.parse_peek(i);
+        let ret = callback.parse_next(i);
         self.level.set(prev_level);
         ret
     }
