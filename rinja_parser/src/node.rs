@@ -171,7 +171,7 @@ impl<'a> Node<'a> {
     fn expr(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         let start = i;
         let (i, (pws, expr)) = preceded(
-            unpeek(|i| s.tag_expr_start(i)),
+            |i: &mut _| s.tag_expr_start(i),
             cut_node(
                 None,
                 (
