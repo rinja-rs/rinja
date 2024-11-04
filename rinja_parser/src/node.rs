@@ -1344,7 +1344,7 @@ impl<'a> Comment<'a> {
 
         fn tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Tag> {
             alt((
-                unpeek(|i| s.tag_comment_start(i)).value(Tag::Open),
+                (|i: &mut _| s.tag_comment_start(i)).value(Tag::Open),
                 unpeek(|i| s.tag_comment_end(i)).value(Tag::Close),
             ))
             .parse_peek(i)
@@ -1383,7 +1383,7 @@ impl<'a> Comment<'a> {
 
         let start = i;
         let (i, content) = preceded(
-            unpeek(|i| s.tag_comment_start(i)),
+            |i: &mut _| s.tag_comment_start(i),
             cut_node(Some("comment"), unpeek(|i| content(i, s))),
         )
         .parse_peek(i)?;

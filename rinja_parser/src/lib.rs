@@ -766,8 +766,8 @@ impl<'a> State<'a> {
         }
     }
 
-    fn tag_comment_start<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
-        self.syntax.comment_start.value(()).parse_peek(i)
+    fn tag_comment_start<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
+        self.syntax.comment_start.value(()).parse_next(i)
     }
 
     fn tag_comment_end<'i>(&self, i: &'i str) -> InputParseResult<'i, ()> {
