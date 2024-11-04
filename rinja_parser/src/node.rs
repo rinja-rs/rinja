@@ -1345,7 +1345,7 @@ impl<'a> Comment<'a> {
         fn tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Tag> {
             alt((
                 (|i: &mut _| s.tag_comment_start(i)).value(Tag::Open),
-                unpeek(|i| s.tag_comment_end(i)).value(Tag::Close),
+                (|i: &mut _| s.tag_comment_end(i)).value(Tag::Close),
             ))
             .parse_peek(i)
         }
