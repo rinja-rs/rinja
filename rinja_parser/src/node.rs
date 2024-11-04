@@ -85,7 +85,7 @@ impl<'a> Node<'a> {
         }
 
         let start = i;
-        let (j, tag) = preceded(
+        let (i, tag) = preceded(
             |i| s.tag_block_start(i),
             peek(preceded(
                 (opt(Whitespace::parse), take_till0(not_ws)),
@@ -112,7 +112,7 @@ impl<'a> Node<'a> {
             _ => return fail.parse_next(start),
         };
 
-        let (i, node) = s.nest(j, |i| func(i, s))?;
+        let (i, node) = s.nest(i, |i| func(i, s))?;
 
         let (i, closed) = cut_node(
             None,
