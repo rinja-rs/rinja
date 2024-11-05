@@ -737,7 +737,7 @@ impl<'a> State<'a> {
         mut callback: F,
     ) -> ParseResult<'b, T> {
         let prev_level = self.level.get();
-        let (_, level) = prev_level.nest(i)?;
+        let level = prev_level.nest(i)?;
         self.level.set(level);
         let ret = callback.parse_next(i);
         self.level.set(prev_level);
@@ -952,7 +952,7 @@ impl<'a> SyntaxBuilder<'a> {
 pub(crate) struct Level(u8);
 
 impl Level {
-    fn nest(self, i: &str) -> InputParseResult<'_, Level> {
+    fn nest(self, i: &str) -> ParseResult<'_, Level> {
         if self.0 >= Self::MAX_DEPTH {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "your template code is too deeply nested, or last expression is too complex",
@@ -960,7 +960,7 @@ impl Level {
             )));
         }
 
-        Ok((i, Level(self.0 + 1)))
+        Ok(Level(self.0 + 1))
     }
 
     const MAX_DEPTH: u8 = 128;
@@ -973,7 +973,7 @@ fn filter<'a>(
     let start = *i;
     let _ = ws(('|', not('|'))).parse_next(i)?;
 
-    *level = level.nest(start)?.1;
+    *level = level.nest(start)?;
     cut_err((
         ws(identifier),
         opt(unpeek(|i| Expr::arguments(i, *level, false))),
