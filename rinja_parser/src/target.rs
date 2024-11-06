@@ -1,5 +1,5 @@
 use winnow::Parser;
-use winnow::combinator::{alt, opt, preceded, separated1};
+use winnow::combinator::{alt, opt, peek, preceded, separated1};
 use winnow::token::one_of;
 
 use crate::{
@@ -130,7 +130,7 @@ impl<'a> Target<'a> {
         let start = i;
         let (i, rest) = opt(Self::rest.with_recognized()).parse_next(i)?;
         if let Some(rest) = rest {
-            let (_, chr) = ws(opt(one_of([',', ':']))).parse_next(i)?;
+            let (i, chr) = peek(ws(opt(one_of([',', ':'])))).parse_next(i)?;
             if let Some(chr) = chr {
                 return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!(
