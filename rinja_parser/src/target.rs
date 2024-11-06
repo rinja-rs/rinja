@@ -27,7 +27,7 @@ pub enum Target<'a> {
 
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
-    pub(super) fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
+    pub(super) fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         separated1(
             |i: &mut _| s.nest(i, unpeek(|i| Self::parse_one(i, s))),
             ws("or"),
@@ -37,7 +37,7 @@ impl<'a> Target<'a> {
             1 => opts.pop().unwrap(),
             _ => Self::OrChain(opts),
         })
-        .parse_peek(i)
+        .parse_next(i)
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
@@ -129,7 +129,7 @@ impl<'a> Target<'a> {
     }
 
     fn unnamed(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        alt((Self::rest, unpeek(|i| Self::parse(i, s)))).parse_next(i)
+        alt((Self::rest, |i: &mut _| Self::parse(i, s))).parse_next(i)
     }
 
     fn named(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
@@ -160,7 +160,7 @@ impl<'a> Target<'a> {
         *i = start;
         let (src, target) = (
             identifier,
-            opt(preceded(ws(':'), unpeek(|i| Self::parse(i, s)))),
+            opt(preceded(ws(':'), |i: &mut _| Self::parse(i, s))),
         )
             .parse_next(i)?;
 
