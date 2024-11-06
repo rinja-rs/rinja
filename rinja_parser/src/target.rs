@@ -170,8 +170,9 @@ impl<'a> Target<'a> {
         Ok((i, (src, target)))
     }
 
-    fn rest(start: &'a str) -> ParseResult<'a, Self> {
-        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(start)?;
+    fn rest(i: &'a str) -> ParseResult<'a, Self> {
+        let start = i;
+        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(i)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
