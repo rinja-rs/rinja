@@ -3,8 +3,9 @@ use winnow::token::one_of;
 use winnow::{Parser, unpeek};
 
 use crate::{
-    CharLit, ErrorContext, InputParseResult, Num, ParseErr, PathOrIdentifier, State, StrLit,
-    WithSpan, bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
+    CharLit, ErrorContext, InputParseResult, Num, ParseErr, ParseResult, PathOrIdentifier, State,
+    StrLit, WithSpan, bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier,
+    str_lit, ws,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -45,7 +46,7 @@ impl<'a> Target<'a> {
         let mut opt_opening_brace = opt(ws('{')).map(|o| o.is_some());
         let mut opt_opening_bracket = opt(ws('[')).map(|o| o.is_some());
 
-        let (i, lit) = opt(unpeek(Self::lit)).parse_peek(i)?;
+        let (i, lit) = opt(Self::lit).parse_peek(i)?;
         if let Some(lit) = lit {
             return Ok((i, lit));
         }
@@ -115,7 +116,7 @@ impl<'a> Target<'a> {
         Ok((i, target))
     }
 
-    fn lit(i: &'a str) -> InputParseResult<'a, Self> {
+    fn lit(i: &mut &'a str) -> ParseResult<'a, Self> {
         alt((
             str_lit.map(Self::StrLit),
             char_lit.map(Self::CharLit),
@@ -124,7 +125,7 @@ impl<'a> Target<'a> {
                 .map(|(num, full)| Target::NumLit(full, num)),
             bool_lit.map(Self::BoolLit),
         ))
-        .parse_peek(i)
+        .parse_next(i)
     }
 
     fn unnamed(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
