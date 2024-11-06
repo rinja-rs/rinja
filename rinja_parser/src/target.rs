@@ -55,7 +55,7 @@ impl<'a> Target<'a> {
         let (i, target_is_tuple) = opt_opening_paren.parse_peek(i)?;
         if target_is_tuple {
             let (i, (singleton, mut targets)) =
-                collect_targets(i, ')', unpeek(|i| Self::unnamed(i, s)))?;
+                collect_targets(i, ')', |i: &mut _| Self::unnamed(i, s))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -67,7 +67,7 @@ impl<'a> Target<'a> {
         let (i, target_is_array) = opt_opening_bracket.parse_peek(i)?;
         if target_is_array {
             let (i, (singleton, mut targets)) =
-                collect_targets(i, ']', unpeek(|i| Self::unnamed(i, s)))?;
+                collect_targets(i, ']', |i: &mut _| Self::unnamed(i, s))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -90,7 +90,7 @@ impl<'a> Target<'a> {
 
             let (i, is_unnamed_struct) = opt_opening_paren.parse_peek(i)?;
             if is_unnamed_struct {
-                let (i, (_, targets)) = collect_targets(i, ')', unpeek(|i| Self::unnamed(i, s)))?;
+                let (i, (_, targets)) = collect_targets(i, ')', |i: &mut _| Self::unnamed(i, s))?;
                 return Ok((
                     i,
                     Self::Tuple(path, only_one_rest_pattern(targets, false, "struct")?),
@@ -128,8 +128,8 @@ impl<'a> Target<'a> {
         .parse_next(i)
     }
 
-    fn unnamed(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
-        alt((unpeek(Self::rest), unpeek(|i| Self::parse(i, s)))).parse_peek(i)
+    fn unnamed(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+        alt((unpeek(Self::rest), unpeek(|i| Self::parse(i, s)))).parse_next(i)
     }
 
     fn named(i: &'a str, s: &State<'_>) -> InputParseResult<'a, (&'a str, Self)> {
