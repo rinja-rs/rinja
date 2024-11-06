@@ -126,8 +126,9 @@ impl<'a> Target<'a> {
         alt((Self::rest, |i| Self::parse(i, s))).parse_next(i)
     }
 
-    fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
-        let (i, rest) = opt(Self::rest.with_recognized()).parse_next(init_i)?;
+    fn named(i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
+        let start = i;
+        let (i, rest) = opt(Self::rest.with_recognized()).parse_next(i)?;
         if let Some(rest) = rest {
             let (_, chr) = ws(opt(one_of([',', ':']))).parse_next(i)?;
             if let Some(chr) = chr {
@@ -150,19 +151,21 @@ impl<'a> Target<'a> {
             return Ok((i, (rest.1, rest.0)));
         }
 
+        let i = start;
         let (i, (src, target)) =
-            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(init_i)?;
+            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(i)?;
 
         if src == "_" {
+            let i = start;
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot use placeholder `_` as source in named struct",
-                init_i,
+                i,
             )));
         }
 
         let target = match target {
             Some(target) => target,
-            None => verify_name(init_i, src)?,
+            None => verify_name(start, src)?,
         };
         Ok((i, (src, target)))
     }
