@@ -129,12 +129,12 @@ impl<'a> Target<'a> {
     }
 
     fn unnamed(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        alt((unpeek(Self::rest), unpeek(|i| Self::parse(i, s)))).parse_next(i)
+        alt((Self::rest, unpeek(|i| Self::parse(i, s)))).parse_next(i)
     }
 
     fn named(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
         let start = *i;
-        let rest = opt(unpeek(Self::rest).with_recognized()).parse_next(i)?;
+        let rest = opt(Self::rest.with_recognized()).parse_next(i)?;
         if let Some(rest) = rest {
             let chr = peek(ws(opt(one_of([',', ':'])))).parse_next(i)?;
             if let Some(chr) = chr {
@@ -179,13 +179,13 @@ impl<'a> Target<'a> {
         Ok((src, target))
     }
 
-    fn rest(i: &'a str) -> InputParseResult<'a, Self> {
-        let start = i;
-        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_peek(i)?;
-        Ok((
-            i,
-            Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),
-        ))
+    fn rest(i: &mut &'a str) -> ParseResult<'a, Self> {
+        let start = *i;
+        let (ident, _) = (opt((identifier, ws('@'))), "..").parse_next(i)?;
+        Ok(Self::Rest(WithSpan::new(
+            ident.map(|(ident, _)| ident),
+            start,
+        )))
     }
 }
 
