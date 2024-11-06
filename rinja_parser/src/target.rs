@@ -99,7 +99,7 @@ impl<'a> Target<'a> {
 
             let (i, is_named_struct) = opt_opening_brace.parse_peek(i)?;
             if is_named_struct {
-                let (i, (_, targets)) = collect_targets(i, '}', unpeek(|i| Self::named(i, s)))?;
+                let (i, (_, targets)) = collect_targets(i, '}', |i: &mut _| Self::named(i, s))?;
                 return Ok((i, Self::Struct(path, targets)));
             }
 
@@ -132,18 +132,18 @@ impl<'a> Target<'a> {
         alt((unpeek(Self::rest), unpeek(|i| Self::parse(i, s)))).parse_next(i)
     }
 
-    fn named(i: &'a str, s: &State<'_>) -> InputParseResult<'a, (&'a str, Self)> {
-        let start = i;
-        let (i, rest) = opt(unpeek(Self::rest).with_recognized()).parse_peek(i)?;
+    fn named(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
+        let start = *i;
+        let rest = opt(unpeek(Self::rest).with_recognized()).parse_next(i)?;
         if let Some(rest) = rest {
-            let (i, chr) = peek(ws(opt(one_of([',', ':'])))).parse_peek(i)?;
+            let chr = peek(ws(opt(one_of([',', ':'])))).parse_next(i)?;
             if let Some(chr) = chr {
                 return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!(
                         "unexpected `{chr}` character after `..`\n\
                          note that in a named struct, `..` must come last to ignore other members"
                     ),
-                    i,
+                    *i,
                 )));
             }
             if let Target::Rest(ref s) = rest.0 {
@@ -154,21 +154,21 @@ impl<'a> Target<'a> {
                     )));
                 }
             }
-            return Ok((i, (rest.1, rest.0)));
+            return Ok((rest.1, rest.0));
         }
 
-        let i = start;
-        let (i, (src, target)) = (
+        *i = start;
+        let (src, target) = (
             identifier,
             opt(preceded(ws(':'), unpeek(|i| Self::parse(i, s)))),
         )
-            .parse_peek(i)?;
+            .parse_next(i)?;
 
         if src == "_" {
-            let i = start;
+            *i = start;
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot use placeholder `_` as source in named struct",
-                i,
+                *i,
             )));
         }
 
@@ -176,7 +176,7 @@ impl<'a> Target<'a> {
             Some(target) => target,
             None => verify_name(start, src)?,
         };
-        Ok((i, (src, target)))
+        Ok((src, target))
     }
 
     fn rest(i: &'a str) -> InputParseResult<'a, Self> {
