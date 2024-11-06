@@ -102,12 +102,13 @@ impl<'a> Target<'a> {
         }
 
         // neither literal nor struct nor path
-        let (new_i, name) = identifier.parse_next(i)?;
+        let i_before_identifier = i;
+        let (i, name) = identifier.parse_next(i)?;
         let target = match name {
-            "_" => Self::Placeholder(WithSpan::new((), i)),
-            _ => verify_name(i, name)?,
+            "_" => Self::Placeholder(WithSpan::new((), i_before_identifier)),
+            _ => verify_name(i_before_identifier, name)?,
         };
-        Ok((new_i, target))
+        Ok((i, target))
     }
 
     fn lit(i: &'a str) -> ParseResult<'a, Self> {
