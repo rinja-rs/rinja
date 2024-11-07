@@ -50,7 +50,7 @@ impl<'a> Target<'a> {
         // match tuples and unused parentheses
         let (i, target_is_tuple) = opt_opening_paren.parse_next(i)?;
         if target_is_tuple {
-            let (i, (singleton, mut targets)) = collect_targets(i, s, ')', Self::unnamed)?;
+            let (i, (singleton, mut targets)) = collect_targets(i, ')', |i| Self::unnamed(i, s))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -61,7 +61,7 @@ impl<'a> Target<'a> {
         }
         let (i, target_is_array) = opt_opening_bracket.parse_next(i)?;
         if target_is_array {
-            let (i, (singleton, mut targets)) = collect_targets(i, s, ']', Self::unnamed)?;
+            let (i, (singleton, mut targets)) = collect_targets(i, ']', |i| Self::unnamed(i, s))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -71,14 +71,10 @@ impl<'a> Target<'a> {
             ));
         }
 
-        let path = |i| {
-            path_or_identifier
-                .try_map(|v| match v {
-                    PathOrIdentifier::Path(v) => Ok(v),
-                    PathOrIdentifier::Identifier(v) => Err(v),
-                })
-                .parse_next(i)
-        };
+        let path = path_or_identifier.try_map(|v| match v {
+            PathOrIdentifier::Path(v) => Ok(v),
+            PathOrIdentifier::Identifier(v) => Err(v),
+        });
 
         // match structs
         let (i, path) = opt(path).parse_next(i)?;
@@ -88,7 +84,7 @@ impl<'a> Target<'a> {
 
             let (i, is_unnamed_struct) = opt_opening_paren.parse_next(i)?;
             if is_unnamed_struct {
-                let (i, (_, targets)) = collect_targets(i, s, ')', Self::unnamed)?;
+                let (i, (_, targets)) = collect_targets(i, ')', |i| Self::unnamed(i, s))?;
                 return Ok((
                     i,
                     Self::Tuple(path, only_one_rest_pattern(targets, false, "struct")?),
@@ -97,7 +93,7 @@ impl<'a> Target<'a> {
 
             let (i, is_named_struct) = opt_opening_brace.parse_next(i)?;
             if is_named_struct {
-                let (i, (_, targets)) = collect_targets(i, s, '}', Self::named)?;
+                let (i, (_, targets)) = collect_targets(i, '}', |i| Self::named(i, s))?;
                 return Ok((i, Self::Struct(path, targets)));
             }
 
@@ -105,7 +101,7 @@ impl<'a> Target<'a> {
         }
 
         // neither literal nor struct nor path
-        let (new_i, name) = identifier(i)?;
+        let (new_i, name) = identifier.parse_next(i)?;
         let target = match name {
             "_" => Self::Placeholder(name),
             _ => verify_name(i, name)?,
@@ -194,19 +190,18 @@ fn verify_name<'a>(
 
 fn collect_targets<'a, T>(
     i: &'a str,
-    s: &State<'_>,
     delim: char,
-    mut one: impl FnMut(&'a str, &State<'_>) -> ParseResult<'a, T>,
+    one: impl Parser<&'a str, T, ErrorContext<'a>>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
-    let opt_comma = |i| ws(opt(',')).map(|o| o.is_some()).parse_next(i);
-    let mut opt_end = |i| ws(opt(one_of(delim))).map(|o| o.is_some()).parse_next(i);
+    let opt_comma = ws(opt(',')).map(|o| o.is_some());
+    let mut opt_end = ws(opt(one_of(delim))).map(|o| o.is_some());
 
     let (i, has_end) = opt_end.parse_next(i)?;
     if has_end {
         return Ok((i, (false, Vec::new())));
     }
 
-    let (i, targets) = opt(separated1(|i| one(i, s), ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
+    let (i, targets) = opt(separated1(one, ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
     let Some(targets) = targets else {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "expected comma separated list of members",
