@@ -71,14 +71,10 @@ impl<'a> Target<'a> {
             ));
         }
 
-        let path = |i| {
-            path_or_identifier
-                .try_map(|v| match v {
-                    PathOrIdentifier::Path(v) => Ok(v),
-                    PathOrIdentifier::Identifier(v) => Err(v),
-                })
-                .parse_next(i)
-        };
+        let path = path_or_identifier.try_map(|v| match v {
+            PathOrIdentifier::Path(v) => Ok(v),
+            PathOrIdentifier::Identifier(v) => Err(v),
+        });
 
         // match structs
         let (i, path) = opt(path).parse_next(i)?;
@@ -197,8 +193,8 @@ fn collect_targets<'a, T>(
     delim: char,
     one: impl Parser<&'a str, T, ErrorContext<'a>>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
-    let opt_comma = |i| ws(opt(',')).map(|o| o.is_some()).parse_next(i);
-    let mut opt_end = |i| ws(opt(one_of(delim))).map(|o| o.is_some()).parse_next(i);
+    let opt_comma = ws(opt(',')).map(|o| o.is_some());
+    let mut opt_end = ws(opt(one_of(delim))).map(|o| o.is_some());
 
     let (i, has_end) = opt_end.parse_next(i)?;
     if has_end {
