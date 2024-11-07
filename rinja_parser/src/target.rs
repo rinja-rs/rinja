@@ -52,10 +52,10 @@ impl<'a> Target<'a> {
         }
 
         // match tuples and unused parentheses
-        let (i, target_is_tuple) = opt_opening_paren.parse_peek(i)?;
+        let (mut i, target_is_tuple) = opt_opening_paren.parse_peek(i)?;
         if target_is_tuple {
-            let (i, (singleton, mut targets)) =
-                collect_targets(i, ')', |i: &mut _| Self::unnamed(i, s))?;
+            let (singleton, mut targets) =
+                collect_targets(&mut i, ')', |i: &mut _| Self::unnamed(i, s))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -64,10 +64,10 @@ impl<'a> Target<'a> {
                 Self::Tuple(Vec::new(), only_one_rest_pattern(targets, false, "tuple")?),
             ));
         }
-        let (i, target_is_array) = opt_opening_bracket.parse_peek(i)?;
+        let (mut i, target_is_array) = opt_opening_bracket.parse_peek(i)?;
         if target_is_array {
-            let (i, (singleton, mut targets)) =
-                collect_targets(i, ']', |i: &mut _| Self::unnamed(i, s))?;
+            let (singleton, mut targets) =
+                collect_targets(&mut i, ']', |i: &mut _| Self::unnamed(i, s))?;
             if singleton {
                 return Ok((i, targets.pop().unwrap()));
             }
@@ -88,18 +88,18 @@ impl<'a> Target<'a> {
             let i_before_matching_with = i;
             let (i, _) = opt(ws(keyword("with"))).parse_peek(i)?;
 
-            let (i, is_unnamed_struct) = opt_opening_paren.parse_peek(i)?;
+            let (mut i, is_unnamed_struct) = opt_opening_paren.parse_peek(i)?;
             if is_unnamed_struct {
-                let (i, (_, targets)) = collect_targets(i, ')', |i: &mut _| Self::unnamed(i, s))?;
+                let (_, targets) = collect_targets(&mut i, ')', |i: &mut _| Self::unnamed(i, s))?;
                 return Ok((
                     i,
                     Self::Tuple(path, only_one_rest_pattern(targets, false, "struct")?),
                 ));
             }
 
-            let (i, is_named_struct) = opt_opening_brace.parse_peek(i)?;
+            let (mut i, is_named_struct) = opt_opening_brace.parse_peek(i)?;
             if is_named_struct {
-                let (i, (_, targets)) = collect_targets(i, '}', |i: &mut _| Self::named(i, s))?;
+                let (_, targets) = collect_targets(&mut i, '}', |i: &mut _| Self::named(i, s))?;
                 return Ok((i, Self::Struct(path, targets)));
             }
 
@@ -203,37 +203,37 @@ fn verify_name<'a>(
 }
 
 fn collect_targets<'a, T>(
-    i: &'a str,
+    i: &mut &'a str,
     delim: char,
     one: impl Parser<&'a str, T, ErrorContext<'a>>,
-) -> InputParseResult<'a, (bool, Vec<T>)> {
+) -> ParseResult<'a, (bool, Vec<T>)> {
     let opt_comma = ws(opt(',')).map(|o| o.is_some());
     let mut opt_end = ws(opt(one_of(delim))).map(|o| o.is_some());
 
-    let (i, has_end) = opt_end.parse_peek(i)?;
+    let has_end = opt_end.parse_next(i)?;
     if has_end {
-        return Ok((i, (false, Vec::new())));
+        return Ok((false, Vec::new()));
     }
 
-    let (i, targets) = opt(separated1(one, ws(',')).map(|v: Vec<_>| v)).parse_peek(i)?;
+    let targets = opt(separated1(one, ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
     let Some(targets) = targets else {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "expected comma separated list of members",
-            i,
+            *i,
         )));
     };
 
-    let (i, (has_comma, has_end)) = (opt_comma, opt_end).parse_peek(i)?;
+    let (has_comma, has_end) = (opt_comma, opt_end).parse_next(i)?;
     if !has_end {
         let msg = match has_comma {
             true => format!("expected member, or `{delim}` as terminator"),
             false => format!("expected `,` for more members, or `{delim}` as terminator"),
         };
-        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(msg, i)));
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(msg, *i)));
     }
 
     let singleton = !has_comma && targets.len() == 1;
-    Ok((i, (singleton, targets)))
+    Ok((singleton, targets))
 }
 
 fn only_one_rest_pattern<'a>(
