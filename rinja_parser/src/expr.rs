@@ -10,9 +10,9 @@ use winnow::error::{ErrorKind, ParserError as _};
 use winnow::{Parser, unpeek};
 
 use crate::{
-    CharLit, ErrorContext, InputParseResult, Level, Num, ParseErr, PathOrIdentifier, Span, StrLit,
-    WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
-    skip_ws1, str_lit, ws,
+    CharLit, ErrorContext, InputParseResult, Level, Num, ParseErr, ParseResult, PathOrIdentifier,
+    Span, StrLit, WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier,
+    skip_ws0, skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -579,7 +579,7 @@ impl<'a> Suffix<'a> {
                 unpeek(Self::attr),
                 unpeek(|i| Self::index(i, level)),
                 unpeek(|i| Self::call(i, level)),
-                unpeek(Self::r#try),
+                Self::r#try,
                 unpeek(Self::r#macro),
             )))
             .parse_peek(i)?;
@@ -699,7 +699,7 @@ impl<'a> Suffix<'a> {
             .parse_peek(i)
     }
 
-    fn r#try(i: &'a str) -> InputParseResult<'a, Self> {
-        preceded(skip_ws0, '?').map(|_| Self::Try).parse_peek(i)
+    fn r#try(i: &mut &'a str) -> ParseResult<'a, Self> {
+        preceded(skip_ws0, '?').map(|_| Self::Try).parse_next(i)
     }
 }
