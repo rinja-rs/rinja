@@ -873,7 +873,7 @@ impl<'a> Generator<'a> {
             buf.write('{');
             this.prepare_ws(def.ws1);
 
-            let mut named_arguments = HashMap::default();
+            let mut named_arguments: HashMap<&str, _, FxBuildHasher> = HashMap::default();
             // Since named arguments can only be passed last, we only need to check if the last argument
             // is a named one.
             if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
@@ -888,7 +888,7 @@ impl<'a> Generator<'a> {
                             call,
                         ));
                     }
-                    named_arguments.insert(Cow::Borrowed(arg_name), (index, arg));
+                    named_arguments.insert(arg_name, (index, arg));
                 }
             }
 
@@ -904,7 +904,7 @@ impl<'a> Generator<'a> {
             let mut allow_positional = true;
             let mut used_named_args = std::collections::HashSet::with_capacity(named_arguments.len());
             for (index, (arg, default_value)) in def.args.iter().enumerate() {
-                let expr = if let Some((index, expr)) = named_arguments.get(&Cow::Borrowed(arg)) {
+                let expr = if let Some((index, expr)) = named_arguments.get(arg) {
                     used_named_args.insert(*index);
                     allow_positional = false;
                     expr
