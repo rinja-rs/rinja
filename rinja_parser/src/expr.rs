@@ -578,7 +578,7 @@ impl<'a> Suffix<'a> {
             let (j, suffix) = opt(alt((
                 unpeek(Self::attr),
                 unpeek(|i| Self::index(i, level)),
-                unpeek(|i| Self::call(i, level)),
+                |i: &mut _| Self::call(i, level),
                 Self::r#try,
                 unpeek(Self::r#macro),
             )))
@@ -692,11 +692,11 @@ impl<'a> Suffix<'a> {
         .parse_peek(i)
     }
 
-    fn call(i: &'a str, level: Level) -> InputParseResult<'a, Self> {
+    fn call(i: &mut &'a str, level: Level) -> ParseResult<'a, Self> {
         let level = level.nest(i)?;
         unpeek(move |i| Expr::arguments(i, level, false))
             .map(Self::Call)
-            .parse_peek(i)
+            .parse_next(i)
     }
 
     fn r#try(i: &mut &'a str) -> ParseResult<'a, Self> {
