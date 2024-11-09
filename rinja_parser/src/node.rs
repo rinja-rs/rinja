@@ -3,8 +3,9 @@ use std::str;
 
 use winnow::Parser;
 use winnow::combinator::{
-    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated0, separated1,
+    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated1,
 };
+use winnow::sequence::terminated;
 use winnow::token::{any, tag, take_till0};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
@@ -603,22 +604,38 @@ fn check_duplicated_name<'a>(
 
 impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let level = s.level.get();
         #[allow(clippy::type_complexity)]
-        fn parameters(i: &str) -> ParseResult<'_, Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>> {
-            delimited(
-                ws('('),
-                separated0(
+        let parameters =
+            |i| -> ParseResult<'_, Option<Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>>> {
+                let (i, args) = opt(preceded(
+                    '(',
                     (
-                        ws(identifier),
-                        opt((ws('='), ws(|i| Expr::parse(i, crate::Level::default())))
-                            .map(|(_, value)| value)),
+                        opt(terminated(
+                            separated1(
+                                (
+                                    ws(identifier),
+                                    opt(preceded('=', ws(|i| Expr::parse(i, level)))),
+                                ),
+                                ',',
+                            ),
+                            opt(','),
+                        )),
+                        ws(opt(')')),
                     ),
-                    ',',
-                ),
-                (opt(ws(',')), ')'),
-            )
-            .parse_next(i)
-        }
+                ))
+                .parse_next(i)?;
+                match args {
+                    Some((args, Some(_))) => Ok((i, args)),
+                    Some((_, None)) => {
+                        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                            "expected `)` to close macro argument list",
+                            i,
+                        )));
+                    }
+                    None => Ok((i, None)),
+                }
+            };
 
         let start_s = i;
         let mut start = (
@@ -626,12 +643,9 @@ impl<'a> Macro<'a> {
             ws(keyword("macro")),
             cut_node(
                 Some("macro"),
-                (
-                    ws(identifier),
-                    opt(ws(parameters)),
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
-                ),
+                (ws(identifier), parameters, opt(Whitespace::parse), |i| {
+                    s.tag_block_end(i)
+                }),
             ),
         );
         let (j, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
