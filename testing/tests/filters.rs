@@ -6,14 +6,14 @@ use rinja::Template;
 #[cfg(feature = "serde_json")]
 use serde_json::Value;
 
-#[derive(Template)]
-#[template(path = "filters.html")]
-struct TestTemplate {
-    strvar: String,
-}
-
 #[test]
 fn filter_escape() {
+    #[derive(Template)]
+    #[template(path = "filters.html")]
+    struct TestTemplate {
+        strvar: String,
+    }
+
     let s = TestTemplate {
         strvar: "// my <html> is \"unsafe\" & should be 'escaped'".to_string(),
     };
@@ -24,20 +24,20 @@ fn filter_escape() {
     );
 }
 
-#[derive(Template)]
-#[template(
-    source = "{{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape(\"none\") }}
+#[test]
+fn filter_opt_escaper_none() {
+    #[derive(Template)]
+    #[template(
+        source = "{{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape(\"none\") }}
 {{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape(\"html\") }}
 {{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape }}
 {{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\" }}
 ",
-    ext = "txt",
-    escape = "none"
-)]
-struct OptEscaperNoneTemplate;
+        ext = "txt",
+        escape = "none"
+    )]
+    struct OptEscaperNoneTemplate;
 
-#[test]
-fn filter_opt_escaper_none() {
     let t = OptEscaperNoneTemplate;
     assert_eq!(
         t.render().unwrap(),
@@ -49,20 +49,20 @@ fn filter_opt_escaper_none() {
     );
 }
 
-#[derive(Template)]
-#[template(
-    source = "{{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape(\"none\") }}
+#[test]
+fn filter_opt_escaper_html() {
+    #[derive(Template)]
+    #[template(
+        source = "{{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape(\"none\") }}
 {{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape(\"html\") }}
 {{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\"|escape }}
 {{ \"<h1 class=\\\"title\\\">Foo Bar</h1>\" }}
 ",
-    ext = "txt",
-    escape = "html"
-)]
-struct OptEscaperHtmlTemplate;
+        ext = "txt",
+        escape = "html"
+    )]
+    struct OptEscaperHtmlTemplate;
 
-#[test]
-fn filter_opt_escaper_html() {
     let t = OptEscaperHtmlTemplate;
     assert_eq!(
         t.render().unwrap(),
@@ -74,34 +74,28 @@ fn filter_opt_escaper_html() {
     );
 }
 
-#[derive(Template)]
-#[template(path = "format.html", escape = "none")]
-struct FormatTemplate<'a> {
-    var: &'a str,
-}
-
 #[test]
 fn filter_format() {
+    #[derive(Template)]
+    #[template(path = "format.html", escape = "none")]
+    struct FormatTemplate<'a> {
+        var: &'a str,
+    }
+
     let t = FormatTemplate { var: "formatted" };
     assert_eq!(t.render().unwrap(), "\"formatted\"");
 }
 
-#[derive(Template)]
-#[template(source = "{{ var|fmt(\"{:?}\") }}", ext = "html", escape = "none")]
-struct FmtTemplate<'a> {
-    var: &'a str,
-}
-
 #[test]
 fn filter_fmt() {
+    #[derive(Template)]
+    #[template(source = "{{ var|fmt(\"{:?}\") }}", ext = "html", escape = "none")]
+    struct FmtTemplate<'a> {
+        var: &'a str,
+    }
+
     let t = FmtTemplate { var: "formatted" };
     assert_eq!(t.render().unwrap(), "\"formatted\"");
-}
-
-#[derive(Template)]
-#[template(source = "{{ s|myfilter }}", ext = "txt")]
-struct MyFilterTemplate<'a> {
-    s: &'a str,
 }
 
 mod filters {
@@ -116,32 +110,38 @@ mod filters {
 
 #[test]
 fn test_my_filter() {
+    #[derive(Template)]
+    #[template(source = "{{ s|myfilter }}", ext = "txt")]
+    struct MyFilterTemplate<'a> {
+        s: &'a str,
+    }
+
     let t = MyFilterTemplate { s: "foo" };
     assert_eq!(t.render().unwrap(), "faa");
 }
 
-#[derive(Template)]
-#[template(path = "filters_join.html")]
-struct JoinTemplate<'a> {
-    s: &'a [&'a str],
-}
-
 #[test]
 fn test_join() {
+    #[derive(Template)]
+    #[template(path = "filters_join.html")]
+    struct JoinTemplate<'a> {
+        s: &'a [&'a str],
+    }
+
     let t = JoinTemplate {
         s: &["foo", "bar", "bazz"],
     };
     assert_eq!(t.render().unwrap(), "foo, bar, bazz");
 }
 
-#[derive(Template)]
-#[template(path = "filters_join.html")]
-struct VecJoinTemplate {
-    s: Vec<String>,
-}
-
 #[test]
 fn test_vec_join() {
+    #[derive(Template)]
+    #[template(path = "filters_join.html")]
+    struct VecJoinTemplate {
+        s: Vec<String>,
+    }
+
     let t = VecJoinTemplate {
         s: vec!["foo".into(), "bar".into(), "bazz".into()],
     };
@@ -149,22 +149,21 @@ fn test_vec_join() {
 }
 
 #[cfg(feature = "serde_json")]
-#[derive(Template)]
-#[template(
-    source = r#"{
+#[test]
+fn test_json() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{
   "foo": "{{ foo }}",
   "bar": {{ bar|json|safe }}
 }"#,
-    ext = "txt"
-)]
-struct JsonTemplate<'a> {
-    foo: &'a str,
-    bar: &'a Value,
-}
+        ext = "txt"
+    )]
+    struct JsonTemplate<'a> {
+        foo: &'a str,
+        bar: &'a Value,
+    }
 
-#[cfg(feature = "serde_json")]
-#[test]
-fn test_json() {
     let val = json!({"arr": [ "one", 2, true, null ]});
     let t = JsonTemplate {
         foo: "a",
@@ -180,22 +179,21 @@ fn test_json() {
 }
 
 #[cfg(feature = "serde_json")]
-#[derive(Template)]
-#[template(
-    source = r#"{
+#[test]
+fn test_pretty_json() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{
   "foo": "{{ foo }}",
   "bar": {{ bar|json(2)|safe }}
 }"#,
-    ext = "txt"
-)]
-struct PrettyJsonTemplate<'a> {
-    foo: &'a str,
-    bar: &'a Value,
-}
+        ext = "txt"
+    )]
+    struct PrettyJsonTemplate<'a> {
+        foo: &'a str,
+        bar: &'a Value,
+    }
 
-#[cfg(feature = "serde_json")]
-#[test]
-fn test_pretty_json() {
     let val = json!({"arr": [ "one", 2, true, null ]});
     let t = PrettyJsonTemplate {
         foo: "a",
@@ -219,16 +217,15 @@ fn test_pretty_json() {
 }
 
 #[cfg(feature = "serde_json")]
-#[derive(Template)]
-#[template(source = r#"{{ bar|json(indent)|safe }}"#, ext = "txt")]
-struct DynamicJsonTemplate<'a> {
-    bar: &'a Value,
-    indent: &'a str,
-}
-
-#[cfg(feature = "serde_json")]
 #[test]
 fn test_dynamic_json() {
+    #[derive(Template)]
+    #[template(source = r#"{{ bar|json(indent)|safe }}"#, ext = "txt")]
+    struct DynamicJsonTemplate<'a> {
+        bar: &'a Value,
+        indent: &'a str,
+    }
+
     let val = json!({"arr": ["one", 2]});
     let t = DynamicJsonTemplate {
         bar: &val,
@@ -245,40 +242,40 @@ fn test_dynamic_json() {
     );
 }
 
-#[derive(Template)]
-#[template(source = "{{ x|mytrim|safe }}", ext = "html")]
-struct NestedFilterTemplate {
-    x: String,
-}
-
 #[test]
 fn test_nested_filter_ref() {
+    #[derive(Template)]
+    #[template(source = "{{ x|mytrim|safe }}", ext = "html")]
+    struct NestedFilterTemplate {
+        x: String,
+    }
+
     let t = NestedFilterTemplate {
         x: " floo & bar".to_string(),
     };
     assert_eq!(t.render().unwrap(), "floo & bar");
 }
 
-#[derive(Template)]
-#[template(
-    source = "{% let p = baz.print(foo.as_ref()) %}{{ p|upper }}",
-    ext = "html"
-)]
-struct FilterLetFilterTemplate {
-    foo: String,
-    baz: Baz,
-}
-
-struct Baz {}
-
-impl Baz {
-    fn print(&self, s: &str) -> String {
-        s.trim().to_owned()
-    }
-}
-
 #[test]
 fn test_filter_let_filter() {
+    #[derive(Template)]
+    #[template(
+        source = "{% let p = baz.print(foo.as_ref()) %}{{ p|upper }}",
+        ext = "html"
+    )]
+    struct FilterLetFilterTemplate {
+        foo: String,
+        baz: Baz,
+    }
+
+    struct Baz {}
+
+    impl Baz {
+        fn print(&self, s: &str) -> String {
+            s.trim().to_owned()
+        }
+    }
+
     let t = FilterLetFilterTemplate {
         foo: " bar ".to_owned(),
         baz: Baz {},
@@ -286,14 +283,14 @@ fn test_filter_let_filter() {
     assert_eq!(t.render().unwrap(), "BAR");
 }
 
-#[derive(Template)]
-#[template(source = "{{ foo|truncate(10) }}{{ foo|truncate(5) }}", ext = "txt")]
-struct TruncateFilter {
-    foo: String,
-}
-
 #[test]
 fn test_filter_truncate() {
+    #[derive(Template)]
+    #[template(source = "{{ foo|truncate(10) }}{{ foo|truncate(5) }}", ext = "txt")]
+    struct TruncateFilter {
+        foo: String,
+    }
+
     let t = TruncateFilter {
         foo: "alpha bar".into(),
     };
@@ -301,15 +298,14 @@ fn test_filter_truncate() {
 }
 
 #[cfg(feature = "serde_json")]
-#[derive(Template)]
-#[template(source = r#"<li data-name="{{name|json}}"></li>"#, ext = "html")]
-struct JsonAttributeTemplate<'a> {
-    name: &'a str,
-}
-
-#[cfg(feature = "serde_json")]
 #[test]
 fn test_json_attribute() {
+    #[derive(Template)]
+    #[template(source = r#"<li data-name="{{name|json}}"></li>"#, ext = "html")]
+    struct JsonAttributeTemplate<'a> {
+        name: &'a str,
+    }
+
     let t = JsonAttributeTemplate {
         name: r#""><button>Hacked!</button>"#,
     };
@@ -320,15 +316,14 @@ fn test_json_attribute() {
 }
 
 #[cfg(feature = "serde_json")]
-#[derive(Template)]
-#[template(source = r#"<li data-name='{{name|json|safe}}'></li>"#, ext = "html")]
-struct JsonAttribute2Template<'a> {
-    name: &'a str,
-}
-
-#[cfg(feature = "serde_json")]
 #[test]
 fn test_json_attribute2() {
+    #[derive(Template)]
+    #[template(source = r#"<li data-name='{{name|json|safe}}'></li>"#, ext = "html")]
+    struct JsonAttribute2Template<'a> {
+        name: &'a str,
+    }
+
     let t = JsonAttribute2Template {
         name: r"'><button>Hacked!</button>",
     };
@@ -339,18 +334,17 @@ fn test_json_attribute2() {
 }
 
 #[cfg(feature = "serde_json")]
-#[derive(Template)]
-#[template(
-    source = r#"<script>var user = {{name|json|safe}}</script>"#,
-    ext = "html"
-)]
-struct JsonScriptTemplate<'a> {
-    name: &'a str,
-}
-
-#[cfg(feature = "serde_json")]
 #[test]
 fn test_json_script() {
+    #[derive(Template)]
+    #[template(
+        source = r#"<script>var user = {{name|json|safe}}</script>"#,
+        ext = "html"
+    )]
+    struct JsonScriptTemplate<'a> {
+        name: &'a str,
+    }
+
     let t = JsonScriptTemplate {
         name: r"</script><button>Hacked!</button>",
     };
@@ -360,19 +354,19 @@ fn test_json_script() {
     );
 }
 
-#[derive(rinja::Template)]
-#[template(
-    source = r#"{% let word = s|ref %}{{ word }}
-{%- let hello = String::from("hello") %}
-{%- if word|deref == hello %}1{% else %}2{% endif %}"#,
-    ext = "html"
-)]
-struct LetBorrow {
-    s: String,
-}
-
 #[test]
 fn test_let_borrow() {
+    #[derive(rinja::Template)]
+    #[template(
+        source = r#"{% let word = s|ref %}{{ word }}
+{%- let hello = String::from("hello") %}
+{%- if word|deref == hello %}1{% else %}2{% endif %}"#,
+        ext = "html"
+    )]
+    struct LetBorrow {
+        s: String,
+    }
+
     let template = LetBorrow {
         s: "hello".to_owned(),
     };

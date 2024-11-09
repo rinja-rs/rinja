@@ -9,16 +9,16 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use rinja::Template;
 use rinja::filters::HtmlSafe;
 
-#[derive(Template)]
-#[template(path = "simple.html")]
-struct VariablesTemplate<'a> {
-    strvar: &'a str,
-    num: i64,
-    i18n: String,
-}
-
 #[test]
 fn test_variables() {
+    #[derive(Template)]
+    #[template(path = "simple.html")]
+    struct VariablesTemplate<'a> {
+        strvar: &'a str,
+        num: i64,
+        i18n: String,
+    }
+
     let s = VariablesTemplate {
         strvar: "foo",
         num: 42,
@@ -34,29 +34,29 @@ fn test_variables() {
     assert_eq!(VariablesTemplate::EXTENSION, Some("html"));
 }
 
-#[derive(Template)]
-#[template(path = "hello.html")]
-struct EscapeTemplate<'a> {
-    name: &'a str,
-}
-
 #[test]
 fn test_escape() {
+    #[derive(Template)]
+    #[template(path = "hello.html")]
+    struct EscapeTemplate<'a> {
+        name: &'a str,
+    }
+
     let s = EscapeTemplate { name: "<>&\"'" };
 
     assert_eq!(s.render().unwrap(), "Hello, &#60;&#62;&#38;&#34;&#39;!");
 }
 
-#[derive(Template)]
-#[template(path = "simple-no-escape.txt")]
-struct VariablesTemplateNoEscape<'a> {
-    strvar: &'a str,
-    num: i64,
-    i18n: String,
-}
-
 #[test]
 fn test_variables_no_escape() {
+    #[derive(Template)]
+    #[template(path = "simple-no-escape.txt")]
+    struct VariablesTemplateNoEscape<'a> {
+        strvar: &'a str,
+        num: i64,
+        i18n: String,
+    }
+
     let s = VariablesTemplateNoEscape {
         strvar: "foo",
         num: 42,
@@ -71,69 +71,73 @@ fn test_variables_no_escape() {
     );
 }
 
-#[derive(Template)]
-#[template(
-    source = "{{ foo }} {{ foo_bar }} {{ FOO }} {{ FOO_BAR }} {{ self::FOO }} {{ self::FOO_BAR }} {{ Self::BAR }} {{ Self::BAR_BAZ }}",
-    ext = "txt"
-)]
-struct ConstTemplate {
-    foo: &'static str,
-    foo_bar: &'static str,
-}
+mod test_constants {
+    use rinja::Template;
 
-impl ConstTemplate {
-    const BAR: &'static str = "BAR";
-    const BAR_BAZ: &'static str = "BAR BAZ";
-}
+    const FOO: &str = "FOO";
+    const FOO_BAR: &str = "FOO BAR";
 
-#[test]
-fn test_constants() {
-    let t = ConstTemplate {
-        foo: "foo",
-        foo_bar: "foo bar",
-    };
-    assert_eq!(
-        t.render().unwrap(),
-        "foo foo bar FOO FOO BAR FOO FOO BAR BAR BAR BAZ"
-    );
-}
+    #[derive(Template)]
+    #[template(
+        source = "{{ foo }} {{ foo_bar }} {{ FOO }} {{ FOO_BAR }} {{ self::FOO }} {{ self::FOO_BAR }} {{ Self::BAR }} {{ Self::BAR_BAZ }}",
+        ext = "txt"
+    )]
+    struct ConstTemplate {
+        foo: &'static str,
+        foo_bar: &'static str,
+    }
 
-const FOO: &str = "FOO";
-const FOO_BAR: &str = "FOO BAR";
+    impl ConstTemplate {
+        const BAR: &'static str = "BAR";
+        const BAR_BAZ: &'static str = "BAR BAZ";
+    }
 
-#[derive(Template)]
-#[template(path = "if.html")]
-struct IfTemplate {
-    cond: bool,
+    #[test]
+    fn test_constants() {
+        let t = ConstTemplate {
+            foo: "foo",
+            foo_bar: "foo bar",
+        };
+        assert_eq!(
+            t.render().unwrap(),
+            "foo foo bar FOO FOO BAR FOO FOO BAR BAR BAR BAZ"
+        );
+    }
 }
 
 #[test]
 fn test_if() {
+    #[derive(Template)]
+    #[template(path = "if.html")]
+    struct IfTemplate {
+        cond: bool,
+    }
+
     let s = IfTemplate { cond: true };
     assert_eq!(s.render().unwrap(), "true");
 }
 
-#[derive(Template)]
-#[template(path = "else.html")]
-struct ElseTemplate {
-    cond: bool,
-}
-
 #[test]
 fn test_else() {
+    #[derive(Template)]
+    #[template(path = "else.html")]
+    struct ElseTemplate {
+        cond: bool,
+    }
+
     let s = ElseTemplate { cond: false };
     assert_eq!(s.render().unwrap(), "false");
 }
 
-#[derive(Template)]
-#[template(path = "else-if.html")]
-struct ElseIfTemplate {
-    cond: bool,
-    check: bool,
-}
-
 #[test]
 fn test_else_if() {
+    #[derive(Template)]
+    #[template(path = "else-if.html")]
+    struct ElseIfTemplate {
+        cond: bool,
+        check: bool,
+    }
+
     let s = ElseIfTemplate {
         cond: false,
         check: true,
@@ -141,22 +145,22 @@ fn test_else_if() {
     assert_eq!(s.render().unwrap(), "checked");
 }
 
-#[derive(Template)]
-#[template(path = "literals.html")]
-struct LiteralsTemplate {}
-
 #[test]
 fn test_literals() {
+    #[derive(Template)]
+    #[template(path = "literals.html")]
+    struct LiteralsTemplate {}
+
     let s = LiteralsTemplate {};
     assert_eq!(s.render().unwrap(), "a\na\ntrue\nfalse");
 }
 
-#[derive(Template)]
-#[template(path = "literals-escape.html")]
-struct LiteralsEscapeTemplate {}
-
 #[test]
 fn test_literals_escape() {
+    #[derive(Template)]
+    #[template(path = "literals-escape.html")]
+    struct LiteralsEscapeTemplate {}
+
     let s = LiteralsEscapeTemplate {};
     assert_eq!(
         s.render().unwrap(),
@@ -164,50 +168,54 @@ fn test_literals_escape() {
     );
 }
 
-struct Holder {
-    a: usize,
-}
-
-#[derive(Template)]
-#[template(path = "attr.html")]
-struct AttrTemplate {
-    inner: Holder,
-}
-
 #[test]
 fn test_attr() {
+    struct Holder {
+        a: usize,
+    }
+
+    #[derive(Template)]
+    #[template(path = "attr.html")]
+    struct AttrTemplate {
+        inner: Holder,
+    }
+
     let t = AttrTemplate {
         inner: Holder { a: 5 },
     };
     assert_eq!(t.render().unwrap(), "5");
 }
 
-#[derive(Template)]
-#[template(path = "tuple-attr.html")]
-struct TupleAttrTemplate<'a> {
-    tuple: (&'a str, &'a str),
-}
-
 #[test]
 fn test_tuple_attr() {
+    #[derive(Template)]
+    #[template(path = "tuple-attr.html")]
+    struct TupleAttrTemplate<'a> {
+        tuple: (&'a str, &'a str),
+    }
+
     let t = TupleAttrTemplate {
         tuple: ("foo", "bar"),
     };
     assert_eq!(t.render().unwrap(), "foobar");
 }
 
-struct NestedHolder {
-    holder: Holder,
-}
-
-#[derive(Template)]
-#[template(path = "nested-attr.html")]
-struct NestedAttrTemplate {
-    inner: NestedHolder,
-}
-
 #[test]
 fn test_nested_attr() {
+    struct Holder {
+        a: usize,
+    }
+
+    struct NestedHolder {
+        holder: Holder,
+    }
+
+    #[derive(Template)]
+    #[template(path = "nested-attr.html")]
+    struct NestedAttrTemplate {
+        inner: NestedHolder,
+    }
+
     let t = NestedAttrTemplate {
         inner: NestedHolder {
             holder: Holder { a: 5 },
@@ -216,227 +224,237 @@ fn test_nested_attr() {
     assert_eq!(t.render().unwrap(), "5");
 }
 
-#[derive(Template)]
-#[template(path = "option.html")]
-struct OptionTemplate<'a> {
-    var: Option<&'a str>,
-}
-
 #[test]
 fn test_option() {
+    #[derive(Template)]
+    #[template(path = "option.html")]
+    struct OptionTemplate<'a> {
+        var: Option<&'a str>,
+    }
+
     let some = OptionTemplate { var: Some("foo") };
     assert_eq!(some.render().unwrap(), "some: foo");
     let none = OptionTemplate { var: None };
     assert_eq!(none.render().unwrap(), "none");
 }
 
-#[derive(Template)]
-#[template(source = "{{ Self::foo(None) }} {{ Self::foo(Some(1)) }}", ext = "txt")]
-struct OptionNoneSomeTemplate;
-
-impl OptionNoneSomeTemplate {
-    fn foo(x: Option<i32>) -> i32 {
-        x.unwrap_or_default()
-    }
-}
-
 #[test]
 fn test_option_none_some() {
+    #[derive(Template)]
+    #[template(source = "{{ Self::foo(None) }} {{ Self::foo(Some(1)) }}", ext = "txt")]
+    struct OptionNoneSomeTemplate;
+
+    impl OptionNoneSomeTemplate {
+        fn foo(x: Option<i32>) -> i32 {
+            x.unwrap_or_default()
+        }
+    }
+
     let t = OptionNoneSomeTemplate;
     assert_eq!(t.render().unwrap(), "0 1");
 }
 
-#[derive(Template)]
-#[template(path = "generics.html")]
-struct GenericsTemplate<T, U = u8>
-where
-    T: std::fmt::Display,
-    U: std::fmt::Display,
-{
-    t: T,
-    u: U,
-}
-
 #[test]
 fn test_generics() {
+    #[derive(Template)]
+    #[template(path = "generics.html")]
+    struct GenericsTemplate<T, U = u8>
+    where
+        T: std::fmt::Display,
+        U: std::fmt::Display,
+    {
+        t: T,
+        u: U,
+    }
+
     let t = GenericsTemplate { t: "a", u: 42 };
     assert_eq!(t.render().unwrap(), "a42");
 }
 
-#[derive(Template)]
-#[template(path = "composition.html")]
-struct CompositionTemplate {
-    foo: IfTemplate,
-}
-
 #[test]
 fn test_composition() {
+    #[derive(Template)]
+    #[template(path = "if.html")]
+    struct IfTemplate {
+        cond: bool,
+    }
+
+    #[derive(Template)]
+    #[template(path = "composition.html")]
+    struct CompositionTemplate {
+        foo: IfTemplate,
+    }
+
     let t = CompositionTemplate {
         foo: IfTemplate { cond: true },
     };
     assert_eq!(t.render().unwrap(), "composed: true");
 }
 
-#[derive(PartialEq, Eq)]
-enum Alphabet {
-    Alpha,
-}
-
-#[derive(Template)]
-#[template(source = "{% if x == Alphabet::Alpha %}true{% endif %}", ext = "txt")]
-struct PathCompareTemplate {
-    x: Alphabet,
-}
-
 #[test]
 fn test_path_compare() {
+    #[derive(PartialEq, Eq)]
+    enum Alphabet {
+        Alpha,
+    }
+
+    #[derive(Template)]
+    #[template(source = "{% if x == Alphabet::Alpha %}true{% endif %}", ext = "txt")]
+    struct PathCompareTemplate {
+        x: Alphabet,
+    }
+
     let t = PathCompareTemplate { x: Alphabet::Alpha };
     assert_eq!(t.render().unwrap(), "true");
 }
 
-#[derive(Template)]
-#[template(
-    source = "{% for i in [\"a\", \"\"] %}{{ i }}{% endfor %}",
-    ext = "txt"
-)]
-struct ArrayTemplate {}
-
 #[test]
 fn test_slice_literal() {
+    #[derive(Template)]
+    #[template(
+        source = "{% for i in [\"a\", \"\"] %}{{ i }}{% endfor %}",
+        ext = "txt"
+    )]
+    struct ArrayTemplate {}
+
     let t = ArrayTemplate {};
     assert_eq!(t.render().unwrap(), "a");
 }
 
-#[derive(Template)]
-#[template(source = "Hello, {{ world(\"123\", 4) }}!", ext = "txt")]
-struct FunctionRefTemplate;
-
-impl FunctionRefTemplate {
-    fn world(&self, s: &str, v: u8) -> String {
-        format!("world({s}, {v})")
-    }
-}
-
 #[test]
 fn test_func_ref_call() {
+    #[derive(Template)]
+    #[template(source = "Hello, {{ world(\"123\", 4) }}!", ext = "txt")]
+    struct FunctionRefTemplate;
+
+    impl FunctionRefTemplate {
+        fn world(&self, s: &str, v: u8) -> String {
+            format!("world({s}, {v})")
+        }
+    }
+
     let t = FunctionRefTemplate;
     assert_eq!(t.render().unwrap(), "Hello, world(123, 4)!");
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn world2(s: &str, v: u8) -> String {
-    format!("world{v}{s}")
-}
+mod test_path_func_call {
+    use rinja::Template;
 
-#[derive(Template)]
-#[template(source = "Hello, {{ self::world2(\"123\", 4) }}!", ext = "txt")]
-struct PathFunctionTemplate;
-
-#[test]
-fn test_path_func_call() {
-    assert_eq!(PathFunctionTemplate.render().unwrap(), "Hello, world4123!");
-}
-
-#[derive(Template)]
-#[template(source = "{{ ::std::string::String::from(\"123\") }}", ext = "txt")]
-struct RootPathFunctionTemplate;
-
-#[test]
-fn test_root_path_func_call() {
-    assert_eq!(RootPathFunctionTemplate.render().unwrap(), "123");
-}
-
-#[derive(Template)]
-#[template(source = "Hello, {{ Self::world3(self, \"123\", 4) }}!", ext = "txt")]
-struct FunctionTemplate;
-
-impl FunctionTemplate {
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    #[allow(dead_code)]
-    fn world3(&self, s: &str, v: u8) -> String {
-        format!("world{s}{v}")
+    fn world2(s: &str, v: u8) -> String {
+        format!("world{v}{s}")
+    }
+
+    #[derive(Template)]
+    #[template(source = "Hello, {{ self::world2(\"123\", 4) }}!", ext = "txt")]
+    struct PathFunctionTemplate;
+
+    #[test]
+    fn test_path_func_call() {
+        assert_eq!(PathFunctionTemplate.render().unwrap(), "Hello, world4123!");
     }
 }
 
 #[test]
+fn test_root_path_func_call() {
+    #[derive(Template)]
+    #[template(source = "{{ ::std::string::String::from(\"123\") }}", ext = "txt")]
+    struct RootPathFunctionTemplate;
+
+    assert_eq!(RootPathFunctionTemplate.render().unwrap(), "123");
+}
+
+#[test]
 fn test_fn() {
+    #[derive(Template)]
+    #[template(source = "Hello, {{ Self::world3(self, \"123\", 4) }}!", ext = "txt")]
+    struct FunctionTemplate;
+
+    impl FunctionTemplate {
+        #[allow(clippy::trivially_copy_pass_by_ref)]
+        #[allow(dead_code)]
+        fn world3(&self, s: &str, v: u8) -> String {
+            format!("world{s}{v}")
+        }
+    }
+
     let t = FunctionTemplate;
     assert_eq!(t.render().unwrap(), "Hello, world1234!");
 }
 
-#[derive(Template)]
-#[template(source = "  {# foo -#} ", ext = "txt")]
-struct CommentTemplate {}
-
 #[test]
 fn test_comment() {
+    #[derive(Template)]
+    #[template(source = "  {# foo -#} ", ext = "txt")]
+    struct CommentTemplate {}
+
     let t = CommentTemplate {};
     assert_eq!(t.render().unwrap(), "  ");
 }
 
-#[derive(Template)]
-#[template(source = "{% if !foo %}Hello{% endif %}", ext = "txt")]
-struct NegationTemplate {
-    foo: bool,
-}
-
 #[test]
 fn test_negation() {
+    #[derive(Template)]
+    #[template(source = "{% if !foo %}Hello{% endif %}", ext = "txt")]
+    struct NegationTemplate {
+        foo: bool,
+    }
+
     let t = NegationTemplate { foo: false };
     assert_eq!(t.render().unwrap(), "Hello");
 }
 
-#[derive(Template)]
-#[template(source = "{% if foo > -2 %}Hello{% endif %}", ext = "txt")]
-struct MinusTemplate {
-    foo: i8,
-}
-
 #[test]
 fn test_minus() {
+    #[derive(Template)]
+    #[template(source = "{% if foo > -2 %}Hello{% endif %}", ext = "txt")]
+    struct MinusTemplate {
+        foo: i8,
+    }
+
     let t = MinusTemplate { foo: 1 };
     assert_eq!(t.render().unwrap(), "Hello");
 }
 
-#[derive(Template)]
-#[template(source = "{{ foo[\"bar\"] }}", ext = "txt")]
-struct IndexTemplate {
-    foo: HashMap<String, String>,
-}
-
 #[test]
 fn test_index() {
+    #[derive(Template)]
+    #[template(source = "{{ foo[\"bar\"] }}", ext = "txt")]
+    struct IndexTemplate {
+        foo: HashMap<String, String>,
+    }
+
     let mut foo = HashMap::new();
     foo.insert("bar".into(), "baz".into());
     let t = IndexTemplate { foo };
     assert_eq!(t.render().unwrap(), "baz");
 }
 
-#[derive(Template)]
-#[template(source = "foo", ext = "txt")]
-struct Empty;
-
 #[test]
 fn test_empty() {
+    #[derive(Template)]
+    #[template(source = "foo", ext = "txt")]
+    struct Empty;
+
     assert_eq!(Empty.render().unwrap(), "foo");
 }
 
-#[derive(Template)]
-#[template(path = "raw-simple.html")]
-struct RawTemplate;
-
 #[test]
 fn test_raw_simple() {
+    #[derive(Template)]
+    #[template(path = "raw-simple.html")]
+    struct RawTemplate;
+
     let template = RawTemplate;
     assert_eq!(template.render().unwrap(), "\n<span>{{ name }}</span>\n");
 }
 
-#[derive(Template)]
-#[template(path = "raw-complex.html")]
-struct RawTemplateComplex;
-
 #[test]
 fn test_raw_complex() {
+    #[derive(Template)]
+    #[template(path = "raw-complex.html")]
+    struct RawTemplateComplex;
+
     let template = RawTemplateComplex;
     assert_eq!(
         template.render().unwrap(),
@@ -444,12 +462,12 @@ fn test_raw_complex() {
     );
 }
 
-#[derive(Template)]
-#[template(path = "raw-ws.html")]
-struct RawTemplateWs;
-
 #[test]
 fn test_raw_ws() {
+    #[derive(Template)]
+    #[template(path = "raw-ws.html")]
+    struct RawTemplateWs;
+
     let template = RawTemplateWs;
     assert_eq!(template.render().unwrap(), "<{{hello}}>\n<{{bye}}>");
 }
@@ -466,44 +484,37 @@ mod without_import_on_derive {
     }
 }
 
-#[derive(rinja::Template)]
-#[template(source = "{% let s = String::new() %}{{ s }}", ext = "txt")]
-struct DefineStringVar;
-
 #[test]
 fn test_define_string_var() {
+    #[derive(rinja::Template)]
+    #[template(source = "{% let s = String::new() %}{{ s }}", ext = "txt")]
+    struct DefineStringVar;
+
     let template = DefineStringVar;
     assert_eq!(template.render().unwrap(), "");
 }
 
-#[derive(rinja::Template)]
-#[template(source = "{% let x = 4.5 %}{{ x }}", ext = "html")]
-struct SimpleFloat;
-
 #[test]
 fn test_simple_float() {
+    #[derive(rinja::Template)]
+    #[template(source = "{% let x = 4.5 %}{{ x }}", ext = "html")]
+    struct SimpleFloat;
+
     let template = SimpleFloat;
     assert_eq!(template.render().unwrap(), "4.5");
 }
 
-#[derive(rinja::Template)]
-#[template(path = "num-literals.html")]
-struct NumLiterals;
-
 #[test]
 fn test_num_literals() {
+    #[derive(rinja::Template)]
+    #[template(path = "num-literals.html")]
+    struct NumLiterals;
+
     let template = NumLiterals;
     assert_eq!(
         template.render().unwrap(),
         "[90, -90, 90, 2, 56, 240, 10.5, 10.5, 100000000000, 105000000000]\n1\n12",
     );
-}
-
-#[allow(non_snake_case)]
-#[derive(rinja::Template)]
-#[template(source = "{{ xY }}", ext = "txt")]
-struct MixedCase {
-    xY: &'static str,
 }
 
 /// Test that we can use mixed case in variable names
@@ -515,20 +526,27 @@ struct MixedCase {
 /// <https://github.com/rinja-rs/rinja/issues/924>
 #[test]
 fn test_mixed_case() {
+    #[allow(non_snake_case)]
+    #[derive(rinja::Template)]
+    #[template(source = "{{ xY }}", ext = "txt")]
+    struct MixedCase {
+        xY: &'static str,
+    }
+
     let template = MixedCase { xY: "foo" };
     assert_eq!(template.render().unwrap(), "foo");
-}
-
-#[allow(non_snake_case)]
-#[derive(rinja::Template)]
-#[template(source = "Hello, {{ user }}!", ext = "txt")]
-struct Referenced {
-    user: &'static str,
 }
 
 #[test]
 #[allow(clippy::needless_borrows_for_generic_args)]
 fn test_referenced() {
+    #[allow(non_snake_case)]
+    #[derive(rinja::Template)]
+    #[template(source = "Hello, {{ user }}!", ext = "txt")]
+    struct Referenced {
+        user: &'static str,
+    }
+
     fn template_to_string(template: impl Template) -> String {
         template.to_string()
     }
@@ -539,30 +557,30 @@ fn test_referenced() {
     assert_eq!(template_to_string(template), "Hello, person!");
 }
 
-#[derive(rinja::Template)]
-#[template(
-    source = "{{ input as u8 }} {{ &input as u8 }} {{ &&input as u8 }}",
-    ext = "txt"
-)]
-struct TestI16ToU8 {
-    input: i16,
-}
-
 #[test]
 fn test_i16_to_u8() {
+    #[derive(rinja::Template)]
+    #[template(
+        source = "{{ input as u8 }} {{ &input as u8 }} {{ &&input as u8 }}",
+        ext = "txt"
+    )]
+    struct TestI16ToU8 {
+        input: i16,
+    }
+
     assert_eq!(TestI16ToU8 { input: 0 }.to_string(), "0 0 0");
     assert_eq!(TestI16ToU8 { input: 0x7f00 }.to_string(), "0 0 0");
     assert_eq!(TestI16ToU8 { input: 255 }.to_string(), "255 255 255");
     assert_eq!(TestI16ToU8 { input: -12345 }.to_string(), "199 199 199");
 }
 
-#[derive(Template)]
-#[template(source = "🙂")]
-#[template(ext = "txt")]
-struct SplitTemplateDeclaration;
-
 #[test]
 fn test_split_template_declaration() {
+    #[derive(Template)]
+    #[template(source = "🙂")]
+    #[template(ext = "txt")]
+    struct SplitTemplateDeclaration;
+
     assert_eq!(SplitTemplateDeclaration.to_string(), "🙂");
 }
 
