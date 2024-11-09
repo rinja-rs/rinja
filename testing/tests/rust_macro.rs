@@ -6,12 +6,12 @@ macro_rules! hello {
     };
 }
 
-#[derive(Template)]
-#[template(path = "rust-macros.html")]
-struct RustMacrosTemplate {}
-
 #[test]
 fn macro_basic() {
+    #[derive(Template)]
+    #[template(path = "rust-macros.html")]
+    struct RustMacrosTemplate {}
+
     let template = RustMacrosTemplate {};
     assert_eq!("Hello, world!", template.render().unwrap());
 }
@@ -26,12 +26,12 @@ mod foo {
     pub(crate) use hello2;
 }
 
-#[derive(Template)]
-#[template(path = "rust-macros-full-path.html")]
-struct RustMacrosFullPathTemplate {}
-
 #[test]
 fn macro_full_path() {
+    #[derive(Template)]
+    #[template(path = "rust-macros-full-path.html")]
+    struct RustMacrosFullPathTemplate {}
+
     let template = RustMacrosFullPathTemplate {};
     assert_eq!("Hello, world!", template.render().unwrap());
 }
@@ -50,24 +50,28 @@ macro_rules! call_a_or_b_on_tail {
     };
 }
 
-fn year(y: u16, _: &str, _: u8) -> u16 {
-    y
-}
+mod macro_with_args {
+    use rinja::Template;
 
-fn month(_: u16, m: &str, _: u8) -> &str {
-    m
-}
+    fn year(y: u16, _: &str, _: u8) -> u16 {
+        y
+    }
 
-fn day(_: u16, _: &str, d: u8) -> u8 {
-    d
-}
+    fn month(_: u16, m: &str, _: u8) -> &str {
+        m
+    }
 
-#[derive(Template)]
-#[template(path = "rust-macro-args.html")]
-struct RustMacrosArgTemplate {}
+    fn day(_: u16, _: &str, d: u8) -> u8 {
+        d
+    }
 
-#[test]
-fn macro_with_args() {
-    let template = RustMacrosArgTemplate {};
-    assert_eq!("2021\nJuly\n2", template.render().unwrap());
+    #[derive(Template)]
+    #[template(path = "rust-macro-args.html")]
+    struct RustMacrosArgTemplate {}
+
+    #[test]
+    fn macro_with_args() {
+        let template = RustMacrosArgTemplate {};
+        assert_eq!("2021\nJuly\n2", template.render().unwrap());
+    }
 }
