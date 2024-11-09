@@ -576,7 +576,7 @@ impl<'a> Suffix<'a> {
         loop {
             let before_suffix = i;
             let (j, suffix) = opt(alt((
-                unpeek(Self::attr),
+                Self::attr,
                 |i: &mut _| Self::index(i, level),
                 |i: &mut _| Self::call(i, level),
                 Self::r#try,
@@ -673,10 +673,10 @@ impl<'a> Suffix<'a> {
         .parse_peek(i)
     }
 
-    fn attr(i: &'a str) -> InputParseResult<'a, Self> {
+    fn attr(i: &mut &'a str) -> ParseResult<'a, Self> {
         preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier))))
             .map(Self::Attr)
-            .parse_peek(i)
+            .parse_next(i)
     }
 
     fn index(i: &mut &'a str, level: Level) -> ParseResult<'a, Self> {
