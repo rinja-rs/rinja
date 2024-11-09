@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::str;
 
 use winnow::Parser;
 use winnow::combinator::{
-    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated0, separated1,
+    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated1,
 };
+use winnow::sequence::terminated;
 use winnow::token::{any, tag, take_till0};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
@@ -581,21 +583,59 @@ impl<'a> Loop<'a> {
 pub struct Macro<'a> {
     pub ws1: Ws,
     pub name: &'a str,
-    pub args: Vec<&'a str>,
+    pub args: Vec<(&'a str, Option<WithSpan<'a, Expr<'a>>>)>,
     pub nodes: Vec<Node<'a>>,
     pub ws2: Ws,
 }
 
+fn check_duplicated_name<'a>(
+    names: &mut HashSet<&'a str>,
+    arg_name: &'a str,
+    i: &'a str,
+) -> Result<(), crate::ParseErr<'a>> {
+    if !names.insert(arg_name) {
+        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+            format!("duplicated argument `{arg_name}`"),
+            i,
+        )));
+    }
+    Ok(())
+}
+
 impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        fn parameters(i: &str) -> ParseResult<'_, Vec<&str>> {
-            delimited(
-                ws('('),
-                separated0(ws(identifier), ','),
-                (opt(ws(',')), ')'),
-            )
-            .parse_next(i)
-        }
+        let level = s.level.get();
+        #[allow(clippy::type_complexity)]
+        let parameters =
+            |i| -> ParseResult<'_, Option<Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>>> {
+                let (i, args) = opt(preceded(
+                    '(',
+                    (
+                        opt(terminated(
+                            separated1(
+                                (
+                                    ws(identifier),
+                                    opt(preceded('=', ws(|i| Expr::parse(i, level)))),
+                                ),
+                                ',',
+                            ),
+                            opt(','),
+                        )),
+                        ws(opt(')')),
+                    ),
+                ))
+                .parse_next(i)?;
+                match args {
+                    Some((args, Some(_))) => Ok((i, args)),
+                    Some((_, None)) => {
+                        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                            "expected `)` to close macro argument list",
+                            i,
+                        )));
+                    }
+                    None => Ok((i, None)),
+                }
+            };
 
         let start_s = i;
         let mut start = (
@@ -603,12 +643,9 @@ impl<'a> Macro<'a> {
             ws(keyword("macro")),
             cut_node(
                 Some("macro"),
-                (
-                    ws(identifier),
-                    opt(ws(parameters)),
-                    opt(Whitespace::parse),
-                    |i| s.tag_block_end(i),
-                ),
+                (ws(identifier), parameters, opt(Whitespace::parse), |i| {
+                    s.tag_block_end(i)
+                }),
             ),
         );
         let (j, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
@@ -617,6 +654,29 @@ impl<'a> Macro<'a> {
                 format!("'{name}' is not a valid name for a macro"),
                 i,
             )));
+        }
+
+        if let Some(ref params) = params {
+            let mut names = HashSet::new();
+
+            let mut iter = params.iter();
+            while let Some((arg_name, default_value)) = iter.next() {
+                check_duplicated_name(&mut names, arg_name, i)?;
+                if default_value.is_some() {
+                    for (new_arg_name, default_value) in iter.by_ref() {
+                        check_duplicated_name(&mut names, new_arg_name, i)?;
+                        if default_value.is_none() {
+                            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                                format!(
+                                    "all arguments following `{arg_name}` should have a default \
+                                         value, `{new_arg_name}` doesn't have a default value"
+                                ),
+                                i,
+                            )));
+                        }
+                    }
+                }
+            }
         }
 
         let mut end = cut_node(

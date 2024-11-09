@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::{cmp, hash, mem, str};
 
 use parser::node::{
-    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
+    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Macro, Match,
+    Whitespace, Ws,
 };
 use parser::{
     CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, StrLit, StrPrefix, Target,
@@ -865,42 +866,32 @@ impl<'a> Generator<'a> {
 
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
         let size_hint = self.push_locals(|this| {
+            macro_call_ensure_arg_count(call, def, ctx)?;
+
             this.write_buf_writable(ctx, buf)?;
             buf.write('{');
             this.prepare_ws(def.ws1);
 
-            let mut names = Buffer::new();
-            let mut values = Buffer::new();
-            let mut is_first_variable = true;
-            if args.len() != def.args.len() {
-                return Err(ctx.generate_error(
-                    &format!(
-                        "macro {name:?} expected {} argument{}, found {}",
-                        def.args.len(),
-                        if def.args.len() != 1 { "s" } else { "" },
-                        args.len()
-                    ),
-                    call,
-                ));
-            }
-            let mut named_arguments = HashMap::new();
+            let mut named_arguments: HashMap<&str, _, FxBuildHasher> = HashMap::default();
             // Since named arguments can only be passed last, we only need to check if the last argument
             // is a named one.
             if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
                 // First we check that all named arguments actually exist in the called item.
-                for arg in args.iter().rev() {
+                for (index, arg) in args.iter().enumerate().rev() {
                     let Expr::NamedArgument(arg_name, _) = &**arg else {
                         break;
                     };
-                    if !def.args.iter().any(|arg| arg == arg_name) {
+                    if !def.args.iter().any(|(arg, _)| arg == arg_name) {
                         return Err(ctx.generate_error(
                             &format!("no argument named `{arg_name}` in macro {name:?}"),
                             call,
                         ));
                     }
-                    named_arguments.insert(Cow::Borrowed(arg_name), arg);
+                    named_arguments.insert(arg_name, (index, arg));
                 }
             }
+
+            let mut value = Buffer::new();
 
             // Handling both named and unnamed arguments requires to be careful of the named arguments
             // order. To do so, we iterate through the macro defined arguments and then check if we have
@@ -910,23 +901,43 @@ impl<'a> Generator<'a> {
             // * If there isn't one, then we pick the next argument (we can do it without checking
             //   anything since named arguments are always last).
             let mut allow_positional = true;
-            for (index, arg) in def.args.iter().enumerate() {
-                let expr = if let Some(expr) = named_arguments.get(&Cow::Borrowed(arg)) {
+            let mut used_named_args = vec![false; args.len()];
+            for (index, (arg, default_value)) in def.args.iter().enumerate() {
+                let expr = if let Some((index, expr)) = named_arguments.get(arg) {
+                    used_named_args[*index] = true;
                     allow_positional = false;
                     expr
                 } else {
-                    if !allow_positional {
-                        // If there is already at least one named argument, then it's not allowed
-                        // to use unnamed ones at this point anymore.
-                        return Err(ctx.generate_error(
-                            &format!(
-                            "cannot have unnamed argument (`{arg}`) after named argument in macro \
-                             {name:?}"
-                        ),
-                            call,
-                        ));
+                    match args.get(index) {
+                        Some(arg_expr) if !matches!(**arg_expr, Expr::NamedArgument(_, _)) => {
+                            // If there is already at least one named argument, then it's not allowed
+                            // to use unnamed ones at this point anymore.
+                            if !allow_positional {
+                                return Err(ctx.generate_error(
+                                    &format!(
+                                        "cannot have unnamed argument (`{arg}`) after named argument \
+                                         in call to macro {name:?}"
+                                    ),
+                                    call,
+                                ));
+                            }
+                            arg_expr
+                        }
+                        Some(arg_expr) if used_named_args[index] => {
+                            let Expr::NamedArgument(name, _) = **arg_expr else { unreachable!() };
+                            return Err(ctx.generate_error(
+                                &format!("`{name}` is passed more than once"),
+                                call,
+                            ));
+                        }
+                        _ => {
+                            if let Some(default_value) = default_value {
+                                default_value
+                            } else {
+                                return Err(ctx.generate_error(&format!("missing `{arg}` argument"), call));
+                            }
+                        }
                     }
-                    &args[index]
                 };
                 match &**expr {
                     // If `expr` is already a form of variable then
@@ -950,28 +961,17 @@ impl<'a> Generator<'a> {
                     // multiple times, e.g. in the case of macro
                     // parameters being used multiple times.
                     _ => {
-                        if is_first_variable {
-                            is_first_variable = false;
+                        value.clear();
+                        let (before, after) = if !is_copyable(expr) {
+                            ("&(", ")")
                         } else {
-                            names.write(',');
-                            values.write(',');
-                        }
-                        names.write(arg);
-
-                        values.write('(');
-                        if !is_copyable(expr) {
-                            values.write('&');
-                        }
-                        values.write(this.visit_expr_root(ctx, expr)?);
-                        values.write(')');
+                            ("", "")
+                        };
+                        value.write(this.visit_expr_root(ctx, expr)?);
+                        buf.write(format_args!("let {arg} = {before}{}{after};", value.buf));
                         this.locals.insert_with_default(Cow::Borrowed(arg));
                     }
                 }
-            }
-
-            debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
-            if !names.buf.is_empty() {
-                buf.write(format_args!("let ({}) = ({});", names.buf, values.buf));
             }
 
             let mut size_hint = this.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
@@ -2451,6 +2451,43 @@ impl<'a> Generator<'a> {
     }
 }
 
+fn macro_call_ensure_arg_count(
+    call: &WithSpan<'_, Call<'_>>,
+    def: &Macro<'_>,
+    ctx: &Context<'_>,
+) -> Result<(), CompileError> {
+    if call.args.len() == def.args.len() {
+        // exactly enough arguments were provided
+        return Ok(());
+    }
+
+    let nb_default_args = def
+        .args
+        .iter()
+        .rev()
+        .take_while(|(_, default_value)| default_value.is_some())
+        .count();
+    if call.args.len() < def.args.len() && call.args.len() >= def.args.len() - nb_default_args {
+        // all missing arguments have a default value, and there weren't too many args
+        return Ok(());
+    }
+
+    // either too many or not enough arguments were provided
+    let (expected_args, extra) = match nb_default_args {
+        0 => (def.args.len(), ""),
+        _ => (nb_default_args, "at least "),
+    };
+    Err(ctx.generate_error(
+        &format!(
+            "macro {:?} expected {extra}{expected_args} argument{}, found {}",
+            def.name,
+            if expected_args != 1 { "s" } else { "" },
+            call.args.len(),
+        ),
+        call,
+    ))
+}
+
 #[cfg(target_pointer_width = "16")]
 type TargetIsize = i16;
 #[cfg(target_pointer_width = "32")]
@@ -2708,6 +2745,11 @@ impl Buffer {
             self.buf.push_str(CLOSE);
         }
         s.len()
+    }
+
+    fn clear(&mut self) {
+        self.buf.clear();
+        self.last_was_write_str = false;
     }
 }
 
@@ -2979,11 +3021,12 @@ fn is_copyable(expr: &Expr<'_>) -> bool {
 
 fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
     match expr {
-        Expr::BoolLit(_) | Expr::NumLit(_, _) | Expr::StrLit(_) | Expr::CharLit(_) => true,
+        Expr::BoolLit(_)
+        | Expr::NumLit(_, _)
+        | Expr::StrLit(_)
+        | Expr::CharLit(_)
+        | Expr::BinOp(_, _, _) => true,
         Expr::Unary(.., expr) => is_copyable_within_op(expr, true),
-        Expr::BinOp(_, lhs, rhs) => {
-            is_copyable_within_op(lhs, true) && is_copyable_within_op(rhs, true)
-        }
         Expr::Range(..) => true,
         // The result of a call likely doesn't need to be borrowed,
         // as in that case the call is more likely to return a
