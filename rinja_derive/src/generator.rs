@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::{cmp, hash, mem, str};
 
 use parser::node::{
-    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
+    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Macro, Match,
+    Whitespace, Ws,
 };
 use parser::{
     CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, StrLit, StrPrefix, Target,
@@ -866,28 +867,13 @@ impl<'a> Generator<'a> {
 
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
         let size_hint = self.push_locals(|this| {
+            macro_call_ensure_arg_count(call, def, ctx)?;
+
             this.write_buf_writable(ctx, buf)?;
             buf.write('{');
             this.prepare_ws(def.ws1);
 
-            if args.len() > def.args.len() || (args.len() < def.args.len() && !def.args.iter().skip(args.len()).all(|(_, default_value)| default_value.is_some())) {
-                let nb_default_args = def.args.iter().filter(|(_, default_value)| default_value.is_some()).count();
-                let (expected_args, extra) = if nb_default_args != 0 {
-                    (nb_default_args, "at least ")
-                } else {
-                    (def.args.len(), "")
-                };
-
-                return Err(ctx.generate_error(
-                    &format!(
-                        "macro {name:?} expected {extra}{expected_args} argument{}, found {}",
-                        if expected_args != 1 { "s" } else { "" },
-                        args.len(),
-                    ),
-                    call,
-                ));
-            }
-            let mut named_arguments = HashMap::new();
+            let mut named_arguments = HashMap::default();
             // Since named arguments can only be passed last, we only need to check if the last argument
             // is a named one.
             if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
@@ -2470,6 +2456,43 @@ impl<'a> Generator<'a> {
     fn prepare_ws(&mut self, ws: Ws) {
         self.skip_ws = self.should_trim_ws(ws.1);
     }
+}
+
+fn macro_call_ensure_arg_count(
+    call: &WithSpan<'_, Call<'_>>,
+    def: &Macro<'_>,
+    ctx: &Context<'_>,
+) -> Result<(), CompileError> {
+    if call.args.len() == def.args.len() {
+        // exactly enough arguments were provided
+        return Ok(());
+    }
+
+    let nb_default_args = def
+        .args
+        .iter()
+        .rev()
+        .take_while(|(_, default_value)| default_value.is_some())
+        .count();
+    if call.args.len() < def.args.len() && call.args.len() >= def.args.len() - nb_default_args {
+        // all missing arguments have a default value, and there weren't too many args
+        return Ok(());
+    }
+
+    // either too many or not enough arguments were provided
+    let (expected_args, extra) = match nb_default_args {
+        0 => (def.args.len(), ""),
+        _ => (nb_default_args, "at least "),
+    };
+    Err(ctx.generate_error(
+        &format!(
+            "macro {:?} expected {extra}{expected_args} argument{}, found {}",
+            def.name,
+            if expected_args != 1 { "s" } else { "" },
+            call.args.len(),
+        ),
+        call,
+    ))
 }
 
 #[cfg(target_pointer_width = "16")]
