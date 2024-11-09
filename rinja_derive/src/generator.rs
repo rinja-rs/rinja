@@ -902,10 +902,10 @@ impl<'a> Generator<'a> {
             // * If there isn't one, then we pick the next argument (we can do it without checking
             //   anything since named arguments are always last).
             let mut allow_positional = true;
-            let mut used_named_args = std::collections::HashSet::with_capacity(named_arguments.len());
+            let mut used_named_args = vec![false; args.len()];
             for (index, (arg, default_value)) in def.args.iter().enumerate() {
                 let expr = if let Some((index, expr)) = named_arguments.get(arg) {
-                    used_named_args.insert(*index);
+                    used_named_args[*index] = true;
                     allow_positional = false;
                     expr
                 } else {
@@ -916,15 +916,15 @@ impl<'a> Generator<'a> {
                             if !allow_positional {
                                 return Err(ctx.generate_error(
                                     &format!(
-                                        "cannot have unnamed argument (`{arg}`) after named argument in \
-                                         macro {name:?}"
+                                        "cannot have unnamed argument (`{arg}`) after named argument \
+                                         in call to macro {name:?}"
                                     ),
                                     call,
                                 ));
                             }
                             arg_expr
                         }
-                        Some(arg_expr) if used_named_args.contains(&index) => {
+                        Some(arg_expr) if used_named_args[index] => {
                             let Expr::NamedArgument(name, _) = **arg_expr else { unreachable!() };
                             return Err(ctx.generate_error(
                                 &format!("`{name}` is passed more than once"),
