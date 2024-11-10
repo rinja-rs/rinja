@@ -801,6 +801,14 @@ impl<'a> SyntaxBuilder<'a> {
                     "delimiters must be at least two characters long. \
                         The {k} delimiter ({s:?}) is too short",
                 ));
+            } else if s.len() > 32 {
+                return Err(format!(
+                    "delimiters must be at most 32 characters long. \
+                        The {k} delimiter ({:?}...) is too long",
+                    &s[..(16..=s.len())
+                        .find(|&i| s.is_char_boundary(i))
+                        .unwrap_or(s.len())],
+                ));
             } else if s.chars().any(char::is_whitespace) {
                 return Err(format!(
                     "delimiters may not contain white spaces. \

@@ -1066,6 +1066,9 @@ fn fuzzed_filter_recursion() {
 }
 
 #[test]
+#[should_panic = "called `Result::unwrap()` on an `Err` value: \
+    \"delimiters must be at most 32 characters long. The closing block delimiter \
+    (\\\"\\\\0]***NEWFILE\\\\u{1f}***\\\"...) is too long\""]
 fn fuzzed_excessive_syntax_lengths() {
     let syntax = SyntaxBuilder {
         name: "test",
