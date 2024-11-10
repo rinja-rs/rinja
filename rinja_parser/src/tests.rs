@@ -1,5 +1,5 @@
 use crate::node::{Lit, Whitespace, Ws};
-use crate::{Ast, Expr, Filter, InnerSyntax, Node, Num, StrLit, Syntax, WithSpan};
+use crate::{Ast, Expr, Filter, InnerSyntax, Node, Num, StrLit, Syntax, SyntaxBuilder, WithSpan};
 
 impl<T> WithSpan<'static, T> {
     fn no_span(inner: T) -> Self {
@@ -1063,4 +1063,37 @@ fn let_set() {
 fn fuzzed_filter_recursion() {
     const TEMPLATE: &str = include_str!("../tests/filter-recursion.txt");
     assert!(Ast::from_str(TEMPLATE, None, &Syntax::default()).is_err());
+}
+
+#[test]
+fn fuzzed_excessive_syntax_lengths() {
+    let syntax = SyntaxBuilder {
+        name: "test",
+        block_start: Some("\0*DD\0\0"),
+        block_end: Some(
+            "\0]***NEWFILE\u{1f}***:7/v/.-3/\u{1b}/~~~~z~0/*:7/v/./t/t/.p//NEWVILE**::7/v",
+        ),
+        expr_start: Some("/."),
+        expr_end: None,
+        comment_start: Some(include_str!(
+            "../tests/excessive_syntax_lengths-comment-start.bin"
+        )),
+        comment_end: None,
+    }
+    .to_syntax()
+    .unwrap();
+
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let test = std::thread::spawn(move || {
+        let result = Ast::from_str(
+            include_str!("../tests/excessive_syntax_lengths-source.bin"),
+            None,
+            &syntax,
+        );
+        sender.send(result).unwrap();
+    });
+    let _: Result<Ast<'_>, crate::ParseError> = receiver
+        .recv_timeout(std::time::Duration::from_secs(3))
+        .expect("timeout");
+    test.join().unwrap();
 }
