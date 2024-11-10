@@ -7,10 +7,6 @@ on:
   schedule:
     - cron: "32 4 * * 5"
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   Test:
     strategy:
@@ -175,10 +171,41 @@ jobs:
           components: rust-src
       - run: curl --location --silent --show-error --fail https://github.com/cargo-bins/cargo-quickinstall/releases/download/cargo-fuzz-0.12.0/cargo-fuzz-0.12.0-x86_64-unknown-linux-gnu.tar.gz | tar -xzvvf - -C $HOME/.cargo/bin
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fuzz run ${{ matrix.fuzz_target }} --jobs 4 -- -max_total_time=90
+      - run: cargo fuzz run ${{ matrix.fuzz_target }} --jobs 4 -- -max_total_time=120
         working-directory: fuzzing
         env:
           RUSTFLAGS: '-Ctarget-feature=-crt-static'
+
+  Cluster-Fuzz:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Build Fuzzers
+        id: build
+        uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+        with:
+          oss-fuzz-project-name: rinja
+          language: rust
+      - name: Run Fuzzers
+        uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+        with:
+          oss-fuzz-project-name: rinja
+          language: rust
+          fuzz-seconds: 600
+          output-sarif: true
+      - name: Upload Crash
+        uses: actions/upload-artifact@v4
+        if: failure() && steps.build.outcome == 'success'
+        with:
+          name: artifacts
+          path: ./out/artifacts
+      - name: Upload Sarif
+        if: always() && steps.build.outcome == 'success'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: cifuzz-sarif/results.sarif
+          checkout_path: cifuzz-sarif
 
   Typos:
     runs-on: ubuntu-latest
