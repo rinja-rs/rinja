@@ -42,8 +42,8 @@ error: when using `in_doc = true`, the enum's documentation needs a `rinja` code
 60 | #[template(ext = "txt", in_doc = true)]
    |                         ^^^^^^
 
-error: when using `in_doc = true`, the union's documentation needs a `rinja` code block
-  --> tests/ui/rinja-block.rs:67:25
+error: rinja templates are not supported for `union` types, only `struct` and `enum`
+  --> tests/ui/rinja-block.rs:68:1
    |
-67 | #[template(ext = "txt", in_doc = true)]
-   |                         ^^^^^^
+68 | union NoDocForUnion {
+   | ^^^^^

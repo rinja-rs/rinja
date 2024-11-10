@@ -302,9 +302,17 @@ pub(crate) struct TemplateArgs {
 
 impl TemplateArgs {
     pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
+        // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
+        if let syn::Data::Union(data) = &ast.data {
+            return Err(CompileError::new_with_span(
+                "rinja templates are not supported for `union` types, only `struct` and `enum`",
+                None,
+                Some(data.union_token.span),
+            ));
+        }
+
         // Check that an attribute called `template()` exists at least once and that it is
         // the proper type (list).
-
         let mut templates_attrs = ast
             .attrs
             .iter()
@@ -532,6 +540,7 @@ fn no_rinja_code_block(name: &syn::Ident, ast: &syn::DeriveInput) -> CompileErro
     let kind = match &ast.data {
         syn::Data::Struct(_) => "struct",
         syn::Data::Enum(_) => "enum",
+        // actually unreachable: `union`s are rejected by `TemplateArgs::new()`
         syn::Data::Union(_) => "union",
     };
     CompileError::no_file_info(
