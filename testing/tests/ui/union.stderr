@@ -1,0 +1,8 @@
+error[E0133]: access to union field is unsafe and requires unsafe function or block
+ --> tests/ui/union.rs:3:10
+  |
+3 | #[derive(Template)]
+  |          ^^^^^^^^ access to union field
+  |
+  = note: the field may not be properly initialized: using uninitialized data will cause undefined behavior
+  = note: this error originates in the derive macro `Template` (in Nightly builds, run with -Z macro-backtrace for more info)
