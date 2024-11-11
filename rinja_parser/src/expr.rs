@@ -7,6 +7,7 @@ use winnow::combinator::{
     terminated,
 };
 use winnow::error::{ErrorKind, ParserError as _};
+use winnow::stream::Stream as _;
 use winnow::{Parser, unpeek};
 
 use crate::{
@@ -580,7 +581,7 @@ impl<'a> Suffix<'a> {
                 |i: &mut _| Self::index(i, level),
                 |i: &mut _| Self::call(i, level),
                 Self::r#try,
-                unpeek(Self::r#macro),
+                Self::r#macro,
             )))
             .parse_peek(i)?;
             i = j;
@@ -617,8 +618,8 @@ impl<'a> Suffix<'a> {
         Ok((i, expr))
     }
 
-    fn r#macro(i: &'a str) -> InputParseResult<'a, Self> {
-        fn nested_parenthesis(input: &str) -> InputParseResult<'_, ()> {
+    fn r#macro(i: &mut &'a str) -> ParseResult<'a, Self> {
+        fn nested_parenthesis<'a>(input: &mut &'a str) -> ParseResult<'a, ()> {
             let mut nested = 0;
             let mut last = 0;
             let mut in_str = false;
@@ -657,20 +658,21 @@ impl<'a> Suffix<'a> {
             }
 
             if nested == 0 {
-                Ok((&input[last..], ()))
+                let _ = input.next_slice(last);
+                Ok(())
             } else {
-                fail.parse_peek(input)
+                fail.parse_next(input)
             }
         }
 
         preceded(
             (ws('!'), '('),
             cut_err(terminated(
-                unpeek(nested_parenthesis).recognize().map(Self::MacroCall),
+                nested_parenthesis.recognize().map(Self::MacroCall),
                 ')',
             )),
         )
-        .parse_peek(i)
+        .parse_next(i)
     }
 
     fn attr(i: &mut &'a str) -> ParseResult<'a, Self> {
