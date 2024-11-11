@@ -10,6 +10,28 @@ use crate::{Error, Result};
 // MAX_LEN is maximum allowed length for filters.
 const MAX_LEN: usize = 10_000;
 
+/// Return an ephemeral `&str` for `$src: impl fmt::Display`
+///
+/// If `$str` is `&str` or `String`, this macro simply passes on its content.
+/// If it is neither, then the formatted data is collection into `&buffer`.
+///
+/// `return`s with an error if the formatting failed.
+macro_rules! try_to_str {
+    ($src:expr => $buffer:ident) => {
+        match format_args!("{}", $src) {
+            args => {
+                if let Some(s) = args.as_str() {
+                    s
+                } else {
+                    $buffer = String::new();
+                    $buffer.write_fmt(args)?;
+                    &$buffer
+                }
+            }
+        }
+    };
+}
+
 /// Formats arguments according to the specified format
 ///
 /// The *second* argument to this filter must be a string literal (as in normal
@@ -102,11 +124,13 @@ pub fn format() {}
 /// ```
 #[inline]
 pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
-    fn linebreaks(s: String) -> String {
+    fn linebreaks(s: &str) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace('\n', "<br/>");
         format!("<p>{linebroken}</p>")
     }
-    Ok(HtmlSafeOutput(linebreaks(try_to_string(s)?)))
+
+    let mut buffer;
+    Ok(HtmlSafeOutput(linebreaks(try_to_str!(s => buffer))))
 }
 
 /// Converts all newlines in a piece of plain text to HTML line breaks
@@ -131,10 +155,12 @@ pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::E
 /// ```
 #[inline]
 pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
-    fn linebreaksbr(s: String) -> String {
+    fn linebreaksbr(s: &str) -> String {
         s.replace('\n', "<br/>")
     }
-    Ok(HtmlSafeOutput(linebreaksbr(try_to_string(s)?)))
+
+    let mut buffer;
+    Ok(HtmlSafeOutput(linebreaksbr(try_to_str!(s => buffer))))
 }
 
 /// Replaces only paragraph breaks in plain text with appropriate HTML
@@ -163,11 +189,13 @@ pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt:
 /// ```
 #[inline]
 pub fn paragraphbreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
-    fn paragraphbreaks(s: String) -> String {
+    fn paragraphbreaks(s: &str) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace("<p></p>", "");
         format!("<p>{linebroken}</p>")
     }
-    Ok(HtmlSafeOutput(paragraphbreaks(try_to_string(s)?)))
+
+    let mut buffer;
+    Ok(HtmlSafeOutput(paragraphbreaks(try_to_str!(s => buffer))))
 }
 
 /// Converts to lowercase
@@ -197,10 +225,8 @@ pub fn paragraphbreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, f
 /// ```
 #[inline]
 pub fn lower(s: impl fmt::Display) -> Result<String, fmt::Error> {
-    fn lower(s: String) -> Result<String, fmt::Error> {
-        Ok(s.to_lowercase())
-    }
-    lower(try_to_string(s)?)
+    let mut buffer;
+    Ok(try_to_str!(s => buffer).to_lowercase())
 }
 
 /// Converts to lowercase, alias for the `|lower` filter
@@ -260,10 +286,8 @@ pub fn lowercase(s: impl fmt::Display) -> Result<String, fmt::Error> {
 /// ```
 #[inline]
 pub fn upper(s: impl fmt::Display) -> Result<String, fmt::Error> {
-    fn upper(s: String) -> Result<String, fmt::Error> {
-        Ok(s.to_uppercase())
-    }
-    upper(try_to_string(s)?)
+    let mut buffer;
+    Ok(try_to_str!(s => buffer).to_uppercase())
 }
 
 /// Converts to uppercase, alias for the `|upper` filter
@@ -463,10 +487,25 @@ impl<W: fmt::Write> fmt::Write for TruncateWriter<W> {
 /// ```
 #[inline]
 pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> {
-    fn indent(s: String, width: usize) -> Result<String, fmt::Error> {
-        if width >= MAX_LEN || s.len() >= MAX_LEN {
-            return Ok(s);
-        }
+    fn indent(args: fmt::Arguments<'_>, width: usize) -> Result<String, fmt::Error> {
+        let mut buffer = String::new();
+        let s = if width >= MAX_LEN {
+            buffer.write_fmt(args)?;
+            return Ok(buffer);
+        } else if let Some(s) = args.as_str() {
+            if s.len() >= MAX_LEN {
+                return Ok(s.to_owned());
+            } else {
+                s
+            }
+        } else {
+            buffer.write_fmt(args)?;
+            if buffer.len() >= MAX_LEN {
+                return Ok(buffer);
+            }
+            buffer.as_str()
+        };
+
         let mut indented = String::new();
         for (i, c) in s.char_indices() {
             indented.push(c);
@@ -479,7 +518,7 @@ pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> 
         }
         Ok(indented)
     }
-    indent(try_to_string(s)?, width)
+    indent(format_args!("{s}"), width)
 }
 
 /// Joins iterable into a string separated by provided argument
@@ -573,17 +612,20 @@ where
 /// ```
 #[inline]
 pub fn capitalize(s: impl fmt::Display) -> Result<String, fmt::Error> {
-    fn capitalize(s: String) -> Result<String, fmt::Error> {
-        match s.chars().next() {
-            Some(c) => {
-                let mut replacement: String = c.to_uppercase().collect();
-                replacement.push_str(&s[c.len_utf8()..].to_lowercase());
-                Ok(replacement)
-            }
-            _ => Ok(s),
+    fn capitalize(s: &str) -> Result<String, fmt::Error> {
+        let mut chars = s.chars();
+        if let Some(c) = chars.next() {
+            let mut replacement = String::with_capacity(s.len());
+            replacement.extend(c.to_uppercase());
+            replacement.push_str(&chars.as_str().to_lowercase());
+            Ok(replacement)
+        } else {
+            Ok(String::new())
         }
     }
-    capitalize(try_to_string(s)?)
+
+    let mut buffer;
+    capitalize(try_to_str!(s => buffer))
 }
 
 /// Centers the value in a field of a given width
@@ -646,12 +688,9 @@ impl<T: fmt::Display> fmt::Display for Center<T> {
 /// );
 /// # }
 /// ```
-#[inline]
 pub fn wordcount(s: impl fmt::Display) -> Result<usize, fmt::Error> {
-    fn wordcount(s: String) -> Result<usize, fmt::Error> {
-        Ok(s.split_whitespace().count())
-    }
-    wordcount(try_to_string(s)?)
+    let mut buffer;
+    Ok(try_to_str!(s => buffer).split_whitespace().count())
 }
 
 /// Return a title cased version of the value. Words will start with uppercase letters, all
@@ -676,7 +715,8 @@ pub fn wordcount(s: impl fmt::Display) -> Result<usize, fmt::Error> {
 /// # }
 /// ```
 pub fn title(s: impl fmt::Display) -> Result<String, fmt::Error> {
-    let s = try_to_string(s)?;
+    let mut buffer;
+    let s = try_to_str!(s => buffer);
     let mut need_capitalization = true;
 
     // Sadly enough, we can't mutate a string when iterating over its chars, likely because it could
@@ -930,12 +970,6 @@ impl<S: FastWritable, P: FastWritable> FastWritable for Pluralize<S, P> {
             Pluralize::Plural(value) => value.write_into(dest),
         }
     }
-}
-
-fn try_to_string(s: impl fmt::Display) -> Result<String, fmt::Error> {
-    let mut result = String::new();
-    write!(result, "{s}")?;
-    Ok(result)
 }
 
 #[cfg(test)]
