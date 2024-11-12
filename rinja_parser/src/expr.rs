@@ -410,7 +410,7 @@ impl<'a> Expr<'a> {
             Self::str,
             Self::char,
             Self::path_var_bool,
-            unpeek(move |i| Self::array(i, level)),
+            move |i: &mut _| Self::array(i, level),
             unpeek(move |i| Self::group(i, level)),
         ))
         .parse_peek(i)
@@ -446,10 +446,10 @@ impl<'a> Expr<'a> {
         Ok((i, WithSpan::new(Self::Tuple(exprs), start)))
     }
 
-    fn array(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn array(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         let level = level.nest(i)?;
-        let (i, array) = preceded(
+        let array = preceded(
             ws('['),
             cut_err(terminated(
                 opt(terminated(
@@ -459,11 +459,8 @@ impl<'a> Expr<'a> {
                 ']',
             )),
         )
-        .parse_peek(i)?;
-        Ok((
-            i,
-            WithSpan::new(Self::Array(array.unwrap_or_default()), start),
-        ))
+        .parse_next(i)?;
+        Ok(WithSpan::new(Self::Array(array.unwrap_or_default()), start))
     }
 
     fn path_var_bool(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
