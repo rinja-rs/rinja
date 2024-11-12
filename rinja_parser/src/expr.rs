@@ -408,7 +408,7 @@ impl<'a> Expr<'a> {
         alt((
             unpeek(Self::num),
             unpeek(Self::str),
-            unpeek(Self::char),
+            Self::char,
             unpeek(Self::path_var_bool),
             unpeek(move |i| Self::array(i, level)),
             unpeek(move |i| Self::group(i, level)),
@@ -492,11 +492,11 @@ impl<'a> Expr<'a> {
         Ok((i, WithSpan::new(Expr::NumLit(full, num), start)))
     }
 
-    fn char(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn char(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         char_lit
             .map(|i| WithSpan::new(Self::CharLit(i), start))
-            .parse_peek(i)
+            .parse_next(i)
     }
 
     #[must_use]
