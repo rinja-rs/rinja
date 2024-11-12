@@ -736,6 +736,11 @@ restrictions:
 - If the source is a reference to a primitive type, e.g. `&&&bool`, then rinja automatically
   dereferences the value until it gets the underlying `bool`.
 
+### String concatenation
+
+As a short-hand for `{{ a }}{{ b }}{{ c }}` you can use the concat operator `~`: `{{ a ~ b ~ c }}`.
+The tilde `~` has to be surrounded by spaces to avoid confusion with the whitespace control operator.
+
 ## Templates in templates
 
 Using expressions, it is possible to delegate rendering part of a template to another template.

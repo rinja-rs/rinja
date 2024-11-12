@@ -8,7 +8,7 @@ use winnow::combinator::{
     terminated,
 };
 use winnow::error::{ErrorKind, ParserError as _};
-use winnow::token::take_till0;
+use winnow::token::{take_till0, take_till1};
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
@@ -68,6 +68,7 @@ pub enum Expr<'a> {
     FilterSource,
     IsDefined(&'a str),
     IsNotDefined(&'a str),
+    Concat(Vec<WithSpan<'a, Expr<'a>>>),
 }
 
 impl<'a> Expr<'a> {
@@ -176,7 +177,40 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(bxor, band, token_xor);
     expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
-    expr_prec_layer!(addsub, muldivmod, alt(("+", "-")));
+    expr_prec_layer!(addsub, concat, alt(("+", "-")));
+
+    fn concat(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+        fn concat_expr(i: &str, level: Level) -> ParseResult<'_, Option<WithSpan<'_, Expr<'_>>>> {
+            let ws1 = |i| opt(take_till1(not_ws)).parse_next(i);
+            let (j, data) = opt((ws1, '~', ws1, |i| Expr::muldivmod(i, level))).parse_next(i)?;
+            if let Some((t1, _, t2, expr)) = data {
+                if t1.is_none() || t2.is_none() {
+                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                        "the concat operator `~` must be surrounded by spaces",
+                        i,
+                    )));
+                }
+                Ok((j, Some(expr)))
+            } else {
+                Ok((j, None))
+            }
+        }
+
+        let start = i;
+        let (i, expr) = Self::muldivmod(i, level)?;
+        let (mut i, expr2) = concat_expr(i, level)?;
+        if let Some(expr2) = expr2 {
+            let mut exprs = vec![expr, expr2];
+            while let (j, Some(expr)) = concat_expr(i, level)? {
+                i = j;
+                exprs.push(expr);
+            }
+            Ok((i, WithSpan::new(Self::Concat(exprs), start)))
+        } else {
+            Ok((i, expr))
+        }
+    }
+
     expr_prec_layer!(muldivmod, is_as, alt(("*", "/", "%")));
 
     fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
@@ -393,7 +427,8 @@ impl<'a> Expr<'a> {
             | Self::Tuple(_)
             | Self::Array(_)
             | Self::BinOp(_, _, _)
-            | Self::Path(_) => false,
+            | Self::Path(_)
+            | Self::Concat(_) => false,
         }
     }
 }

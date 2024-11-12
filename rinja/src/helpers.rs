@@ -236,3 +236,21 @@ impl FastWritable for Empty {
 pub fn as_bool<T: PrimitiveType<Value = bool>>(value: T) -> bool {
     value.get()
 }
+
+pub struct Concat<L, R>(pub L, pub R);
+
+impl<L: fmt::Display, R: fmt::Display> fmt::Display for Concat<L, R> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)?;
+        self.1.fmt(f)
+    }
+}
+
+impl<L: FastWritable, R: FastWritable> FastWritable for Concat<L, R> {
+    #[inline]
+    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+        self.0.write_into(dest)?;
+        self.1.write_into(dest)
+    }
+}
