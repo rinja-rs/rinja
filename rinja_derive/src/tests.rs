@@ -945,3 +945,52 @@ fn test_pluralize() {
         3,
     );
 }
+
+#[test]
+fn test_concat() {
+    compare(
+        r#"{{ "<" ~ a ~ "|" ~ b ~ '>' }}"#,
+        r#"
+            writer.write_str("<")?;
+            match (
+                &((&&rinja::filters::AutoEscaper::new(&(self.a), rinja::filters::Text))
+                    .rinja_auto_escape()?),
+                &((&&rinja::filters::AutoEscaper::new(&(self.b), rinja::filters::Text))
+                    .rinja_auto_escape()?),
+            ) {
+                (expr1, expr3) => {
+                    (&&rinja::filters::Writable(expr1)).rinja_write(writer)?;
+                    writer.write_str("|")?;
+                    (&&rinja::filters::Writable(expr3)).rinja_write(writer)?;
+                }
+            }
+            writer.write_str(">")?;
+        "#,
+        &[("a", "&'static str"), ("b", "u32")],
+        9,
+    );
+
+    compare(
+        r#"{{ ("a=" ~ a ~ " b=" ~ b)|upper }}"#,
+        r#"
+            match (
+                &((&&rinja::filters::AutoEscaper::new(
+                    &(rinja::filters::upper(
+                        &((rinja::helpers::Concat(
+                            &(rinja::helpers::Concat(&("a="), &(self.a))),
+                            &(rinja::helpers::Concat(&(" b="), &(self.b))),
+                        ))),
+                    )?),
+                    rinja::filters::Text,
+                ))
+                    .rinja_auto_escape()?),
+            ) {
+                (expr0,) => {
+                    (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                }
+            }
+        "#,
+        &[("a", "&'static str"), ("b", "u32")],
+        3,
+    );
+}

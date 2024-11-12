@@ -454,7 +454,8 @@ impl<'a> Generator<'a> {
             | Expr::Tuple(_)
             | Expr::NamedArgument(_, _)
             | Expr::FilterSource
-            | Expr::As(_, _) => {
+            | Expr::As(_, _)
+            | Expr::Concat(_) => {
                 *only_contains_is_defined = false;
                 (EvaluatedResult::Unknown, WithSpan::new(expr, span))
             }
@@ -1306,8 +1307,15 @@ impl<'a> Generator<'a> {
 
     fn write_expr(&mut self, ws: Ws, s: &'a WithSpan<'a, Expr<'a>>) {
         self.handle_ws(ws);
-        self.buf_writable
-            .push(compile_time_escape(s, self.input.escaper).unwrap_or(Writable::Expr(s)));
+        let items = if let Expr::Concat(exprs) = &**s {
+            exprs
+        } else {
+            std::slice::from_ref(s)
+        };
+        for s in items {
+            self.buf_writable
+                .push(compile_time_escape(s, self.input.escaper).unwrap_or(Writable::Expr(s)));
+        }
     }
 
     // Write expression buffer and empty
@@ -1486,6 +1494,7 @@ impl<'a> Generator<'a> {
             Expr::IsDefined(var_name) => self.visit_is_defined(buf, true, var_name)?,
             Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
             Expr::As(ref expr, target) => self.visit_as(ctx, buf, expr, target)?,
+            Expr::Concat(ref exprs) => self.visit_concat(ctx, buf, exprs)?,
         })
     }
 
@@ -1548,6 +1557,27 @@ impl<'a> Generator<'a> {
             ")) as rinja::helpers::core::primitive::{target}"
         ));
         Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn visit_concat(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        exprs: &[WithSpan<'_, Expr<'_>>],
+    ) -> Result<DisplayWrap, CompileError> {
+        match exprs {
+            [] => unreachable!(),
+            [expr] => self.visit_expr(ctx, buf, expr),
+            exprs => {
+                let (l, r) = exprs.split_at((exprs.len() + 1) / 2);
+                buf.write("rinja::helpers::Concat(&(");
+                self.visit_concat(ctx, buf, l)?;
+                buf.write("), &(");
+                self.visit_concat(ctx, buf, r)?;
+                buf.write("))");
+                Ok(DisplayWrap::Unwrapped)
+            }
+        }
     }
 
     fn visit_try(
@@ -3083,6 +3113,7 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::NamedArgument(_, expr) => is_cacheable(expr),
         Expr::As(expr, _) => is_cacheable(expr),
         Expr::Try(expr) => is_cacheable(expr),
+        Expr::Concat(args) => args.iter().all(is_cacheable),
         // We have too little information to tell if the expression is pure:
         Expr::Call(_, _) => false,
         Expr::RustMacro(_, _) => false,

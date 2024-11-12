@@ -611,3 +611,25 @@ fn test_ref_custom_type() {
     };
     assert_eq!(tmpl.render().unwrap(), TEXT);
 }
+
+#[test]
+fn test_concat_outer() {
+    #[derive(Template)]
+    #[template(ext = "html", source = r#"{{ "<" ~ a ~ '>' }}"#)]
+    struct ConcatOuter {
+        a: &'static str,
+    }
+
+    assert_eq!(ConcatOuter { a: "'" }.to_string(), "&#60;&#39;&#62;");
+}
+
+#[test]
+fn test_concat_inner() {
+    #[derive(Template)]
+    #[template(ext = "html", source = r#"{{ ("<" ~ a ~ '>')|urlencode }}"#)]
+    struct ConcatInner {
+        a: &'static str,
+    }
+
+    assert_eq!(ConcatInner { a: "'" }.to_string(), "%3C%27%3E");
+}
