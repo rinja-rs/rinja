@@ -256,7 +256,7 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(compare, bor, alt(("==", "!=", ">=", ">", "<=", "<",)));
     expr_prec_layer!(bor, bxor, "bitor".value("|"));
     expr_prec_layer!(bxor, band, unpeek(token_xor));
-    expr_prec_layer!(band, shifts, unpeek(token_bitand));
+    expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
     expr_prec_layer!(addsub, concat, alt(("+", "-")));
 
@@ -542,15 +542,14 @@ fn token_xor(i: &str) -> InputParseResult<'_> {
     }
 }
 
-fn token_bitand(i: &str) -> InputParseResult<'_> {
-    let (i, good) =
-        alt((keyword("bitand").value(true), ('&', not('&')).value(false))).parse_peek(i)?;
+fn token_bitand<'a>(i: &mut &'a str) -> ParseResult<'a> {
+    let good = alt((keyword("bitand").value(true), ('&', not('&')).value(false))).parse_next(i)?;
     if good {
-        Ok((i, "&"))
+        Ok("&")
     } else {
         Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the binary AND operator is called `bitand` in rinja",
-            i,
+            *i,
         )))
     }
 }
