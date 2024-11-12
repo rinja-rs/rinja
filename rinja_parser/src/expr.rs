@@ -409,7 +409,7 @@ impl<'a> Expr<'a> {
             Self::num,
             Self::str,
             Self::char,
-            unpeek(Self::path_var_bool),
+            Self::path_var_bool,
             unpeek(move |i| Self::array(i, level)),
             unpeek(move |i| Self::group(i, level)),
         ))
@@ -466,8 +466,8 @@ impl<'a> Expr<'a> {
         ))
     }
 
-    fn path_var_bool(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn path_var_bool(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         path_or_identifier
             .map(|v| match v {
                 PathOrIdentifier::Path(v) => Self::Path(v),
@@ -475,8 +475,8 @@ impl<'a> Expr<'a> {
                 PathOrIdentifier::Identifier("false") => Self::BoolLit(false),
                 PathOrIdentifier::Identifier(v) => Self::Var(v),
             })
-            .parse_peek(i)
-            .map(|(i, expr)| (i, WithSpan::new(expr, start)))
+            .parse_next(i)
+            .map(|expr| WithSpan::new(expr, start))
     }
 
     fn str(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
