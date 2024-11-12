@@ -411,29 +411,28 @@ impl<'a> Expr<'a> {
             Self::char,
             Self::path_var_bool,
             move |i: &mut _| Self::array(i, level),
-            unpeek(move |i| Self::group(i, level)),
+            move |i: &mut _| Self::group(i, level),
         ))
         .parse_peek(i)
     }
 
-    fn group(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    fn group(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let level = level.nest(i)?;
-        let start = i;
-        let (i, expr) =
-            preceded(ws('('), opt(unpeek(|i| Self::parse(i, level, true)))).parse_peek(i)?;
+        let start = *i;
+        let expr = preceded(ws('('), opt(unpeek(|i| Self::parse(i, level, true)))).parse_next(i)?;
         let Some(expr) = expr else {
-            let (i, _) = ')'.parse_peek(i)?;
-            return Ok((i, WithSpan::new(Self::Tuple(vec![]), start)));
+            let _ = ')'.parse_next(i)?;
+            return Ok(WithSpan::new(Self::Tuple(vec![]), start));
         };
 
-        let (i, comma) = ws(opt(peek(','))).parse_peek(i)?;
+        let comma = ws(opt(peek(','))).parse_next(i)?;
         if comma.is_none() {
-            let (i, _) = ')'.parse_peek(i)?;
-            return Ok((i, WithSpan::new(Self::Group(Box::new(expr)), start)));
+            let _ = ')'.parse_next(i)?;
+            return Ok(WithSpan::new(Self::Group(Box::new(expr)), start));
         }
 
         let mut exprs = vec![expr];
-        let (i, ()) = fold_repeat(
+        fold_repeat(
             0..,
             preceded(',', ws(unpeek(|i| Self::parse(i, level, true)))),
             || (),
@@ -441,9 +440,9 @@ impl<'a> Expr<'a> {
                 exprs.push(expr);
             },
         )
-        .parse_peek(i)?;
-        let (i, _) = (ws(opt(',')), ')').parse_peek(i)?;
-        Ok((i, WithSpan::new(Self::Tuple(exprs), start)))
+        .parse_next(i)?;
+        let _ = (ws(opt(',')), ')').parse_next(i)?;
+        Ok(WithSpan::new(Self::Tuple(exprs), start))
     }
 
     fn array(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
