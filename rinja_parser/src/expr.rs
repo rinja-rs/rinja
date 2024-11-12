@@ -407,7 +407,7 @@ impl<'a> Expr<'a> {
         let level = level.nest(i)?;
         alt((
             Self::num,
-            unpeek(Self::str),
+            Self::str,
             Self::char,
             unpeek(Self::path_var_bool),
             unpeek(move |i| Self::array(i, level)),
@@ -479,11 +479,11 @@ impl<'a> Expr<'a> {
             .map(|(i, expr)| (i, WithSpan::new(expr, start)))
     }
 
-    fn str(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn str(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         str_lit
             .map(|i| WithSpan::new(Self::StrLit(i), start))
-            .parse_peek(i)
+            .parse_next(i)
     }
 
     fn num(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
