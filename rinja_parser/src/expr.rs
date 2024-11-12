@@ -255,7 +255,7 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(and, compare, "&&");
     expr_prec_layer!(compare, bor, alt(("==", "!=", ">=", ">", "<=", "<",)));
     expr_prec_layer!(bor, bxor, "bitor".value("|"));
-    expr_prec_layer!(bxor, band, unpeek(token_xor));
+    expr_prec_layer!(bxor, band, token_xor);
     expr_prec_layer!(band, shifts, token_bitand);
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
     expr_prec_layer!(addsub, concat, alt(("+", "-")));
@@ -530,14 +530,14 @@ impl<'a> Expr<'a> {
     }
 }
 
-fn token_xor(i: &str) -> InputParseResult<'_> {
-    let (i, good) = alt((keyword("xor").value(true), '^'.value(false))).parse_peek(i)?;
+fn token_xor<'a>(i: &mut &'a str) -> ParseResult<'a> {
+    let good = alt((keyword("xor").value(true), '^'.value(false))).parse_next(i)?;
     if good {
-        Ok((i, "^"))
+        Ok("^")
     } else {
         Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "the binary XOR operator is called `xor` in rinja",
-            i,
+            *i,
         )))
     }
 }
