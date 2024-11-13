@@ -274,40 +274,14 @@ impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
     }
 }
 
-/// FIXME: replace with `s.trim_ascii_start()` when we raise our MSRV to 1.80
-fn trim_ascii_start(s: &str) -> &str {
-    let mut s = s.as_bytes();
-    loop {
-        match s {
-            [c, tail @ ..] if c.is_ascii_whitespace() => s = tail,
-            // SAFETY: either we are at the front of the input, at an empty input, or the previous
-            // character was an ASCII character, so we must be at a char boundary
-            s => return unsafe { std::str::from_utf8_unchecked(s) },
-        }
-    }
-}
-
-/// FIXME: replace with `s.trim_ascii_end()` when we raise our MSRV to 1.80
-fn trim_ascii_end(s: &str) -> &str {
-    let mut s = s.as_bytes();
-    loop {
-        match s {
-            [init @ .., c] if c.is_ascii_whitespace() => s = init,
-            // SAFETY: either we are at the front of the input, at an empty input, or the previous
-            // character was an ASCII character, so we must be at a char boundary
-            s => return unsafe { std::str::from_utf8_unchecked(s) },
-        }
-    }
-}
-
 #[inline]
 fn skip_ws0(i: &str) -> ParseResult<'_, ()> {
-    Ok((trim_ascii_start(i), ()))
+    Ok((i.trim_ascii_start(), ()))
 }
 
 #[inline]
 fn skip_ws1(i: &str) -> ParseResult<'_, ()> {
-    let j = trim_ascii_start(i);
+    let j = i.trim_ascii_start();
     if i.len() != j.len() {
         Ok((j, ()))
     } else {
