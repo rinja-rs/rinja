@@ -12,10 +12,10 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::ascii::escaped;
-use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, preceded, repeat};
+use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::AsChar;
-use winnow::token::{any, one_of, tag, take_till0, take_till1, take_while};
+use winnow::token::{any, one_of, take_till0, take_till1, take_while};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -666,28 +666,42 @@ impl<'a> State<'a> {
         ret
     }
 
-    fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_start).parse_next(i)
+    fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.block_start.value(()).parse_next(i)
     }
 
-    fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_end).parse_next(i)
+    fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        let (i, control) = alt((
+            self.syntax.block_end.value(None),
+            peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
+            |_| fail(i), // rollback on partial matches in the previous line
+        ))
+        .parse_next(i)?;
+        if let Some(control) = control {
+            let message = format!(
+                "unclosed block, you likely meant to apply whitespace control: {:?}",
+                format!("{control}{}", self.syntax.block_end),
+            );
+            Err(ParseErr::backtrack(ErrorContext::new(message, i).into()))
+        } else {
+            Ok((i, ()))
+        }
     }
 
-    fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_start).parse_next(i)
+    fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.comment_start.value(()).parse_next(i)
     }
 
-    fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_end).parse_next(i)
+    fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.comment_end.value(()).parse_next(i)
     }
 
-    fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_start).parse_next(i)
+    fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.expr_start.value(()).parse_next(i)
     }
 
-    fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_end).parse_next(i)
+    fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.expr_end.value(()).parse_next(i)
     }
 
     fn enter_loop(&self) {

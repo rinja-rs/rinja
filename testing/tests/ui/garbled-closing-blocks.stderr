@@ -1,4 +1,4 @@
-error: failed to parse template source
+error: unclosed block, you likely meant to apply whitespace control: "-%}"
  --> <source attribute>:1:11
        "%-}{% endif %}"
  --> tests/ui/garbled-closing-blocks.rs:4:34
@@ -6,7 +6,7 @@ error: failed to parse template source
 4 | #[template(ext = "txt", source = "{% if cond %-}{% endif %}")]
   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: failed to parse template source
+error: unclosed block, you likely meant to apply whitespace control: "+%}"
  --> <source attribute>:1:11
        "%+}{% endif %}"
   --> tests/ui/garbled-closing-blocks.rs:10:34
@@ -14,7 +14,7 @@ error: failed to parse template source
 10 | #[template(ext = "txt", source = "{% if cond %+}{% endif %}")]
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: failed to parse template source
+error: unclosed block, you likely meant to apply whitespace control: "~%}"
  --> <source attribute>:1:11
        "%~}{% endif %}"
   --> tests/ui/garbled-closing-blocks.rs:16:34
@@ -22,7 +22,7 @@ error: failed to parse template source
 16 | #[template(ext = "txt", source = "{% if cond %~}{% endif %}")]
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: failed to parse template source
+error: unclosed block, you likely meant to apply whitespace control: "-%}"
  --> <source attribute>:1:22
        "%-}"
   --> tests/ui/garbled-closing-blocks.rs:22:34
@@ -30,7 +30,7 @@ error: failed to parse template source
 22 | #[template(ext = "txt", source = "{% if cond %}{% endif %-}")]
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: failed to parse template source
+error: unclosed block, you likely meant to apply whitespace control: "+%}"
  --> <source attribute>:1:22
        "%+}"
   --> tests/ui/garbled-closing-blocks.rs:28:34
@@ -38,7 +38,7 @@ error: failed to parse template source
 28 | #[template(ext = "txt", source = "{% if cond %}{% endif %+}")]
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: failed to parse template source
+error: unclosed block, you likely meant to apply whitespace control: "~%}"
  --> <source attribute>:1:22
        "%~}"
   --> tests/ui/garbled-closing-blocks.rs:34:34

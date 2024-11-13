@@ -117,7 +117,7 @@ impl<'a> Node<'a> {
 
         let (i, closed) = cut_node(
             None,
-            alt(((|i| s.tag_block_end(i)).value(true), ws(eof).value(false))),
+            alt((ws(eof).value(false), (|i| s.tag_block_end(i)).value(true))),
         )
         .parse_next(i)?;
         match closed {
@@ -457,7 +457,7 @@ fn check_block_start<'a>(
     s: &State<'_>,
     node: &str,
     expected: &str,
-) -> ParseResult<'a> {
+) -> ParseResult<'a, ()> {
     if i.is_empty() {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             format!("expected `{expected}` to terminate `{node}` node, found nothing"),
