@@ -15,7 +15,7 @@ use winnow::ascii::escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::AsChar;
-use winnow::token::{any, one_of, take_till0, take_till1, take_while};
+use winnow::token::{any, one_of, take_till1, take_while};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -274,18 +274,51 @@ impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
     }
 }
 
-fn is_ws(c: char) -> bool {
-    matches!(c, ' ' | '\t' | '\r' | '\n')
+/// FIXME: replace with `s.trim_ascii_start()` when we raise our MSRV to 1.80
+fn trim_ascii_start(s: &str) -> &str {
+    let mut s = s.as_bytes();
+    loop {
+        match s {
+            [c, tail @ ..] if c.is_ascii_whitespace() => s = tail,
+            // SAFETY: either we are at the front of the input, at an empty input, or the previous
+            // character was an ASCII character, so we must be at a char boundary
+            s => return unsafe { std::str::from_utf8_unchecked(s) },
+        }
+    }
 }
 
-fn not_ws(c: char) -> bool {
-    !is_ws(c)
+/// FIXME: replace with `s.trim_ascii_end()` when we raise our MSRV to 1.80
+fn trim_ascii_end(s: &str) -> &str {
+    let mut s = s.as_bytes();
+    loop {
+        match s {
+            [init @ .., c] if c.is_ascii_whitespace() => s = init,
+            // SAFETY: either we are at the front of the input, at an empty input, or the previous
+            // character was an ASCII character, so we must be at a char boundary
+            s => return unsafe { std::str::from_utf8_unchecked(s) },
+        }
+    }
+}
+
+#[inline]
+fn skip_ws0(i: &str) -> ParseResult<'_, ()> {
+    Ok((trim_ascii_start(i), ()))
+}
+
+#[inline]
+fn skip_ws1(i: &str) -> ParseResult<'_, ()> {
+    let j = trim_ascii_start(i);
+    if i.len() != j.len() {
+        Ok((j, ()))
+    } else {
+        fail.parse_next(i)
+    }
 }
 
 fn ws<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
-    delimited(take_till0(not_ws), inner, take_till0(not_ws))
+    delimited(skip_ws0, inner, skip_ws0)
 }
 
 /// Skips input until `end` was found, but does not consume it.
@@ -892,7 +925,7 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = take_till0(not_ws).parse_next(i)?;
+    let (j, _) = skip_ws0.parse_next(i)?;
     let had_spaces = i.len() != j.len();
     let (j, _) = ('|', not('|')).parse_next(j)?;
 
