@@ -333,8 +333,9 @@ impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
 }
 
 #[inline]
-fn skip_ws0(i: &str) -> InputParseResult<'_, ()> {
-    Ok((i.trim_ascii_start(), ()))
+fn skip_ws0<'a>(i: &mut &'a str) -> ParseResult<'a, ()> {
+    *i = i.trim_ascii_start();
+    Ok(())
 }
 
 #[inline]
@@ -350,7 +351,7 @@ fn skip_ws1(i: &str) -> InputParseResult<'_, ()> {
 fn ws<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
-    delimited(unpeek(skip_ws0), inner, unpeek(skip_ws0))
+    delimited(skip_ws0, inner, skip_ws0)
 }
 
 /// Skips input until `end` was found, but does not consume it.

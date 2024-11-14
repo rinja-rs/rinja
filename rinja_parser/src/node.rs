@@ -92,7 +92,7 @@ impl<'a> Node<'a> {
         let (mut i, tag) = preceded(
             |i: &mut _| s.tag_block_start(i),
             peek(preceded(
-                (opt(unpeek(Whitespace::parse)), unpeek(skip_ws0)),
+                (opt(unpeek(Whitespace::parse)), skip_ws0),
                 identifier,
             )),
         )
