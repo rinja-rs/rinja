@@ -700,8 +700,6 @@ impl<'a> Suffix<'a> {
     }
 
     fn r#try(i: &'a str) -> InputParseResult<'a, Self> {
-        preceded(unpeek(skip_ws0), '?')
-            .map(|_| Self::Try)
-            .parse_peek(i)
+        preceded(skip_ws0, '?').map(|_| Self::Try).parse_peek(i)
     }
 }
