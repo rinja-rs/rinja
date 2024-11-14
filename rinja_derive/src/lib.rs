@@ -183,11 +183,7 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
     let mut result = build_template_inner(ast, &template_args);
     if let Err(err) = &mut result {
         if err.span.is_none() {
-            err.span = template_args
-                .source
-                .as_ref()
-                .and_then(|(_, span)| *span)
-                .or(template_args.template_span);
+            err.span = template_args.source.1.or(template_args.template_span);
         }
     }
     result

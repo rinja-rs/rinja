@@ -3,6 +3,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::fs::read_to_string;
 use std::iter::FusedIterator;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
@@ -11,6 +12,7 @@ use proc_macro2::Span;
 use rustc_hash::FxBuildHasher;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::{Attribute, Expr, ExprLit, Ident, Lit, LitBool, LitStr, Meta, Token};
 
 use crate::config::{Config, SyntaxAndCache};
 use crate::{CompileError, FileInfo, MsgValidEscapers, OnceMap};
@@ -40,7 +42,7 @@ impl TemplateInput<'_> {
         args: &'n TemplateArgs,
     ) -> Result<TemplateInput<'n>, CompileError> {
         let TemplateArgs {
-            source,
+            source: (source, source_span),
             block,
             print,
             escaping,
@@ -53,15 +55,6 @@ impl TemplateInput<'_> {
         // Validate the `source` and `ext` value together, since they are
         // related. In case `source` was used instead of `path`, the value
         // of `ext` is merged into a synthetic `path` value here.
-        let &(ref source, source_span) = source.as_ref().ok_or_else(|| {
-            CompileError::new(
-                #[cfg(not(feature = "code-in-doc"))]
-                "specify one template argument `path` or `source`",
-                #[cfg(feature = "code-in-doc")]
-                "specify one template argument `path`, `source` or `in_doc`",
-                None,
-            )
-        })?;
         let path = match (&source, &ext) {
             (Source::Path(path), _) => config.find_template(path, None, None)?,
             (&Source::Source(_), Some(ext)) => {
@@ -117,7 +110,7 @@ impl TemplateInput<'_> {
             extension_to_mime_type(ext_default_to_path(ext.as_deref(), &path).unwrap_or("txt"))
                 .to_string();
 
-        let empty_punctuated = syn::punctuated::Punctuated::new();
+        let empty_punctuated = Punctuated::new();
         let fields = match ast.data {
             syn::Data::Struct(ref struct_) => {
                 if let syn::Fields::Named(ref fields) = &struct_.fields {
@@ -141,7 +134,7 @@ impl TemplateInput<'_> {
             config,
             syntax,
             source,
-            source_span,
+            source_span: *source_span,
             block: block.as_deref(),
             print: *print,
             escaper,
@@ -285,9 +278,9 @@ impl TemplateInput<'_> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct TemplateArgs {
-    pub(crate) source: Option<(Source, Option<Span>)>,
+    pub(crate) source: (Source, Option<Span>),
     block: Option<String>,
     print: Print,
     escaping: Option<String>,
@@ -311,128 +304,61 @@ impl TemplateArgs {
             ));
         }
 
-        // Check that an attribute called `template()` exists at least once and that it is
-        // the proper type (list).
-        let mut templates_attrs = ast
-            .attrs
-            .iter()
-            .filter(|attr| attr.path().is_ident("template"))
-            .peekable();
-        let mut args = match templates_attrs.peek() {
-            Some(attr) => Self {
-                template_span: Some(attr.path().span()),
-                ..Self::default()
-            },
-            None => {
-                return Err(CompileError::no_file_info(
-                    "no attribute `template` found",
-                    None,
-                ));
-            }
+        let args = PartialTemplateArgs::new(&ast.attrs)?;
+        let Some(template) = args.template else {
+            return Err(CompileError::no_file_info(
+                "no attribute `template` found",
+                None,
+            ));
         };
-        let attrs = templates_attrs
-            .map(|attr| {
-                type Attrs = Punctuated<syn::Meta, syn::Token![,]>;
-                match attr.parse_args_with(Attrs::parse_terminated) {
-                    Ok(args) => Ok(args),
-                    Err(e) => Err(CompileError::no_file_info(
-                        format!("unable to parse template arguments: {e}"),
-                        Some(attr.path().span()),
-                    )),
+        Ok(Self {
+            source: match args.source {
+                Some((_, PartialTemplateArgsSource::Path(s))) => {
+                    (Source::Path(s.value()), Some(s.span()))
                 }
-            })
-            .flat_map(ResultIter::from);
-
-        // Loop over the meta attributes and find everything that we
-        // understand. Return a CompileError if something is not right.
-        // `source` contains an enum that can represent `path` or `source`.
-        for item in attrs {
-            let pair = match item? {
-                syn::Meta::NameValue(pair) => pair,
-                v => {
+                Some((_, PartialTemplateArgsSource::Source(s))) => {
+                    (Source::Source(s.value().into()), Some(s.span()))
+                }
+                #[cfg(feature = "code-in-doc")]
+                Some((ident, PartialTemplateArgsSource::InDoc(_))) => {
+                    source_from_docs(&ident, &args.meta_docs, ast)?
+                }
+                None => {
                     return Err(CompileError::no_file_info(
-                        "unsupported attribute argument",
-                        Some(v.span()),
+                        #[cfg(not(feature = "code-in-doc"))]
+                        "specify one template argument `path` or `source`",
+                        #[cfg(feature = "code-in-doc")]
+                        "specify one template argument `path`, `source` or `in_doc`",
+                        Some(template.span()),
                     ));
                 }
-            };
-
-            let ident = match pair.path.get_ident() {
-                Some(ident) => ident,
-                None => unreachable!("not possible in syn::Meta::NameValue(…)"),
-            };
-
-            let mut value_expr = &pair.value;
-            let value = loop {
-                match value_expr {
-                    syn::Expr::Lit(lit) => break lit,
-                    syn::Expr::Group(group) => value_expr = &group.expr,
-                    v => {
-                        return Err(CompileError::no_file_info(
-                            format!("unsupported argument value type for `{ident}`"),
-                            Some(v.span()),
-                        ));
-                    }
-                }
-            };
-
-            if ident == "path" {
-                source_or_path(ident, value, &mut args.source, Source::Path)?;
-                args.ext_span = Some(value.span());
-            } else if ident == "source" {
-                source_or_path(ident, value, &mut args.source, |s| Source::Source(s.into()))?;
-            } else if ident == "in_doc" {
-                source_from_docs(ident, value, &mut args.source, ast)?;
-            } else if ident == "block" {
-                set_template_str_attr(ident, value, &mut args.block)?;
-            } else if ident == "print" {
-                if let syn::Lit::Str(s) = &value.lit {
-                    args.print = match s.value().as_str() {
-                        "all" => Print::All,
-                        "ast" => Print::Ast,
-                        "code" => Print::Code,
-                        "none" => Print::None,
-                        v => {
-                            return Err(CompileError::no_file_info(
-                                format!("invalid value for `print` option: {v}"),
-                                Some(s.span()),
-                            ));
-                        }
-                    };
-                } else {
-                    return Err(CompileError::no_file_info(
-                        "`print` value must be string literal",
-                        Some(value.lit.span()),
-                    ));
-                }
-            } else if ident == "escape" {
-                set_template_str_attr(ident, value, &mut args.escaping)?;
-            } else if ident == "ext" {
-                set_template_str_attr(ident, value, &mut args.ext)?;
-                args.ext_span = Some(value.span());
-            } else if ident == "syntax" {
-                set_template_str_attr(ident, value, &mut args.syntax)?;
-            } else if ident == "config" {
-                set_template_str_attr(ident, value, &mut args.config)?;
-                args.config_span = Some(value.span());
-            } else if ident == "whitespace" {
-                set_template_str_attr(ident, value, &mut args.whitespace)?;
-            } else {
-                return Err(CompileError::no_file_info(
-                    format!("unsupported attribute key `{ident}` found"),
-                    Some(ident.span()),
-                ));
-            }
-        }
-
-        Ok(args)
+            },
+            block: args.block.map(|(_, value)| value.value()),
+            print: args.print.map(|(_, _, value)| value).unwrap_or_default(),
+            escaping: args.escape.map(|(_, value)| value.value()),
+            ext: args.ext.as_ref().map(|(_, s)| s.value()),
+            ext_span: args.ext.as_ref().map(|(_, s)| s.span()),
+            syntax: args.syntax.map(|(_, value)| value.value()),
+            config: args.config.as_ref().map(|(_, s)| s.value()),
+            whitespace: args.whitespace.map(|(_, value)| value.value()),
+            template_span: Some(template.span()),
+            config_span: args.config.as_ref().map(|(_, s)| s.span()),
+        })
     }
 
     pub(crate) fn fallback() -> Self {
         Self {
-            source: Some((Source::Source("".into()), None)),
+            source: (Source::Source("".into()), None),
+            block: None,
+            print: Print::default(),
+            escaping: None,
             ext: Some("txt".to_string()),
-            ..Self::default()
+            ext_span: None,
+            syntax: None,
+            config: None,
+            whitespace: None,
+            template_span: None,
+            config_span: None,
         }
     }
 
@@ -444,47 +370,22 @@ impl TemplateArgs {
 /// Try to find the source in the comment, in a `rinja` code block.
 ///
 /// This is only done if no path or source was given in the `#[template]` attribute.
+#[cfg(feature = "code-in-doc")]
 fn source_from_docs(
-    name: &syn::Ident,
-    value: &syn::ExprLit,
-    dest: &mut Option<(Source, Option<Span>)>,
+    name: &Ident,
+    docs: &[Attribute],
     ast: &syn::DeriveInput,
-) -> Result<(), CompileError> {
-    match &value.lit {
-        syn::Lit::Bool(syn::LitBool { value, .. }) => {
-            if !value {
-                return Ok(());
-            }
-        }
-        lit => {
-            return Err(CompileError::no_file_info(
-                "argument `in_doc` expects as boolean value",
-                Some(lit.span()),
-            ));
-        }
-    };
-    #[cfg(not(feature = "code-in-doc"))]
-    {
-        let _ = (name, dest, ast);
-        Err(CompileError::no_file_info(
-            "enable feature `code-in-doc` to use `in_doc` argument",
-            Some(name.span()),
-        ))
-    }
-    #[cfg(feature = "code-in-doc")]
-    {
-        ensure_source_once(name, dest)?;
-        let (span, source) = collect_comment_blocks(name, ast)?;
-        let source = strip_common_ws_prefix(source);
-        let source = collect_rinja_code_blocks(name, ast, source)?;
-        *dest = Some((source, span));
-        Ok(())
-    }
+) -> Result<(Source, Option<Span>), CompileError> {
+    let (span, source) = collect_comment_blocks(name, docs, ast)?;
+    let source = strip_common_ws_prefix(source);
+    let source = collect_rinja_code_blocks(name, ast, source)?;
+    Ok((source, span))
 }
 
 #[cfg(feature = "code-in-doc")]
 fn collect_comment_blocks(
-    name: &syn::Ident,
+    name: &Ident,
+    docs: &[Attribute],
     ast: &syn::DeriveInput,
 ) -> Result<(Option<Span>, String), CompileError> {
     let mut span: Option<Span> = None;
@@ -502,9 +403,9 @@ fn collect_comment_blocks(
     };
 
     let mut source = String::new();
-    for a in &ast.attrs {
+    for a in docs {
         // is a comment?
-        let syn::Meta::NameValue(kv) = &a.meta else {
+        let Meta::NameValue(kv) = &a.meta else {
             continue;
         };
         if !kv.path.is_ident("doc") {
@@ -515,12 +416,12 @@ fn collect_comment_blocks(
         let mut value = &kv.value;
         let value = loop {
             match value {
-                syn::Expr::Lit(lit) => break lit,
-                syn::Expr::Group(group) => value = &group.expr,
+                Expr::Lit(lit) => break lit,
+                Expr::Group(group) => value = &group.expr,
                 _ => continue,
             }
         };
-        let syn::Lit::Str(value) = &value.lit else {
+        let Lit::Str(value) = &value.lit else {
             continue;
         };
 
@@ -536,7 +437,7 @@ fn collect_comment_blocks(
 }
 
 #[cfg(feature = "code-in-doc")]
-fn no_rinja_code_block(name: &syn::Ident, ast: &syn::DeriveInput) -> CompileError {
+fn no_rinja_code_block(name: &Ident, ast: &syn::DeriveInput) -> CompileError {
     let kind = match &ast.data {
         syn::Data::Struct(_) => "struct",
         syn::Data::Enum(_) => "enum",
@@ -581,7 +482,7 @@ fn strip_common_ws_prefix(source: String) -> String {
 
 #[cfg(feature = "code-in-doc")]
 fn collect_rinja_code_blocks(
-    name: &syn::Ident,
+    name: &Ident,
     ast: &syn::DeriveInput,
     source: String,
 ) -> Result<Source, CompileError> {
@@ -637,62 +538,6 @@ impl<I: Iterator, E> Iterator for ResultIter<I, E> {
 
 impl<I: FusedIterator, E> FusedIterator for ResultIter<I, E> {}
 
-fn source_or_path(
-    name: &syn::Ident,
-    value: &syn::ExprLit,
-    dest: &mut Option<(Source, Option<Span>)>,
-    ctor: fn(String) -> Source,
-) -> Result<(), CompileError> {
-    ensure_source_once(name, dest)?;
-    if let syn::Lit::Str(s) = &value.lit {
-        *dest = Some((ctor(s.value()), Some(value.span())));
-        Ok(())
-    } else {
-        Err(CompileError::no_file_info(
-            format!("`{name}` value must be string literal"),
-            Some(value.lit.span()),
-        ))
-    }
-}
-
-fn ensure_source_once(
-    name: &syn::Ident,
-    source: &mut Option<(Source, Option<Span>)>,
-) -> Result<(), CompileError> {
-    if source.is_none() {
-        Ok(())
-    } else {
-        Err(CompileError::no_file_info(
-            #[cfg(feature = "code-in-doc")]
-            "must specify `source`, `path` or `is_doc` exactly once",
-            #[cfg(not(feature = "code-in-doc"))]
-            "must specify `source` or `path` exactly once",
-            Some(name.span()),
-        ))
-    }
-}
-
-fn set_template_str_attr(
-    name: &syn::Ident,
-    value: &syn::ExprLit,
-    dest: &mut Option<String>,
-) -> Result<(), CompileError> {
-    if dest.is_some() {
-        Err(CompileError::no_file_info(
-            format!("attribute `{name}` already set"),
-            Some(name.span()),
-        ))
-    } else if let syn::Lit::Str(s) = &value.lit {
-        *dest = Some(s.value());
-        Ok(())
-    } else {
-        Err(CompileError::no_file_info(
-            format!("`{name}` value must be string literal"),
-            Some(value.lit.span()),
-        ))
-    }
-}
-
 #[inline]
 fn ext_default_to_path<'a>(ext: Option<&'a str>, path: &'a Path) -> Option<&'a str> {
     ext.or_else(|| extension(path))
@@ -728,6 +573,20 @@ pub(crate) enum Print {
 impl Default for Print {
     fn default() -> Self {
         Self::None
+    }
+}
+
+impl FromStr for Print {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" => Ok(Self::All),
+            "ast" => Ok(Self::Ast),
+            "code" => Ok(Self::Code),
+            "none" => Ok(Self::None),
+            _ => Err(format!("invalid value for `print` option: {s}")),
+        }
     }
 }
 
@@ -798,6 +657,207 @@ pub(crate) fn get_template_source(
         Arc::clone,
     )
 }
+
+#[derive(Default)]
+pub(crate) struct PartialTemplateArgs {
+    pub(crate) template: Option<Ident>,
+    pub(crate) meta_docs: Vec<Attribute>,
+    pub(crate) source: Option<(Ident, PartialTemplateArgsSource)>,
+    pub(crate) block: Option<(Ident, LitStr)>,
+    pub(crate) print: Option<(Ident, LitStr, Print)>,
+    pub(crate) escape: Option<(Ident, LitStr)>,
+    pub(crate) ext: Option<(Ident, LitStr)>,
+    pub(crate) syntax: Option<(Ident, LitStr)>,
+    pub(crate) config: Option<(Ident, LitStr)>,
+    pub(crate) whitespace: Option<(Ident, LitStr)>,
+}
+
+pub(crate) enum PartialTemplateArgsSource {
+    Path(LitStr),
+    Source(LitStr),
+    #[cfg(feature = "code-in-doc")]
+    InDoc(#[allow(dead_code)] LitBool),
+}
+
+// implement PartialTemplateArgs::new()
+const _: () = {
+    impl PartialTemplateArgs {
+        pub(crate) fn new(attrs: &[Attribute]) -> Result<Self, CompileError> {
+            new(attrs)
+        }
+    }
+
+    #[inline]
+    fn new(attrs: &[Attribute]) -> Result<PartialTemplateArgs, CompileError> {
+        let mut this = PartialTemplateArgs::default();
+        for attr in attrs {
+            let Some(ident) = attr.path().get_ident() else {
+                continue;
+            };
+            if ident == "doc" {
+                this.meta_docs.push(attr.clone());
+                continue;
+            } else if ident == "template" {
+                this.template = Some(ident.clone());
+            } else {
+                continue;
+            }
+
+            let args = attr
+                .parse_args_with(<Punctuated<Meta, Token![,]>>::parse_terminated)
+                .map_err(|e| {
+                    CompileError::no_file_info(
+                        format!("unable to parse template arguments: {e}"),
+                        Some(attr.path().span()),
+                    )
+                })?;
+            for arg in args {
+                let pair = match arg {
+                    Meta::NameValue(pair) => pair,
+                    v => {
+                        return Err(CompileError::no_file_info(
+                            "unsupported attribute argument",
+                            Some(v.span()),
+                        ));
+                    }
+                };
+                let ident = match pair.path.get_ident() {
+                    Some(ident) => ident,
+                    None => unreachable!("not possible in syn::Meta::NameValue(…)"),
+                };
+
+                let mut value_expr = pair.value;
+                let value = loop {
+                    match value_expr {
+                        Expr::Lit(lit) => break lit,
+                        Expr::Group(group) => value_expr = *group.expr,
+                        v => {
+                            return Err(CompileError::no_file_info(
+                                format!("unsupported argument value type for `{ident}`"),
+                                Some(v.span()),
+                            ));
+                        }
+                    }
+                };
+
+                if ident == "path" {
+                    ensure_source_only_once(ident, &this.source)?;
+                    let value = get_strlit(ident, value)?;
+                    this.source = Some((ident.clone(), PartialTemplateArgsSource::Path(value)));
+                } else if ident == "source" {
+                    ensure_source_only_once(ident, &this.source)?;
+                    let value = get_strlit(ident, value)?;
+                    this.source = Some((ident.clone(), PartialTemplateArgsSource::Source(value)));
+                } else if ident == "in_doc" {
+                    let value = get_strbool(ident, value)?;
+                    if !value.value() {
+                        continue;
+                    }
+                    ensure_source_only_once(ident, &this.source)?;
+
+                    #[cfg(not(feature = "code-in-doc"))]
+                    {
+                        return Err(CompileError::no_file_info(
+                            "enable feature `code-in-doc` to use `in_doc` argument",
+                            Some(ident.span()),
+                        ));
+                    }
+                    #[cfg(feature = "code-in-doc")]
+                    {
+                        this.source =
+                            Some((ident.clone(), PartialTemplateArgsSource::InDoc(value)));
+                    }
+                } else if ident == "block" {
+                    set_strlit_pair(ident, value, &mut this.block)?;
+                } else if ident == "print" {
+                    ensure_only_once(ident, &mut this.print)?;
+                    let str_value = get_strlit(ident, value)?;
+                    let value = str_value
+                        .value()
+                        .parse()
+                        .map_err(|msg| CompileError::no_file_info(msg, Some(ident.span())))?;
+                    this.print = Some((ident.clone(), str_value, value));
+                } else if ident == "escape" {
+                    set_strlit_pair(ident, value, &mut this.escape)?;
+                } else if ident == "ext" {
+                    set_strlit_pair(ident, value, &mut this.ext)?;
+                } else if ident == "syntax" {
+                    set_strlit_pair(ident, value, &mut this.syntax)?;
+                } else if ident == "config" {
+                    set_strlit_pair(ident, value, &mut this.config)?;
+                } else if ident == "whitespace" {
+                    set_strlit_pair(ident, value, &mut this.whitespace)?;
+                } else {
+                    return Err(CompileError::no_file_info(
+                        format!("unsupported attribute key `{ident}` found"),
+                        Some(ident.span()),
+                    ));
+                }
+            }
+        }
+        Ok(this)
+    }
+
+    fn set_strlit_pair(
+        name: &Ident,
+        value: ExprLit,
+        dest: &mut Option<(Ident, LitStr)>,
+    ) -> Result<(), CompileError> {
+        ensure_only_once(name, dest)?;
+        let value = get_strlit(name, value)?;
+        *dest = Some((name.clone(), value));
+        Ok(())
+    }
+
+    fn ensure_only_once<T>(name: &Ident, dest: &mut Option<T>) -> Result<(), CompileError> {
+        if dest.is_none() {
+            Ok(())
+        } else {
+            Err(CompileError::no_file_info(
+                format!("attribute `{name}` already set"),
+                Some(name.span()),
+            ))
+        }
+    }
+
+    fn get_strlit(name: &Ident, value: ExprLit) -> Result<LitStr, CompileError> {
+        if let Lit::Str(s) = value.lit {
+            Ok(s)
+        } else {
+            Err(CompileError::no_file_info(
+                format!("`{name}` value must be string literal"),
+                Some(value.lit.span()),
+            ))
+        }
+    }
+
+    fn get_strbool(name: &Ident, value: ExprLit) -> Result<LitBool, CompileError> {
+        if let Lit::Bool(s) = value.lit {
+            Ok(s)
+        } else {
+            Err(CompileError::no_file_info(
+                format!("argument `{name}` expects as boolean value"),
+                Some(value.lit.span()),
+            ))
+        }
+    }
+
+    fn ensure_source_only_once(
+        name: &Ident,
+        source: &Option<(Ident, PartialTemplateArgsSource)>,
+    ) -> Result<(), CompileError> {
+        if source.is_some() {
+            return Err(CompileError::no_file_info(
+                #[cfg(feature = "code-in-doc")]
+                "must specify `source`, `path` or `is_doc` exactly once",
+                #[cfg(not(feature = "code-in-doc"))]
+                "must specify `source` or `path` exactly once",
+                Some(name.span()),
+            ));
+        }
+        Ok(())
+    }
+};
 
 const JINJA_EXTENSIONS: &[&str] = &["j2", "jinja", "jinja2", "rinja"];
 
