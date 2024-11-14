@@ -21,3 +21,13 @@ fn let_macro() {
     let template = A { y: false };
     assert_eq!(template.render().unwrap(), "blob")
 }
+
+// Ensures that variables name can start with `_`.
+#[test]
+fn underscore() {
+    #[derive(Template)]
+    #[template(source = r#"{% let _x = 7 %}{{ _x }}"#, ext = "html")]
+    struct X;
+
+    assert_eq!(X.render().unwrap(), "7")
+}

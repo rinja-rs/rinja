@@ -633,7 +633,12 @@ fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
             path.extend(rest);
             Ok((i, PathOrIdentifier::Path(path)))
         }
-        (None, name, []) if name.chars().next().map_or(true, char::is_lowercase) => {
+        (None, name, [])
+            if name
+                .chars()
+                .next()
+                .map_or(true, |c| c == '_' || c.is_lowercase()) =>
+        {
             Ok((i, PathOrIdentifier::Identifier(name)))
         }
         (None, start, tail) => {
