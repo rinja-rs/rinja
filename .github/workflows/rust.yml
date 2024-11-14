@@ -110,10 +110,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: mdbook
-      - run: mdbook build book
+      - name: Generate "book/theme/index.hbs" as "skeleton" of the generated pages.
+        run: ./update-theme.py
+        working-directory: book
+      - name: Install mdbook
+        run: |
+          mkdir -p $HOME/bin
+          curl --location --silent --show-error --fail https://github.com/cargo-bins/cargo-quickinstall/releases/download/mdbook-0.4.40/mdbook-0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar -xzvvf - -C $HOME/bin
+      - name: Convert the book to HTML
+        run: $HOME/bin/mdbook build
+        working-directory: book
 
   DevSkim:
     name: DevSkim
