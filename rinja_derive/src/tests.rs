@@ -4,6 +4,7 @@ use std::fmt;
 use std::path::Path;
 
 use console::style;
+use prettyplease::unparse;
 use similar::{Algorithm, ChangeTag, TextDiffConfig};
 
 use crate::build_template;
@@ -12,31 +13,7 @@ use crate::build_template;
 // the code we want to check.
 #[track_caller]
 fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usize) {
-    let jinja = format!(
-        r##"#[template(source = {jinja:?}, ext = "txt")]
-struct Foo {{ {} }}"##,
-        fields
-            .iter()
-            .map(|(name, type_)| format!("{name}: {type_}"))
-            .collect::<Vec<_>>()
-            .join(","),
-    );
-
-    let generated = build_template(&syn::parse_str::<syn::DeriveInput>(&jinja).unwrap()).unwrap();
-    let generated = match generated.parse() {
-        Ok(generated) => generated,
-        Err(err) => panic!(
-            "\n\
-            === Invalid code generated ===\n\
-            \n\
-            {generated}\n\
-            \n\
-            === Error ===\n\
-            \n\
-            {err}"
-        ),
-    };
-    let generated: syn::File = syn::parse2(generated).unwrap();
+    let generated = jinja_to_rust(jinja, fields).unwrap();
 
     let expected: proc_macro2::TokenStream = expected.parse().unwrap();
     let expected: syn::File = syn::parse_quote! {
@@ -82,8 +59,8 @@ struct Foo {{ {} }}"##,
         };
     };
 
-    let expected = prettyplease::unparse(&expected);
-    let generated = prettyplease::unparse(&generated);
+    let expected = unparse(&expected);
+    let generated = unparse(&generated);
     if expected != generated {
         struct Diff<'a>(&'a str, &'a str);
 
@@ -133,6 +110,34 @@ struct Foo {{ {} }}"##,
             diff = Diff(&expected, &generated),
         );
     }
+}
+
+fn jinja_to_rust(jinja: &str, fields: &[(&str, &str)]) -> syn::Result<syn::File> {
+    let jinja = format!(
+        r##"#[template(source = {jinja:?}, ext = "txt")]
+struct Foo {{ {} }}"##,
+        fields
+            .iter()
+            .map(|(name, type_)| format!("{name}: {type_}"))
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+
+    let generated = build_template(&syn::parse_str::<syn::DeriveInput>(&jinja).unwrap()).unwrap();
+    let generated = match generated.parse() {
+        Ok(generated) => generated,
+        Err(err) => panic!(
+            "\n\
+            === Invalid code generated ===\n\
+            \n\
+            {generated}\n\
+            \n\
+            === Error ===\n\
+            \n\
+            {err}"
+        ),
+    };
+    syn::parse2(generated)
 }
 
 #[test]
@@ -993,4 +998,20 @@ fn test_concat() {
         &[("a", "&'static str"), ("b", "u32")],
         3,
     );
+}
+
+#[test]
+fn extends_with_whitespace_control() {
+    const CONTROL: &[&str] = &["", "\t", "-", "+", "~"];
+
+    let expected = jinja_to_rust(r#"front {% extends "a.html" %} back"#, &[]).unwrap();
+    let expected = unparse(&expected);
+    for front in CONTROL {
+        for back in CONTROL {
+            let src = format!(r#"front {{%{front} extends "a.html" {back}%}} back"#);
+            let actual = jinja_to_rust(&src, &[]).unwrap();
+            let actual = unparse(&actual);
+            assert_eq!(expected, actual, "source: {:?}", src);
+        }
+    }
 }

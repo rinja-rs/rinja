@@ -1261,23 +1261,15 @@ pub struct Extends<'a> {
 impl<'a> Extends<'a> {
     fn parse(i: &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-
-        let (i, (pws, _, (path, nws))) = (
-            opt(Whitespace::parse),
-            ws(keyword("extends")),
+        preceded(
+            (opt(Whitespace::parse), ws(keyword("extends"))),
             cut_node(
                 Some("extends"),
-                (ws(str_lit_without_prefix), opt(Whitespace::parse)),
+                terminated(ws(str_lit_without_prefix), opt(Whitespace::parse)),
             ),
         )
-            .parse_next(i)?;
-        match (pws, nws) {
-            (None, None) => Ok((i, WithSpan::new(Self { path }, start))),
-            (_, _) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                "whitespace control is not allowed on `extends`",
-                start,
-            ))),
-        }
+        .map(|path| WithSpan::new(Self { path }, start))
+        .parse_next(i)
     }
 }
 

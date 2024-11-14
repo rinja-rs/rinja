@@ -1107,3 +1107,18 @@ fn fuzzed_excessive_syntax_lengths() {
         );
     }
 }
+
+#[test]
+fn extends_with_whitespace_control() {
+    const CONTROL: &[&str] = &["", "\t", "-", "+", "~"];
+
+    let syntax = Syntax::default();
+    let expected = Ast::from_str(r#"front {% extends "nothing" %} back"#, None, &syntax).unwrap();
+    for front in CONTROL {
+        for back in CONTROL {
+            let src = format!(r#"front {{%{front} extends "nothing" {back}%}} back"#);
+            let actual = Ast::from_str(&src, None, &syntax).unwrap();
+            assert_eq!(expected.nodes(), actual.nodes(), "source: {:?}", src);
+        }
+    }
+}
