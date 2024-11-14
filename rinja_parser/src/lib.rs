@@ -681,7 +681,7 @@ impl<'a> State<'a> {
         let (i, control) = alt((
             self.syntax.block_end.value(None),
             peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
-            |_| fail(i), // rollback on partial matches in the previous line
+            fail, // rollback on partial matches in the previous line
         ))
         .parse_next(i)?;
         if let Some(control) = control {
