@@ -8,11 +8,10 @@ use winnow::combinator::{
     terminated,
 };
 use winnow::error::{ErrorKind, ParserError as _};
-use winnow::token::{take_till0, take_till1};
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseResult, PathOrIdentifier, StrLit, WithSpan, char_lit,
-    filter, identifier, keyword, not_ws, num_lit, path_or_identifier, str_lit, ws,
+    filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0, skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -181,7 +180,7 @@ impl<'a> Expr<'a> {
 
     fn concat(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         fn concat_expr(i: &str, level: Level) -> ParseResult<'_, Option<WithSpan<'_, Expr<'_>>>> {
-            let ws1 = |i| opt(take_till1(not_ws)).parse_next(i);
+            let ws1 = |i| opt(skip_ws1).parse_next(i);
             let (j, data) = opt((ws1, '~', ws1, |i| Expr::muldivmod(i, level))).parse_next(i)?;
             if let Some((t1, _, t2, expr)) = data {
                 if t1.is_none() || t2.is_none() {
@@ -591,8 +590,6 @@ impl<'a> Suffix<'a> {
     }
 
     fn r#try(i: &'a str) -> ParseResult<'a, Self> {
-        preceded(take_till0(not_ws), '?')
-            .map(|_| Self::Try)
-            .parse_next(i)
+        preceded(skip_ws0, '?').map(|_| Self::Try).parse_next(i)
     }
 }

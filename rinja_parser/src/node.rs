@@ -5,12 +5,12 @@ use winnow::Parser;
 use winnow::combinator::{
     alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated1, terminated,
 };
-use winnow::token::{any, tag, take_till0};
+use winnow::token::{any, tag};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
-    ErrorContext, Expr, Filter, ParseResult, State, Target, WithSpan, filter, identifier, is_ws,
-    keyword, not_ws, skip_till, str_lit_without_prefix, ws,
+    ErrorContext, Expr, Filter, ParseResult, State, Target, WithSpan, filter, identifier, keyword,
+    skip_till, skip_ws0, str_lit_without_prefix, ws,
 };
 
 #[derive(Debug, PartialEq)]
@@ -88,10 +88,7 @@ impl<'a> Node<'a> {
         let start = i;
         let (i, tag) = preceded(
             |i| s.tag_block_start(i),
-            peek(preceded(
-                (opt(Whitespace::parse), take_till0(not_ws)),
-                identifier,
-            )),
+            peek(preceded((opt(Whitespace::parse), skip_ws0), identifier)),
         )
         .parse_next(i)?;
 
@@ -1076,9 +1073,9 @@ impl<'a> Lit<'a> {
     }
 
     pub(crate) fn split_ws_parts(s: &'a str) -> Self {
-        let trimmed_start = s.trim_start_matches(is_ws);
+        let trimmed_start = s.trim_ascii_start();
         let len_start = s.len() - trimmed_start.len();
-        let trimmed = trimmed_start.trim_end_matches(is_ws);
+        let trimmed = trimmed_start.trim_ascii_end();
         Self {
             lws: &s[..len_start],
             val: trimmed,
