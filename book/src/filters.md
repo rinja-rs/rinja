@@ -17,42 +17,6 @@ Rinja has a collection of built-in filters, documented below, but can also inclu
 Additionally, the `json` filter is included in the built-in filters, but is disabled by default.
 Enable it with Cargo features (see below for more information).
 
-**Table of contents**
-
-* **[Built-in filters][#built-in-filters]:**  
-
-  * [`capitalize`][#capitalize]
-  * [`center`][#center]
-  * [`deref`][#deref]
-  * [`escape|e`][#escape]
-  * [`filesizeformat`][#filesizeformat]
-  * [`fmt`][#fmt]
-  * [`format`][#format]
-  * [`indent`][#indent]
-  * [`join`][#join]
-  * [`linebreaks`][#linebreaks]
-  * [`linebreaksbr`][#linebreaksbr]
-  * [`lower|lowercase`][#lower]
-  * [`paragraphbreaks`][#paragraphbreaks]
-  * [`pluralize`][#pluralize]
-  * [`ref`][#ref]
-  * [`safe`][#safe]
-  * [`title`][#title]
-  * [`trim`][#trim]
-  * [`truncate`][#truncate]
-  * [`upper|uppercase`][#upper]
-  * [`urlencode`][#urlencode]
-  * [`wordcount`][#wordcount]
-
-* **[Optional / feature gated filters][#optional-filters]:**  
-  [`json|tojson`][#json],
-
-* **[Custom filters][#custom-filters]**
-
-* **[HTML-safe types][#html-safe-types]**
-
-  * **[Safe output of custom filters][#safe-output-of-custom-filters]**
-
 ## Built-In Filters
 [#built-in-filters]: #built-in-filters
 

@@ -12,7 +12,7 @@ from pathlib import Path
 INDEX_HBS_DOMAIN = "api.github.com"
 INDEX_HBS_PORT = 443
 INDEX_HBS_PROTO = "GET"
-INDEX_HBS_PATH = "/repos/rust-lang/mdBook/contents/src/theme/index.hbs"
+INDEX_HBS_PATH = "/repos/rust-lang/mdBook/contents/src/theme/index.hbs?ref=v0.4.40"
 INDEX_HBS_DATA = None
 INDEX_HBS_HEADERS = {
     "user-agent": "Update index.hbs for +https://github.com/rinja-rs/rinja",
