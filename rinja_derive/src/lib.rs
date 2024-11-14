@@ -295,10 +295,11 @@ impl<'a> FileInfo<'a> {
     }
 
     fn of<T>(node: &WithSpan<'a, T>, path: &'a Path, parsed: &'a Parsed) -> Self {
+        let source = parsed.source();
         Self {
             path,
-            source: Some(parsed.source()),
-            node_source: Some(node.span()),
+            source: Some(source),
+            node_source: node.span().as_suffix_of(source),
         }
     }
 }

@@ -185,9 +185,14 @@ impl TemplateInput<'_> {
                             // Add a dummy entry to `map` in order to prevent adding `path`
                             // multiple times to `check`.
                             let new_path = e.key();
+                            let source = parsed.source();
                             let source = get_template_source(
                                 new_path,
-                                Some((&path, parsed.source(), n.span())),
+                                Some((
+                                    &path,
+                                    source,
+                                    n.span().as_suffix_of(source).unwrap_or_default(),
+                                )),
                             )?;
                             check.push((new_path.clone(), source, Some(new_path.clone())));
                             e.insert(Arc::default());

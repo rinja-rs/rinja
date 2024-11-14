@@ -1612,20 +1612,16 @@ impl<'a, 'h> Generator<'a, 'h> {
         args: &[WithSpan<'_, Expr<'_>>],
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
-        const SINGULAR: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
-            Expr::StrLit(StrLit {
+        const SINGULAR: &WithSpan<'static, Expr<'static>> =
+            &WithSpan::new_without_span(Expr::StrLit(StrLit {
                 prefix: None,
                 content: "",
-            }),
-            "",
-        );
-        const PLURAL: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
-            Expr::StrLit(StrLit {
+            }));
+        const PLURAL: &WithSpan<'static, Expr<'static>> =
+            &WithSpan::new_without_span(Expr::StrLit(StrLit {
                 prefix: None,
                 content: "s",
-            }),
-            "",
-        );
+            }));
 
         let (count, sg, pl) = match args {
             [count] => (count, SINGULAR, PLURAL),

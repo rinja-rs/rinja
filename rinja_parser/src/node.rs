@@ -9,8 +9,8 @@ use winnow::token::{any, tag};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
-    ErrorContext, Expr, Filter, ParseResult, State, Target, WithSpan, filter, identifier, keyword,
-    skip_till, skip_ws0, str_lit_without_prefix, ws,
+    ErrorContext, Expr, Filter, ParseResult, Span, State, Target, WithSpan, filter, identifier,
+    keyword, skip_till, skip_ws0, str_lit_without_prefix, ws,
 };
 
 #[derive(Debug, PartialEq)]
@@ -43,7 +43,9 @@ impl<'a> Node<'a> {
                     &err
                 {
                     if err.message.is_none() {
-                        opt(|i| unexpected_tag(i, s)).parse_next(err.input)?;
+                        if let Some(span) = err.span.as_suffix_of(i) {
+                            opt(|i| unexpected_tag(i, s)).parse_next(span)?;
+                        }
                     }
                 }
                 return Err(err);
@@ -184,7 +186,7 @@ impl<'a> Node<'a> {
     }
 
     #[must_use]
-    pub fn span(&self) -> &str {
+    pub fn span(&self) -> Span<'a> {
         match self {
             Self::Lit(span) => span.span,
             Self::Comment(span) => span.span,
@@ -218,7 +220,9 @@ fn cut_node<'a, O>(
             &result
         {
             if err.message.is_none() {
-                opt(|i| unexpected_raw_tag(kind, i)).parse_next(err.input)?;
+                if let Some(span) = err.span.as_suffix_of(i) {
+                    opt(|i| unexpected_raw_tag(kind, i)).parse_next(span)?;
+                }
             }
         }
         result
