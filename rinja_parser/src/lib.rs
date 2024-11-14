@@ -339,12 +339,13 @@ fn skip_ws0<'a>(i: &mut &'a str) -> ParseResult<'a, ()> {
 }
 
 #[inline]
-fn skip_ws1(i: &str) -> InputParseResult<'_, ()> {
+fn skip_ws1<'a>(i: &mut &'a str) -> ParseResult<'a, ()> {
     let j = i.trim_ascii_start();
     if i.len() != j.len() {
-        Ok((j, ()))
+        *i = i.trim_ascii_start();
+        Ok(())
     } else {
-        fail.parse_peek(i)
+        fail.parse_next(i)
     }
 }
 

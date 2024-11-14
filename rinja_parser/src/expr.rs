@@ -264,7 +264,7 @@ impl<'a> Expr<'a> {
             i: &str,
             level: Level,
         ) -> InputParseResult<'_, Option<WithSpan<'_, Expr<'_>>>> {
-            let ws1 = |i| opt(unpeek(skip_ws1)).parse_peek(i);
+            let ws1 = |i| opt(skip_ws1).parse_peek(i);
 
             let start = i;
             let (i, data) = opt((
