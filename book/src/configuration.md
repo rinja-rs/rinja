@@ -108,6 +108,8 @@ The following keys can currently be used to customize template syntax:
 Values must be at least two characters long.
 If a key is omitted, the value from the default syntax is used.
 
+## Escapers
+
 Here is an example of a custom escaper:
 
 ```toml
