@@ -24,10 +24,28 @@ fn let_macro() {
 
 // Ensures that variables name can start with `_`.
 #[test]
-fn underscore() {
+fn underscore_ident1() {
     #[derive(Template)]
     #[template(source = r#"{% let _x = 7 %}{{ _x }}"#, ext = "html")]
     struct X;
 
     assert_eq!(X.render().unwrap(), "7")
+}
+
+// Ensures that variables can be named `_`.
+#[test]
+fn underscore_ident2() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% if let Some(_) = Some(12) %}hey{% endif %}
+{% if let [_] = [12] %}hoy{% endif %}
+{% match [12] %}
+{%- when [_] %}matched
+{%- endmatch -%}
+"#,
+        ext = "html"
+    )]
+    struct X;
+
+    assert_eq!(X.render().unwrap(), "hey\nhoy\nmatched");
 }

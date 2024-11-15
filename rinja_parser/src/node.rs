@@ -163,7 +163,7 @@ impl<'a> Node<'a> {
                 None,
                 (
                     opt(Whitespace::parse),
-                    ws(|i| Expr::parse(i, s.level.get())),
+                    ws(|i| Expr::parse(i, s.level.get(), false)),
                 ),
             ),
         )
@@ -326,7 +326,7 @@ impl<'a> When<'a> {
             cut_node(
                 Some("match-when"),
                 (
-                    separated1(ws(|i| Target::parse(i, s)), '|'),
+                    separated1(ws(|i| Target::parse(i, s, true)), '|'),
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
                     cut_node(Some("match-when"), |i| Node::many(i, s)),
@@ -411,10 +411,10 @@ impl<'a> CondTest<'a> {
         let (i, (target, expr)) = (
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
-                ws(|i| Target::parse(i, s)),
+                ws(|i| Target::parse(i, s, true)),
                 ws('='),
             )),
-            ws(|i| Expr::parse(i, s.level.get())),
+            ws(|i| Expr::parse(i, s.level.get(), false)),
         )
             .parse_next(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
@@ -488,7 +488,7 @@ impl<'a> Loop<'a> {
         let start = i;
         let if_cond = preceded(
             ws(keyword("if")),
-            cut_node(Some("for-if"), ws(|i| Expr::parse(i, s.level.get()))),
+            cut_node(Some("for-if"), ws(|i| Expr::parse(i, s.level.get(), true))),
         );
 
         let else_block = |i| {
@@ -538,12 +538,12 @@ impl<'a> Loop<'a> {
             cut_node(
                 Some("for"),
                 (
-                    ws(|i| Target::parse(i, s)),
+                    ws(|i| Target::parse(i, s, true)),
                     ws(keyword("in")),
                     cut_node(
                         Some("for"),
                         (
-                            ws(|i| Expr::parse(i, s.level.get())),
+                            ws(|i| Expr::parse(i, s.level.get(), true)),
                             opt(if_cond),
                             opt(Whitespace::parse),
                             |i| s.tag_block_end(i),
@@ -611,7 +611,7 @@ impl<'a> Macro<'a> {
                             separated1(
                                 (
                                     ws(identifier),
-                                    opt(preceded('=', ws(|i| Expr::parse(i, level)))),
+                                    opt(preceded('=', ws(|i| Expr::parse(i, level, false)))),
                                 ),
                                 ',',
                             ),
@@ -895,7 +895,7 @@ impl<'a> Match<'a> {
             cut_node(
                 Some("match"),
                 (
-                    ws(|i| Expr::parse(i, s.level.get())),
+                    ws(|i| Expr::parse(i, s.level.get(), false)),
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
                     cut_node(
@@ -1139,8 +1139,11 @@ impl<'a> Let<'a> {
             cut_node(
                 Some("let"),
                 (
-                    ws(|i| Target::parse(i, s)),
-                    opt(preceded(ws('='), ws(|i| Expr::parse(i, s.level.get())))),
+                    ws(|i| Target::parse(i, s, false)),
+                    opt(preceded(
+                        ws('='),
+                        ws(|i| Expr::parse(i, s.level.get(), false)),
+                    )),
                     opt(Whitespace::parse),
                 ),
             ),

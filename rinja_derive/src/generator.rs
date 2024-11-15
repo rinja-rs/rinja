@@ -997,6 +997,7 @@ impl<'a> Generator<'a> {
                     _ => Ok(false),
                 }
             }
+            Target::Placeholder("_") => Ok(false),
             Target::Tuple(_, targets) => {
                 for target in targets {
                     match self.is_shadowing_variable(ctx, target, l) {
