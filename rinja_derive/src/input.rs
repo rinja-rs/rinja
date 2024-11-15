@@ -99,7 +99,8 @@ impl TemplateInput<'_> {
             .ok_or_else(|| {
                 CompileError::no_file_info(
                     format!(
-                        "no escaper defined for extension '{escaping}'. {}",
+                        "no escaper defined for extension '{escaping}'. You can define an escaper \
+                        in the config file (named `rinja.toml` by default). {}",
                         MsgValidEscapers(&config.escapers),
                     ),
                     *ext_span,
