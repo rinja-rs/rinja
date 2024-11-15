@@ -403,7 +403,7 @@ impl<'a> Expr<'a> {
         Ok((i, expr))
     }
 
-    fn single(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    fn single(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let level = level.nest(i)?;
         alt((
             Self::num,
@@ -413,7 +413,7 @@ impl<'a> Expr<'a> {
             move |i: &mut _| Self::array(i, level),
             move |i: &mut _| Self::group(i, level),
         ))
-        .parse_peek(i)
+        .parse_next(i)
     }
 
     fn group(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
@@ -566,9 +566,9 @@ enum Suffix<'a> {
 }
 
 impl<'a> Suffix<'a> {
-    fn parse(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Expr<'a>>> {
+    fn parse(mut i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Expr<'a>>> {
         let level = level.nest(i)?;
-        let (mut i, mut expr) = Expr::single(i, level)?;
+        let mut expr = Expr::single(&mut i, level)?;
         loop {
             let before_suffix = i;
             let (j, suffix) = opt(alt((
