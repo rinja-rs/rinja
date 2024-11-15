@@ -120,10 +120,35 @@ extensions = ["tex"]
 
 An escaper block consists of the attributes `path` and `extensions`. `path`
 contains a Rust identifier that must be in scope for templates using this
-escaper. `extensions` defines a list of file extensions that will trigger
+escaper. This type must implement the [`Escaper`]
+trait.
+
+`extensions` defines a list of file extensions that will trigger
 the use of that escaper. Extensions are matched in order, starting with the
 first escaper configured and ending with the default escapers for HTML
 (extensions `html`, `htm`, `xml`, `j2`, `jinja`, `jinja2`) and plain text
 (no escaping; `md`, `yml`, `none`, `txt`, and the empty string). Note that
 this means you can also define other escapers that match different extensions
 to the same escaper.
+
+You can then use templates with this extension or use the
+[`escape`](https://docs.rs/rinja/latest/rinja/filters/fn.escape.html) filter with
+the name of your extension in your template:
+
+```jinja
+{{ some_string|escape("tex") }}
+```
+
+As an example, we want `.js` files to be treated like "txt" files. To do so:
+
+```toml
+[[escaper]]
+path = "rinja::filters::Text"
+extensions = ["js"]
+```
+
+[`Text`](https://docs.rs/rinja/latest/rinja/filters/struct.Text.html) implements the
+[`Escaper`] trait so since we don't need want any escaping on our `.js` files, we use
+it.
+
+[`Escaper`]: https://docs.rs/rinja/latest/rinja/filters/trait.Escaper.html
