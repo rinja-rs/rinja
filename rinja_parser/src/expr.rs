@@ -369,9 +369,9 @@ impl<'a> Expr<'a> {
         Ok((i, WithSpan::new(ctor(var_name), start)))
     }
 
-    fn filtered(i: &'a str, mut level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    fn filtered(mut i: &'a str, mut level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (mut i, mut res) = Self::prefix(i, level)?;
+        let mut res = Self::prefix(&mut i, level)?;
         while let (j, Some((name, args))) = opt(|i: &mut _| filter(i, &mut level)).parse_peek(i)? {
             i = j;
 
@@ -383,14 +383,14 @@ impl<'a> Expr<'a> {
         Ok((i, res))
     }
 
-    fn prefix(i: &'a str, mut level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    fn prefix(i: &mut &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let nested = level.nest(i)?;
-        let start = i;
-        let (i, (ops, mut expr)) = (
+        let start = *i;
+        let (ops, mut expr) = (
             repeat(0.., ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
             unpeek(|i| Suffix::parse(i, nested)),
         )
-            .parse_peek(i)?;
+            .parse_next(i)?;
 
         for op in ops.iter().rev() {
             // This is a rare place where we create recursion in the parsed AST
@@ -400,7 +400,7 @@ impl<'a> Expr<'a> {
             expr = WithSpan::new(Self::Unary(op, Box::new(expr)), start);
         }
 
-        Ok((i, expr))
+        Ok(expr)
     }
 
     fn single(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
