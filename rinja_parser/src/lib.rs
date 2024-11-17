@@ -899,7 +899,7 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = (ws('|'), not('|')).parse_next(i)?;
+    let (j, _) = ws(('|', not('|'))).parse_next(i)?;
 
     *level = level.nest(i)?.1;
     cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
