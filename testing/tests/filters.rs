@@ -436,3 +436,17 @@ fn test_filesizeformat() {
 
     assert_eq!(S { s: Some(12) }.render().unwrap(), "12 B");
 }
+
+#[test]
+fn test_whitespace_around_filter_operator() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{{ 12 |safe }}
+{{ 8| safe }}
+{{ 4   |    safe }}"#,
+        ext = "html"
+    )]
+    struct S;
+
+    assert_eq!(S.render().unwrap(), "12\n8\n4");
+}

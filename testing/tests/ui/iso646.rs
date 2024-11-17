@@ -15,13 +15,6 @@ struct BitAndIso646 {
 }
 
 #[derive(Template)]
-#[template(ext = "txt", source = "{{ a | b }}")]
-struct BitOr {
-    a: u32,
-    b: u32,
-}
-
-#[derive(Template)]
 #[template(ext = "txt", source = "{{ a bitor b }}")]
 struct BitOrIso646 {
     a: u32,
@@ -36,7 +29,7 @@ struct Xor {
 }
 
 #[derive(Template)]
-#[template(ext = "txt", source = "{{ a xor b }}")]
+#[template(ext = "txt", source = "{{ a xor b }} {{ c }}")]
 struct XorIso646 {
     a: u32,
     b: u32,
