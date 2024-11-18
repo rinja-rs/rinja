@@ -276,7 +276,7 @@ impl CompileError {
         }
     }
 
-    fn no_file_info<S: fmt::Display>(msg: S, span: Option<Span>) -> Self {
+    fn no_file_info<S: ToString>(msg: S, span: Option<Span>) -> Self {
         Self {
             msg: msg.to_string(),
             span,
