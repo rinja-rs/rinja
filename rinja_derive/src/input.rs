@@ -26,7 +26,6 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
-    pub(crate) ext: Option<&'a str>,
     pub(crate) mime_type: String,
     pub(crate) path: Arc<Path>,
     pub(crate) fields: Vec<String>,
@@ -108,7 +107,7 @@ impl TemplateInput<'_> {
             })?;
 
         let mime_type =
-            extension_to_mime_type(ext_default_to_path(ext.as_deref(), &path).unwrap_or("txt"))
+            extension_to_mime_type(ext.as_deref().or_else(|| extension(&path)).unwrap_or("txt"))
                 .to_string();
 
         let empty_punctuated = Punctuated::new();
@@ -139,7 +138,6 @@ impl TemplateInput<'_> {
             block: block.as_deref(),
             print: *print,
             escaper,
-            ext: ext.as_deref(),
             mime_type,
             path,
             fields,
@@ -271,11 +269,6 @@ impl TemplateInput<'_> {
             map.insert(path, parsed);
         }
         Ok(())
-    }
-
-    #[inline]
-    pub(crate) fn extension(&self) -> Option<&str> {
-        ext_default_to_path(self.ext, &self.path)
     }
 }
 
@@ -538,11 +531,6 @@ impl<I: Iterator, E> Iterator for ResultIter<I, E> {
 }
 
 impl<I: FusedIterator, E> FusedIterator for ResultIter<I, E> {}
-
-#[inline]
-fn ext_default_to_path<'a>(ext: Option<&'a str>, path: &'a Path) -> Option<&'a str> {
-    ext.or_else(|| extension(path))
-}
 
 fn extension(path: &Path) -> Option<&str> {
     let ext = path.extension()?.to_str()?;

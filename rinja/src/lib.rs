@@ -134,9 +134,6 @@ pub trait Template: fmt::Display {
         }
     }
 
-    /// The template's extension, if provided
-    const EXTENSION: Option<&'static str>;
-
     /// Provides a rough estimate of the expanded length of the rendered template. Larger
     /// values result in higher memory usage but fewer reallocations. Smaller values result in the
     /// opposite. This value only affects [`render`]. It does not take effect when calling
@@ -168,8 +165,6 @@ impl<T: Template + ?Sized> Template for &T {
         T::write_into(self, writer)
     }
 
-    const EXTENSION: Option<&'static str> = T::EXTENSION;
-
     const SIZE_HINT: usize = T::SIZE_HINT;
 
     const MIME_TYPE: &'static str = T::MIME_TYPE;
@@ -187,9 +182,6 @@ pub trait DynTemplate {
 
     /// Renders the template to the given `writer` io buffer
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()>;
-
-    /// Helper function to inspect the template's extension
-    fn extension(&self) -> Option<&'static str>;
 
     /// Provides a conservative estimate of the expanded length of the rendered template
     fn size_hint(&self) -> usize;
@@ -210,10 +202,6 @@ impl<T: Template> DynTemplate for T {
     #[inline]
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         <Self as Template>::write_into(self, writer)
-    }
-
-    fn extension(&self) -> Option<&'static str> {
-        Self::EXTENSION
     }
 
     fn size_hint(&self) -> usize {
@@ -270,8 +258,6 @@ mod tests {
             fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
                 Ok(writer.write_str("test")?)
             }
-
-            const EXTENSION: Option<&'static str> = Some("txt");
 
             const SIZE_HINT: usize = 4;
 

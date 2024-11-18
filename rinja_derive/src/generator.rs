@@ -171,12 +171,8 @@ impl<'a> Generator<'a> {
             "\
                 rinja::Result::Ok(())\
             }}\
-            const EXTENSION:\
-                rinja::helpers::core::option::Option<&'static rinja::helpers::core::primitive::str> =\
-                rinja::helpers::core::option::Option::{:?};\
             const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;\
             const MIME_TYPE: &'static rinja::helpers::core::primitive::str = {:?};",
-            self.input.extension(),
             self.input.mime_type,
         ));
 
