@@ -7,6 +7,7 @@ mod generator;
 mod heritage;
 mod html;
 mod input;
+mod integration;
 #[cfg(test)]
 mod tests;
 
@@ -18,7 +19,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use config::{Config, read_config_file};
-use generator::{Generator, MapChain};
+use generator::template_to_string;
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
 use parser::{Parsed, WithSpan, strip_common};
@@ -160,15 +161,7 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
     let mut contexts = HashMap::default();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
-    Generator::new(
-        &input,
-        &contexts,
-        None,
-        MapChain::default(),
-        input.block.is_some(),
-        0,
-    )
-    .build(&contexts[&input.path])
+    template_to_string(&input, &contexts, None)
 }
 
 /// Takes a `syn::DeriveInput` and generates source code for it
@@ -233,15 +226,7 @@ fn build_template_inner(
         eprintln!("{:?}", templates[&input.path].nodes());
     }
 
-    let code = Generator::new(
-        &input,
-        &contexts,
-        heritage.as_ref(),
-        MapChain::default(),
-        input.block.is_some(),
-        0,
-    )
-    .build(&contexts[&input.path])?;
+    let code = template_to_string(&input, &contexts, heritage.as_ref())?;
     if input.print == Print::Code || input.print == Print::All {
         eprintln!("{code}");
     }
