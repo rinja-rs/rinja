@@ -31,7 +31,6 @@ fn test_variables() {
          Iñtërnâtiônàlizætiøn is important\n\
          in vars too: Iñtërnâtiônàlizætiøn"
     );
-    assert_eq!(VariablesTemplate::EXTENSION, Some("html"));
 }
 
 #[test]

@@ -30,9 +30,6 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
                     #expected
                     rinja::Result::Ok(())
                 }
-                const EXTENSION:
-                    rinja::helpers::core::option::Option<&'static rinja::helpers::core::primitive::str> =
-                    rinja::helpers::core::option::Option::Some("txt");
                 const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
                 const MIME_TYPE: &'static rinja::helpers::core::primitive::str = "text/plain; charset=utf-8";
             }
