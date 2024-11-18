@@ -191,9 +191,9 @@ fn check_if_let() {
 
     // In this test we make sure that every used template gets referenced exactly once.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
-    let path1 = path.join("include1.html");
-    let path2 = path.join("include2.html");
-    let path3 = path.join("include3.html");
+    let path1 = path.join("include1.html").canonicalize().unwrap();
+    let path2 = path.join("include2.html").canonicalize().unwrap();
+    let path3 = path.join("include3.html").canonicalize().unwrap();
     compare(
         r#"{% include "include1.html" %}"#,
         &format!(
