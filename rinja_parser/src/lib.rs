@@ -899,20 +899,10 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = skip_ws0.parse_next(i)?;
-    let had_spaces = i.len() != j.len();
-    let (j, _) = ('|', not('|')).parse_next(j)?;
+    let (j, _) = ws(('|', not('|'))).parse_next(i)?;
 
-    if !had_spaces {
-        *level = level.nest(i)?.1;
-        cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
-    } else {
-        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-            "the filter operator `|` must not be preceded by any whitespace characters\n\
-            the binary OR operator is called `bitor` in rinja",
-            i,
-        )))
-    }
+    *level = level.nest(i)?.1;
+    cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
 }
 
 /// Returns the common parts of two paths.
