@@ -30,7 +30,7 @@ error: specify one template argument `path`, `source` or `in_doc`
 42 | #[template(ext = "txt", in_doc = false)]
    |   ^^^^^^^^
 
-error: argument `in_doc` expects as boolean value
+error: template attribute `in_doc` expects a boolean value
   --> tests/ui/rinja-block.rs:51:34
    |
 51 | #[template(ext = "txt", in_doc = "yes")]

@@ -727,19 +727,7 @@ const _: () = {
                     None => unreachable!("not possible in syn::Meta::NameValue(…)"),
                 };
 
-                let mut value_expr = pair.value;
-                let value = loop {
-                    match value_expr {
-                        Expr::Lit(lit) => break lit,
-                        Expr::Group(group) => value_expr = *group.expr,
-                        v => {
-                            return Err(CompileError::no_file_info(
-                                format!("unsupported argument value type for `{ident}`"),
-                                Some(v.span()),
-                            ));
-                        }
-                    }
-                };
+                let value = get_lit(ident, pair.value)?;
 
                 if ident == "path" {
                     ensure_source_only_once(ident, &this.source)?;
@@ -750,7 +738,7 @@ const _: () = {
                     let value = get_strlit(ident, value)?;
                     this.source = Some((ident.clone(), PartialTemplateArgsSource::Source(value)));
                 } else if ident == "in_doc" {
-                    let value = get_strbool(ident, value)?;
+                    let value = get_boollit(ident, value)?;
                     if !value.value() {
                         continue;
                     }
@@ -790,7 +778,7 @@ const _: () = {
                     set_strlit_pair(ident, value, &mut this.whitespace)?;
                 } else {
                     return Err(CompileError::no_file_info(
-                        format!("unsupported attribute key `{ident}` found"),
+                        format!("unsupported template attribute `{ident}` found"),
                         Some(ident.span()),
                     ));
                 }
@@ -815,9 +803,24 @@ const _: () = {
             Ok(())
         } else {
             Err(CompileError::no_file_info(
-                format!("attribute `{name}` already set"),
+                format!("template attribute `{name}` already set"),
                 Some(name.span()),
             ))
+        }
+    }
+
+    fn get_lit(name: &Ident, mut expr: Expr) -> Result<ExprLit, CompileError> {
+        loop {
+            match expr {
+                Expr::Lit(lit) => return Ok(lit),
+                Expr::Group(group) => expr = *group.expr,
+                v => {
+                    return Err(CompileError::no_file_info(
+                        format!("template attribute `{name}` expects a literal"),
+                        Some(v.span()),
+                    ));
+                }
+            }
         }
     }
 
@@ -826,18 +829,18 @@ const _: () = {
             Ok(s)
         } else {
             Err(CompileError::no_file_info(
-                format!("`{name}` value must be string literal"),
+                format!("template attribute `{name}` expects a string literal"),
                 Some(value.lit.span()),
             ))
         }
     }
 
-    fn get_strbool(name: &Ident, value: ExprLit) -> Result<LitBool, CompileError> {
+    fn get_boollit(name: &Ident, value: ExprLit) -> Result<LitBool, CompileError> {
         if let Lit::Bool(s) = value.lit {
             Ok(s)
         } else {
             Err(CompileError::no_file_info(
-                format!("argument `{name}` expects as boolean value"),
+                format!("template attribute `{name}` expects a boolean value"),
                 Some(value.lit.span()),
             ))
         }
