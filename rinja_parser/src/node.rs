@@ -273,13 +273,13 @@ impl<'a> When<'a> {
                 ),
             ),
         );
-        let (i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
+        let (new_i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
         Ok((
-            i,
+            new_i,
             WithSpan::new(
                 Self {
                     ws: Ws(pws, nws),
-                    target: vec![Target::Placeholder("_")],
+                    target: vec![Target::Placeholder(WithSpan::new((), i))],
                     nodes,
                 },
                 start,

@@ -2216,7 +2216,7 @@ impl<'a> Generator<'a> {
         target: &Target<'a>,
     ) {
         match target {
-            Target::Placeholder(s) => buf.write(s),
+            Target::Placeholder(_) => buf.write('_'),
             Target::Rest(s) => {
                 if let Some(var_name) = &**s {
                     self.locals

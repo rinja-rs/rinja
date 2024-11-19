@@ -9,13 +9,11 @@ use crate::{
 
 fn check_underscore<'a>(i: &'a str, target: &Target<'a>) -> Result<(), ParseErr<'a>> {
     match target {
-        Target::Name(name) | Target::Placeholder(name) => {
-            if *name == "_" {
-                return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                    "reserved keyword `_` cannot be used here",
-                    i,
-                )));
-            }
+        Target::Name("_") | Target::Placeholder(_) => {
+            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                "reserved keyword `_` cannot be used here",
+                i,
+            )));
         }
         Target::Struct(elems1, elems2) => {
             for elem in elems1 {
@@ -36,7 +34,8 @@ fn check_underscore<'a>(i: &'a str, target: &Target<'a>) -> Result<(), ParseErr<
                 check_underscore(i, elem)?;
             }
         }
-        Target::Tuple(_, _)
+        Target::Name(_)
+        | Target::Tuple(_, _)
         | Target::Array(_, _)
         | Target::NumLit(_, _)
         | Target::CharLit(_)
@@ -74,7 +73,7 @@ pub enum Target<'a> {
     BoolLit(&'a str),
     Path(Vec<&'a str>),
     OrChain(Vec<Target<'a>>),
-    Placeholder(&'a str),
+    Placeholder(WithSpan<'a, ()>),
     /// The `Option` is the variable name (if any) in `var_name @ ..`.
     Rest(WithSpan<'a, Option<&'a str>>),
 }
@@ -166,7 +165,7 @@ impl<'a> Target<'a> {
         // neither literal nor struct nor path
         let (new_i, name) = identifier.parse_next(i)?;
         let target = match name {
-            "_" => Self::Placeholder(name),
+            "_" => Self::Placeholder(WithSpan::new((), i)),
             _ => verify_name(i, name)?,
         };
         Ok((new_i, target))
