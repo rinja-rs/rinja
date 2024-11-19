@@ -1,7 +1,16 @@
 use std::fmt::{Arguments, Display, Write};
 
-use quote::quote;
-use syn::DeriveInput;
+use proc_macro2::{TokenStream, TokenTree};
+use quote::{ToTokens, quote};
+use syn::spanned::Spanned;
+use syn::{
+    Data, DeriveInput, Fields, GenericParam, Generics, Ident, Lifetime, LifetimeParam, Token, Type,
+    Variant, parse_quote,
+};
+
+use crate::generator::TmplKind;
+use crate::input::{PartialTemplateArgs, TemplateArgs};
+use crate::{CompileError, build_template_item};
 
 /// Implement every integration for the given item
 pub(crate) fn impl_everything(ast: &DeriveInput, buf: &mut Buffer) {
@@ -222,4 +231,292 @@ fn string_escape(dest: &mut String, src: &str) {
         last = x + 1;
     }
     dest.extend(&src[last..]);
+}
+
+pub(crate) fn build_template_enum(
+    buf: &mut Buffer,
+    enum_ast: &DeriveInput,
+    mut enum_args: Option<PartialTemplateArgs>,
+    vars_args: Vec<Option<PartialTemplateArgs>>,
+    has_default_impl: bool,
+) -> Result<usize, CompileError> {
+    let Data::Enum(enum_data) = &enum_ast.data else {
+        unreachable!();
+    };
+
+    buf.write("const _: () = { extern crate rinja as rinja;");
+    impl_everything(enum_ast, buf);
+
+    let enum_id = &enum_ast.ident;
+    let enum_span = enum_id.span();
+    let lifetime = Lifetime::new(&format!("'__Rinja_{enum_id}"), enum_span);
+
+    let mut generics = enum_ast.generics.clone();
+    if generics.lt_token.is_none() {
+        generics.lt_token = Some(Token![<](enum_span));
+    }
+    if generics.gt_token.is_none() {
+        generics.gt_token = Some(Token![>](enum_span));
+    }
+    generics
+        .params
+        .insert(0, GenericParam::Lifetime(LifetimeParam::new(lifetime)));
+
+    let mut biggest_size_hint = 0;
+    let mut render_into_arms = TokenStream::new();
+    let mut size_hint_arms = TokenStream::new();
+    for (var, var_args) in enum_data.variants.iter().zip(vars_args) {
+        let Some(mut var_args) = var_args else {
+            continue;
+        };
+
+        let var_ast = type_for_enum_variant(enum_ast, &generics, var);
+        buf.write(quote!(#var_ast).to_string());
+
+        // not inherited: template, meta_docs, block, print
+        if let Some(enum_args) = &mut enum_args {
+            set_default(&mut var_args, enum_args, |v| &mut v.source);
+            set_default(&mut var_args, enum_args, |v| &mut v.escape);
+            set_default(&mut var_args, enum_args, |v| &mut v.ext);
+            set_default(&mut var_args, enum_args, |v| &mut v.syntax);
+            set_default(&mut var_args, enum_args, |v| &mut v.config);
+            set_default(&mut var_args, enum_args, |v| &mut v.whitespace);
+        }
+        let size_hint = biggest_size_hint.max(build_template_item(
+            buf,
+            &var_ast,
+            &TemplateArgs::from_partial(&var_ast, Some(var_args))?,
+            TmplKind::Variant,
+        )?);
+        biggest_size_hint = biggest_size_hint.max(size_hint);
+
+        variant_as_arm(
+            &var_ast,
+            var,
+            size_hint,
+            &mut render_into_arms,
+            &mut size_hint_arms,
+        );
+    }
+    if has_default_impl {
+        let size_hint = build_template_item(
+            buf,
+            enum_ast,
+            &TemplateArgs::from_partial(enum_ast, enum_args)?,
+            TmplKind::Variant,
+        )?;
+        biggest_size_hint = biggest_size_hint.max(size_hint);
+
+        render_into_arms.extend(quote! {
+            ref __rinja_arg => {
+                <_ as rinja::helpers::EnumVariantTemplate>::render_into_with_values(
+                    __rinja_arg,
+                    __rinja_writer,
+                    __rinja_values,
+                )
+            }
+        });
+        size_hint_arms.extend(quote! {
+            _ => {
+                #size_hint
+            }
+        });
+    }
+
+    write_header(enum_ast, buf, "rinja::Template");
+    buf.write(format_args!(
+        "\
+        fn render_into_with_values<RinjaW>(\
+            &self,\
+            __rinja_writer: &mut RinjaW,\
+            __rinja_values: &dyn rinja::Values,\
+        ) -> rinja::Result<()>\
+        where \
+            RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
+        {{\
+            match *self {{\
+                {render_into_arms}\
+            }}\
+        }}",
+    ));
+
+    #[cfg(feature = "alloc")]
+    buf.write(format_args!(
+        "\
+        fn render_with_values(\
+            &self,\
+            __rinja_values: &dyn rinja::Values,\
+        ) -> rinja::Result<rinja::helpers::alloc::string::String> {{\
+            let size_hint = match self {{\
+                {size_hint_arms}\
+            }};\
+            let mut buf = rinja::helpers::alloc::string::String::new();\
+            let _ = buf.try_reserve(size_hint);\
+            self.render_into_with_values(&mut buf, __rinja_values)?;\
+            rinja::Result::Ok(buf)\
+        }}",
+    ));
+
+    buf.write(format_args!(
+        "\
+        const SIZE_HINT: rinja::helpers::core::primitive::usize = {biggest_size_hint}usize;\
+        }}\
+        }};",
+    ));
+    Ok(biggest_size_hint)
+}
+
+fn set_default<S, T, A>(dest: &mut S, parent: &mut S, mut access: A)
+where
+    T: Clone,
+    A: FnMut(&mut S) -> &mut Option<T>,
+{
+    let dest = access(dest);
+    if dest.is_none() {
+        if let Some(parent) = access(parent) {
+            *dest = Some(parent.clone());
+        }
+    }
+}
+
+/// Generates a `struct` to contain the data of an enum variant
+fn type_for_enum_variant(
+    enum_ast: &DeriveInput,
+    enum_generics: &Generics,
+    var: &Variant,
+) -> DeriveInput {
+    let enum_id = &enum_ast.ident;
+    let (_, ty_generics, _) = enum_ast.generics.split_for_impl();
+    let lt = enum_generics.params.first().unwrap();
+
+    let id = &var.ident;
+    let span = id.span();
+    let id = Ident::new(&format!("__Rinja__{enum_id}__{id}"), span);
+
+    let phantom: Type = parse_quote! {
+        rinja::helpers::core::marker::PhantomData < &#lt #enum_id #ty_generics >
+    };
+    let fields = match &var.fields {
+        Fields::Named(fields) => {
+            let mut fields = fields.clone();
+            for f in fields.named.iter_mut() {
+                let ty = &f.ty;
+                f.ty = parse_quote!(&#lt #ty);
+            }
+            let id = Ident::new(&format!("__Rinja__{enum_id}__phantom"), span);
+            fields.named.push(parse_quote!(#id: #phantom));
+            Fields::Named(fields)
+        }
+        Fields::Unnamed(fields) => {
+            let mut fields = fields.clone();
+            for f in fields.unnamed.iter_mut() {
+                let ty = &f.ty;
+                f.ty = parse_quote!(&#lt #ty);
+            }
+            fields.unnamed.push(parse_quote!(#phantom));
+            Fields::Unnamed(fields)
+        }
+        Fields::Unit => Fields::Unnamed(parse_quote!((#phantom))),
+    };
+    let semicolon = match &var.fields {
+        Fields::Named(_) => None,
+        _ => Some(Token![;](span)),
+    };
+
+    parse_quote! {
+        #[rinja::helpers::core::prelude::rust_2021::derive(
+            rinja::helpers::core::prelude::rust_2021::Clone,
+            rinja::helpers::core::prelude::rust_2021::Copy,
+            rinja::helpers::core::prelude::rust_2021::Debug
+        )]
+        #[allow(dead_code, non_camel_case_types, non_snake_case)]
+        struct #id #enum_generics #fields #semicolon
+    }
+}
+
+/// Generates a `match` arm for an `enum` variant, that calls `<_ as EnumVariantTemplate>::render_into()`
+/// for that type and data
+fn variant_as_arm(
+    var_ast: &DeriveInput,
+    var: &Variant,
+    size_hint: usize,
+    render_into_arms: &mut TokenStream,
+    size_hint_arms: &mut TokenStream,
+) {
+    let var_id = &var_ast.ident;
+    let ident = &var.ident;
+    let span = ident.span();
+
+    let generics = var_ast.generics.clone();
+    let (_, ty_generics, _) = generics.split_for_impl();
+    let ty_generics: TokenStream = ty_generics
+        .as_turbofish()
+        .to_token_stream()
+        .into_iter()
+        .enumerate()
+        .map(|(idx, token)| match idx {
+            // 0 1 2 3 4   =>   : : < ' __Rinja_Foo
+            4 => TokenTree::Ident(Ident::new("_", span)),
+            _ => token,
+        })
+        .collect();
+
+    let Data::Struct(ast_data) = &var_ast.data else {
+        unreachable!();
+    };
+    let mut src = TokenStream::new();
+    let mut this = TokenStream::new();
+    match &var.fields {
+        Fields::Named(fields) => {
+            for (idx, field) in fields.named.iter().enumerate() {
+                let arg = Ident::new(&format!("__rinja_arg_{idx}"), field.span());
+                let id = field.ident.as_ref().unwrap();
+                src.extend(quote!(#id: ref #arg,));
+                this.extend(quote!(#id: #arg,));
+            }
+
+            let phantom = match &ast_data.fields {
+                Fields::Named(fields) => fields
+                    .named
+                    .iter()
+                    .next_back()
+                    .unwrap()
+                    .ident
+                    .as_ref()
+                    .unwrap(),
+                Fields::Unnamed(_) | Fields::Unit => unreachable!(),
+            };
+            this.extend(quote!(#phantom: rinja::helpers::core::marker::PhantomData {},));
+        }
+
+        Fields::Unnamed(fields) => {
+            for (idx, field) in fields.unnamed.iter().enumerate() {
+                let span = field.ident.span();
+                let arg = Ident::new(&format!("__rinja_arg_{idx}"), span);
+                let idx = syn::LitInt::new(&format!("{idx}"), span);
+                src.extend(quote!(#idx: ref #arg,));
+                this.extend(quote!(#idx: #arg,));
+            }
+            let idx = syn::LitInt::new(&format!("{}", fields.unnamed.len()), span);
+            this.extend(quote!(#idx: rinja::helpers::core::marker::PhantomData {},));
+        }
+
+        Fields::Unit => {
+            this.extend(quote!(0: rinja::helpers::core::marker::PhantomData {},));
+        }
+    };
+    render_into_arms.extend(quote! {
+        Self :: #ident { #src } => {
+            <_ as rinja::helpers::EnumVariantTemplate>::render_into_with_values(
+                & #var_id #ty_generics { #this },
+                __rinja_writer,
+                __rinja_values,
+            )
+        }
+    });
+    size_hint_arms.extend(quote! {
+        Self :: #ident { .. } => {
+            #size_hint
+        }
+    });
 }

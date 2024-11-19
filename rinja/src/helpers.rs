@@ -269,3 +269,11 @@ impl<L: FastWritable, R: FastWritable> FastWritable for Concat<L, R> {
         self.1.write_into(dest)
     }
 }
+
+pub trait EnumVariantTemplate {
+    fn render_into_with_values<W: fmt::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        values: &dyn crate::Values,
+    ) -> crate::Result<()>;
+}
