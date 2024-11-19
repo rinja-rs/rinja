@@ -271,6 +271,63 @@ impl TemplateInput<'_> {
     }
 }
 
+pub(crate) enum AnyTemplateArgs {
+    Struct(TemplateArgs),
+    Enum {
+        enum_args: Option<PartialTemplateArgs>,
+        vars_args: Vec<Option<PartialTemplateArgs>>,
+        has_default_impl: bool,
+    },
+}
+
+impl AnyTemplateArgs {
+    pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
+        let syn::Data::Enum(enum_data) = &ast.data else {
+            return Ok(Self::Struct(TemplateArgs::new(ast)?));
+        };
+
+        let enum_args = PartialTemplateArgs::new(ast, &ast.attrs)?;
+        let vars_args = enum_data
+            .variants
+            .iter()
+            .map(|variant| PartialTemplateArgs::new(ast, &variant.attrs))
+            .collect::<Result<Vec<_>, _>>()?;
+        if vars_args.is_empty() {
+            return Ok(Self::Struct(TemplateArgs::from_partial(ast, enum_args)?));
+        }
+
+        let mut needs_default_impl = vars_args.len();
+        let enum_source = enum_args.as_ref().and_then(|v| v.source.as_ref());
+        for (variant, var_args) in enum_data.variants.iter().zip(&vars_args) {
+            if var_args
+                .as_ref()
+                .and_then(|v| v.source.as_ref())
+                .or(enum_source)
+                .is_none()
+            {
+                return Err(CompileError::new_with_span(
+                    #[cfg(not(feature = "code-in-doc"))]
+                    "either all `enum` variants need a `path` or `source` argument, \
+                    or the `enum` itself needs a default implementation",
+                    #[cfg(feature = "code-in-doc")]
+                    "either all `enum` variants need a `path`, `source` or `in_doc` argument, \
+                    or the `enum` itself needs a default implementation",
+                    None,
+                    Some(variant.ident.span()),
+                ));
+            } else if !var_args.is_none() {
+                needs_default_impl -= 1;
+            }
+        }
+
+        Ok(Self::Enum {
+            enum_args,
+            vars_args,
+            has_default_impl: needs_default_impl > 0,
+        })
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct TemplateArgs {
     pub(crate) source: (Source, Option<Span>),
@@ -624,6 +681,17 @@ pub(crate) enum PartialTemplateArgsSource {
     Source(LitStr),
     #[cfg(feature = "code-in-doc")]
     InDoc(Span, Source),
+}
+
+impl PartialTemplateArgsSource {
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            Self::Path(s) => s.span(),
+            Self::Source(s) => s.span(),
+            #[cfg(feature = "code-in-doc")]
+            Self::InDoc(s, _) => s.span(),
+        }
+    }
 }
 
 // implement PartialTemplateArgs::new()
