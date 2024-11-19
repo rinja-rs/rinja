@@ -997,7 +997,16 @@ impl<'a> Generator<'a> {
                     _ => Ok(false),
                 }
             }
-            Target::Placeholder("_") => Ok(false),
+            Target::Placeholder(_) => Ok(false),
+            Target::Rest(var_name) => {
+                if let Some(var_name) = **var_name {
+                    match self.is_shadowing_variable(ctx, &Target::Name(var_name), l) {
+                        Ok(false) => {}
+                        outcome => return outcome,
+                    }
+                }
+                Ok(false)
+            }
             Target::Tuple(_, targets) => {
                 for target in targets {
                     match self.is_shadowing_variable(ctx, target, l) {
