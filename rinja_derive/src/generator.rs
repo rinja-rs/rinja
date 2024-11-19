@@ -172,11 +172,10 @@ impl<'a> Generator<'a> {
                 Source::Source(_) => path != &*self.input.path,
             };
             if path_is_valid {
-                let canonical_path = path.canonicalize().unwrap();
-                let include_path = canonical_path.to_str().unwrap();
                 buf.write(format_args!(
                     "const _: &[rinja::helpers::core::primitive::u8] =\
-                        rinja::helpers::core::include_bytes!({include_path:#?});",
+                        rinja::helpers::core::include_bytes!({:#?});",
+                    path.canonicalize().as_deref().unwrap_or(path),
                 ));
             }
         }
