@@ -271,3 +271,7 @@ where
 {
     result.map_err(crate::Error::custom)
 }
+
+pub trait EnumVariantTemplate {
+    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> crate::Result<()>;
+}

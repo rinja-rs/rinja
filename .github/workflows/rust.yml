@@ -12,12 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, beta]
-        exclude:
-          - os: macos-latest
-            rust: beta
-          - os: windows-latest
-            rust: beta
+        rust: [stable]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +24,7 @@ jobs:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --all-targets --features full
-      - run: cargo nextest run --all-targets --features full
+      - run: cargo nextest run --all-targets --features full --no-fail-fast
 
   Package:
     strategy:
@@ -48,7 +43,8 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-      - run: cd ${{ matrix.package }} && cargo nextest run
+      - run: cd ${{ matrix.package }} && cargo build --all-targets
+      - run: cd ${{ matrix.package }} && cargo nextest run --all-targets --no-fail-fast --no-tests=warn
       - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
 
   Docs:
