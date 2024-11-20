@@ -7,10 +7,10 @@ error: unknown node `fail`
   | ^^^^^^^^^^^^^^^^^^^^^^
 
 error: when using `in_doc = true`, the struct's documentation needs a `rinja` code block
-  --> tests/ui/rinja-block.rs:15:25
+  --> tests/ui/rinja-block.rs:15:34
    |
 15 | #[template(ext = "txt", in_doc = true)]
-   |                         ^^^^^^
+   |                                  ^^^^
 
 error: specify one template argument `path`, `source` or `in_doc`
   --> tests/ui/rinja-block.rs:24:3
@@ -37,10 +37,10 @@ error: template attribute `in_doc` expects a boolean value
    |                                  ^^^^^
 
 error: when using `in_doc = true`, the enum's documentation needs a `rinja` code block
-  --> tests/ui/rinja-block.rs:60:25
+  --> tests/ui/rinja-block.rs:60:34
    |
 60 | #[template(ext = "txt", in_doc = true)]
-   |                         ^^^^^^
+   |                                  ^^^^
 
 error: rinja templates are not supported for `union` types, only `struct` and `enum`
   --> tests/ui/rinja-block.rs:68:1
