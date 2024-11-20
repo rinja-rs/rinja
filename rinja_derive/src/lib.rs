@@ -187,7 +187,7 @@ fn build_template_inner(
     let config = Config::new(
         &s,
         config_path,
-        template_args.whitespace.as_deref(),
+        template_args.whitespace,
         template_args.config_span,
     )?;
     let input = TemplateInput::new(ast, config, template_args)?;

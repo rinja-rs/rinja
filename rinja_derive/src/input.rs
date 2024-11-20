@@ -7,6 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
+use parser::node::Whitespace;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
 use rustc_hash::FxBuildHasher;
@@ -282,7 +283,7 @@ pub(crate) struct TemplateArgs {
     ext_span: Option<Span>,
     syntax: Option<String>,
     config: Option<String>,
-    pub(crate) whitespace: Option<String>,
+    pub(crate) whitespace: Option<Whitespace>,
     pub(crate) template_span: Option<Span>,
     pub(crate) config_span: Option<Span>,
 }
@@ -334,7 +335,7 @@ impl TemplateArgs {
             ext_span: args.ext.as_ref().map(|value| value.span()),
             syntax: args.syntax.map(|value| value.value()),
             config: args.config.as_ref().map(|value| value.value()),
-            whitespace: args.whitespace.map(|value| value.value()),
+            whitespace: args.whitespace.map(|(_, value)| value),
             template_span: Some(template.span()),
             config_span: args.config.as_ref().map(|value| value.span()),
         })
@@ -658,7 +659,7 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) ext: Option<LitStr>,
     pub(crate) syntax: Option<LitStr>,
     pub(crate) config: Option<LitStr>,
-    pub(crate) whitespace: Option<LitStr>,
+    pub(crate) whitespace: Option<(LitStr, Whitespace)>,
 }
 
 pub(crate) enum PartialTemplateArgsSource {
@@ -745,13 +746,7 @@ const _: () = {
                 } else if ident == "block" {
                     set_strlit_pair(ident, value, &mut this.block)?;
                 } else if ident == "print" {
-                    ensure_only_once(ident, &mut this.print)?;
-                    let str_value = get_strlit(ident, value)?;
-                    let value = str_value
-                        .value()
-                        .parse()
-                        .map_err(|msg| CompileError::no_file_info(msg, Some(ident.span())))?;
-                    this.print = Some((str_value, value));
+                    set_parseable_string(ident, value, &mut this.print)?;
                 } else if ident == "escape" {
                     set_strlit_pair(ident, value, &mut this.escape)?;
                 } else if ident == "ext" {
@@ -761,7 +756,7 @@ const _: () = {
                 } else if ident == "config" {
                     set_strlit_pair(ident, value, &mut this.config)?;
                 } else if ident == "whitespace" {
-                    set_strlit_pair(ident, value, &mut this.whitespace)?;
+                    set_parseable_string(ident, value, &mut this.whitespace)?;
                 } else {
                     return Err(CompileError::no_file_info(
                         format!("unsupported template attribute `{ident}` found"),
@@ -780,6 +775,21 @@ const _: () = {
     ) -> Result<(), CompileError> {
         ensure_only_once(name, dest)?;
         *dest = Some(get_strlit(name, value)?);
+        Ok(())
+    }
+
+    fn set_parseable_string<T: FromStr<Err: ToString>>(
+        name: &Ident,
+        value: ExprLit,
+        dest: &mut Option<(LitStr, T)>,
+    ) -> Result<(), CompileError> {
+        ensure_only_once(name, dest)?;
+        let str_value = get_strlit(name, value)?;
+        let value = str_value
+            .value()
+            .parse()
+            .map_err(|msg| CompileError::no_file_info(msg, Some(str_value.span())))?;
+        *dest = Some((str_value, value));
         Ok(())
     }
 
