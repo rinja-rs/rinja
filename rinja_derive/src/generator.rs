@@ -15,7 +15,6 @@ use parser::{
 };
 use rustc_hash::FxBuildHasher;
 
-use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
@@ -72,7 +71,7 @@ struct Generator<'a, 'h> {
     next_ws: Option<&'a str>,
     // Whitespace suppression from the previous non-literal. Will be used to
     // determine whether to flush prefix whitespace from the next literal.
-    skip_ws: WhitespaceHandling,
+    skip_ws: Whitespace,
     // If currently in a block, this will contain the name of a potential parent block
     super_block: Option<(&'a str, usize)>,
     // Buffer for writable
@@ -96,7 +95,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             heritage,
             locals,
             next_ws: None,
-            skip_ws: WhitespaceHandling::Preserve,
+            skip_ws: Whitespace::Preserve,
             super_block: None,
             buf_writable: WritableBuffer {
                 discard: buf_writable_discard,
@@ -328,7 +327,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         if AstLevel::Top == level {
             // Handle any pending whitespace.
             if self.next_ws.is_some() {
-                self.flush_ws(Ws(Some(self.skip_ws.into()), None));
+                self.flush_ws(Ws(Some(self.skip_ws), None));
             }
 
             size_hint += self.write_buf_writable(ctx, buf)?;
@@ -1325,15 +1324,15 @@ impl<'a, 'h> Generator<'a, 'h> {
         let Lit { lws, val, rws } = *lit;
         if !lws.is_empty() {
             match self.skip_ws {
-                WhitespaceHandling::Suppress => {}
+                Whitespace::Suppress => {}
                 _ if val.is_empty() => {
                     assert!(rws.is_empty());
                     self.next_ws = Some(lws);
                 }
-                WhitespaceHandling::Preserve => {
+                Whitespace::Preserve => {
                     self.buf_writable.push(Writable::Lit(Cow::Borrowed(lws)));
                 }
-                WhitespaceHandling::Minimize => {
+                Whitespace::Minimize => {
                     self.buf_writable.push(Writable::Lit(Cow::Borrowed(
                         match lws.contains('\n') {
                             true => "\n",
@@ -1345,7 +1344,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         }
 
         if !val.is_empty() {
-            self.skip_ws = WhitespaceHandling::Preserve;
+            self.skip_ws = Whitespace::Preserve;
             self.buf_writable.push(Writable::Lit(Cow::Borrowed(val)));
         }
 
@@ -2342,13 +2341,8 @@ impl<'a, 'h> Generator<'a, 'h> {
         self.prepare_ws(ws);
     }
 
-    fn should_trim_ws(&self, ws: Option<Whitespace>) -> WhitespaceHandling {
-        match ws {
-            Some(Whitespace::Suppress) => WhitespaceHandling::Suppress,
-            Some(Whitespace::Preserve) => WhitespaceHandling::Preserve,
-            Some(Whitespace::Minimize) => WhitespaceHandling::Minimize,
-            None => self.input.config.whitespace,
-        }
+    fn should_trim_ws(&self, ws: Option<Whitespace>) -> Whitespace {
+        ws.unwrap_or(self.input.config.whitespace)
     }
 
     // If the previous literal left some trailing whitespace in `next_ws` and the
@@ -2362,13 +2356,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         // If `whitespace` is set to `suppress`, we keep the whitespace characters only if there is
         // a `+` character.
         match self.should_trim_ws(ws.0) {
-            WhitespaceHandling::Preserve => {
+            Whitespace::Preserve => {
                 let val = self.next_ws.unwrap();
                 if !val.is_empty() {
                     self.buf_writable.push(Writable::Lit(Cow::Borrowed(val)));
                 }
             }
-            WhitespaceHandling::Minimize => {
+            Whitespace::Minimize => {
                 let val = self.next_ws.unwrap();
                 if !val.is_empty() {
                     self.buf_writable.push(Writable::Lit(Cow::Borrowed(
@@ -2379,7 +2373,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                     )));
                 }
             }
-            WhitespaceHandling::Suppress => {}
+            Whitespace::Suppress => {}
         }
         self.next_ws = None;
     }

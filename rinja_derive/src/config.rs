@@ -20,7 +20,7 @@ pub(crate) struct Config {
     pub(crate) syntaxes: BTreeMap<String, SyntaxAndCache<'static>>,
     pub(crate) default_syntax: &'static str,
     pub(crate) escapers: Vec<(Vec<Cow<'static, str>>, Cow<'static, str>)>,
-    pub(crate) whitespace: WhitespaceHandling,
+    pub(crate) whitespace: Whitespace,
     // `Config` is self referential and `_key` owns it data, so it must come last
     _key: OwnedConfigKey,
 }
@@ -126,18 +126,14 @@ impl Config {
                 default_syntax.unwrap_or(DEFAULT_SYNTAX_NAME),
                 whitespace,
             ),
-            None => (
-                default_dirs,
-                DEFAULT_SYNTAX_NAME,
-                WhitespaceHandling::default(),
-            ),
+            None => (default_dirs, DEFAULT_SYNTAX_NAME, Whitespace::default()),
         };
         let file_info = config_path.map(|path| FileInfo::new(Path::new(path), None, None));
         if let Some(template_whitespace) = template_whitespace {
             whitespace = match template_whitespace {
-                "suppress" => WhitespaceHandling::Suppress,
-                "minimize" => WhitespaceHandling::Minimize,
-                "preserve" => WhitespaceHandling::Preserve,
+                "suppress" => Whitespace::Suppress,
+                "minimize" => Whitespace::Minimize,
+                "preserve" => Whitespace::Preserve,
                 s => {
                     return Err(CompileError::new(
                         format!("invalid value for `whitespace`: \"{s}\""),
@@ -327,38 +323,13 @@ impl RawConfig<'_> {
     }
 }
 
-#[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash)]
-#[cfg_attr(feature = "config", derive(Deserialize))]
-#[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
-pub(crate) enum WhitespaceHandling {
-    /// The default behavior. It will leave the whitespace characters "as is".
-    #[default]
-    Preserve,
-    /// It'll remove all the whitespace characters before and after the jinja block.
-    Suppress,
-    /// It'll remove all the whitespace characters except one before and after the jinja blocks.
-    /// If there is a newline character, the preserved character in the trimmed characters, it will
-    /// the one preserved.
-    Minimize,
-}
-
-impl From<WhitespaceHandling> for Whitespace {
-    fn from(ws: WhitespaceHandling) -> Self {
-        match ws {
-            WhitespaceHandling::Suppress => Whitespace::Suppress,
-            WhitespaceHandling::Preserve => Whitespace::Preserve,
-            WhitespaceHandling::Minimize => Whitespace::Minimize,
-        }
-    }
-}
-
 #[cfg_attr(feature = "config", derive(Deserialize))]
 struct General<'a> {
     #[cfg_attr(feature = "config", serde(borrow))]
     dirs: Option<Vec<&'a str>>,
     default_syntax: Option<&'a str>,
     #[cfg_attr(feature = "config", serde(default))]
-    whitespace: WhitespaceHandling,
+    whitespace: Whitespace,
 }
 
 #[cfg_attr(feature = "config", derive(Deserialize))]
@@ -704,10 +675,10 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Suppress);
+        assert_eq!(config.whitespace, Whitespace::Suppress);
 
         let config = Config::new(r#""#, None, None, None).unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Preserve);
+        assert_eq!(config.whitespace, Whitespace::Preserve);
 
         let config = Config::new(
             r#"
@@ -719,7 +690,7 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Preserve);
+        assert_eq!(config.whitespace, Whitespace::Preserve);
 
         let config = Config::new(
             r#"
@@ -731,7 +702,7 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
+        assert_eq!(config.whitespace, Whitespace::Minimize);
     }
 
     #[cfg(feature = "config")]
@@ -739,7 +710,7 @@ mod tests {
     fn test_whitespace_in_template() {
         // Checking that template arguments have precedence over general configuration.
         // So in here, in the template arguments, there is `whitespace = "minimize"` so
-        // the `WhitespaceHandling` should be `Minimize` as well.
+        // the `Whitespace` should be `Minimize` as well.
         let config = Config::new(
             r#"
             [general]
@@ -750,10 +721,10 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
+        assert_eq!(config.whitespace, Whitespace::Minimize);
 
         let config = Config::new(r#""#, None, Some("minimize"), None).unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
+        assert_eq!(config.whitespace, Whitespace::Minimize);
     }
 
     #[test]
