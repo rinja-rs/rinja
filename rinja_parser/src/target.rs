@@ -7,60 +7,6 @@ use crate::{
     bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
 };
 
-fn check_underscore<'a>(i: &'a str, target: &Target<'a>) -> Result<(), ParseErr<'a>> {
-    match target {
-        Target::Name("_") | Target::Placeholder(_) => {
-            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                "reserved keyword `_` cannot be used here",
-                i,
-            )));
-        }
-        Target::Struct(elems1, elems2) => {
-            for elem in elems1 {
-                if *elem == "_" {
-                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                        "reserved keyword `_` cannot be used here",
-                        i,
-                    )));
-                }
-            }
-            for (name, elem) in elems2 {
-                if *name == "_" {
-                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                        "reserved keyword `_` cannot be used here",
-                        i,
-                    )));
-                }
-                check_underscore(i, elem)?;
-            }
-        }
-        Target::Name(_)
-        | Target::Tuple(_, _)
-        | Target::Array(_, _)
-        | Target::NumLit(_, _)
-        | Target::CharLit(_)
-        | Target::BoolLit(_)
-        | Target::StrLit(_)
-        | Target::Rest(_) => {}
-        Target::Path(elems) => {
-            for elem in elems {
-                if *elem == "_" {
-                    return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                        "reserved keyword `_` cannot be used here",
-                        i,
-                    )));
-                }
-            }
-        }
-        Target::OrChain(elems) => {
-            for elem in elems {
-                check_underscore(i, elem)?;
-            }
-        }
-    }
-    Ok(())
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Target<'a> {
     Name(&'a str),
@@ -80,11 +26,7 @@ pub enum Target<'a> {
 
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
-    pub(super) fn parse(
-        i: &'a str,
-        s: &State<'_>,
-        allow_underscore: bool,
-    ) -> ParseResult<'a, Self> {
+    pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         let (new_i, target) = separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
             .map(|v: Vec<_>| v)
             .map(|mut opts| match opts.len() {
@@ -92,9 +34,6 @@ impl<'a> Target<'a> {
                 _ => Self::OrChain(opts),
             })
             .parse_next(i)?;
-        if !allow_underscore {
-            check_underscore(i, &target)?;
-        }
         Ok((new_i, target))
     }
 
@@ -184,7 +123,7 @@ impl<'a> Target<'a> {
     }
 
     fn unnamed(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        alt((Self::rest, |i| Self::parse(i, s, true))).parse_next(i)
+        alt((Self::rest, |i| Self::parse(i, s))).parse_next(i)
     }
 
     fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
@@ -211,11 +150,8 @@ impl<'a> Target<'a> {
             return Ok((i, (rest.1, rest.0)));
         }
 
-        let (i, (src, target)) = (
-            identifier,
-            opt(preceded(ws(':'), |i| Self::parse(i, s, true))),
-        )
-            .parse_next(init_i)?;
+        let (i, (src, target)) =
+            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(init_i)?;
 
         if src == "_" {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(

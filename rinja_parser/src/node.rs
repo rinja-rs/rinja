@@ -326,7 +326,7 @@ impl<'a> When<'a> {
             cut_node(
                 Some("match-when"),
                 (
-                    separated1(ws(|i| Target::parse(i, s, true)), '|'),
+                    separated1(ws(|i| Target::parse(i, s)), '|'),
                     opt(Whitespace::parse),
                     |i| s.tag_block_end(i),
                     cut_node(Some("match-when"), |i| Node::many(i, s)),
@@ -411,7 +411,7 @@ impl<'a> CondTest<'a> {
         let (i, (target, expr)) = (
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
-                ws(|i| Target::parse(i, s, true)),
+                ws(|i| Target::parse(i, s)),
                 ws('='),
             )),
             ws(|i| Expr::parse(i, s.level.get(), false)),
@@ -538,7 +538,7 @@ impl<'a> Loop<'a> {
             cut_node(
                 Some("for"),
                 (
-                    ws(|i| Target::parse(i, s, true)),
+                    ws(|i| Target::parse(i, s)),
                     ws(keyword("in")),
                     cut_node(
                         Some("for"),
@@ -1139,7 +1139,7 @@ impl<'a> Let<'a> {
             cut_node(
                 Some("let"),
                 (
-                    ws(|i| Target::parse(i, s, false)),
+                    ws(|i| Target::parse(i, s)),
                     opt(preceded(
                         ws('='),
                         ws(|i| Expr::parse(i, s.level.get(), false)),

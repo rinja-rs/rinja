@@ -42,6 +42,8 @@ fn underscore_ident2() {
 {% match [12] %}
 {%- when [_] %}matched
 {%- endmatch -%}
+{%- let _ = 2 -%}
+{%- let [_] = [2] -%}
 "#,
         ext = "html"
     )]
