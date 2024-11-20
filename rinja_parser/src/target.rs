@@ -19,7 +19,7 @@ pub enum Target<'a> {
     BoolLit(&'a str),
     Path(Vec<&'a str>),
     OrChain(Vec<Target<'a>>),
-    Placeholder(&'a str),
+    Placeholder(WithSpan<'a, ()>),
     /// The `Option` is the variable name (if any) in `var_name @ ..`.
     Rest(WithSpan<'a, Option<&'a str>>),
 }
@@ -27,13 +27,14 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
+        let (new_i, target) = separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
             .map(|v: Vec<_>| v)
             .map(|mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
             })
-            .parse_next(i)
+            .parse_next(i)?;
+        Ok((new_i, target))
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
@@ -103,7 +104,7 @@ impl<'a> Target<'a> {
         // neither literal nor struct nor path
         let (new_i, name) = identifier.parse_next(i)?;
         let target = match name {
-            "_" => Self::Placeholder(name),
+            "_" => Self::Placeholder(WithSpan::new((), i)),
             _ => verify_name(i, name)?,
         };
         Ok((new_i, target))
