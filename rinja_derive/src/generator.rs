@@ -1,35 +1,63 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
-use std::fmt::{Arguments, Display, Write};
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 use std::{cmp, hash, mem, str};
 
 use parser::node::{
-    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Match, Whitespace, Ws,
+    Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Macro, Match,
+    Whitespace, Ws,
 };
 use parser::{
     CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, StrLit, StrPrefix, Target,
     WithSpan,
 };
-use quote::quote;
 use rustc_hash::FxBuildHasher;
 
 use crate::config::WhitespaceHandling;
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
+use crate::integration::{Buffer, impl_everything, write_header};
 use crate::{BUILT_IN_FILTERS, CRATE, CompileError, FileInfo, MsgValidEscapers};
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum EvaluatedResult {
-    AlwaysTrue,
-    AlwaysFalse,
-    Unknown,
+pub(crate) fn template_to_string(
+    input: &TemplateInput<'_>,
+    contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
+    heritage: Option<&Heritage<'_>>,
+) -> Result<String, CompileError> {
+    let mut buf = Buffer::new();
+    template_into_buffer(input, contexts, heritage, &mut buf, false)?;
+    Ok(buf.into_string())
 }
 
-pub(crate) struct Generator<'a> {
+pub(crate) fn template_into_buffer(
+    input: &TemplateInput<'_>,
+    contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
+    heritage: Option<&Heritage<'_>>,
+    buf: &mut Buffer,
+    only_template: bool,
+) -> Result<(), CompileError> {
+    let ctx = &contexts[&input.path];
+    let generator = Generator::new(
+        input,
+        contexts,
+        heritage,
+        MapChain::default(),
+        input.block.is_some(),
+        0,
+    );
+    let mut result = generator.build(ctx, buf, only_template);
+    if let Err(err) = &mut result {
+        if err.span.is_none() {
+            err.span = input.source_span;
+        }
+    }
+    result
+}
+
+struct Generator<'a> {
     // The template input state: original struct AST and attributes
     input: &'a TemplateInput<'a>,
     // All contexts, keyed by the package-relative template path
@@ -54,7 +82,7 @@ pub(crate) struct Generator<'a> {
 }
 
 impl<'a> Generator<'a> {
-    pub(crate) fn new<'n>(
+    fn new<'n>(
         input: &'n TemplateInput<'_>,
         contexts: &'n HashMap<&'n Arc<Path>, Context<'n>, FxBuildHasher>,
         heritage: Option<&'n Heritage<'_>>,
@@ -79,37 +107,28 @@ impl<'a> Generator<'a> {
     }
 
     // Takes a Context and generates the relevant implementations.
-    pub(crate) fn build(mut self, ctx: &Context<'a>) -> Result<String, CompileError> {
-        let mut buf = Buffer::new();
-        buf.write(format_args!(
-            "\
-            const _: () = {{\
-                extern crate {CRATE} as rinja;\
-            "
-        ));
-
-        if let Err(mut err) = self.impl_template(ctx, &mut buf) {
-            if err.span.is_none() {
-                err.span = self.input.source_span;
-            }
-            return Err(err);
+    fn build(
+        mut self,
+        ctx: &Context<'a>,
+        buf: &mut Buffer,
+        only_template: bool,
+    ) -> Result<(), CompileError> {
+        if !only_template {
+            buf.write(format_args!(
+                "\
+                const _: () = {{\
+                    extern crate {CRATE} as rinja;\
+                "
+            ));
         }
 
-        self.impl_display(&mut buf);
-        self.impl_fast_writable(&mut buf);
+        self.impl_template(ctx, buf)?;
+        impl_everything(self.input.ast, buf, only_template);
 
-        #[cfg(feature = "with-actix-web")]
-        self.impl_actix_web_responder(&mut buf);
-        #[cfg(feature = "with-axum")]
-        self.impl_axum_into_response(&mut buf);
-        #[cfg(feature = "with-rocket")]
-        self.impl_rocket_responder(&mut buf);
-        #[cfg(feature = "with-warp")]
-        self.impl_warp_reply(&mut buf);
-
-        buf.write("};");
-
-        Ok(buf.buf)
+        if !only_template {
+            buf.write("};");
+        }
+        Ok(())
     }
 
     fn push_locals<T, F: FnOnce(&mut Self) -> Result<T, CompileError>>(
@@ -123,8 +142,12 @@ impl<'a> Generator<'a> {
     }
 
     // Implement `Template` for the given context struct.
-    fn impl_template(&mut self, ctx: &Context<'a>, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "rinja::Template", None);
+    fn impl_template(
+        &mut self,
+        ctx: &Context<'a>,
+        buf: &mut Buffer,
+    ) -> Result<usize, CompileError> {
+        write_header(self.input.ast, buf, "rinja::Template", None);
         buf.write(
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
             where \
@@ -149,10 +172,10 @@ impl<'a> Generator<'a> {
                 Source::Source(_) => path != &*self.input.path,
             };
             if path_is_valid {
-                let path = path.to_str().unwrap();
                 buf.write(format_args!(
                     "const _: &[rinja::helpers::core::primitive::u8] =\
-                        rinja::helpers::core::include_bytes!({path:#?});",
+                        rinja::helpers::core::include_bytes!({:#?});",
+                    path.canonicalize().as_deref().unwrap_or(path),
                 ));
             }
         }
@@ -170,158 +193,13 @@ impl<'a> Generator<'a> {
             "\
                 rinja::Result::Ok(())\
             }}\
-            const EXTENSION:\
-                rinja::helpers::core::option::Option<&'static rinja::helpers::core::primitive::str> =\
-                rinja::helpers::core::option::Option::{:?};\
             const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;\
             const MIME_TYPE: &'static rinja::helpers::core::primitive::str = {:?};",
-            self.input.extension(),
             self.input.mime_type,
         ));
 
         buf.write('}');
-        Ok(())
-    }
-
-    // Implement `Display` for the given context struct.
-    fn impl_display(&mut self, buf: &mut Buffer) {
-        let ident = &self.input.ast.ident;
-        buf.write(format_args!(
-            "\
-            /// Implement the [`format!()`][rinja::helpers::std::format] trait for [`{}`]\n\
-            ///\n\
-            /// Please be aware of the rendering performance notice in the \
-                [`Template`][rinja::Template] trait.\n\
-            ",
-            quote!(#ident),
-        ));
-        self.write_header(buf, "rinja::helpers::core::fmt::Display", None);
-        buf.write(
-            "\
-                #[inline]\
-                fn fmt(\
-                    &self,\
-                    f: &mut rinja::helpers::core::fmt::Formatter<'_>\
-                ) -> rinja::helpers::core::fmt::Result {\
-                    rinja::Template::render_into(self, f)\
-                        .map_err(|_| rinja::helpers::core::fmt::Error)\
-                }\
-            }",
-        );
-    }
-
-    // Implement `FastWritable` for the given context struct.
-    fn impl_fast_writable(&mut self, buf: &mut Buffer) {
-        self.write_header(buf, "rinja::filters::FastWritable", None);
-        buf.write(
-            "\
-                #[inline]\
-                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::helpers::core::fmt::Result \
-                where \
-                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,\
-                {\
-                    rinja::Template::render_into(self, dest)\
-                        .map_err(|_| rinja::helpers::core::fmt::Error)\
-                }\
-            }",
-        );
-    }
-
-    // Implement Actix-web's `Responder`.
-    #[cfg(feature = "with-actix-web")]
-    fn impl_actix_web_responder(&mut self, buf: &mut Buffer) {
-        self.write_header(buf, "::rinja_actix::actix_web::Responder", None);
-        buf.write(
-            "\
-                type Body = ::rinja_actix::actix_web::body::BoxBody;\
-                #[inline]\
-                fn respond_to(self, _req: &::rinja_actix::actix_web::HttpRequest)\
-                -> ::rinja_actix::actix_web::HttpResponse<Self::Body> {\
-                    ::rinja_actix::into_response(&self)\
-                }\
-            }",
-        );
-    }
-
-    // Implement Axum's `IntoResponse`.
-    #[cfg(feature = "with-axum")]
-    fn impl_axum_into_response(&mut self, buf: &mut Buffer) {
-        self.write_header(buf, "::rinja_axum::axum_core::response::IntoResponse", None);
-        buf.write(
-            "\
-                #[inline]\
-                fn into_response(self) -> ::rinja_axum::axum_core::response::Response {\
-                    ::rinja_axum::into_response(&self)\
-                }\
-            }",
-        );
-    }
-
-    // Implement Rocket's `Responder`.
-    #[cfg(feature = "with-rocket")]
-    fn impl_rocket_responder(&mut self, buf: &mut Buffer) {
-        let lifetime1 = syn::Lifetime::new("'rinja1", proc_macro2::Span::call_site());
-        let param1 = syn::GenericParam::Lifetime(syn::LifetimeParam::new(lifetime1));
-
-        self.write_header(
-            buf,
-            "::rinja_rocket::rocket::response::Responder<'rinja1, 'static>",
-            Some(vec![param1]),
-        );
-        buf.write(
-            "\
-                #[inline]\
-                fn respond_to(self, _: &'rinja1 ::rinja_rocket::rocket::request::Request<'_>)\
-                    -> ::rinja_rocket::rocket::response::Result<'static>\
-                {\
-                    ::rinja_rocket::respond(&self)\
-                }\
-            }",
-        );
-    }
-
-    #[cfg(feature = "with-warp")]
-    fn impl_warp_reply(&mut self, buf: &mut Buffer) {
-        self.write_header(buf, "::rinja_warp::warp::reply::Reply", None);
-        buf.write(
-            "\
-                #[inline]\
-                fn into_response(self) -> ::rinja_warp::warp::reply::Response {\
-                    ::rinja_warp::into_response(&self)\
-                }\
-            }",
-        );
-    }
-
-    // Writes header for the `impl` for `TraitFromPathName` or `Template`
-    // for the given context struct.
-    fn write_header(
-        &mut self,
-        buf: &mut Buffer,
-        target: impl Display,
-        params: Option<Vec<syn::GenericParam>>,
-    ) {
-        let mut generics;
-        let (impl_generics, orig_ty_generics, where_clause) = if let Some(params) = params {
-            generics = self.input.ast.generics.clone();
-            for param in params {
-                generics.params.push(param);
-            }
-
-            let (_, orig_ty_generics, _) = self.input.ast.generics.split_for_impl();
-            let (impl_generics, _, where_clause) = generics.split_for_impl();
-            (impl_generics, orig_ty_generics, where_clause)
-        } else {
-            self.input.ast.generics.split_for_impl()
-        };
-
-        let ident = &self.input.ast.ident;
-        buf.write(format_args!(
-            "impl {} {} for {} {{",
-            quote!(#impl_generics),
-            target,
-            quote!(#ident #orig_ty_generics #where_clause),
-        ));
+        Ok(size_hint)
     }
 
     // Helper methods for handling node types
@@ -454,7 +332,8 @@ impl<'a> Generator<'a> {
             | Expr::Tuple(_)
             | Expr::NamedArgument(_, _)
             | Expr::FilterSource
-            | Expr::As(_, _) => {
+            | Expr::As(_, _)
+            | Expr::Concat(_) => {
                 *only_contains_is_defined = false;
                 (EvaluatedResult::Unknown, WithSpan::new(expr, span))
             }
@@ -643,7 +522,7 @@ impl<'a> Generator<'a> {
                                 this.visit_target(buf, true, true, target);
                             }
                         }
-                        buf.write(format_args!("= &{} {{", expr_buf.buf));
+                        buf.write(format_args!("= &{expr_buf} {{"));
                     } else if cond_info.generate_condition {
                         this.visit_condition(ctx, buf, expr)?;
                         buf.write('{');
@@ -866,42 +745,32 @@ impl<'a> Generator<'a> {
 
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
         let size_hint = self.push_locals(|this| {
+            macro_call_ensure_arg_count(call, def, ctx)?;
+
             this.write_buf_writable(ctx, buf)?;
             buf.write('{');
             this.prepare_ws(def.ws1);
 
-            let mut names = Buffer::new();
-            let mut values = Buffer::new();
-            let mut is_first_variable = true;
-            if args.len() != def.args.len() {
-                return Err(ctx.generate_error(
-                    &format!(
-                        "macro {name:?} expected {} argument{}, found {}",
-                        def.args.len(),
-                        if def.args.len() != 1 { "s" } else { "" },
-                        args.len()
-                    ),
-                    call,
-                ));
-            }
-            let mut named_arguments = HashMap::new();
+            let mut named_arguments: HashMap<&str, _, FxBuildHasher> = HashMap::default();
             // Since named arguments can only be passed last, we only need to check if the last argument
             // is a named one.
             if let Some(Expr::NamedArgument(_, _)) = args.last().map(|expr| &**expr) {
                 // First we check that all named arguments actually exist in the called item.
-                for arg in args.iter().rev() {
+                for (index, arg) in args.iter().enumerate().rev() {
                     let Expr::NamedArgument(arg_name, _) = &**arg else {
                         break;
                     };
-                    if !def.args.iter().any(|arg| arg == arg_name) {
+                    if !def.args.iter().any(|(arg, _)| arg == arg_name) {
                         return Err(ctx.generate_error(
                             &format!("no argument named `{arg_name}` in macro {name:?}"),
                             call,
                         ));
                     }
-                    named_arguments.insert(Cow::Borrowed(arg_name), arg);
+                    named_arguments.insert(arg_name, (index, arg));
                 }
             }
+
+            let mut value = Buffer::new();
 
             // Handling both named and unnamed arguments requires to be careful of the named arguments
             // order. To do so, we iterate through the macro defined arguments and then check if we have
@@ -911,23 +780,43 @@ impl<'a> Generator<'a> {
             // * If there isn't one, then we pick the next argument (we can do it without checking
             //   anything since named arguments are always last).
             let mut allow_positional = true;
-            for (index, arg) in def.args.iter().enumerate() {
-                let expr = if let Some(expr) = named_arguments.get(&Cow::Borrowed(arg)) {
+            let mut used_named_args = vec![false; args.len()];
+            for (index, (arg, default_value)) in def.args.iter().enumerate() {
+                let expr = if let Some((index, expr)) = named_arguments.get(arg) {
+                    used_named_args[*index] = true;
                     allow_positional = false;
                     expr
                 } else {
-                    if !allow_positional {
-                        // If there is already at least one named argument, then it's not allowed
-                        // to use unnamed ones at this point anymore.
-                        return Err(ctx.generate_error(
-                            &format!(
-                            "cannot have unnamed argument (`{arg}`) after named argument in macro \
-                             {name:?}"
-                        ),
-                            call,
-                        ));
+                    match args.get(index) {
+                        Some(arg_expr) if !matches!(**arg_expr, Expr::NamedArgument(_, _)) => {
+                            // If there is already at least one named argument, then it's not allowed
+                            // to use unnamed ones at this point anymore.
+                            if !allow_positional {
+                                return Err(ctx.generate_error(
+                                    &format!(
+                                        "cannot have unnamed argument (`{arg}`) after named argument \
+                                         in call to macro {name:?}"
+                                    ),
+                                    call,
+                                ));
+                            }
+                            arg_expr
+                        }
+                        Some(arg_expr) if used_named_args[index] => {
+                            let Expr::NamedArgument(name, _) = **arg_expr else { unreachable!() };
+                            return Err(ctx.generate_error(
+                                &format!("`{name}` is passed more than once"),
+                                call,
+                            ));
+                        }
+                        _ => {
+                            if let Some(default_value) = default_value {
+                                default_value
+                            } else {
+                                return Err(ctx.generate_error(&format!("missing `{arg}` argument"), call));
+                            }
+                        }
                     }
-                    &args[index]
                 };
                 match &**expr {
                     // If `expr` is already a form of variable then
@@ -942,7 +831,8 @@ impl<'a> Generator<'a> {
                         let mut attr_buf = Buffer::new();
                         this.visit_attr(ctx, &mut attr_buf, obj, attr)?;
 
-                        let var = this.locals.resolve(&attr_buf.buf).unwrap_or(attr_buf.buf);
+                        let attr = attr_buf.into_string();
+                        let var = this.locals.resolve(&attr).unwrap_or(attr);
                         this.locals
                             .insert(Cow::Borrowed(arg), LocalMeta::with_ref(var));
                     }
@@ -951,28 +841,17 @@ impl<'a> Generator<'a> {
                     // multiple times, e.g. in the case of macro
                     // parameters being used multiple times.
                     _ => {
-                        if is_first_variable {
-                            is_first_variable = false;
+                        value.clear();
+                        let (before, after) = if !is_copyable(expr) {
+                            ("&(", ")")
                         } else {
-                            names.write(',');
-                            values.write(',');
-                        }
-                        names.write(arg);
-
-                        values.write('(');
-                        if !is_copyable(expr) {
-                            values.write('&');
-                        }
-                        values.write(this.visit_expr_root(ctx, expr)?);
-                        values.write(')');
+                            ("", "")
+                        };
+                        value.write(this.visit_expr_root(ctx, expr)?);
+                        buf.write(format_args!("let {arg} = {before}{value}{after};"));
                         this.locals.insert_with_default(Cow::Borrowed(arg));
                     }
                 }
-            }
-
-            debug_assert_eq!(names.buf.is_empty(), values.buf.is_empty());
-            if !names.buf.is_empty() {
-                buf.write(format_args!("let ({}) = ({});", names.buf, values.buf));
             }
 
             let mut size_hint = this.handle(own_ctx, &def.nodes, buf, AstLevel::Nested)?;
@@ -1026,10 +905,10 @@ impl<'a> Generator<'a> {
             filter,
         )?;
         let filter_buf = match display_wrap {
-            DisplayWrap::Wrapped => filter_buf.buf,
+            DisplayWrap::Wrapped => filter_buf.into_string(),
             DisplayWrap::Unwrapped => format!(
-                "(&&rinja::filters::AutoEscaper::new(&({}), {})).rinja_auto_escape()?",
-                filter_buf.buf, self.input.escaper,
+                "(&&rinja::filters::AutoEscaper::new(&({filter_buf}), {})).rinja_auto_escape()?",
+                self.input.escaper,
             ),
         };
         buf.write(format_args!(
@@ -1118,6 +997,16 @@ impl<'a> Generator<'a> {
                     _ => Ok(false),
                 }
             }
+            Target::Placeholder(_) => Ok(false),
+            Target::Rest(var_name) => {
+                if let Some(var_name) = **var_name {
+                    match self.is_shadowing_variable(ctx, &Target::Name(var_name), l) {
+                        Ok(false) => {}
+                        outcome => return outcome,
+                    }
+                }
+                Ok(false)
+            }
             Target::Tuple(_, targets) => {
                 for target in targets {
                     match self.is_shadowing_variable(ctx, target, l) {
@@ -1181,7 +1070,7 @@ impl<'a> Generator<'a> {
         } else {
             ("", "")
         };
-        buf.write(format_args!(" = {before}{}{after};", &expr_buf.buf));
+        buf.write(format_args!(" = {before}{expr_buf}{after};"));
         Ok(())
     }
 
@@ -1307,8 +1196,15 @@ impl<'a> Generator<'a> {
 
     fn write_expr(&mut self, ws: Ws, s: &'a WithSpan<'a, Expr<'a>>) {
         self.handle_ws(ws);
-        self.buf_writable
-            .push(compile_time_escape(s, self.input.escaper).unwrap_or(Writable::Expr(s)));
+        let items = if let Expr::Concat(exprs) = &**s {
+            exprs
+        } else {
+            std::slice::from_ref(s)
+        };
+        for s in items {
+            self.buf_writable
+                .push(compile_time_escape(s, self.input.escaper).unwrap_or(Writable::Expr(s)));
+        }
     }
 
     // Write expression buffer and empty
@@ -1358,11 +1254,11 @@ impl<'a> Generator<'a> {
 
                     let mut expr_buf = Buffer::new();
                     let expr = match self.visit_expr(ctx, &mut expr_buf, s)? {
-                        DisplayWrap::Wrapped => expr_buf.buf,
+                        DisplayWrap::Wrapped => expr_buf.into_string(),
                         DisplayWrap::Unwrapped => format!(
-                            "(&&rinja::filters::AutoEscaper::new(&({}), {})).\
+                            "(&&rinja::filters::AutoEscaper::new(&({expr_buf}), {})).\
                                 rinja_auto_escape()?",
-                            expr_buf.buf, self.input.escaper,
+                            self.input.escaper,
                         ),
                     };
                     let idx = if is_cacheable(s) {
@@ -1388,11 +1284,10 @@ impl<'a> Generator<'a> {
         }
         buf.write(format_args!(
             ") {{\
-                ({}) => {{\
-                    {}\
+                ({targets}) => {{\
+                    {lines}\
                 }}\
-            }}",
-            targets.buf, lines.buf,
+            }}"
         ));
 
         for s in trailing_simple_lines {
@@ -1449,7 +1344,7 @@ impl<'a> Generator<'a> {
     ) -> Result<String, CompileError> {
         let mut buf = Buffer::new();
         self.visit_expr(ctx, &mut buf, expr)?;
-        Ok(buf.buf)
+        Ok(buf.into_string())
     }
 
     fn visit_expr(
@@ -1487,6 +1382,7 @@ impl<'a> Generator<'a> {
             Expr::IsDefined(var_name) => self.visit_is_defined(buf, true, var_name)?,
             Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
             Expr::As(ref expr, target) => self.visit_as(ctx, buf, expr, target)?,
+            Expr::Concat(ref exprs) => self.visit_concat(ctx, buf, exprs)?,
         })
     }
 
@@ -1549,6 +1445,27 @@ impl<'a> Generator<'a> {
             ")) as rinja::helpers::core::primitive::{target}"
         ));
         Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn visit_concat(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        exprs: &[WithSpan<'_, Expr<'_>>],
+    ) -> Result<DisplayWrap, CompileError> {
+        match exprs {
+            [] => unreachable!(),
+            [expr] => self.visit_expr(ctx, buf, expr),
+            exprs => {
+                let (l, r) = exprs.split_at((exprs.len() + 1) / 2);
+                buf.write("rinja::helpers::Concat(&(");
+                self.visit_concat(ctx, buf, l)?;
+                buf.write("), &(");
+                self.visit_concat(ctx, buf, r)?;
+                buf.write("))");
+                Ok(DisplayWrap::Unwrapped)
+            }
+        }
     }
 
     fn visit_try(
@@ -2299,7 +2216,7 @@ impl<'a> Generator<'a> {
         target: &Target<'a>,
     ) {
         match target {
-            Target::Placeholder(s) => buf.write(s),
+            Target::Placeholder(_) => buf.write('_'),
             Target::Rest(s) => {
                 if let Some(var_name) = &**s {
                     self.locals
@@ -2330,7 +2247,7 @@ impl<'a> Generator<'a> {
                 }
             },
             Target::Tuple(path, targets) => {
-                buf.write(SeparatedPath(path));
+                buf.write_separated_path(path);
                 buf.write('(');
                 for target in targets {
                     self.visit_target(buf, initialized, false, target);
@@ -2339,7 +2256,7 @@ impl<'a> Generator<'a> {
                 buf.write(')');
             }
             Target::Array(path, targets) => {
-                buf.write(SeparatedPath(path));
+                buf.write_separated_path(path);
                 buf.write('[');
                 for target in targets {
                     self.visit_target(buf, initialized, false, target);
@@ -2348,7 +2265,7 @@ impl<'a> Generator<'a> {
                 buf.write(']');
             }
             Target::Struct(path, targets) => {
-                buf.write(SeparatedPath(path));
+                buf.write_separated_path(path);
                 buf.write('{');
                 for (name, target) in targets {
                     if let Target::Rest(_) = target {
@@ -2452,6 +2369,43 @@ impl<'a> Generator<'a> {
     }
 }
 
+fn macro_call_ensure_arg_count(
+    call: &WithSpan<'_, Call<'_>>,
+    def: &Macro<'_>,
+    ctx: &Context<'_>,
+) -> Result<(), CompileError> {
+    if call.args.len() == def.args.len() {
+        // exactly enough arguments were provided
+        return Ok(());
+    }
+
+    let nb_default_args = def
+        .args
+        .iter()
+        .rev()
+        .take_while(|(_, default_value)| default_value.is_some())
+        .count();
+    if call.args.len() < def.args.len() && call.args.len() >= def.args.len() - nb_default_args {
+        // all missing arguments have a default value, and there weren't too many args
+        return Ok(());
+    }
+
+    // either too many or not enough arguments were provided
+    let (expected_args, extra) = match nb_default_args {
+        0 => (def.args.len(), ""),
+        _ => (nb_default_args, "at least "),
+    };
+    Err(ctx.generate_error(
+        &format!(
+            "macro {:?} expected {extra}{expected_args} argument{}, found {}",
+            def.name,
+            if expected_args != 1 { "s" } else { "" },
+            call.args.len(),
+        ),
+        call,
+    ))
+}
+
 #[cfg(target_pointer_width = "16")]
 type TargetIsize = i16;
 #[cfg(target_pointer_width = "32")]
@@ -2504,7 +2458,7 @@ fn expr_is_int_lit_plus_minus_one(expr: &WithSpan<'_, Expr<'_>>) -> Option<bool>
                     Some(IntKind::$svar) => is_signed_singular($sty::from_str_radix, $value, 1, -1),
                 )*
                 $(
-                    Some(IntKind::$uvar) => is_unsigned_singular($sty::from_str_radix, $value, 1),
+                    Some(IntKind::$uvar) => is_unsigned_singular($uty::from_str_radix, $value, 1),
                 )*
                 None => match $value.starts_with('-') {
                     true => is_signed_singular(i128::from_str_radix, $value, 1, -1),
@@ -2652,100 +2606,6 @@ fn compile_time_escape<'a>(expr: &Expr<'a>, escaper: &str) -> Option<Writable<'a
     }))
 }
 
-#[derive(Debug)]
-struct Buffer {
-    // The buffer to generate the code into
-    buf: String,
-    discard: bool,
-    last_was_write_str: bool,
-}
-
-impl Buffer {
-    fn new() -> Self {
-        Self {
-            buf: String::new(),
-            discard: false,
-            last_was_write_str: false,
-        }
-    }
-
-    fn is_discard(&self) -> bool {
-        self.discard
-    }
-
-    fn set_discard(&mut self, discard: bool) {
-        self.discard = discard;
-        self.last_was_write_str = false;
-    }
-
-    fn write(&mut self, src: impl BufferFmt) {
-        if !self.discard {
-            src.append_to(&mut self.buf);
-            self.last_was_write_str = false;
-        }
-    }
-
-    fn write_escaped_str(&mut self, s: &str) {
-        if !self.discard {
-            self.buf.push('"');
-            string_escape(&mut self.buf, s);
-            self.buf.push('"');
-        }
-    }
-
-    fn write_writer(&mut self, s: &str) -> usize {
-        const OPEN: &str = r#"writer.write_str(""#;
-        const CLOSE: &str = r#"")?;"#;
-
-        if !s.is_empty() && !self.discard {
-            if !self.last_was_write_str {
-                self.last_was_write_str = true;
-                self.buf.push_str(OPEN);
-            } else {
-                // strip trailing `")?;`, leaving an unterminated string
-                self.buf.truncate(self.buf.len() - CLOSE.len());
-            }
-            string_escape(&mut self.buf, s);
-            self.buf.push_str(CLOSE);
-        }
-        s.len()
-    }
-}
-
-trait BufferFmt {
-    fn append_to(&self, buf: &mut String);
-}
-
-impl<T: BufferFmt + ?Sized> BufferFmt for &T {
-    fn append_to(&self, buf: &mut String) {
-        T::append_to(self, buf);
-    }
-}
-
-impl BufferFmt for char {
-    fn append_to(&self, buf: &mut String) {
-        buf.push(*self);
-    }
-}
-
-impl BufferFmt for str {
-    fn append_to(&self, buf: &mut String) {
-        buf.push_str(self);
-    }
-}
-
-impl BufferFmt for String {
-    fn append_to(&self, buf: &mut String) {
-        buf.push_str(self);
-    }
-}
-
-impl BufferFmt for Arguments<'_> {
-    fn append_to(&self, buf: &mut String) {
-        buf.write_fmt(*self).unwrap();
-    }
-}
-
 struct CondInfo<'a> {
     cond: &'a WithSpan<'a, Cond<'a>>,
     cond_expr: Option<WithSpan<'a, Expr<'a>>>,
@@ -2758,6 +2618,13 @@ struct Conds<'a> {
     ws_before: Option<Ws>,
     ws_after: Option<Ws>,
     nb_conds: usize,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum EvaluatedResult {
+    AlwaysTrue,
+    AlwaysFalse,
+    Unknown,
 }
 
 impl<'a> Conds<'a> {
@@ -2862,21 +2729,8 @@ impl<'a> Conds<'a> {
     }
 }
 
-struct SeparatedPath<I>(I);
-
-impl<I: IntoIterator<Item = E> + Copy, E: BufferFmt> BufferFmt for SeparatedPath<I> {
-    fn append_to(&self, buf: &mut String) {
-        for (idx, item) in self.0.into_iter().enumerate() {
-            if idx > 0 {
-                buf.push_str("::");
-            }
-            item.append_to(buf);
-        }
-    }
-}
-
 #[derive(Clone, Default)]
-pub(crate) struct LocalMeta {
+struct LocalMeta {
     refs: Option<String>,
     initialized: bool,
 }
@@ -2898,7 +2752,7 @@ impl LocalMeta {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct MapChain<'a, K, V>
+struct MapChain<'a, K, V>
 where
     K: cmp::Eq + hash::Hash,
 {
@@ -2980,11 +2834,12 @@ fn is_copyable(expr: &Expr<'_>) -> bool {
 
 fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
     match expr {
-        Expr::BoolLit(_) | Expr::NumLit(_, _) | Expr::StrLit(_) | Expr::CharLit(_) => true,
+        Expr::BoolLit(_)
+        | Expr::NumLit(_, _)
+        | Expr::StrLit(_)
+        | Expr::CharLit(_)
+        | Expr::BinOp(_, _, _) => true,
         Expr::Unary(.., expr) => is_copyable_within_op(expr, true),
-        Expr::BinOp(_, lhs, rhs) => {
-            is_copyable_within_op(lhs, true) && is_copyable_within_op(rhs, true)
-        }
         Expr::Range(..) => true,
         // The result of a call likely doesn't need to be borrowed,
         // as in that case the call is more likely to return a
@@ -3001,7 +2856,7 @@ fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
 }
 
 /// Returns `true` if this is an `Attr` where the `obj` is `"self"`.
-pub(crate) fn is_attr_self(mut expr: &Expr<'_>) -> bool {
+fn is_attr_self(mut expr: &Expr<'_>) -> bool {
     loop {
         match expr {
             Expr::Attr(obj, _) if matches!(***obj, Expr::Var("self")) => return true,
@@ -3014,7 +2869,7 @@ pub(crate) fn is_attr_self(mut expr: &Expr<'_>) -> bool {
 /// Returns `true` if the outcome of this expression may be used multiple times in the same
 /// `write!()` call, without evaluating the expression again, i.e. the expression should be
 /// side-effect free.
-pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
+fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
     match &**expr {
         // Literals are the definition of pure:
         Expr::BoolLit(_) => true,
@@ -3041,6 +2896,7 @@ pub(crate) fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::NamedArgument(_, expr) => is_cacheable(expr),
         Expr::As(expr, _) => is_cacheable(expr),
         Expr::Try(expr) => is_cacheable(expr),
+        Expr::Concat(args) => args.iter().all(is_cacheable),
         // We have too little information to tell if the expression is pure:
         Expr::Call(_, _) => false,
         Expr::RustMacro(_, _) => false,
@@ -3139,27 +2995,4 @@ fn normalize_identifier(ident: &str) -> &str {
 
     // SAFETY: We know that the input byte slice is pure-ASCII.
     unsafe { std::str::from_utf8_unchecked(&replacement[..ident.len() + 2]) }
-}
-
-/// Similar to `write!(dest, "{src:?}")`, but only escapes the strictly needed characters,
-/// and without the surrounding `"…"` quotation marks.
-pub(crate) fn string_escape(dest: &mut String, src: &str) {
-    // SAFETY: we will only push valid str slices
-    let dest = unsafe { dest.as_mut_vec() };
-    let src = src.as_bytes();
-    let mut last = 0;
-
-    // According to <https://doc.rust-lang.org/reference/tokens.html#string-literals>, every
-    // character is valid except `" \ IsolatedCR`. We don't test if the `\r` is isolated or not,
-    // but always escape it.
-    for x in memchr::memchr3_iter(b'\\', b'"', b'\r', src) {
-        dest.extend(&src[last..x]);
-        dest.extend(match src[x] {
-            b'\\' => br"\\",
-            b'\"' => br#"\""#,
-            _ => br"\r",
-        });
-        last = x + 1;
-    }
-    dest.extend(&src[last..]);
 }

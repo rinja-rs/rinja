@@ -1,5 +1,5 @@
 use crate::node::{Lit, Whitespace, Ws};
-use crate::{Ast, Expr, Filter, InnerSyntax, Node, Num, StrLit, Syntax, WithSpan};
+use crate::{Ast, Expr, Filter, InnerSyntax, Node, Num, StrLit, Syntax, SyntaxBuilder, WithSpan};
 
 impl<T> WithSpan<'static, T> {
     fn no_span(inner: T) -> Self {
@@ -1063,4 +1063,62 @@ fn let_set() {
 fn fuzzed_filter_recursion() {
     const TEMPLATE: &str = include_str!("../tests/filter-recursion.txt");
     assert!(Ast::from_str(TEMPLATE, None, &Syntax::default()).is_err());
+}
+
+#[test]
+fn fuzzed_excessive_syntax_lengths() {
+    const LONG_DELIM: Option<&str> =
+        Some("\0]***NEWFILE\u{1f}***:7/v/.-3/\u{1b}/~~~~z~0/*:7/v/./t/t/.p//NEWVILE**::7/v");
+
+    for (kind, syntax_builder) in [
+        ("opening block", SyntaxBuilder {
+            block_start: LONG_DELIM,
+            ..SyntaxBuilder::default()
+        }),
+        ("closing block", SyntaxBuilder {
+            block_end: LONG_DELIM,
+            ..SyntaxBuilder::default()
+        }),
+        ("opening expression", SyntaxBuilder {
+            expr_start: LONG_DELIM,
+            ..SyntaxBuilder::default()
+        }),
+        ("closing expression", SyntaxBuilder {
+            expr_end: LONG_DELIM,
+            ..SyntaxBuilder::default()
+        }),
+        ("opening comment", SyntaxBuilder {
+            comment_start: LONG_DELIM,
+            ..SyntaxBuilder::default()
+        }),
+        ("closing comment", SyntaxBuilder {
+            comment_end: LONG_DELIM,
+            ..SyntaxBuilder::default()
+        }),
+    ] {
+        let err = syntax_builder.to_syntax().unwrap_err();
+        assert_eq!(
+            err,
+            format!(
+                "delimiters must be at most 32 characters long. The {} delimiter \
+                 (\"\\0]***NEWFILE\\u{{1f}}***\"...) is too long",
+                kind
+            ),
+        );
+    }
+}
+
+#[test]
+fn extends_with_whitespace_control() {
+    const CONTROL: &[&str] = &["", "\t", "-", "+", "~"];
+
+    let syntax = Syntax::default();
+    let expected = Ast::from_str(r#"front {% extends "nothing" %} back"#, None, &syntax).unwrap();
+    for front in CONTROL {
+        for back in CONTROL {
+            let src = format!(r#"front {{%{front} extends "nothing" {back}%}} back"#);
+            let actual = Ast::from_str(&src, None, &syntax).unwrap();
+            assert_eq!(expected.nodes(), actual.nodes(), "source: {:?}", src);
+        }
+    }
 }

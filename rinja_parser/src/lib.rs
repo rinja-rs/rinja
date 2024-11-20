@@ -12,10 +12,10 @@ use std::{fmt, str};
 
 use winnow::Parser;
 use winnow::ascii::escaped;
-use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, preceded, repeat};
+use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::AsChar;
-use winnow::token::{any, one_of, tag, take_till0, take_till1, take_while};
+use winnow::token::{any, one_of, take_till1, take_while};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -274,18 +274,25 @@ impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
     }
 }
 
-fn is_ws(c: char) -> bool {
-    matches!(c, ' ' | '\t' | '\r' | '\n')
+#[inline]
+fn skip_ws0(i: &str) -> ParseResult<'_, ()> {
+    Ok((i.trim_ascii_start(), ()))
 }
 
-fn not_ws(c: char) -> bool {
-    !is_ws(c)
+#[inline]
+fn skip_ws1(i: &str) -> ParseResult<'_, ()> {
+    let j = i.trim_ascii_start();
+    if i.len() != j.len() {
+        Ok((j, ()))
+    } else {
+        fail.parse_next(i)
+    }
 }
 
 fn ws<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
-    delimited(take_till0(not_ws), inner, take_till0(not_ws))
+    delimited(skip_ws0, inner, skip_ws0)
 }
 
 /// Skips input until `end` was found, but does not consume it.
@@ -474,7 +481,7 @@ fn str_lit_without_prefix(i: &str) -> ParseResult<'_> {
     Ok((i, s.unwrap_or_default()))
 }
 
-fn str_lit(i: &str) -> Result<(&str, StrLit<'_>), ParseErr<'_>> {
+fn str_lit(i: &str) -> ParseResult<'_, StrLit<'_>> {
     let (i, (prefix, content)) = (opt(alt(('b', 'c'))), str_lit_without_prefix).parse_next(i)?;
     let prefix = match prefix {
         Some('b') => Some(StrPrefix::Binary),
@@ -497,7 +504,7 @@ pub struct CharLit<'a> {
 
 // Information about allowed character escapes is available at:
 // <https://doc.rust-lang.org/reference/tokens.html#character-literals>.
-fn char_lit(i: &str) -> Result<(&str, CharLit<'_>), ParseErr<'_>> {
+fn char_lit(i: &str) -> ParseResult<'_, CharLit<'_>> {
     let start = i;
     let (i, (b_prefix, s)) = (
         opt('b'),
@@ -626,7 +633,12 @@ fn path_or_identifier(i: &str) -> ParseResult<'_, PathOrIdentifier<'_>> {
             path.extend(rest);
             Ok((i, PathOrIdentifier::Path(path)))
         }
-        (None, name, []) if name.chars().next().map_or(true, char::is_lowercase) => {
+        (None, name, [])
+            if name
+                .chars()
+                .next()
+                .map_or(true, |c| c == '_' || c.is_lowercase()) =>
+        {
             Ok((i, PathOrIdentifier::Identifier(name)))
         }
         (None, start, tail) => {
@@ -653,41 +665,55 @@ impl<'a> State<'a> {
         }
     }
 
-    fn nest<'b, T, F: FnOnce(&'b str) -> ParseResult<'b, T>>(
+    fn nest<'b, T, F: Parser<&'b str, T, ErrorContext<'b>>>(
         &self,
         i: &'b str,
-        callback: F,
+        mut callback: F,
     ) -> ParseResult<'b, T> {
         let prev_level = self.level.get();
         let (_, level) = prev_level.nest(i)?;
         self.level.set(level);
-        let ret = callback(i);
+        let ret = callback.parse_next(i);
         self.level.set(prev_level);
         ret
     }
 
-    fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_start).parse_next(i)
+    fn tag_block_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.block_start.value(()).parse_next(i)
     }
 
-    fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.block_end).parse_next(i)
+    fn tag_block_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        let (i, control) = alt((
+            self.syntax.block_end.value(None),
+            peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
+            fail, // rollback on partial matches in the previous line
+        ))
+        .parse_next(i)?;
+        if let Some(control) = control {
+            let message = format!(
+                "unclosed block, you likely meant to apply whitespace control: {:?}",
+                format!("{control}{}", self.syntax.block_end),
+            );
+            Err(ParseErr::backtrack(ErrorContext::new(message, i).into()))
+        } else {
+            Ok((i, ()))
+        }
     }
 
-    fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_start).parse_next(i)
+    fn tag_comment_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.comment_start.value(()).parse_next(i)
     }
 
-    fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.comment_end).parse_next(i)
+    fn tag_comment_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.comment_end.value(()).parse_next(i)
     }
 
-    fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_start).parse_next(i)
+    fn tag_expr_start<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.expr_start.value(()).parse_next(i)
     }
 
-    fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i> {
-        tag(self.syntax.expr_end).parse_next(i)
+    fn tag_expr_end<'i>(&self, i: &'i str) -> ParseResult<'i, ()> {
+        self.syntax.expr_end.value(()).parse_next(i)
     }
 
     fn enter_loop(&self) {
@@ -801,6 +827,14 @@ impl<'a> SyntaxBuilder<'a> {
                     "delimiters must be at least two characters long. \
                         The {k} delimiter ({s:?}) is too short",
                 ));
+            } else if s.len() > 32 {
+                return Err(format!(
+                    "delimiters must be at most 32 characters long. \
+                        The {k} delimiter ({:?}...) is too long",
+                    &s[..(16..=s.len())
+                        .find(|&i| s.is_char_boundary(i))
+                        .unwrap_or(s.len())],
+                ));
             } else if s.chars().any(char::is_whitespace) {
                 return Err(format!(
                     "delimiters may not contain white spaces. \
@@ -870,20 +904,10 @@ fn filter<'a>(
     i: &'a str,
     level: &mut Level,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let (j, _) = take_till0(not_ws).parse_next(i)?;
-    let had_spaces = i.len() != j.len();
-    let (j, _) = ('|', not('|')).parse_next(j)?;
+    let (j, _) = ws(('|', not('|'))).parse_next(i)?;
 
-    if !had_spaces {
-        *level = level.nest(i)?.1;
-        cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
-    } else {
-        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-            "the filter operator `|` must not be preceded by any whitespace characters\n\
-            the binary OR operator is called `bitor` in rinja",
-            i,
-        )))
-    }
+    *level = level.nest(i)?.1;
+    cut_err((ws(identifier), opt(|i| Expr::arguments(i, *level, false)))).parse_next(j)
 }
 
 /// Returns the common parts of two paths.
@@ -1049,42 +1073,63 @@ mod test {
     #[test]
     fn test_num_lit() {
         // Should fail.
-        assert!(num_lit(".").is_err());
+        assert!(num_lit.parse_next(".").is_err());
         // Should succeed.
         assert_eq!(
-            num_lit("1.2E-02").unwrap(),
+            num_lit.parse_next("1.2E-02").unwrap(),
             ("", Num::Float("1.2E-02", None))
         );
-        assert_eq!(num_lit("4e3").unwrap(), ("", Num::Float("4e3", None)),);
-        assert_eq!(num_lit("4e+_3").unwrap(), ("", Num::Float("4e+_3", None)),);
+        assert_eq!(
+            num_lit.parse_next("4e3").unwrap(),
+            ("", Num::Float("4e3", None)),
+        );
+        assert_eq!(
+            num_lit.parse_next("4e+_3").unwrap(),
+            ("", Num::Float("4e+_3", None)),
+        );
         // Not supported because Rust wants a number before the `.`.
-        assert!(num_lit(".1").is_err());
-        assert!(num_lit(".1E-02").is_err());
+        assert!(num_lit.parse_next(".1").is_err());
+        assert!(num_lit.parse_next(".1E-02").is_err());
         // A `_` directly after the `.` denotes a field.
-        assert_eq!(num_lit("1._0").unwrap(), ("._0", Num::Int("1", None)));
-        assert_eq!(num_lit("1_.0").unwrap(), ("", Num::Float("1_.0", None)));
+        assert_eq!(
+            num_lit.parse_next("1._0").unwrap(),
+            ("._0", Num::Int("1", None))
+        );
+        assert_eq!(
+            num_lit.parse_next("1_.0").unwrap(),
+            ("", Num::Float("1_.0", None))
+        );
         // Not supported (voluntarily because of `1..` syntax).
-        assert_eq!(num_lit("1.").unwrap(), (".", Num::Int("1", None)));
-        assert_eq!(num_lit("1_.").unwrap(), (".", Num::Int("1_", None)));
-        assert_eq!(num_lit("1_2.").unwrap(), (".", Num::Int("1_2", None)));
+        assert_eq!(
+            num_lit.parse_next("1.").unwrap(),
+            (".", Num::Int("1", None))
+        );
+        assert_eq!(
+            num_lit.parse_next("1_.").unwrap(),
+            (".", Num::Int("1_", None))
+        );
+        assert_eq!(
+            num_lit.parse_next("1_2.").unwrap(),
+            (".", Num::Int("1_2", None))
+        );
         // Numbers with suffixes
         assert_eq!(
-            num_lit("-1usize").unwrap(),
+            num_lit.parse_next("-1usize").unwrap(),
             ("", Num::Int("-1", Some(IntKind::Usize)))
         );
         assert_eq!(
-            num_lit("123_f32").unwrap(),
+            num_lit.parse_next("123_f32").unwrap(),
             ("", Num::Float("123_", Some(FloatKind::F32)))
         );
         assert_eq!(
-            num_lit("1_.2_e+_3_f64|into_isize").unwrap(),
+            num_lit.parse_next("1_.2_e+_3_f64|into_isize").unwrap(),
             (
                 "|into_isize",
                 Num::Float("1_.2_e+_3_", Some(FloatKind::F64))
             )
         );
         assert_eq!(
-            num_lit("4e3f128").unwrap(),
+            num_lit.parse_next("4e3f128").unwrap(),
             ("", Num::Float("4e3", Some(FloatKind::F128))),
         );
     }
@@ -1096,30 +1141,42 @@ mod test {
             content: s,
         };
 
-        assert_eq!(char_lit("'a'").unwrap(), ("", lit("a")));
-        assert_eq!(char_lit("'字'").unwrap(), ("", lit("字")));
+        assert_eq!(char_lit.parse_next("'a'").unwrap(), ("", lit("a")));
+        assert_eq!(char_lit.parse_next("'字'").unwrap(), ("", lit("字")));
 
         // Escaped single characters.
-        assert_eq!(char_lit("'\\\"'").unwrap(), ("", lit("\\\"")));
-        assert_eq!(char_lit("'\\''").unwrap(), ("", lit("\\'")));
-        assert_eq!(char_lit("'\\t'").unwrap(), ("", lit("\\t")));
-        assert_eq!(char_lit("'\\n'").unwrap(), ("", lit("\\n")));
-        assert_eq!(char_lit("'\\r'").unwrap(), ("", lit("\\r")));
-        assert_eq!(char_lit("'\\0'").unwrap(), ("", lit("\\0")));
+        assert_eq!(char_lit.parse_next("'\\\"'").unwrap(), ("", lit("\\\"")));
+        assert_eq!(char_lit.parse_next("'\\''").unwrap(), ("", lit("\\'")));
+        assert_eq!(char_lit.parse_next("'\\t'").unwrap(), ("", lit("\\t")));
+        assert_eq!(char_lit.parse_next("'\\n'").unwrap(), ("", lit("\\n")));
+        assert_eq!(char_lit.parse_next("'\\r'").unwrap(), ("", lit("\\r")));
+        assert_eq!(char_lit.parse_next("'\\0'").unwrap(), ("", lit("\\0")));
         // Escaped ascii characters (up to `0x7F`).
-        assert_eq!(char_lit("'\\x12'").unwrap(), ("", lit("\\x12")));
-        assert_eq!(char_lit("'\\x02'").unwrap(), ("", lit("\\x02")));
-        assert_eq!(char_lit("'\\x6a'").unwrap(), ("", lit("\\x6a")));
-        assert_eq!(char_lit("'\\x7F'").unwrap(), ("", lit("\\x7F")));
+        assert_eq!(char_lit.parse_next("'\\x12'").unwrap(), ("", lit("\\x12")));
+        assert_eq!(char_lit.parse_next("'\\x02'").unwrap(), ("", lit("\\x02")));
+        assert_eq!(char_lit.parse_next("'\\x6a'").unwrap(), ("", lit("\\x6a")));
+        assert_eq!(char_lit.parse_next("'\\x7F'").unwrap(), ("", lit("\\x7F")));
         // Escaped unicode characters (up to `0x10FFFF`).
-        assert_eq!(char_lit("'\\u{A}'").unwrap(), ("", lit("\\u{A}")));
-        assert_eq!(char_lit("'\\u{10}'").unwrap(), ("", lit("\\u{10}")));
-        assert_eq!(char_lit("'\\u{aa}'").unwrap(), ("", lit("\\u{aa}")));
-        assert_eq!(char_lit("'\\u{10FFFF}'").unwrap(), ("", lit("\\u{10FFFF}")));
+        assert_eq!(
+            char_lit.parse_next("'\\u{A}'").unwrap(),
+            ("", lit("\\u{A}"))
+        );
+        assert_eq!(
+            char_lit.parse_next("'\\u{10}'").unwrap(),
+            ("", lit("\\u{10}"))
+        );
+        assert_eq!(
+            char_lit.parse_next("'\\u{aa}'").unwrap(),
+            ("", lit("\\u{aa}"))
+        );
+        assert_eq!(
+            char_lit.parse_next("'\\u{10FFFF}'").unwrap(),
+            ("", lit("\\u{10FFFF}"))
+        );
 
         // Check with `b` prefix.
         assert_eq!(
-            char_lit("b'a'").unwrap(),
+            char_lit.parse_next("b'a'").unwrap(),
             ("", crate::CharLit {
                 prefix: Some(crate::CharPrefix::Binary),
                 content: "a"
@@ -1127,32 +1184,32 @@ mod test {
         );
 
         // Should fail.
-        assert!(char_lit("''").is_err());
-        assert!(char_lit("'\\o'").is_err());
-        assert!(char_lit("'\\x'").is_err());
-        assert!(char_lit("'\\x1'").is_err());
-        assert!(char_lit("'\\x80'").is_err());
-        assert!(char_lit("'\\u'").is_err());
-        assert!(char_lit("'\\u{}'").is_err());
-        assert!(char_lit("'\\u{110000}'").is_err());
+        assert!(char_lit.parse_next("''").is_err());
+        assert!(char_lit.parse_next("'\\o'").is_err());
+        assert!(char_lit.parse_next("'\\x'").is_err());
+        assert!(char_lit.parse_next("'\\x1'").is_err());
+        assert!(char_lit.parse_next("'\\x80'").is_err());
+        assert!(char_lit.parse_next("'\\u'").is_err());
+        assert!(char_lit.parse_next("'\\u{}'").is_err());
+        assert!(char_lit.parse_next("'\\u{110000}'").is_err());
     }
 
     #[test]
     fn test_str_lit() {
         assert_eq!(
-            str_lit(r#"b"hello""#).unwrap(),
+            str_lit.parse_next(r#"b"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::Binary),
                 content: "hello"
             })
         );
         assert_eq!(
-            str_lit(r#"c"hello""#).unwrap(),
+            str_lit.parse_next(r#"c"hello""#).unwrap(),
             ("", StrLit {
                 prefix: Some(StrPrefix::CLike),
                 content: "hello"
             })
         );
-        assert!(str_lit(r#"d"hello""#).is_err());
+        assert!(str_lit.parse_next(r#"d"hello""#).is_err());
     }
 }

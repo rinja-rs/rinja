@@ -1,28 +1,29 @@
 use rinja::Template;
-#[derive(Template)]
-#[template(path = "render_in_place.html")]
-struct RenderInPlace<'a> {
-    s1: SectionOne<'a>,
-    s2: SectionTwo<'a>,
-    s3: &'a Vec<SectionOne<'a>>,
-}
-
-#[derive(Template)]
-#[template(source = "A={{ a }}\nB={{ b }}", ext = "html")]
-struct SectionOne<'a> {
-    a: &'a str,
-    b: &'a str,
-}
-
-#[derive(Template)]
-#[template(source = "C={{ c }}\nD={{ d }}", ext = "html")]
-struct SectionTwo<'a> {
-    c: &'a str,
-    d: &'a str,
-}
 
 #[test]
 fn test_render_in_place() {
+    #[derive(Template)]
+    #[template(path = "render_in_place.html")]
+    struct RenderInPlace<'a> {
+        s1: SectionOne<'a>,
+        s2: SectionTwo<'a>,
+        s3: &'a Vec<SectionOne<'a>>,
+    }
+
+    #[derive(Template)]
+    #[template(source = "A={{ a }}\nB={{ b }}", ext = "html")]
+    struct SectionOne<'a> {
+        a: &'a str,
+        b: &'a str,
+    }
+
+    #[derive(Template)]
+    #[template(source = "C={{ c }}\nD={{ d }}", ext = "html")]
+    struct SectionTwo<'a> {
+        c: &'a str,
+        d: &'a str,
+    }
+
     let t = RenderInPlace {
         s1: SectionOne { a: "A", b: "B" },
         s2: SectionTwo { c: "C", d: "D" },

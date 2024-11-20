@@ -1,29 +1,29 @@
 use rinja::Template;
 
-#[derive(Template)]
-#[template(path = "fragment-simple.html", block = "body")]
-struct FragmentSimple<'a> {
-    name: &'a str,
-}
-
 /// Tests a simple base-inherited template with block fragment rendering.
 #[test]
 fn test_fragment_simple() {
+    #[derive(Template)]
+    #[template(path = "fragment-simple.html", block = "body")]
+    struct FragmentSimple<'a> {
+        name: &'a str,
+    }
+
     let simple = FragmentSimple { name: "world" };
 
     assert_eq!(simple.render().unwrap(), "\n<p>Hello world!</p>\n");
-}
-
-#[derive(Template)]
-#[template(path = "fragment-super.html", block = "body")]
-struct FragmentSuper<'a> {
-    name: &'a str,
 }
 
 /// Tests a case where a block fragment rendering calls the parent.
 /// Single inheritance only.
 #[test]
 fn test_fragment_super() {
+    #[derive(Template)]
+    #[template(path = "fragment-super.html", block = "body")]
+    struct FragmentSuper<'a> {
+        name: &'a str,
+    }
+
     let sup = FragmentSuper { name: "world" };
 
     assert_eq!(
@@ -32,13 +32,13 @@ fn test_fragment_super() {
     );
 }
 
-#[derive(Template)]
-#[template(path = "fragment-nested-block.html", block = "nested")]
-struct FragmentNestedBlock;
-
 /// Tests rendering a block fragment inside of a block.
 #[test]
 fn test_fragment_nested_block() {
+    #[derive(Template)]
+    #[template(path = "fragment-nested-block.html", block = "nested")]
+    struct FragmentNestedBlock;
+
     let nested_block = FragmentNestedBlock {};
 
     assert_eq!(
@@ -47,16 +47,16 @@ fn test_fragment_nested_block() {
     );
 }
 
-#[derive(Template)]
-#[template(path = "fragment-nested-super.html", block = "body")]
-struct FragmentNestedSuper<'a> {
-    name: &'a str,
-}
-
 /// Tests rendering a block fragment with multiple inheritance.
 /// The middle parent adds square brackets around the base.
 #[test]
 fn test_fragment_nested_super() {
+    #[derive(Template)]
+    #[template(path = "fragment-nested-super.html", block = "body")]
+    struct FragmentNestedSuper<'a> {
+        name: &'a str,
+    }
+
     let nested_sup = FragmentNestedSuper { name: "world" };
 
     assert_eq!(
@@ -65,16 +65,16 @@ fn test_fragment_nested_super() {
     );
 }
 
-#[derive(Template)]
-#[template(path = "fragment-unused-expr.html", block = "body")]
-struct FragmentUnusedExpr<'a> {
-    required: &'a str,
-}
-
 /// Tests a case where an expression is defined outside of a block fragment
 /// Ideally, the struct isn't required to define that field.
 #[test]
 fn test_fragment_unused_expression() {
+    #[derive(Template)]
+    #[template(path = "fragment-unused-expr.html", block = "body")]
+    struct FragmentUnusedExpr<'a> {
+        required: &'a str,
+    }
+
     let unused_expr = FragmentUnusedExpr {
         required: "Required",
     };
@@ -82,20 +82,20 @@ fn test_fragment_unused_expression() {
     assert_eq!(unused_expr.render().unwrap(), "\n<p>Required</p>\n");
 }
 
-#[derive(Template)]
-#[template(path = "blocks.txt", block = "index")]
-struct RenderInPlace<'a> {
-    s1: Section<'a>,
-}
-
-#[derive(Template)]
-#[template(path = "blocks.txt", block = "section")]
-struct Section<'a> {
-    values: &'a [&'a str],
-}
-
 #[test]
 fn test_specific_block() {
+    #[derive(Template)]
+    #[template(path = "blocks.txt", block = "index")]
+    struct RenderInPlace<'a> {
+        s1: Section<'a>,
+    }
+
+    #[derive(Template)]
+    #[template(path = "blocks.txt", block = "section")]
+    struct Section<'a> {
+        values: &'a [&'a str],
+    }
+
     let s1 = Section {
         values: &["a", "b", "c"],
     };
@@ -104,27 +104,29 @@ fn test_specific_block() {
     assert_eq!(t.render().unwrap(), "\nSection: [abc]\n");
 }
 
-#[derive(Template)]
-#[template(
-    source = r#"{% block empty %}
+#[test]
+fn test_render_only_block() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% block empty %}
 {% endblock %}
 
 {% if let Some(var) = var %}
 {{ var }}
 {% endif %}"#,
-    block = "empty",
-    ext = "txt"
-)]
-struct Empty {}
+        block = "empty",
+        ext = "txt"
+    )]
+    struct Empty {}
 
-#[test]
-fn test_render_only_block() {
     assert_eq!(Empty {}.render().unwrap(), "\n");
 }
 
-#[derive(Template)]
-#[template(
-    source = r#"{% extends "fragment-base.html" %}
+#[test]
+fn test_fragment_include() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% extends "fragment-base.html" %}
 
 {% block body %}
 {% include "included.html" %}
@@ -133,15 +135,13 @@ fn test_render_only_block() {
 {% block other_body %}
 <p>Don't render me.</p>
 {% endblock %}"#,
-    block = "body",
-    ext = "html"
-)]
-struct FragmentInclude<'a> {
-    s: &'a str,
-}
+        block = "body",
+        ext = "html"
+    )]
+    struct FragmentInclude<'a> {
+        s: &'a str,
+    }
 
-#[test]
-fn test_fragment_include() {
     let fragment_include = FragmentInclude { s: "world" };
     assert_eq!(fragment_include.render().unwrap(), "\nINCLUDED: world\n");
 }

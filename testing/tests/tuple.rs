@@ -1,27 +1,29 @@
 use rinja::Template;
 
-struct Post {
-    id: u32,
-}
-
-struct Client<'a> {
-    can_post_ids: &'a [u32],
-    can_update_ids: &'a [u32],
-}
-
-impl Client<'_> {
-    fn can_post(&self, post: &Post) -> bool {
-        self.can_post_ids.contains(&post.id)
+#[test]
+fn test_tuple() {
+    struct Post {
+        id: u32,
     }
 
-    fn can_update(&self, post: &Post) -> bool {
-        self.can_update_ids.contains(&post.id)
+    struct Client<'a> {
+        can_post_ids: &'a [u32],
+        can_update_ids: &'a [u32],
     }
-}
 
-#[derive(Template)]
-#[template(
-    source = r#"
+    impl Client<'_> {
+        fn can_post(&self, post: &Post) -> bool {
+            self.can_post_ids.contains(&post.id)
+        }
+
+        fn can_update(&self, post: &Post) -> bool {
+            self.can_update_ids.contains(&post.id)
+        }
+    }
+
+    #[derive(Template)]
+    #[template(
+        source = r#"
 {%- match (client.can_post(post), client.can_update(post)) -%}
     {%- when (false, false) -%}
         No!
@@ -32,15 +34,13 @@ impl Client<'_> {
         </ul>
 {%- endmatch -%}
 "#,
-    ext = "txt"
-)]
-struct TupleTemplate<'a> {
-    client: &'a Client<'a>,
-    post: &'a Post,
-}
+        ext = "txt"
+    )]
+    struct TupleTemplate<'a> {
+        client: &'a Client<'a>,
+        post: &'a Post,
+    }
 
-#[test]
-fn test_tuple() {
     let template = TupleTemplate {
         client: &Client {
             can_post_ids: &[1, 2],

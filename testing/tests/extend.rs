@@ -1,8 +1,10 @@
 use rinja::Template;
 
-#[derive(Template)]
-#[template(
-    source = r#"{% extends "extend_and_import.html" %}
+#[test]
+fn test_macro_in_block_inheritance() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% extends "extend_and_import.html" %}
 {%- import "macro.html" as m2 -%}
 
 {%- macro another(param) -%}
@@ -17,11 +19,9 @@ use rinja::Template;
 {% call another(3) %}
 {%- endblock -%}
 "#,
-    ext = "txt"
-)]
-struct A;
+        ext = "txt"
+    )]
+    struct A;
 
-#[test]
-fn test_macro_in_block_inheritance() {
     assert_eq!(A.render().unwrap(), "\n\n1 1\n2 2\n--> 3");
 }

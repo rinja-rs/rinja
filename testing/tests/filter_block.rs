@@ -1,35 +1,37 @@
 use rinja::Template;
 
-#[derive(Template)]
-#[template(
-    source = r#"{% filter lower %}
+#[test]
+fn filter_block_basic() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% filter lower %}
     {{ t }} / HELLO / {{ u }}
 {% endfilter %}
 
 {{ u|lower }}
 "#,
-    ext = "html"
-)]
-struct A<T, U = u8>
-where
-    T: std::fmt::Display,
-    U: std::fmt::Display,
-{
-    t: T,
-    u: U,
-}
+        ext = "html"
+    )]
+    struct A<T, U = u8>
+    where
+        T: std::fmt::Display,
+        U: std::fmt::Display,
+    {
+        t: T,
+        u: U,
+    }
 
-#[test]
-fn filter_block_basic() {
     let template = A { t: "a", u: "B" };
     assert_eq!(template.render().unwrap(), "\n    a / hello / b\n\n\nb\n");
 }
 
 // This test ensures that we don't have variable shadowing when we have more than one
 // filter block at the same location.
-#[derive(Template)]
-#[template(
-    source = r#"{% filter lower %}
+#[test]
+fn filter_block_shadowing() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% filter lower %}
     {{ t }} / HELLO / {{ u }}
 {% endfilter %}
 
@@ -42,19 +44,17 @@ fn filter_block_basic() {
 {% endfilter %}
 
 {{ u|upper }}"#,
-    ext = "html"
-)]
-struct B<T, U = u8>
-where
-    T: std::fmt::Display,
-    U: std::fmt::Display,
-{
-    t: T,
-    u: U,
-}
+        ext = "html"
+    )]
+    struct B<T, U = u8>
+    where
+        T: std::fmt::Display,
+        U: std::fmt::Display,
+    {
+        t: T,
+        u: U,
+    }
 
-#[test]
-fn filter_block_shadowing() {
     let template = B { t: "a", u: "B" };
     assert_eq!(
         template.render().unwrap(),
@@ -75,9 +75,11 @@ B"
 }
 
 // This test ensures that whitespace control is correctly handled.
-#[derive(Template)]
-#[template(
-    source = r#"{% filter lower -%}
+#[test]
+fn filter_block_whitespace_control() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% filter lower -%}
     {{ t }} / HELLO / {{ u }}
 {% endfilter %}
 
@@ -86,19 +88,17 @@ B"
 {%- endfilter -%}
 
 ++b"#,
-    ext = "html"
-)]
-struct C<T, U = u8>
-where
-    T: std::fmt::Display,
-    U: std::fmt::Display,
-{
-    t: T,
-    u: U,
-}
+        ext = "html"
+    )]
+    struct C<T, U = u8>
+    where
+        T: std::fmt::Display,
+        U: std::fmt::Display,
+    {
+        t: T,
+        u: U,
+    }
 
-#[test]
-fn filter_block_whitespace_control() {
     let template = C { t: "a", u: "B" };
     assert_eq!(
         template.render().unwrap(),
@@ -108,51 +108,53 @@ B + TADAM + A++b"
 }
 
 // This test ensures that HTML escape is correctly handled.
-#[derive(Template)]
-#[template(source = r#"{% filter lower %}<block>{% endfilter %}"#, ext = "html")]
-struct D;
-
 #[test]
 fn filter_block_html_escape() {
+    #[derive(Template)]
+    #[template(source = r#"{% filter lower %}<block>{% endfilter %}"#, ext = "html")]
+    struct D;
+
     let template = D;
     assert_eq!(template.render().unwrap(), r"&#60;block&#62;");
 }
 
 // This test ensures that it is not escaped if it is not HTML.
-#[derive(Template)]
-#[template(source = r#"{% filter lower %}<block>{% endfilter %}"#, ext = "txt")]
-struct E;
-
 #[test]
 fn filter_block_not_html_escape() {
+    #[derive(Template)]
+    #[template(source = r#"{% filter lower %}<block>{% endfilter %}"#, ext = "txt")]
+    struct E;
+
     let template = E;
     assert_eq!(template.render().unwrap(), r"<block>");
 }
 
 // This test checks that the filter chaining is working as expected.
-#[derive(Template)]
-#[template(
-    source = r#"{% filter lower|indent(2)|capitalize -%}
+#[test]
+fn filter_block_chaining() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% filter lower|indent(2)|capitalize -%}
 HELLO
 {{v}}
 {%- endfilter %}"#,
-    ext = "txt"
-)]
-struct F {
-    v: &'static str,
-}
+        ext = "txt"
+    )]
+    struct F {
+        v: &'static str,
+    }
 
-#[test]
-fn filter_block_chaining() {
     let template = F { v: "pIKA" };
     assert_eq!(template.render().unwrap(), "Hello\n  pika");
 }
 
 // This test checks that the filter chaining is working as expected when ending
 // followed by whitespace character(s).
-#[derive(Template)]
-#[template(
-    source = r#"{% filter lower|indent(2) -%}
+#[test]
+fn filter_block_chaining_paren_followed_by_whitespace() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% filter lower|indent(2) -%}
 HELLO
 {{v}}
 {%- endfilter %}
@@ -171,14 +173,12 @@ HELLO
 HELLO
 {{v}}
 {%- endfilter %}"#,
-    ext = "txt"
-)]
-struct G {
-    v: &'static str,
-}
+        ext = "txt"
+    )]
+    struct G {
+        v: &'static str,
+    }
 
-#[test]
-fn filter_block_chaining_paren_followed_by_whitespace() {
     let template = G { v: "pIKA" };
     assert_eq!(
         template.render().unwrap(),
@@ -198,9 +198,13 @@ hello
     );
 }
 
-#[derive(Template)]
-#[template(
-    source = r#"{% extends "html-base.html" %}
+// This test ensures that `include` are correctly working inside filter blocks and that external
+// variables are used correctly.
+#[test]
+fn filter_block_include() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% extends "html-base.html" %}
 
 {%- block body -%}
     <h1>Metadata</h1>
@@ -212,14 +216,10 @@ hello
     {% endfilter %}
 {%- endblock body %}
 "#,
-    ext = "html"
-)]
-struct IncludeInFilter;
+        ext = "html"
+    )]
+    struct IncludeInFilter;
 
-// This test ensures that `include` are correctly working inside filter blocks and that external
-// variables are used correctly.
-#[test]
-fn filter_block_include() {
     assert_eq!(
         IncludeInFilter.render().unwrap(),
         r#"<!DOCTYPE html>
@@ -238,9 +238,13 @@ fn filter_block_include() {
     );
 }
 
-#[derive(Template)]
-#[template(
-    source = r#"
+// This test ensures that `include` are correctly working inside filter blocks and that external
+// variables are used correctly.
+#[test]
+fn filter_block_conditions() {
+    #[derive(Template)]
+    #[template(
+        source = r#"
 {%- filter title %}
     {{- x -}}
     {%- if x == 21 -%}
@@ -254,17 +258,13 @@ fn filter_block_include() {
     {% endif -%}
 {% endfilter -%}
 "#,
-    ext = "html"
-)]
-struct ConditionInFilter {
-    x: usize,
-    v: Option<String>,
-}
+        ext = "html"
+    )]
+    struct ConditionInFilter {
+        x: usize,
+        v: Option<String>,
+    }
 
-// This test ensures that `include` are correctly working inside filter blocks and that external
-// variables are used correctly.
-#[test]
-fn filter_block_conditions() {
     let s = ConditionInFilter {
         x: 21,
         v: Some("hoho".to_string()),
@@ -274,9 +274,11 @@ fn filter_block_conditions() {
 
 // The output of `|upper` is not marked as `|safe`, so the output of `|paragraphbreaks` gets
 // escaped. The '&' in the input is is not marked as `|safe`, so it should get escaped, twice.
-#[derive(Template)]
-#[template(
-    source = r#"
+#[test]
+fn filter_nested_filter_blocks() {
+    #[derive(Template)]
+    #[template(
+        source = r#"
     {%- let count = 1 -%}
     {%- let canary = 2 -%}
     {%- filter upper -%}
@@ -289,14 +291,12 @@ fn filter_block_conditions() {
             {%- endfor -%}
         ]
     {%~ endfilter %}{{ canary }}"#,
-    ext = "html"
-)]
-struct NestedFilterBlocks2 {
-    v: &'static str,
-}
+        ext = "html"
+    )]
+    struct NestedFilterBlocks2 {
+        v: &'static str,
+    }
 
-#[test]
-fn filter_nested_filter_blocks() {
     let template = NestedFilterBlocks2 {
         v: "Hello &\n\ngoodbye!",
     };
@@ -311,20 +311,20 @@ fn filter_nested_filter_blocks() {
     );
 }
 
-#[derive(Template)]
-#[template(
-    source = r#"
+#[test]
+fn filter_block_custom_errors() {
+    #[derive(Template)]
+    #[template(
+        source = r#"
     {%- filter urlencode|urlencode|urlencode|urlencode -%}
         {{ msg.clone()? }}
     {%~ endfilter %}"#,
-    ext = "html"
-)]
-struct FilterBlockCustomErrors {
-    msg: Result<String, String>,
-}
+        ext = "html"
+    )]
+    struct FilterBlockCustomErrors {
+        msg: Result<String, String>,
+    }
 
-#[test]
-fn filter_block_custom_errors() {
     let template = FilterBlockCustomErrors {
         msg: Err("🐢".to_owned()),
     };

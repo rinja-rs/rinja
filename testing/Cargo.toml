@@ -4,7 +4,7 @@ version = "0.3.5"
 authors = ["rinja-rs developers"]
 workspace = ".."
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.80"
 publish = false
 
 [features]

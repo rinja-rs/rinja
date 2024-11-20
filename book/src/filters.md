@@ -4,54 +4,16 @@ Values such as those obtained from variables can be post-processed
 using **filters**.
 Filters are applied to values using the pipe symbol (`|`) and may
 have optional extra arguments in parentheses.
-Note that the pipe symbol must not be surrounded by spaces;
-otherwise, it will be interpreted as the `BitOr` operator.
 Filters can be chained, in which case the output from one filter
 is passed to the next.
 
 ```
-{{ "HELLO"|lower }}
+{{ "HELLO" | lower }}
 ```
 
 Rinja has a collection of built-in filters, documented below, but can also include custom filters. 
 Additionally, the `json` filter is included in the built-in filters, but is disabled by default.
 Enable it with Cargo features (see below for more information).
-
-**Table of contents**
-
-* **[Built-in filters][#built-in-filters]:**  
-
-  * [`capitalize`][#capitalize]
-  * [`center`][#center]
-  * [`deref`][#deref]
-  * [`escape|e`][#escape]
-  * [`filesizeformat`][#filesizeformat]
-  * [`fmt`][#fmt]
-  * [`format`][#format]
-  * [`indent`][#indent]
-  * [`join`][#join]
-  * [`linebreaks`][#linebreaks]
-  * [`linebreaksbr`][#linebreaksbr]
-  * [`lower|lowercase`][#lower]
-  * [`paragraphbreaks`][#paragraphbreaks]
-  * [`pluralize`][#pluralize]
-  * [`ref`][#ref]
-  * [`safe`][#safe]
-  * [`title`][#title]
-  * [`trim`][#trim]
-  * [`truncate`][#truncate]
-  * [`upper|uppercase`][#upper]
-  * [`urlencode`][#urlencode]
-  * [`wordcount`][#wordcount]
-
-* **[Optional / feature gated filters][#optional-filters]:**  
-  [`json|tojson`][#json],
-
-* **[Custom filters][#custom-filters]**
-
-* **[HTML-safe types][#html-safe-types]**
-
-  * **[Safe output of custom filters][#safe-output-of-custom-filters]**
 
 ## Built-In Filters
 [#built-in-filters]: #built-in-filters
@@ -62,7 +24,7 @@ Enable it with Cargo features (see below for more information).
 Capitalize a value. The first character will be uppercase, all others lowercase:
 
 ```jinja
-{{ "hello"|capitalize }}
+{{ "hello" | capitalize }}
 ```
 
 Output:
@@ -77,7 +39,7 @@ Hello
 Centers the value in a field of a given width:
 
 ```jinja
--{{ "a"|center(5) }}-
+-{{ "a" | center(5) }}-
 ```
 
 Output:
@@ -91,8 +53,8 @@ Output:
 Dereferences the given argument.
 
 ```jinja
-{% let s = String::from("a")|as_ref %}
-{% if s|deref == String::from("b") %}
+{% let s = String::from("a") | as_ref %}
+{% if s | deref == String::from("b") %}
 {% endif %}
 ```
 
@@ -109,7 +71,7 @@ if *s == String::from("b") {}
 Escapes HTML characters in strings:
 
 ```jinja
-{{ "Escape <>&"|e }}
+{{ "Escape <>&" | e }}
 ```
 
 Output:
@@ -124,11 +86,11 @@ However, somewhere escaping using the HTML escaper is desired.
 Then it is possible to override and use the HTML escaper like this:
 
 ```jinja
-{{ "Don't Escape <>&"|escape }}
-{{ "Don't Escape <>&"|e }}
+{{ "Don't Escape <>&" | escape }}
+{{ "Don't Escape <>&" | e }}
 
-{{ "Escape <>&"|escape("html") }}
-{{ "Escape <>&"|e("html") }}
+{{ "Escape <>&" | escape("html") }}
+{{ "Escape <>&" | e("html") }}
 ```
 
 Output:
@@ -149,7 +111,7 @@ Escape &lt;&gt;&amp;
 Returns adequate string representation (in KB, ..) of number of bytes:
 
 ```jinja
-{{ 1000|filesizeformat }}
+{{ 1000 | filesizeformat }}
 ```
 
 Output:
@@ -169,14 +131,14 @@ the Rinja code generator, but the order is swapped to support filter
 composition.
 
 ```jinja
-{{ value|fmt("{:?}") }}
+{{ value | fmt("{:?}") }}
 ```
 
 As an example, this allows filters to be composed like the following.
 Which is not possible using the `format` filter.
 
 ```jinja
-{{ value|capitalize|fmt("{:?}") }}
+{{ value | capitalize | fmt("{:?}") }}
 ```
 
 ### format
@@ -189,7 +151,7 @@ The first argument to this filter must be a string literal (as in normal Rust).
 All arguments are passed through to [`format!()`] by the Rinja code generator.
 
 ```jinja
-{{ "{:?}"|format(var) }}
+{{ "{:?}" | format(var) }}
 ```
 
 [`format!()`]: https://doc.rust-lang.org/stable/std/macro.format.html
@@ -200,7 +162,7 @@ All arguments are passed through to [`format!()`] by the Rinja code generator.
 Indent newlines with width spaces.
 
 ```jinja
-{{ "hello\nfoo\nbar"|indent(4) }}
+{{ "hello\nfoo\nbar" | indent(4) }}
 ```
 
 Output:
@@ -221,7 +183,7 @@ array = &["foo", "bar", "bazz"]
 ```
 
 ```jinja
-{{ array|join(", ") }}
+{{ array | join(", ") }}
 ```
 
 Output:
@@ -238,7 +200,7 @@ Replaces line breaks in plain text with appropriate HTML.
 A single newline becomes an HTML line break `<br>` and a new line followed by a blank line becomes a paragraph break `<p>`.
 
 ```jinja
-{{ "hello\nworld\n\nfrom\nrinja"|linebreaks }}
+{{ "hello\nworld\n\nfrom\nrinja" | linebreaks }}
 ```
 
 Output:
@@ -253,7 +215,7 @@ Output:
 Converts all newlines in a piece of plain text to HTML line breaks.
 
 ```jinja
-{{ "hello\nworld\n\nfrom\nrinja"|linebreaks }}
+{{ "hello\nworld\n\nfrom\nrinja" | linebreaks }}
 ```
 
 Output:
@@ -272,7 +234,7 @@ Consecutive double line breaks will be reduced down to a single paragraph break.
 This is useful in contexts where changing single line breaks to line break tags would interfere with other HTML elements, such as lists and nested `<div>` tags.
 
 ```jinja
-{{ "hello\nworld\n\nfrom\n\n\n\nrinja"|paragraphbreaks }}
+{{ "hello\nworld\n\nfrom\n\n\n\nrinja" | paragraphbreaks }}
 ```
 
 Output:
@@ -287,7 +249,7 @@ Output:
 Converts to lowercase.
 
 ```jinja
-{{ "HELLO"|lower }}
+{{ "HELLO" | lower }}
 ```
 
 Output:
@@ -304,20 +266,20 @@ Select a singular or plural version of a word, depending on the input value.
 If the value of `self.count` is +1 or -1, then "cat" is returned, otherwise "cats":
 
 ```jinja
-cat{{ count|pluralize }}
+cat{{ count | pluralize }}
 ```
 
 You can override the default empty singular suffix, e.g. to spell "doggo" for a single dog:
 
 ```jinja
-dog{{ count|pluralize("go") }}
+dog{{ count | pluralize("go") }}
 ```
 
 If the word cannot be declined by simply adding a suffix,
 then you can also override singular and the plural, too:
 
 ```jinja
-{{ count|pluralize("mouse", "mice") }}
+{{ count | pluralize("mouse", "mice") }}
 ```
 
 More complex languages that know multiple plurals might be impossible to implement with this filter,
@@ -329,8 +291,8 @@ though.
 Creates a reference to the given argument.
 
 ```jinja
-{{ "a"|ref }}
-{{ self.x|ref }}
+{{ "a" | ref }}
+{{ self.x | ref }}
 ```
 
 will become:
@@ -346,7 +308,7 @@ will become:
 Marks a string (or other Display type) as safe. By default all strings are escaped according to the format.
 
 ```
-{{ "<p>I'm Safe</p>"|safe }}
+{{ "<p>I'm Safe</p>" | safe }}
 ```
 
 Output:
@@ -362,7 +324,7 @@ Return a title cased version of the value. Words will start with uppercase lette
 remaining characters are lowercase.
 
 ```jinja
-{{ "hello WORLD"|title }}
+{{ "hello WORLD" | title }}
 ```
 
 Output:
@@ -377,7 +339,7 @@ Hello World
 Strip leading and trailing whitespace.
 
 ```jinja
-{{ " hello "|trim }}
+{{ " hello " | trim }}
 ```
 
 Output:
@@ -393,7 +355,7 @@ Limit string length, appends '...' if truncated.
 
 
 ```jinja
-{{ "hello"|truncate(2) }}
+{{ "hello" | truncate(2) }}
 ```
 
 Output:
@@ -408,7 +370,7 @@ he...
 Converts to uppercase.
 
 ```jinja
-{{ "hello"|upper }}
+{{ "hello" | upper }}
 ```
 
 Output:
@@ -438,7 +400,7 @@ hello%3Fworld
 Count the words in that string.
 
 ```jinja
-{{ "rinja is sort of cool"|wordcount }}
+{{ "rinja is sort of cool" | wordcount }}
 ```
 
 Output:
@@ -467,22 +429,22 @@ This will output formatted JSON for any value that implements the required
 The generated string does not contain ampersands `&`, chevrons `< >`, or apostrophes `'`.
 
 To use it in a `<script>` you can combine it with the safe filter.
-In HTML attributes, you can either use it in quotation marks `"{{data|json}}"` as is,
-or in apostrophes with the (optional) safe filter `'{{data|json|safe}}'`.
-In HTML texts the output of e.g. `<pre>{{data|json|safe}}</pre>` is safe, too.
+In HTML attributes, you can either use it in quotation marks `"{{data | json}}"` as is,
+or in apostrophes with the (optional) safe filter `'{{data | json | safe}}'`.
+In HTML texts the output of e.g. `<pre>{{data | json | safe}}</pre>` is safe, too.
 
 ```jinja
-Good: <li data-extra="{{data|json}}">…</li>
-Good: <li data-extra='{{data|json|safe}}'>…</li>
-Good: <pre>{{data|json|safe}}</pre>
-Good: <script>var data = {{data|json|safe}};</script>
+Good: <li data-extra="{{data | json}}">…</li>
+Good: <li data-extra='{{data | json | safe}}'>…</li>
+Good: <pre>{{data | json | safe}}</pre>
+Good: <script>var data = {{data | json | safe}};</script>
 
-Bad:  <li data-extra="{{data|json|safe}}">…</li>
-Bad:  <script>var data = {{data|json}};</script>
-Bad:  <script>var data = "{{data|json|safe}}";</script>
+Bad:  <li data-extra="{{data | json | safe}}">…</li>
+Bad:  <script>var data = {{data | json}};</script>
+Bad:  <script>var data = "{{data | json | safe}}";</script>
 
-Ugly: <script>var data = "{{data|json}}";</script>
-Ugly: <script>var data = '{{data|json|safe}}';</script>
+Ugly: <script>var data = "{{data | json}}";</script>
+Ugly: <script>var data = '{{data | json | safe}}';</script>
 ```
 
 By default, a compact representation of the data is generated, i.e. no whitespaces are generated
@@ -491,10 +453,10 @@ how many spaces to use as indentation, or you can pass a string that gets used a
 
 ```jinja2
 Prefix with four spaces:
-<textarea>{{data|tojson(4)}}</textarea>
+<textarea>{{data | tojson(4)}}</textarea>
 
 Prefix with two &nbsp; characters:
-<p>{{data|tojson("\u{a0}\u{a0}")}}</p>
+<p>{{data | tojson("\u{a0}\u{a0}")}}</p>
 ```
 
 ## Custom Filters
@@ -523,7 +485,7 @@ Implementing a filter that replaces all instances of `"oo"` for `"aa"`.
 use rinja::Template;
 
 #[derive(Template)]
-#[template(source = "{{ s|myfilter }}", ext = "txt")]
+#[template(source = "{{ s | myfilter }}", ext = "txt")]
 struct MyFilterTemplate<'a> {
     s: &'a str,
 }
@@ -548,7 +510,7 @@ Implementing a filter that replaces all instances of `"oo"` for `n` times `"a"`.
 use rinja::Template;
 
 #[derive(Template)]
-#[template(source = "{{ s|myfilter(4) }}", ext = "txt")]
+#[template(source = "{{ s | myfilter(4) }}", ext = "txt")]
 struct MyFilterTemplate<'a> {
     s: &'a str,
 }
@@ -594,7 +556,7 @@ This automatically marks references `&MyStruct` as HTML-safe, too.
 ### Safe output of custom filters
 [#safe-output-of-custom-filters]: #safe-output-of-custom-filters
 
-Say, you have a custom filter `|strip` that removes all HTML-unsafe characters:
+Say, you have a custom filter `| strip` that removes all HTML-unsafe characters:
 
 ```rust
 fn strip(s: impl ToString) -> Result<String, rinja::Error> {

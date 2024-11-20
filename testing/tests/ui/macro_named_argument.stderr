@@ -25,8 +25,8 @@ error: named argument `param1` was passed more than once
    | |________________________________________^
 
 error: failed to parse template source
- --> <source attribute>:5:29
-       "| filter(param1=12) -%}"
+ --> <source attribute>:5:28
+       "|filter(param1=12) -%}"
   --> tests/ui/macro_named_argument.rs:21:21
    |
 21 |   #[template(source = "{%- macro thrice(param1, param2) -%}
@@ -34,8 +34,8 @@ error: failed to parse template source
 22 | | {{ param1 }} {{ param2 }}
 23 | | {%- endmacro -%}
 24 | |
-25 | | {%- call thrice(3, param1=2) | filter(param1=12) -%}", ext = "html")]
-   | |_____________________________________________________^
+25 | | {%- call thrice(3, param1=2)|filter(param1=12) -%}", ext = "html")]
+   | |___________________________________________________^
 
 error: named arguments must always be passed last
  --> <source attribute>:4:15
@@ -49,7 +49,7 @@ error: named arguments must always be passed last
 33 | | {%- call thrice(param1=2, 3) -%}", ext = "html")]
    | |_________________________________^
 
-error: cannot have unnamed argument (`param2`) after named argument in macro "thrice"
+error: `param1` is passed more than once
  --> InvalidNamedArg5.html:4:2
        "- call thrice(3, param1=2) -%}"
   --> tests/ui/macro_named_argument.rs:38:21

@@ -129,14 +129,32 @@ impl AsIndent for String {
 impl AsIndent for usize {
     #[inline]
     fn as_indent(&self) -> &str {
-        const MAX_SPACES: usize = 16;
-        const SPACES: &str = match str::from_utf8(&[b' '; MAX_SPACES]) {
-            Ok(spaces) => spaces,
-            Err(_) => panic!(),
-        };
-
-        &SPACES[..(*self).min(SPACES.len())]
+        spaces(*self)
     }
+}
+
+impl AsIndent for std::num::Wrapping<usize> {
+    #[inline]
+    fn as_indent(&self) -> &str {
+        spaces(self.0)
+    }
+}
+
+impl AsIndent for std::num::NonZeroUsize {
+    #[inline]
+    fn as_indent(&self) -> &str {
+        spaces(self.get())
+    }
+}
+
+fn spaces(width: usize) -> &'static str {
+    const MAX_SPACES: usize = 16;
+    const SPACES: &str = match str::from_utf8(&[b' '; MAX_SPACES]) {
+        Ok(spaces) => spaces,
+        Err(_) => panic!(),
+    };
+
+    &SPACES[..width.min(SPACES.len())]
 }
 
 impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
@@ -168,7 +186,7 @@ where
 
 impl<S: Serialize> FastWritable for ToJson<S> {
     #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> crate::Result<()> {
         fmt_json(f, &self.value)
     }
 }
@@ -176,35 +194,36 @@ impl<S: Serialize> FastWritable for ToJson<S> {
 impl<S: Serialize> fmt::Display for ToJson<S> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_json(f, &self.value)
+        Ok(self.write_into(f)?)
     }
 }
 
 impl<S: Serialize, I: AsIndent> FastWritable for ToJsonPretty<S, I> {
     #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> fmt::Result {
+    fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> crate::Result<()> {
         fmt_json_pretty(f, &self.value, self.indent.as_indent())
     }
 }
 
 impl<S: Serialize, I: AsIndent> fmt::Display for ToJsonPretty<S, I> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_json_pretty(f, &self.value, self.indent.as_indent())
+        Ok(self.write_into(f)?)
     }
 }
 
-fn fmt_json<S: Serialize, W: fmt::Write + ?Sized>(dest: &mut W, value: &S) -> fmt::Result {
-    to_writer(JsonWriter(dest), value).map_err(|_| fmt::Error)
+fn fmt_json<S: Serialize, W: fmt::Write + ?Sized>(dest: &mut W, value: &S) -> crate::Result<()> {
+    Ok(to_writer(JsonWriter(dest), value)?)
 }
 
 fn fmt_json_pretty<S: Serialize, W: fmt::Write + ?Sized>(
     dest: &mut W,
     value: &S,
     indent: &str,
-) -> fmt::Result {
+) -> crate::Result<()> {
     let formatter = PrettyFormatter::with_indent(indent.as_bytes());
     let mut serializer = Serializer::with_formatter(JsonWriter(dest), formatter);
-    value.serialize(&mut serializer).map_err(|_| fmt::Error)
+    Ok(value.serialize(&mut serializer)?)
 }
 
 struct JsonWriter<'a, W: fmt::Write + ?Sized>(&'a mut W);

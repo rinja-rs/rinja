@@ -1,8 +1,10 @@
 use rinja::Template;
 
-#[derive(Template)]
-#[template(
-    source = r#"
+#[test]
+fn test_ref_deref() {
+    #[derive(Template)]
+    #[template(
+        source = r#"
 {%- if *title == "something" -%}
 something1
 {%- elif title == &"another" -%}
@@ -13,14 +15,12 @@ yep3
 {{title}}
 {%- endif -%}
 "#,
-    ext = "html"
-)]
-struct RefDeref {
-    title: &'static &'static str,
-}
+        ext = "html"
+    )]
+    struct RefDeref {
+        title: &'static &'static str,
+    }
 
-#[test]
-fn test_ref_deref() {
     let x = RefDeref {
         title: &"something",
     };
@@ -36,9 +36,11 @@ fn test_ref_deref() {
     assert_eq!(x.render().unwrap(), "bla");
 }
 
-#[derive(Template)]
-#[template(
-    source = r#"
+#[test]
+fn test_ref_deref_assign() {
+    #[derive(Template)]
+    #[template(
+        source = r#"
 {%- let x = **title -%}
 {%- if x == "another" -%}
 another2
@@ -46,14 +48,12 @@ another2
 {{x}}
 {%- endif -%}
 "#,
-    ext = "html"
-)]
-struct RefDerefAssignment {
-    title: &'static &'static str,
-}
+        ext = "html"
+    )]
+    struct RefDerefAssignment {
+        title: &'static &'static str,
+    }
 
-#[test]
-fn test_ref_deref_assign() {
     let x = RefDerefAssignment { title: &"another" };
     assert_eq!(x.render().unwrap(), "another2");
 

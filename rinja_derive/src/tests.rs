@@ -4,6 +4,7 @@ use std::fmt;
 use std::path::Path;
 
 use console::style;
+use prettyplease::unparse;
 use similar::{Algorithm, ChangeTag, TextDiffConfig};
 
 use crate::build_template;
@@ -12,31 +13,7 @@ use crate::build_template;
 // the code we want to check.
 #[track_caller]
 fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usize) {
-    let jinja = format!(
-        r##"#[template(source = {jinja:?}, ext = "txt")]
-struct Foo {{ {} }}"##,
-        fields
-            .iter()
-            .map(|(name, type_)| format!("{name}: {type_}"))
-            .collect::<Vec<_>>()
-            .join(","),
-    );
-
-    let generated = build_template(&syn::parse_str::<syn::DeriveInput>(&jinja).unwrap()).unwrap();
-    let generated = match generated.parse() {
-        Ok(generated) => generated,
-        Err(err) => panic!(
-            "\n\
-            === Invalid code generated ===\n\
-            \n\
-            {generated}\n\
-            \n\
-            === Error ===\n\
-            \n\
-            {err}"
-        ),
-    };
-    let generated: syn::File = syn::parse2(generated).unwrap();
+    let generated = jinja_to_rust(jinja, fields).unwrap();
 
     let expected: proc_macro2::TokenStream = expected.parse().unwrap();
     let expected: syn::File = syn::parse_quote! {
@@ -53,9 +30,6 @@ struct Foo {{ {} }}"##,
                     #expected
                     rinja::Result::Ok(())
                 }
-                const EXTENSION:
-                    rinja::helpers::core::option::Option<&'static rinja::helpers::core::primitive::str> =
-                    rinja::helpers::core::option::Option::Some("txt");
                 const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
                 const MIME_TYPE: &'static rinja::helpers::core::primitive::str = "text/plain; charset=utf-8";
             }
@@ -72,18 +46,18 @@ struct Foo {{ {} }}"##,
 
             impl rinja::filters::FastWritable for Foo {
                 #[inline]
-                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::helpers::core::fmt::Result
+                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::Result<()>
                 where
                     RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
                 {
-                    rinja::Template::render_into(self, dest).map_err(|_| rinja::helpers::core::fmt::Error)
+                    rinja::Template::render_into(self, dest)
                 }
             }
         };
     };
 
-    let expected = prettyplease::unparse(&expected);
-    let generated = prettyplease::unparse(&generated);
+    let expected = unparse(&expected);
+    let generated = unparse(&generated);
     if expected != generated {
         struct Diff<'a>(&'a str, &'a str);
 
@@ -133,6 +107,34 @@ struct Foo {{ {} }}"##,
             diff = Diff(&expected, &generated),
         );
     }
+}
+
+fn jinja_to_rust(jinja: &str, fields: &[(&str, &str)]) -> syn::Result<syn::File> {
+    let jinja = format!(
+        r##"#[template(source = {jinja:?}, ext = "txt")]
+struct Foo {{ {} }}"##,
+        fields
+            .iter()
+            .map(|(name, type_)| format!("{name}: {type_}"))
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+
+    let generated = build_template(&syn::parse_str::<syn::DeriveInput>(&jinja).unwrap()).unwrap();
+    let generated = match generated.parse() {
+        Ok(generated) => generated,
+        Err(err) => panic!(
+            "\n\
+            === Invalid code generated ===\n\
+            \n\
+            {generated}\n\
+            \n\
+            === Error ===\n\
+            \n\
+            {err}"
+        ),
+    };
+    syn::parse2(generated)
 }
 
 #[test]
@@ -189,9 +191,9 @@ fn check_if_let() {
 
     // In this test we make sure that every used template gets referenced exactly once.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
-    let path1 = path.join("include1.html");
-    let path2 = path.join("include2.html");
-    let path3 = path.join("include3.html");
+    let path1 = path.join("include1.html").canonicalize().unwrap();
+    let path2 = path.join("include2.html").canonicalize().unwrap();
+    let path3 = path.join("include3.html").canonicalize().unwrap();
     compare(
         r#"{% include "include1.html" %}"#,
         &format!(
@@ -944,4 +946,69 @@ fn test_pluralize() {
         &[],
         3,
     );
+}
+
+#[test]
+fn test_concat() {
+    compare(
+        r#"{{ "<" ~ a ~ "|" ~ b ~ '>' }}"#,
+        r#"
+            writer.write_str("<")?;
+            match (
+                &((&&rinja::filters::AutoEscaper::new(&(self.a), rinja::filters::Text))
+                    .rinja_auto_escape()?),
+                &((&&rinja::filters::AutoEscaper::new(&(self.b), rinja::filters::Text))
+                    .rinja_auto_escape()?),
+            ) {
+                (expr1, expr3) => {
+                    (&&rinja::filters::Writable(expr1)).rinja_write(writer)?;
+                    writer.write_str("|")?;
+                    (&&rinja::filters::Writable(expr3)).rinja_write(writer)?;
+                }
+            }
+            writer.write_str(">")?;
+        "#,
+        &[("a", "&'static str"), ("b", "u32")],
+        9,
+    );
+
+    compare(
+        r#"{{ ("a=" ~ a ~ " b=" ~ b)|upper }}"#,
+        r#"
+            match (
+                &((&&rinja::filters::AutoEscaper::new(
+                    &(rinja::filters::upper(
+                        &((rinja::helpers::Concat(
+                            &(rinja::helpers::Concat(&("a="), &(self.a))),
+                            &(rinja::helpers::Concat(&(" b="), &(self.b))),
+                        ))),
+                    )?),
+                    rinja::filters::Text,
+                ))
+                    .rinja_auto_escape()?),
+            ) {
+                (expr0,) => {
+                    (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                }
+            }
+        "#,
+        &[("a", "&'static str"), ("b", "u32")],
+        3,
+    );
+}
+
+#[test]
+fn extends_with_whitespace_control() {
+    const CONTROL: &[&str] = &["", "\t", "-", "+", "~"];
+
+    let expected = jinja_to_rust(r#"front {% extends "a.html" %} back"#, &[]).unwrap();
+    let expected = unparse(&expected);
+    for front in CONTROL {
+        for back in CONTROL {
+            let src = format!(r#"front {{%{front} extends "a.html" {back}%}} back"#);
+            let actual = jinja_to_rust(&src, &[]).unwrap();
+            let actual = unparse(&actual);
+            assert_eq!(expected, actual, "source: {:?}", src);
+        }
+    }
 }

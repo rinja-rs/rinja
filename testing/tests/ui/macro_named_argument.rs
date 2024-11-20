@@ -22,7 +22,7 @@ struct InvalidNamedArg2;
 {{ param1 }} {{ param2 }}
 {%- endmacro -%}
 
-{%- call thrice(3, param1=2) | filter(param1=12) -%}", ext = "html")]
+{%- call thrice(3, param1=2)|filter(param1=12) -%}", ext = "html")]
 struct InvalidNamedArg3;
 
 // Ensures that named arguments can only be passed last.

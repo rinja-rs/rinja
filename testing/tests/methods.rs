@@ -18,36 +18,36 @@ fn test_self_method() {
     assert_eq!(t.render().unwrap(), "foo");
 }
 
-#[derive(Template)]
-#[template(source = "{{ self.type() }}", ext = "txt")]
-struct SelfRawIdentifierMethodTemplate {}
-
-impl SelfRawIdentifierMethodTemplate {
-    fn r#type(&self) -> &str {
-        "foo"
-    }
-}
-
 #[test]
 fn test_self_raw_identifier_method() {
+    #[derive(Template)]
+    #[template(source = "{{ self.type() }}", ext = "txt")]
+    struct SelfRawIdentifierMethodTemplate {}
+
+    impl SelfRawIdentifierMethodTemplate {
+        fn r#type(&self) -> &str {
+            "foo"
+        }
+    }
+
     let t = SelfRawIdentifierMethodTemplate {};
     assert_eq!(t.render().unwrap(), "foo");
 }
 
-#[derive(Template)]
-#[template(source = "{{ self.get_s() }} {{ t.get_s() }}", ext = "txt")]
-struct NestedSelfMethodTemplate<'a> {
-    t: SelfMethodTemplate<'a>,
-}
-
-impl<'a> NestedSelfMethodTemplate<'a> {
-    fn get_s(&self) -> &str {
-        "bar"
-    }
-}
-
 #[test]
 fn test_nested() {
+    #[derive(Template)]
+    #[template(source = "{{ self.get_s() }} {{ t.get_s() }}", ext = "txt")]
+    struct NestedSelfMethodTemplate<'a> {
+        t: SelfMethodTemplate<'a>,
+    }
+
+    impl<'a> NestedSelfMethodTemplate<'a> {
+        fn get_s(&self) -> &str {
+            "bar"
+        }
+    }
+
     let t = NestedSelfMethodTemplate {
         t: SelfMethodTemplate { s: "foo" },
     };

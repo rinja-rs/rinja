@@ -35,3 +35,35 @@ error: macro "thrice" expected 0 arguments, found 2
 22 | |
 23 | | {%- call thrice(1, 2) -%}", ext = "html")]
    | |__________________________^
+
+error: expected `)` to close macro argument list
+ --> <source attribute>:1:17
+       "%}{% endmacro %}"
+  --> tests/ui/macro.rs:27:21
+   |
+27 | #[template(source = "{% macro thrice( %}{% endmacro %}", ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `)` to close macro argument list
+ --> <source attribute>:1:24
+       "%}{% endmacro %}"
+  --> tests/ui/macro.rs:31:21
+   |
+31 | #[template(source = "{% macro thrice(a, b, c %}{% endmacro %}", ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `)` to close macro argument list
+ --> <source attribute>:1:23
+       "= %}{% endmacro %}"
+  --> tests/ui/macro.rs:35:21
+   |
+35 | #[template(source = "{% macro thrice(a, b, c= %}{% endmacro %}", ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `)` to close macro argument list
+ --> <source attribute>:1:24
+       "= %}{% endmacro %}"
+  --> tests/ui/macro.rs:39:21
+   |
+39 | #[template(source = "{% macro thrice(a, b, c = %}{% endmacro %}", ext = "html")]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

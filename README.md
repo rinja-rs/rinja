@@ -8,7 +8,9 @@
 **Rinja** implements a template rendering engine based on [Jinja](https://jinja.palletsprojects.com/),
 and generates type-safe Rust code from your templates at compile time
 based on a user-defined `struct` to hold the template's context.
-See below for an example. It is a fork of [Askama](https://crates.io/crates/askama).
+See below for an example. It is a fork of [Askama](https://crates.io/crates/askama), please have a look at our
+[blog post](https://blog.guillaume-gomez.fr/articles/2024-07-31+docs.rs+switching+jinja+template+framework+from+tera+to+rinja)
+highlighting differences between the two crates.
 
 All feedback welcome! Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
