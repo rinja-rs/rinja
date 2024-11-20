@@ -329,13 +329,13 @@ impl TemplateArgs {
                 }
             },
             block: args.block.map(|value| value.value()),
-            print: args.print.map(|(_, value)| value).unwrap_or_default(),
+            print: args.print.unwrap_or_default(),
             escaping: args.escape.map(|value| value.value()),
             ext: args.ext.as_ref().map(|value| value.value()),
             ext_span: args.ext.as_ref().map(|value| value.span()),
             syntax: args.syntax.map(|value| value.value()),
             config: args.config.as_ref().map(|value| value.value()),
-            whitespace: args.whitespace.map(|(_, value)| value),
+            whitespace: args.whitespace,
             template_span: Some(template.span()),
             config_span: args.config.as_ref().map(|value| value.span()),
         })
@@ -654,12 +654,12 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) meta_docs: Vec<Attribute>,
     pub(crate) source: Option<PartialTemplateArgsSource>,
     pub(crate) block: Option<LitStr>,
-    pub(crate) print: Option<(LitStr, Print)>,
+    pub(crate) print: Option<Print>,
     pub(crate) escape: Option<LitStr>,
     pub(crate) ext: Option<LitStr>,
     pub(crate) syntax: Option<LitStr>,
     pub(crate) config: Option<LitStr>,
-    pub(crate) whitespace: Option<(LitStr, Whitespace)>,
+    pub(crate) whitespace: Option<Whitespace>,
 }
 
 pub(crate) enum PartialTemplateArgsSource {
@@ -781,15 +781,16 @@ const _: () = {
     fn set_parseable_string<T: FromStr<Err: ToString>>(
         name: &Ident,
         value: ExprLit,
-        dest: &mut Option<(LitStr, T)>,
+        dest: &mut Option<T>,
     ) -> Result<(), CompileError> {
         ensure_only_once(name, dest)?;
         let str_value = get_strlit(name, value)?;
-        let value = str_value
-            .value()
-            .parse()
-            .map_err(|msg| CompileError::no_file_info(msg, Some(str_value.span())))?;
-        *dest = Some((str_value, value));
+        *dest = Some(
+            str_value
+                .value()
+                .parse()
+                .map_err(|msg| CompileError::no_file_info(msg, Some(str_value.span())))?,
+        );
         Ok(())
     }
 
