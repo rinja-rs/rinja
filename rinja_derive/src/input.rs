@@ -441,7 +441,8 @@ fn no_rinja_code_block(span: Span, ast: &syn::DeriveInput) -> CompileError {
     };
     CompileError::no_file_info(
         format!(
-            "when using `in_doc = true`, the {kind}'s documentation needs a `rinja` code block"
+            "when using `in_doc` with the value `true`, the {kind}'s documentation needs a \
+             `rinja` code block"
         ),
         Some(span),
     )
