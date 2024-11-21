@@ -282,3 +282,79 @@ fn test_default_value5() {
 
     assert_eq!(MacroDefaultValue5.render().unwrap(), "3 3\n1 1\n1 2\n");
 }
+
+// This test ensures...
+// * macro arguments can be named as rust keywords (e.g. "type", "as", "ref", etc.).
+// * the keyword is escaped at definition.
+// * the keyword is escaped at invocation.
+#[test]
+fn test_rust_keywords_as_args() {
+    #[derive(Template)]
+    #[template(
+        source = "
+{%- macro input(type) -%}
+{{ type }}
+{% endmacro -%}
+
+{%- call input(1) -%}
+{%- call input(type=1) -%}
+",
+        ext = "html"
+    )]
+    struct MacroRustKwArgs;
+
+    // primarily checking for compilation
+    assert_eq!(MacroRustKwArgs.render().unwrap(), "1\n1\n");
+}
+
+// This test ensures...
+// * macro arguments can be named as rust keywords (e.g. "type", "as", "ref", etc.).
+// * the argument has a default value.
+// * the keyword is escaped at definition.
+// * the keyword is escaped at invocation.
+#[test]
+fn test_rust_keywords_as_args_with_default() {
+    #[derive(Template)]
+    #[template(
+        source = "
+{%- macro input(type=1) -%}
+{{ type }}
+{% endmacro -%}
+
+{%- call input() -%}
+{%- call input(1) -%}
+{%- call input(type=1) -%}
+",
+        ext = "html"
+    )]
+    struct MacroRustKwArgsDefault;
+
+    // primarily checking for compilation
+    assert_eq!(MacroRustKwArgsDefault.render().unwrap(), "1\n1\n1\n");
+}
+
+// This test ensures...
+// * macro arguments can be named as rust keywords (e.g. "type", "as", "ref", etc.).
+// * a non-literal expression is given as default
+// * the keyword is escaped at definition.
+// * the keyword is escaped at invocation.
+#[test]
+fn test_rust_keywords_as_args_with_default_expr() {
+    #[derive(Template)]
+    #[template(
+        source = "
+{%- macro input(type=1+2) -%}
+{{ type }}
+{% endmacro -%}
+
+{%- call input() -%}
+{%- call input(1) -%}
+{%- call input(type=1) -%}
+",
+        ext = "html"
+    )]
+    struct MacroRustKwArgsDefaultExpr;
+
+    // primarily checking for compilation
+    assert_eq!(MacroRustKwArgsDefaultExpr.render().unwrap(), "3\n1\n1\n");
+}
