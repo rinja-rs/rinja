@@ -305,9 +305,9 @@ impl<'a> Expr<'a> {
 
     expr_prec_layer!(muldivmod, is_as, alt(("*", "/", "%")));
 
-    fn is_as(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    fn is_as(mut i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (i, lhs) = Self::filtered(i, level)?;
+        let lhs = Self::filtered(&mut i, level)?;
         let before_keyword = i;
         let (i, rhs) = opt(ws(identifier)).parse_peek(i)?;
         let i = match rhs {
@@ -369,18 +369,16 @@ impl<'a> Expr<'a> {
         Ok((i, WithSpan::new(ctor(var_name), start)))
     }
 
-    fn filtered(mut i: &'a str, mut level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
-        let mut res = Self::prefix(&mut i, level)?;
-        while let (j, Some((name, args))) = opt(|i: &mut _| filter(i, &mut level)).parse_peek(i)? {
-            i = j;
-
+    fn filtered(i: &mut &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
+        let mut res = Self::prefix(i, level)?;
+        while let Some((name, args)) = opt(|i: &mut _| filter(i, &mut level)).parse_next(i)? {
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
             arguments.insert(0, res);
 
             res = WithSpan::new(Self::Filter(Filter { name, arguments }), start);
         }
-        Ok((i, res))
+        Ok(res)
     }
 
     fn prefix(i: &mut &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
