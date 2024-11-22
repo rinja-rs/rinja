@@ -145,3 +145,21 @@ fn test_fragment_include() {
     let fragment_include = FragmentInclude { s: "world" };
     assert_eq!(fragment_include.render().unwrap(), "\nINCLUDED: world\n");
 }
+
+// This test ensures that parent variables are inherited in the block.
+// This is a regression test for <https://github.com/rinja-rs/rinja/issues/246>.
+#[test]
+fn test_variable_inheritance_in_block() {
+    #[derive(Template)]
+    #[template(
+        source = r#"{% extends "base-decl.txt" %}
+{%- block extended -%}
+--> {{ variable }}
+{% include "use-var.txt" -%}
+{% endblock %}"#,
+        ext = "txt"
+    )]
+    struct Y;
+
+    assert_eq!(Y.render().unwrap(), "--> 42\n42");
+}

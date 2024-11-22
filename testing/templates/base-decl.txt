@@ -1,0 +1,2 @@
+{%- let variable = 42 -%}
+{%- block extended %}{% endblock -%}

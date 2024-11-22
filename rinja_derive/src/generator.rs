@@ -1157,11 +1157,19 @@ impl<'a> Generator<'a> {
             self.input,
             self.contexts,
             Some(heritage),
+            // FIXME: Fix the broken lifetimes.
+            //
             // `transmute` is here to fix the lifetime nightmare around `&self.locals` not
             // living long enough. The correct solution would be to make `MapChain` take two
-            // lifetimes `&'a MapChain<'a, 'b, K, V>`. Except... compiler is triggered because then
-            // the `'b` lifetime is marked as unused.
-            MapChain::with_parent(unsafe { mem::transmute(&self.locals) }),
+            // lifetimes `&'a MapChain<'a, 'b, K, V>`, making the `parent` field take
+            // `<'b, 'b, ...>`. Except... it doesn't work because `self` still doesn't live long
+            // enough here for some reason...
+            MapChain::with_parent(unsafe {
+                mem::transmute::<
+                    &MapChain<'_, Cow<'_, str>, LocalMeta>,
+                    &MapChain<'_, Cow<'_, str>, LocalMeta>,
+                >(&self.locals)
+            }),
             self.buf_writable.discard,
             self.is_in_filter_block,
         );
