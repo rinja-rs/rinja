@@ -282,12 +282,13 @@ impl<'a> Expr<'a> {
 
     fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (before_keyword, lhs) = Self::filtered(i, level)?;
-        let (j, rhs) = opt(ws(identifier)).parse_next(before_keyword)?;
+        let (i, lhs) = Self::filtered(i, level)?;
+        let before_keyword = i;
+        let (i, rhs) = opt(ws(identifier)).parse_next(i)?;
         let i = match rhs {
-            Some("is") => j,
+            Some("is") => i,
             Some("as") => {
-                let (i, target) = opt(identifier).parse_next(j)?;
+                let (i, target) = opt(identifier).parse_next(i)?;
                 let target = target.unwrap_or_default();
                 if crate::PRIMITIVE_TYPES.contains(&target) {
                     return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
@@ -306,7 +307,10 @@ impl<'a> Expr<'a> {
                     )));
                 }
             }
-            _ => return Ok((before_keyword, lhs)),
+            _ => {
+                let i = before_keyword;
+                return Ok((i, lhs));
+            }
         };
 
         let (i, rhs) =
