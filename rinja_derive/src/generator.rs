@@ -1152,16 +1152,20 @@ impl<'a> Generator<'a> {
                 .or_insert_with(|| import.clone());
         }
 
+        let buf_writable = mem::take(&mut self.buf_writable);
         let mut child = Self::new(
             self.input,
             self.contexts,
             Some(heritage),
-            // Variables are NOT inherited from the parent scope.
-            MapChain::default(),
+            // `transmute` is here to fix the lifetime nightmare around `&self.locals` not
+            // living long enough. The correct solution would be to make `MapChain` take two
+            // lifetimes `&'a MapChain<'a, 'b, K, V>`. Except... compiler is triggered because then
+            // the `'b` lifetime is marked as unused.
+            MapChain::with_parent(unsafe { mem::transmute(&self.locals) }),
             self.buf_writable.discard,
             self.is_in_filter_block,
         );
-        child.buf_writable = mem::take(&mut self.buf_writable);
+        child.buf_writable = buf_writable;
 
         // Handle inner whitespace suppression spec and process block nodes
         child.prepare_ws(def.ws1);
