@@ -27,14 +27,13 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let (new_i, target) = separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
+        separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
             .map(|v: Vec<_>| v)
             .map(|mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
             })
-            .parse_next(i)?;
-        Ok((new_i, target))
+            .parse_next(i)
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
