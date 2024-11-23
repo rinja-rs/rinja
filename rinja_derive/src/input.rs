@@ -205,7 +205,7 @@ impl TemplateInput<'_> {
                             let extends = self.config.find_template(
                                 extends.path,
                                 Some(&path),
-                                Some(FileInfo::of(extends, &path, &parsed)),
+                                Some(FileInfo::of(extends.span(), &path, &parsed)),
                             )?;
                             let dependency_path = (path.clone(), extends.clone());
                             if path == extends {
@@ -225,7 +225,7 @@ impl TemplateInput<'_> {
                             let import = self.config.find_template(
                                 import.path,
                                 Some(&path),
-                                Some(FileInfo::of(import, &path, &parsed)),
+                                Some(FileInfo::of(import.span(), &path, &parsed)),
                             )?;
                             add_to_check(import)?;
                         }
@@ -236,7 +236,7 @@ impl TemplateInput<'_> {
                             let include = self.config.find_template(
                                 include.path,
                                 Some(&path),
-                                Some(FileInfo::of(include, &path, &parsed)),
+                                Some(FileInfo::of(include.span(), &path, &parsed)),
                             )?;
                             add_to_check(include)?;
                         }

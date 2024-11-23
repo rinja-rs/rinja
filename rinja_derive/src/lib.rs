@@ -23,7 +23,7 @@ use generator::template_to_string;
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
 use integration::Buffer;
-use parser::{Parsed, WithSpan, strip_common};
+use parser::{Parsed, strip_common};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
@@ -294,12 +294,12 @@ impl<'a> FileInfo<'a> {
         }
     }
 
-    fn of<T>(node: &WithSpan<'a, T>, path: &'a Path, parsed: &'a Parsed) -> Self {
+    fn of(node: parser::Span<'a>, path: &'a Path, parsed: &'a Parsed) -> Self {
         let source = parsed.source();
         Self {
             path,
             source: Some(source),
-            node_source: node.span().as_suffix_of(source),
+            node_source: node.as_suffix_of(source),
         }
     }
 }
