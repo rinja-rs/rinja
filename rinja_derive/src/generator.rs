@@ -25,7 +25,7 @@ use crate::{BUILT_IN_FILTERS, CRATE, CompileError, FileInfo, MsgValidEscapers};
 pub(crate) fn template_to_string(
     input: &TemplateInput<'_>,
     contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
-    heritage: Option<&Heritage<'_>>,
+    heritage: Option<&Heritage<'_, '_>>,
 ) -> Result<String, CompileError> {
     let mut buf = Buffer::new();
     template_into_buffer(input, contexts, heritage, &mut buf, false)?;
@@ -35,7 +35,7 @@ pub(crate) fn template_to_string(
 pub(crate) fn template_into_buffer(
     input: &TemplateInput<'_>,
     contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
-    heritage: Option<&Heritage<'_>>,
+    heritage: Option<&Heritage<'_, '_>>,
     buf: &mut Buffer,
     only_template: bool,
 ) -> Result<(), CompileError> {
@@ -57,13 +57,13 @@ pub(crate) fn template_into_buffer(
     result
 }
 
-struct Generator<'a> {
+struct Generator<'a, 'h> {
     // The template input state: original struct AST and attributes
     input: &'a TemplateInput<'a>,
     // All contexts, keyed by the package-relative template path
     contexts: &'a HashMap<&'a Arc<Path>, Context<'a>, FxBuildHasher>,
     // The heritage contains references to blocks and their ancestry
-    heritage: Option<&'a Heritage<'a>>,
+    heritage: Option<&'h Heritage<'a, 'h>>,
     // Variables accessible directly from the current scope (not redirected to context)
     locals: MapChain<'a>,
     // Suffix whitespace from the previous literal. Will be flushed to the
@@ -81,16 +81,16 @@ struct Generator<'a> {
     is_in_filter_block: usize,
 }
 
-impl<'a> Generator<'a> {
-    fn new<'n>(
-        input: &'n TemplateInput<'_>,
-        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>, FxBuildHasher>,
-        heritage: Option<&'n Heritage<'_>>,
-        locals: MapChain<'n>,
+impl<'a, 'h> Generator<'a, 'h> {
+    fn new(
+        input: &'a TemplateInput<'a>,
+        contexts: &'a HashMap<&'a Arc<Path>, Context<'a>, FxBuildHasher>,
+        heritage: Option<&'h Heritage<'a, 'h>>,
+        locals: MapChain<'a>,
         buf_writable_discard: bool,
         is_in_filter_block: usize,
-    ) -> Generator<'n> {
-        Generator {
+    ) -> Self {
+        Self {
             input,
             contexts,
             heritage,
@@ -131,12 +131,45 @@ impl<'a> Generator<'a> {
         Ok(())
     }
 
-    fn push_locals<T, F: FnOnce(&mut Self) -> Result<T, CompileError>>(
-        &mut self,
-        callback: F,
-    ) -> Result<T, CompileError> {
+    fn push_locals<T, F>(&mut self, callback: F) -> Result<T, CompileError>
+    where
+        F: FnOnce(&mut Self) -> Result<T, CompileError>,
+    {
         self.locals.scopes.push(HashMap::default());
         let res = callback(self);
+        self.locals.scopes.pop().unwrap();
+        res
+    }
+
+    fn with_child<'b, T, F>(
+        &mut self,
+        heritage: Option<&'b Heritage<'a, 'b>>,
+        callback: F,
+    ) -> Result<T, CompileError>
+    where
+        F: FnOnce(&mut Generator<'a, 'b>) -> Result<T, CompileError>,
+    {
+        self.locals.scopes.push(HashMap::default());
+
+        let buf_writable = mem::take(&mut self.buf_writable);
+        let locals = mem::replace(&mut self.locals, MapChain::new_empty());
+
+        let mut child = Generator::new(
+            self.input,
+            self.contexts,
+            heritage,
+            locals,
+            self.buf_writable.discard,
+            self.is_in_filter_block,
+        );
+        child.buf_writable = buf_writable;
+        let res = callback(&mut child);
+        Generator {
+            locals: self.locals,
+            buf_writable: self.buf_writable,
+            ..
+        } = child;
+
         self.locals.scopes.pop().unwrap();
         res
     }
@@ -965,17 +998,14 @@ impl<'a> Generator<'a> {
             Some(heritage) => heritage.root,
             None => child_ctx,
         };
-        let locals = MapChain::with_parent(&self.locals);
-        let mut child = Self::new(
-            self.input,
-            self.contexts,
-            heritage.as_ref(),
-            locals,
-            self.buf_writable.discard,
-            self.is_in_filter_block,
-        );
-        let mut size_hint = child.handle(handle_ctx, handle_ctx.nodes, buf, AstLevel::Top)?;
-        size_hint += child.write_buf_writable(handle_ctx, buf)?;
+
+        let size_hint = self.with_child(heritage.as_ref(), |child| {
+            let mut size_hint = 0;
+            size_hint += child.handle(handle_ctx, handle_ctx.nodes, buf, AstLevel::Top)?;
+            size_hint += child.write_buf_writable(handle_ctx, buf)?;
+            Ok(size_hint)
+        })?;
+
         self.prepare_ws(i.ws);
 
         Ok(size_hint)
@@ -1151,39 +1181,21 @@ impl<'a> Generator<'a> {
                 .or_insert_with(|| import.clone());
         }
 
-        let buf_writable = mem::take(&mut self.buf_writable);
-        let mut child = Self::new(
-            self.input,
-            self.contexts,
-            Some(heritage),
-            // FIXME: Fix the broken lifetimes.
-            //
-            // `transmute` is here to fix the lifetime nightmare around `&self.locals` not
-            // living long enough. The correct solution would be to make `MapChain` take two
-            // lifetimes `&'a MapChain<'a, 'b, K, V>`, making the `parent` field take
-            // `<'b, 'b, ...>`. Except... it doesn't work because `self` still doesn't live long
-            // enough here for some reason...
-            MapChain::with_parent(unsafe {
-                mem::transmute::<&MapChain<'_>, &MapChain<'_>>(&self.locals)
-            }),
-            self.buf_writable.discard,
-            self.is_in_filter_block,
-        );
-        child.buf_writable = buf_writable;
+        let size_hint = self.with_child(Some(heritage), |child| {
+            // Handle inner whitespace suppression spec and process block nodes
+            child.prepare_ws(def.ws1);
 
-        // Handle inner whitespace suppression spec and process block nodes
-        child.prepare_ws(def.ws1);
+            child.super_block = Some(cur);
+            let size_hint = child.handle(&child_ctx, &def.nodes, buf, AstLevel::Block)?;
 
-        child.super_block = Some(cur);
-        let size_hint = child.handle(&child_ctx, &def.nodes, buf, AstLevel::Block)?;
+            if !child.locals.is_current_empty() {
+                // Need to flush the buffer before popping the variable stack
+                child.write_buf_writable(ctx, buf)?;
+            }
 
-        if !child.locals.is_current_empty() {
-            // Need to flush the buffer before popping the variable stack
-            child.write_buf_writable(ctx, buf)?;
-        }
-
-        child.flush_ws(def.ws2);
-        self.buf_writable = child.buf_writable;
+            child.flush_ws(def.ws2);
+            Ok(size_hint)
+        })?;
 
         // Restore original block context and set whitespace suppression for
         // succeeding whitespace according to the outer WS spec
@@ -2639,7 +2651,7 @@ enum EvaluatedResult {
 }
 
 impl<'a> Conds<'a> {
-    fn compute_branches(generator: &Generator<'a>, i: &'a If<'a>) -> Self {
+    fn compute_branches(generator: &Generator<'a, '_>, i: &'a If<'a>) -> Self {
         let mut conds = Vec::with_capacity(i.branches.len());
         let mut ws_before = None;
         let mut ws_after = None;
@@ -2763,25 +2775,18 @@ impl LocalMeta {
 }
 
 struct MapChain<'a> {
-    parent: Option<&'a MapChain<'a>>,
     scopes: Vec<HashMap<Cow<'a, str>, LocalMeta, FxBuildHasher>>,
 }
 
 impl<'a> MapChain<'a> {
-    fn with_parent(parent: &'a MapChain<'_>) -> MapChain<'a> {
-        MapChain {
-            parent: Some(parent),
-            scopes: vec![HashMap::default()],
-        }
+    fn new_empty() -> Self {
+        Self { scopes: vec![] }
     }
 
     /// Iterates the scopes in reverse and returns `Some(LocalMeta)`
     /// from the first scope where `key` exists.
     fn get<'b>(&'b self, key: &str) -> Option<&'b LocalMeta> {
-        let mut scopes = self.scopes.iter().rev();
-        scopes
-            .find_map(|set| set.get(key))
-            .or_else(|| self.parent.and_then(|set| set.get(key)))
+        self.scopes.iter().rev().find_map(|set| set.get(key))
     }
 
     fn is_current_empty(&self) -> bool {
@@ -2819,7 +2824,6 @@ impl<'a> MapChain<'a> {
 impl Default for MapChain<'_> {
     fn default() -> Self {
         Self {
-            parent: None,
             scopes: vec![HashMap::default()],
         }
     }
