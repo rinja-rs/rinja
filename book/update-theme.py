@@ -7,6 +7,7 @@ from io import StringIO
 from json import load
 from os import PathLike
 from pathlib import Path
+from time import sleep
 
 
 INDEX_HBS_DOMAIN = "api.github.com"
@@ -53,12 +54,17 @@ SIDEBAR_END = r"""
 
 
 def update_theme(target: PathLike) -> None:
-    with closing(HTTPSConnection(INDEX_HBS_DOMAIN, INDEX_HBS_PORT)) as conn:
-        conn.request(INDEX_HBS_PROTO, INDEX_HBS_PATH, INDEX_HBS_DATA, INDEX_HBS_HEADERS)
-        res = conn.getresponse()
-        if res.status != 200:
-            raise Exception(f"Status={res.status!r}")
-        data = load(res)
+    for i in reversed(range(3)):
+        with closing(HTTPSConnection(INDEX_HBS_DOMAIN, INDEX_HBS_PORT)) as conn:
+            conn.request(INDEX_HBS_PROTO, INDEX_HBS_PATH, INDEX_HBS_DATA, INDEX_HBS_HEADERS)
+            res = conn.getresponse()
+            if res.status == 200:
+                data = load(res)
+                break
+        if i != 0:
+            sleep(1.0)
+    else:
+        raise Exception(f"Status={res.status!r}")
 
     if data["encoding"] != "base64":
         raise Exception(f'Encoding={data["encoding"]!r}')

@@ -9,34 +9,35 @@ use rustc_hash::FxBuildHasher;
 use crate::config::Config;
 use crate::{CompileError, FileInfo};
 
-pub(crate) struct Heritage<'a> {
-    pub(crate) root: &'a Context<'a>,
-    pub(crate) blocks: BlockAncestry<'a>,
+pub(crate) struct Heritage<'a, 'h> {
+    pub(crate) root: &'h Context<'a>,
+    pub(crate) blocks: BlockAncestry<'a, 'h>,
 }
 
-impl Heritage<'_> {
-    pub(crate) fn new<'n>(
-        mut ctx: &'n Context<'n>,
-        contexts: &'n HashMap<&'n Arc<Path>, Context<'n>, FxBuildHasher>,
-    ) -> Heritage<'n> {
-        let mut blocks: BlockAncestry<'n> = ctx
+impl<'a, 'h> Heritage<'a, 'h> {
+    pub(crate) fn new(
+        mut root: &'h Context<'a>,
+        contexts: &'a HashMap<&'a Arc<Path>, Context<'a>, FxBuildHasher>,
+    ) -> Self {
+        let mut blocks: BlockAncestry<'a, 'h> = root
             .blocks
             .iter()
-            .map(|(name, def)| (*name, vec![(ctx, *def)]))
+            .map(|(name, def)| (*name, vec![(root, *def)]))
             .collect();
 
-        while let Some(path) = &ctx.extends {
-            ctx = &contexts[path];
-            for (name, def) in &ctx.blocks {
-                blocks.entry(name).or_default().push((ctx, def));
+        while let Some(path) = &root.extends {
+            root = &contexts[path];
+            for (name, def) in &root.blocks {
+                blocks.entry(name).or_default().push((root, def));
             }
         }
 
-        Heritage { root: ctx, blocks }
+        Self { root, blocks }
     }
 }
 
-type BlockAncestry<'a> = HashMap<&'a str, Vec<(&'a Context<'a>, &'a BlockDef<'a>)>, FxBuildHasher>;
+type BlockAncestry<'a, 'h> =
+    HashMap<&'a str, Vec<(&'h Context<'a>, &'a BlockDef<'a>)>, FxBuildHasher>;
 
 #[derive(Clone)]
 pub(crate) struct Context<'a> {
