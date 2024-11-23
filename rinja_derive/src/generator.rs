@@ -3,7 +3,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
-use std::{cmp, hash, mem, str};
+use std::{mem, str};
 
 use parser::node::{
     Call, Comment, Cond, CondTest, FilterBlock, If, Include, Let, Lit, Loop, Macro, Match,
@@ -65,7 +65,7 @@ struct Generator<'a> {
     // The heritage contains references to blocks and their ancestry
     heritage: Option<&'a Heritage<'a>>,
     // Variables accessible directly from the current scope (not redirected to context)
-    locals: MapChain<'a, Cow<'a, str>, LocalMeta>,
+    locals: MapChain<'a>,
     // Suffix whitespace from the previous literal. Will be flushed to the
     // output buffer unless suppressed by whitespace suppression on the next
     // non-literal.
@@ -86,7 +86,7 @@ impl<'a> Generator<'a> {
         input: &'n TemplateInput<'_>,
         contexts: &'n HashMap<&'n Arc<Path>, Context<'n>, FxBuildHasher>,
         heritage: Option<&'n Heritage<'_>>,
-        locals: MapChain<'n, Cow<'n, str>, LocalMeta>,
+        locals: MapChain<'n>,
         buf_writable_discard: bool,
         is_in_filter_block: usize,
     ) -> Generator<'n> {
@@ -304,8 +304,7 @@ impl<'a> Generator<'a> {
     }
 
     fn is_var_defined(&self, var_name: &str) -> bool {
-        self.locals.get(&var_name.into()).is_some()
-            || self.input.fields.iter().any(|f| f == var_name)
+        self.locals.get(var_name).is_some() || self.input.fields.iter().any(|f| f == var_name)
     }
 
     fn evaluate_condition(
@@ -991,7 +990,7 @@ impl<'a> Generator<'a> {
         match var {
             Target::Name(name) => {
                 let name = normalize_identifier(name);
-                match self.locals.get(&Cow::Borrowed(name)) {
+                match self.locals.get(name) {
                     // declares a new variable
                     None => Ok(false),
                     // an initialized variable gets shadowed
@@ -1062,7 +1061,7 @@ impl<'a> Generator<'a> {
         }
         if shadowed
             || !matches!(l.var, Target::Name(_))
-            || matches!(&l.var, Target::Name(name) if self.locals.get(&Cow::Borrowed(name)).is_none())
+            || matches!(&l.var, Target::Name(name) if self.locals.get(name).is_none())
         {
             buf.write("let ");
         }
@@ -1165,10 +1164,7 @@ impl<'a> Generator<'a> {
             // `<'b, 'b, ...>`. Except... it doesn't work because `self` still doesn't live long
             // enough here for some reason...
             MapChain::with_parent(unsafe {
-                mem::transmute::<
-                    &MapChain<'_, Cow<'_, str>, LocalMeta>,
-                    &MapChain<'_, Cow<'_, str>, LocalMeta>,
-                >(&self.locals)
+                mem::transmute::<&MapChain<'_>, &MapChain<'_>>(&self.locals)
             }),
             self.buf_writable.discard,
             self.is_in_filter_block,
@@ -2766,20 +2762,13 @@ impl LocalMeta {
     }
 }
 
-#[derive(Debug, Clone)]
-struct MapChain<'a, K, V>
-where
-    K: cmp::Eq + hash::Hash,
-{
-    parent: Option<&'a MapChain<'a, K, V>>,
-    scopes: Vec<HashMap<K, V, FxBuildHasher>>,
+struct MapChain<'a> {
+    parent: Option<&'a MapChain<'a>>,
+    scopes: Vec<HashMap<Cow<'a, str>, LocalMeta, FxBuildHasher>>,
 }
 
-impl<'a, K: 'a, V: 'a> MapChain<'a, K, V>
-where
-    K: cmp::Eq + hash::Hash,
-{
-    fn with_parent<'p>(parent: &'p MapChain<'_, K, V>) -> MapChain<'p, K, V> {
+impl<'a> MapChain<'a> {
+    fn with_parent(parent: &'a MapChain<'_>) -> MapChain<'a> {
         MapChain {
             parent: Some(parent),
             scopes: vec![HashMap::default()],
@@ -2788,7 +2777,7 @@ where
 
     /// Iterates the scopes in reverse and returns `Some(LocalMeta)`
     /// from the first scope where `key` exists.
-    fn get(&self, key: &K) -> Option<&V> {
+    fn get<'b>(&'b self, key: &str) -> Option<&'b LocalMeta> {
         let mut scopes = self.scopes.iter().rev();
         scopes
             .find_map(|set| set.get(key))
@@ -2799,7 +2788,7 @@ where
         self.scopes.last().unwrap().is_empty()
     }
 
-    fn insert(&mut self, key: K, val: V) {
+    fn insert(&mut self, key: Cow<'a, str>, val: LocalMeta) {
         self.scopes.last_mut().unwrap().insert(key, val);
 
         // Note that if `insert` returns `Some` then it implies
@@ -2809,15 +2798,10 @@ where
         // compile error "identifier `a` used more than once".
     }
 
-    fn insert_with_default(&mut self, key: K)
-    where
-        V: Default,
-    {
-        self.insert(key, V::default());
+    fn insert_with_default(&mut self, key: Cow<'a, str>) {
+        self.insert(key, LocalMeta::default());
     }
-}
 
-impl MapChain<'_, Cow<'_, str>, LocalMeta> {
     fn resolve(&self, name: &str) -> Option<String> {
         let name = normalize_identifier(name);
         self.get(&Cow::Borrowed(name)).map(|meta| match &meta.refs {
@@ -2832,7 +2816,7 @@ impl MapChain<'_, Cow<'_, str>, LocalMeta> {
     }
 }
 
-impl<'a, K: Eq + hash::Hash, V> Default for MapChain<'a, K, V> {
+impl Default for MapChain<'_> {
     fn default() -> Self {
         Self {
             parent: None,
