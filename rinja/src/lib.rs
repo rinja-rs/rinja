@@ -170,9 +170,11 @@ impl<T: Template + ?Sized> Template for &T {
     const MIME_TYPE: &'static str = T::MIME_TYPE;
 }
 
-/// Object-safe wrapper trait around [`Template`] implementers
+/// [`dyn`-compatible] wrapper trait around [`Template`] implementers
 ///
-/// This trades reduced performance (mostly due to writing into `dyn Write`) for object safety.
+/// This trades reduced performance (mostly due to writing into `dyn Write`) for dyn-compatibility.
+///
+/// [`dyn`-compatible]: <https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility>
 pub trait DynTemplate {
     /// Helper method which allocates a new `String` and renders into it
     fn dyn_render(&self) -> Result<String>;
@@ -191,29 +193,34 @@ pub trait DynTemplate {
 }
 
 impl<T: Template> DynTemplate for T {
+    #[inline]
     fn dyn_render(&self) -> Result<String> {
-        <Self as Template>::render(self)
+        Self::render(self)
     }
 
+    #[inline]
     fn dyn_render_into(&self, writer: &mut dyn fmt::Write) -> Result<()> {
-        <Self as Template>::render_into(self, writer)
+        Self::render_into(self, writer)
     }
 
     #[inline]
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()> {
-        <Self as Template>::write_into(self, writer)
+        Self::write_into(self, writer)
     }
 
+    #[inline]
     fn size_hint(&self) -> usize {
         Self::SIZE_HINT
     }
 
+    #[inline]
     fn mime_type(&self) -> &'static str {
         Self::MIME_TYPE
     }
 }
 
 impl fmt::Display for dyn DynTemplate {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.dyn_render_into(f).map_err(|_| fmt::Error {})
     }
