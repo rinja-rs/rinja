@@ -7,7 +7,13 @@ use console::style;
 use prettyplease::unparse;
 use similar::{Algorithm, ChangeTag, TextDiffConfig};
 
-use crate::build_template;
+use crate::integration::Buffer;
+
+fn build_template(ast: &syn::DeriveInput) -> Result<String, crate::CompileError> {
+    let mut buf = Buffer::new();
+    crate::build_template(&mut buf, ast)?;
+    Ok(buf.into_string())
+}
 
 // This function makes it much easier to compare expected code by adding the wrapping around
 // the code we want to check.

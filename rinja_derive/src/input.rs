@@ -290,41 +290,37 @@ pub(crate) struct TemplateArgs {
 
 impl TemplateArgs {
     pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
-        // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
-        if let syn::Data::Union(data) = &ast.data {
-            return Err(CompileError::new_with_span(
-                "rinja templates are not supported for `union` types, only `struct` and `enum`",
-                None,
-                Some(data.union_token.span),
-            ));
-        }
+        Self::from_partial(ast, PartialTemplateArgs::new(ast, &ast.attrs)?)
+    }
 
-        let args = PartialTemplateArgs::new(&ast.attrs)?;
-        let Some(template) = args.template else {
-            return Err(CompileError::no_file_info(
+    pub(crate) fn from_partial(
+        ast: &syn::DeriveInput,
+        args: Option<PartialTemplateArgs>,
+    ) -> Result<Self, CompileError> {
+        let Some(args) = args else {
+            return Err(CompileError::new_with_span(
                 "no attribute `template` found",
                 None,
+                Some(ast.ident.span()),
             ));
         };
         Ok(Self {
             source: match args.source {
                 Some(PartialTemplateArgsSource::Path(s)) => {
-                    (Source::Path(s.value()), Some(s.span()))
+                    (Source::Path(s.value().into()), Some(s.span()))
                 }
                 Some(PartialTemplateArgsSource::Source(s)) => {
                     (Source::Source(s.value().into()), Some(s.span()))
                 }
                 #[cfg(feature = "code-in-doc")]
-                Some(PartialTemplateArgsSource::InDoc(s)) => {
-                    source_from_docs(s.span(), &args.meta_docs, ast)?
-                }
+                Some(PartialTemplateArgsSource::InDoc(span, source)) => (source, Some(span)),
                 None => {
                     return Err(CompileError::no_file_info(
                         #[cfg(not(feature = "code-in-doc"))]
                         "specify one template argument `path` or `source`",
                         #[cfg(feature = "code-in-doc")]
                         "specify one template argument `path`, `source` or `in_doc`",
-                        Some(template.span()),
+                        Some(args.template.span()),
                     ));
                 }
             },
@@ -336,7 +332,7 @@ impl TemplateArgs {
             syntax: args.syntax.map(|value| value.value()),
             config: args.config.as_ref().map(|value| value.value()),
             whitespace: args.whitespace,
-            template_span: Some(template.span()),
+            template_span: Some(args.template.span()),
             config_span: args.config.as_ref().map(|value| value.span()),
         })
     }
@@ -368,7 +364,7 @@ impl TemplateArgs {
 #[cfg(feature = "code-in-doc")]
 fn source_from_docs(
     span: Span,
-    docs: &[Attribute],
+    docs: &[&Attribute],
     ast: &syn::DeriveInput,
 ) -> Result<(Source, Option<Span>), CompileError> {
     let (source_span, source) = collect_comment_blocks(span, docs, ast)?;
@@ -380,7 +376,7 @@ fn source_from_docs(
 #[cfg(feature = "code-in-doc")]
 fn collect_comment_blocks(
     span: Span,
-    docs: &[Attribute],
+    docs: &[&Attribute],
     ast: &syn::DeriveInput,
 ) -> Result<(Option<Span>, String), CompileError> {
     let mut source_span: Option<Span> = None;
@@ -547,9 +543,9 @@ fn extension(path: &Path) -> Option<&str> {
     }
 }
 
-#[derive(Debug, Hash, PartialEq)]
+#[derive(Debug, Clone, Hash, PartialEq)]
 pub(crate) enum Source {
-    Path(String),
+    Path(Arc<str>),
     Source(Arc<str>),
 }
 
@@ -649,10 +645,8 @@ pub(crate) fn get_template_source(
     )
 }
 
-#[derive(Default)]
 pub(crate) struct PartialTemplateArgs {
-    pub(crate) template: Option<Ident>,
-    pub(crate) meta_docs: Vec<Attribute>,
+    pub(crate) template: Ident,
     pub(crate) source: Option<PartialTemplateArgsSource>,
     pub(crate) block: Option<LitStr>,
     pub(crate) print: Option<Print>,
@@ -663,34 +657,67 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) whitespace: Option<Whitespace>,
 }
 
+#[derive(Clone)]
 pub(crate) enum PartialTemplateArgsSource {
     Path(LitStr),
     Source(LitStr),
     #[cfg(feature = "code-in-doc")]
-    InDoc(#[allow(dead_code)] LitBool),
+    InDoc(Span, Source),
 }
 
 // implement PartialTemplateArgs::new()
 const _: () = {
     impl PartialTemplateArgs {
-        pub(crate) fn new(attrs: &[Attribute]) -> Result<Self, CompileError> {
-            new(attrs)
+        pub(crate) fn new(
+            ast: &syn::DeriveInput,
+            attrs: &[Attribute],
+        ) -> Result<Option<Self>, CompileError> {
+            new(ast, attrs)
         }
     }
 
     #[inline]
-    fn new(attrs: &[Attribute]) -> Result<PartialTemplateArgs, CompileError> {
-        let mut this = PartialTemplateArgs::default();
+    fn new(
+        ast: &syn::DeriveInput,
+        attrs: &[Attribute],
+    ) -> Result<Option<PartialTemplateArgs>, CompileError> {
+        // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
+        if let syn::Data::Union(data) = &ast.data {
+            return Err(CompileError::new_with_span(
+                "rinja templates are not supported for `union` types, only `struct` and `enum`",
+                None,
+                Some(data.union_token.span),
+            ));
+        }
+
+        #[cfg(feature = "code-in-doc")]
+        let mut meta_docs = vec![];
+
+        let mut this = PartialTemplateArgs {
+            template: Ident::new("template", Span::call_site()),
+            source: None,
+            block: None,
+            print: None,
+            escape: None,
+            ext: None,
+            syntax: None,
+            config: None,
+            whitespace: None,
+        };
+        let mut has_data = false;
+
         for attr in attrs {
             let Some(ident) = attr.path().get_ident() else {
                 continue;
             };
-            if ident == "doc" {
-                this.meta_docs.push(attr.clone());
-                continue;
-            } else if ident == "template" {
-                this.template = Some(ident.clone());
+            if ident == "template" {
+                this.template = ident.clone();
+                has_data = true;
             } else {
+                #[cfg(feature = "code-in-doc")]
+                if ident == "doc" {
+                    meta_docs.push(attr);
+                }
                 continue;
             }
 
@@ -742,7 +769,10 @@ const _: () = {
                     }
                     #[cfg(feature = "code-in-doc")]
                     {
-                        this.source = Some(PartialTemplateArgsSource::InDoc(value));
+                        this.source = Some(PartialTemplateArgsSource::InDoc(
+                            value.span(),
+                            Source::Path("".into()),
+                        ));
                     }
                 } else if ident == "block" {
                     set_strlit_pair(ident, value, &mut this.block)?;
@@ -766,7 +796,20 @@ const _: () = {
                 }
             }
         }
-        Ok(this)
+        if !has_data {
+            return Ok(None);
+        }
+
+        #[cfg(feature = "code-in-doc")]
+        if let Some(PartialTemplateArgsSource::InDoc(lit_span, _)) = this.source {
+            let (source, doc_span) = source_from_docs(lit_span, &meta_docs, ast)?;
+            this.source = Some(PartialTemplateArgsSource::InDoc(
+                doc_span.unwrap_or(lit_span),
+                source,
+            ));
+        }
+
+        Ok(Some(this))
     }
 
     fn set_strlit_pair(

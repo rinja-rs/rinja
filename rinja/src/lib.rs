@@ -95,7 +95,7 @@ pub use crate::helpers::PrimitiveType;
 /// `.render()`.
 ///
 /// [dynamic methods calls]: <https://doc.rust-lang.org/stable/std/keyword.dyn.html>
-pub trait Template: fmt::Display {
+pub trait Template: fmt::Display + filters::FastWritable {
     /// Helper method which allocates a new `String` and renders into it
     fn render(&self) -> Result<String> {
         let mut buf = String::new();
@@ -152,17 +152,17 @@ pub trait Template: fmt::Display {
 impl<T: Template + ?Sized> Template for &T {
     #[inline]
     fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
-        T::render_into(self, writer)
+        <T as Template>::render_into(self, writer)
     }
 
     #[inline]
     fn render(&self) -> Result<String> {
-        T::render(self)
+        <T as Template>::render(self)
     }
 
     #[inline]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
-        T::write_into(self, writer)
+        <T as Template>::write_into(self, writer)
     }
 
     const SIZE_HINT: usize = T::SIZE_HINT;
@@ -254,6 +254,7 @@ mod tests {
     #[test]
     fn dyn_template() {
         struct Test;
+
         impl Template for Test {
             fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
                 Ok(writer.write_str("test")?)
@@ -268,6 +269,13 @@ mod tests {
             #[inline]
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 self.render_into(f).map_err(|_| fmt::Error {})
+            }
+        }
+
+        impl filters::FastWritable for Test {
+            #[inline]
+            fn write_into<W: fmt::Write + ?Sized>(&self, f: &mut W) -> crate::Result<()> {
+                self.render_into(f)
             }
         }
 
