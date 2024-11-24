@@ -636,10 +636,10 @@ fn check_escaping_at_compile_time() {
         {%- endmatch %}"#,
         r#"writer.write_str("The card is")?;
         match &self.suit {
-            Suit::Clubs | Suit::Spades => {
+            Suit::Clubs {} | Suit::Spades {} => {
                 writer.write_str(" black")?;
             }
-            Suit::Diamonds | Suit::Hearts => {
+            Suit::Diamonds {} | Suit::Hearts {} => {
                 writer.write_str(" red")?;
             }
         }"#,
