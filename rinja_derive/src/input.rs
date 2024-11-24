@@ -290,11 +290,18 @@ pub(crate) struct TemplateArgs {
 
 impl TemplateArgs {
     pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
-        let args = PartialTemplateArgs::new(ast, &ast.attrs)?;
-        let Some(template) = args.template else {
-            return Err(CompileError::no_file_info(
+        Self::from_partial(ast, PartialTemplateArgs::new(ast, &ast.attrs)?)
+    }
+
+    pub(crate) fn from_partial(
+        ast: &syn::DeriveInput,
+        args: Option<PartialTemplateArgs>,
+    ) -> Result<Self, CompileError> {
+        let Some(args) = args else {
+            return Err(CompileError::new_with_span(
                 "no attribute `template` found",
                 None,
+                Some(ast.ident.span()),
             ));
         };
         Ok(Self {
@@ -313,7 +320,7 @@ impl TemplateArgs {
                         "specify one template argument `path` or `source`",
                         #[cfg(feature = "code-in-doc")]
                         "specify one template argument `path`, `source` or `in_doc`",
-                        Some(template.span()),
+                        Some(args.template.span()),
                     ));
                 }
             },
@@ -325,7 +332,7 @@ impl TemplateArgs {
             syntax: args.syntax.map(|value| value.value()),
             config: args.config.as_ref().map(|value| value.value()),
             whitespace: args.whitespace,
-            template_span: Some(template.span()),
+            template_span: Some(args.template.span()),
             config_span: args.config.as_ref().map(|value| value.span()),
         })
     }
@@ -638,9 +645,8 @@ pub(crate) fn get_template_source(
     )
 }
 
-#[derive(Default)]
 pub(crate) struct PartialTemplateArgs {
-    pub(crate) template: Option<Ident>,
+    pub(crate) template: Ident,
     pub(crate) source: Option<PartialTemplateArgsSource>,
     pub(crate) block: Option<LitStr>,
     pub(crate) print: Option<Print>,
@@ -665,7 +671,7 @@ const _: () = {
         pub(crate) fn new(
             ast: &syn::DeriveInput,
             attrs: &[Attribute],
-        ) -> Result<Self, CompileError> {
+        ) -> Result<Option<Self>, CompileError> {
             new(ast, attrs)
         }
     }
@@ -674,7 +680,7 @@ const _: () = {
     fn new(
         ast: &syn::DeriveInput,
         attrs: &[Attribute],
-    ) -> Result<PartialTemplateArgs, CompileError> {
+    ) -> Result<Option<PartialTemplateArgs>, CompileError> {
         // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
         if let syn::Data::Union(data) = &ast.data {
             return Err(CompileError::new_with_span(
@@ -687,13 +693,26 @@ const _: () = {
         #[cfg(feature = "code-in-doc")]
         let mut meta_docs = vec![];
 
-        let mut this = PartialTemplateArgs::default();
+        let mut this = PartialTemplateArgs {
+            template: Ident::new("template", Span::call_site()),
+            source: None,
+            block: None,
+            print: None,
+            escape: None,
+            ext: None,
+            syntax: None,
+            config: None,
+            whitespace: None,
+        };
+        let mut has_data = false;
+
         for attr in attrs {
             let Some(ident) = attr.path().get_ident() else {
                 continue;
             };
             if ident == "template" {
-                this.template = Some(ident.clone());
+                this.template = ident.clone();
+                has_data = true;
             } else {
                 #[cfg(feature = "code-in-doc")]
                 if ident == "doc" {
@@ -777,6 +796,9 @@ const _: () = {
                 }
             }
         }
+        if !has_data {
+            return Ok(None);
+        }
 
         #[cfg(feature = "code-in-doc")]
         if let Some(PartialTemplateArgsSource::InDoc(lit_span, _)) = this.source {
@@ -787,7 +809,7 @@ const _: () = {
             ));
         }
 
-        Ok(this)
+        Ok(Some(this))
     }
 
     fn set_strlit_pair(
