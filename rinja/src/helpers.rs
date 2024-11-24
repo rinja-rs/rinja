@@ -153,18 +153,18 @@ where
 ///
 /// ```
 /// # use std::cell::Cell;
-/// # use std::num::NonZeroI16;
+/// # use std::num::{NonZeroI16, Saturating};
 /// # use std::rc::Rc;
 /// # use std::pin::Pin;
 /// # use rinja::Template;
 /// #[derive(Template)]
 /// #[template(ext = "txt", source = "{{ value as u16 }}")]
 /// struct Test<'a> {
-///     value: &'a Pin<Rc<Cell<NonZeroI16>>>
+///     value: &'a Pin<Rc<Cell<Saturating<NonZeroI16>>>>
 /// }
 ///
 /// assert_eq!(
-///     Test { value: &Rc::pin(Cell::new(NonZeroI16::new(-1).unwrap())) }.to_string(),
+///     Test { value: &Rc::pin(Cell::new(Saturating(NonZeroI16::new(-1).unwrap()))) }.to_string(),
 ///     "65535",
 /// );
 /// ```
@@ -178,6 +178,15 @@ impl<T: PrimitiveType + Copy> PrimitiveType for Cell<T> {
 }
 
 impl<T: PrimitiveType> PrimitiveType for std::num::Wrapping<T> {
+    type Value = T::Value;
+
+    #[inline]
+    fn get(&self) -> Self::Value {
+        self.0.get()
+    }
+}
+
+impl<T: PrimitiveType> PrimitiveType for std::num::Saturating<T> {
     type Value = T::Value;
 
     #[inline]
