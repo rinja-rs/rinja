@@ -22,6 +22,7 @@ use config::{Config, read_config_file};
 use generator::template_to_string;
 use heritage::{Context, Heritage};
 use input::{Print, TemplateArgs, TemplateInput};
+use integration::Buffer;
 use parser::{Parsed, WithSpan, strip_common};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
@@ -126,16 +127,18 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
             return compile_error(msgs, Span::call_site()).into();
         }
     };
-    match build_template(&ast) {
-        Ok(source) => source.parse().unwrap(),
-        Err(CompileError { msg, span }) => {
-            let mut ts = compile_error(std::iter::once(msg), span.unwrap_or(ast.ident.span()));
-            if let Ok(source) = build_skeleton(&ast) {
-                let source: TokenStream = source.parse().unwrap();
-                ts.extend(source);
-            }
-            ts.into()
+
+    let mut buf = Buffer::new();
+    if let Err(CompileError { msg, span }) = build_template(&mut buf, &ast) {
+        let mut ts = compile_error(std::iter::once(msg), span.unwrap_or(ast.ident.span()));
+        buf.clear();
+        if build_skeleton(&mut buf, &ast).is_ok() {
+            let source: TokenStream = buf.into_string().parse().unwrap();
+            ts.extend(source);
         }
+        ts.into()
+    } else {
+        buf.into_string().parse().unwrap()
     }
 }
 
@@ -150,14 +153,14 @@ fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream 
     }
 }
 
-fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
+fn build_skeleton(buf: &mut Buffer, ast: &syn::DeriveInput) -> Result<usize, CompileError> {
     let template_args = TemplateArgs::fallback();
     let config = Config::new("", None, None, None)?;
     let input = TemplateInput::new(ast, config, &template_args)?;
     let mut contexts = HashMap::default();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
-    template_to_string(&input, &contexts, None)
+    template_to_string(buf, &input, &contexts, None, None)
 }
 
 /// Takes a `syn::DeriveInput` and generates source code for it
@@ -167,9 +170,12 @@ fn build_skeleton(ast: &syn::DeriveInput) -> Result<String, CompileError> {
 /// parsed, and the parse tree is fed to the code generator. Will print
 /// the parse tree and/or generated source according to the `print` key's
 /// value as passed to the `template()` attribute.
-pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileError> {
+pub(crate) fn build_template(
+    buf: &mut Buffer,
+    ast: &syn::DeriveInput,
+) -> Result<usize, CompileError> {
     let template_args = TemplateArgs::new(ast)?;
-    let mut result = build_template_inner(ast, &template_args);
+    let mut result = build_template_item(buf, ast, &template_args, None);
     if let Err(err) = &mut result {
         if err.span.is_none() {
             err.span = template_args.source.1.or(template_args.template_span);
@@ -178,10 +184,12 @@ pub(crate) fn build_template(ast: &syn::DeriveInput) -> Result<String, CompileEr
     result
 }
 
-fn build_template_inner(
+fn build_template_item(
+    buf: &mut Buffer,
     ast: &syn::DeriveInput,
     template_args: &TemplateArgs,
-) -> Result<String, CompileError> {
+    target: Option<&str>,
+) -> Result<usize, CompileError> {
     let config_path = template_args.config_path();
     let s = read_config_file(config_path, template_args.config_span)?;
     let config = Config::new(
@@ -222,11 +230,12 @@ fn build_template_inner(
         eprintln!("{:?}", templates[&input.path].nodes());
     }
 
-    let code = template_to_string(&input, &contexts, heritage.as_ref())?;
+    let mark = buf.get_mark();
+    let size_hint = template_to_string(buf, &input, &contexts, heritage.as_ref(), target)?;
     if input.print == Print::Code || input.print == Print::All {
-        eprintln!("{code}");
+        eprintln!("{}", buf.marked_text(mark));
     }
-    Ok(code)
+    Ok(size_hint)
 }
 
 #[derive(Debug, Clone)]

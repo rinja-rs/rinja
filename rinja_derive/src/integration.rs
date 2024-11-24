@@ -4,20 +4,18 @@ use quote::quote;
 use syn::DeriveInput;
 
 /// Implement every integration for the given item
-pub(crate) fn impl_everything(ast: &DeriveInput, buf: &mut Buffer, only_template: bool) {
+pub(crate) fn impl_everything(ast: &DeriveInput, buf: &mut Buffer) {
     impl_display(ast, buf);
     impl_fast_writable(ast, buf);
 
-    if !only_template {
-        #[cfg(feature = "with-actix-web")]
-        impl_actix_web_responder(ast, buf);
-        #[cfg(feature = "with-axum")]
-        impl_axum_into_response(ast, buf);
-        #[cfg(feature = "with-rocket")]
-        impl_rocket_responder(ast, buf);
-        #[cfg(feature = "with-warp")]
-        impl_warp_reply(ast, buf);
-    }
+    #[cfg(feature = "with-actix-web")]
+    impl_actix_web_responder(ast, buf);
+    #[cfg(feature = "with-axum")]
+    impl_axum_into_response(ast, buf);
+    #[cfg(feature = "with-rocket")]
+    impl_rocket_responder(ast, buf);
+    #[cfg(feature = "with-warp")]
+    impl_warp_reply(ast, buf);
 }
 
 /// Writes header for the `impl` for `TraitFromPathName` or `Template` for the given item
@@ -257,6 +255,14 @@ impl Buffer {
     pub(crate) fn clear(&mut self) {
         self.buf.clear();
         self.last_was_write_str = false;
+    }
+
+    pub(crate) fn get_mark(&mut self) -> usize {
+        self.buf.len()
+    }
+
+    pub(crate) fn marked_text(&self, mark: usize) -> &str {
+        &self.buf[..mark]
     }
 }
 

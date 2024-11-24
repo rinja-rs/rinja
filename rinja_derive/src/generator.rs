@@ -22,22 +22,12 @@ use crate::integration::{Buffer, impl_everything, write_header};
 use crate::{BUILT_IN_FILTERS, CRATE, CompileError, FileInfo, MsgValidEscapers};
 
 pub(crate) fn template_to_string(
-    input: &TemplateInput<'_>,
-    contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
-    heritage: Option<&Heritage<'_, '_>>,
-) -> Result<String, CompileError> {
-    let mut buf = Buffer::new();
-    template_into_buffer(input, contexts, heritage, &mut buf, false)?;
-    Ok(buf.into_string())
-}
-
-pub(crate) fn template_into_buffer(
-    input: &TemplateInput<'_>,
-    contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
-    heritage: Option<&Heritage<'_, '_>>,
     buf: &mut Buffer,
-    only_template: bool,
-) -> Result<(), CompileError> {
+    input: &TemplateInput<'_>,
+    contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
+    heritage: Option<&Heritage<'_, '_>>,
+    target: Option<&str>,
+) -> Result<usize, CompileError> {
     let ctx = &contexts[&input.path];
     let generator = Generator::new(
         input,
@@ -47,7 +37,7 @@ pub(crate) fn template_into_buffer(
         input.block.is_some(),
         0,
     );
-    let mut result = generator.build(ctx, buf, only_template);
+    let mut result = generator.build(ctx, buf, target);
     if let Err(err) = &mut result {
         if err.span.is_none() {
             err.span = input.source_span;
@@ -110,24 +100,19 @@ impl<'a, 'h> Generator<'a, 'h> {
         mut self,
         ctx: &Context<'a>,
         buf: &mut Buffer,
-        only_template: bool,
-    ) -> Result<(), CompileError> {
-        if !only_template {
+        target: Option<&str>,
+    ) -> Result<usize, CompileError> {
+        if target.is_none() {
             buf.write(format_args!(
-                "\
-                const _: () = {{\
-                    extern crate {CRATE} as rinja;\
-                "
+                "const _: () = {{ extern crate {CRATE} as rinja;"
             ));
         }
-
-        self.impl_template(ctx, buf)?;
-        impl_everything(self.input.ast, buf, only_template);
-
-        if !only_template {
+        let size_hint = self.impl_template(ctx, buf, target.unwrap_or("rinja::Template"))?;
+        if target.is_none() {
+            impl_everything(self.input.ast, buf);
             buf.write("};");
         }
-        Ok(())
+        Ok(size_hint)
     }
 
     fn push_locals<T, F>(&mut self, callback: F) -> Result<T, CompileError>
@@ -178,8 +163,9 @@ impl<'a, 'h> Generator<'a, 'h> {
         &mut self,
         ctx: &Context<'a>,
         buf: &mut Buffer,
+        target: &str,
     ) -> Result<usize, CompileError> {
-        write_header(self.input.ast, buf, "rinja::Template", None);
+        write_header(self.input.ast, buf, target, None);
         buf.write(
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
             where \
@@ -189,7 +175,6 @@ impl<'a, 'h> Generator<'a, 'h> {
                 use rinja::helpers::core::fmt::Write as _;",
         );
 
-        buf.set_discard(self.buf_writable.discard);
         // Make sure the compiler understands that the generated code depends on the template files.
         let mut paths = self
             .contexts
@@ -212,14 +197,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             }
         }
 
-        let size_hint = if let Some(heritage) = self.heritage {
-            self.handle(heritage.root, heritage.root.nodes, buf, AstLevel::Top)
-        } else {
-            self.handle(ctx, ctx.nodes, buf, AstLevel::Top)
-        }?;
-        buf.set_discard(false);
-
-        self.flush_ws(Ws(None, None));
+        let size_hint = self.impl_template_inner(ctx, buf)?;
 
         buf.write(format_args!(
             "\
@@ -231,6 +209,22 @@ impl<'a, 'h> Generator<'a, 'h> {
         ));
 
         buf.write('}');
+        Ok(size_hint)
+    }
+
+    fn impl_template_inner(
+        &mut self,
+        ctx: &Context<'a>,
+        buf: &mut Buffer,
+    ) -> Result<usize, CompileError> {
+        buf.set_discard(self.buf_writable.discard);
+        let size_hint = if let Some(heritage) = self.heritage {
+            self.handle(heritage.root, heritage.root.nodes, buf, AstLevel::Top)
+        } else {
+            self.handle(ctx, ctx.nodes, buf, AstLevel::Top)
+        }?;
+        self.flush_ws(Ws(None, None));
+        buf.set_discard(false);
         Ok(size_hint)
     }
 
