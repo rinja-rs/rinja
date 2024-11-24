@@ -2311,6 +2311,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             }
             Target::Path(path) => {
                 self.visit_path(buf, path);
+                buf.write("{}");
             }
             Target::StrLit(s) => {
                 if first_level {
