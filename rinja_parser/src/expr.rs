@@ -10,9 +10,9 @@ use winnow::combinator::{
 use winnow::error::{ErrorKind, ParserError as _};
 
 use crate::{
-    CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, StrLit, WithSpan,
-    char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0, skip_ws1,
-    str_lit, ws,
+    CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
+    WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
+    skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -217,14 +217,14 @@ impl<'a> Expr<'a> {
         allow_underscore: bool,
     ) -> ParseResult<'a, WithSpan<'a, Self>> {
         let (_, level) = level.nest(i)?;
-        let start = i;
+        let start = Span::from(i);
         let range_right =
             move |i| (ws(alt(("..=", ".."))), opt(move |i| Self::or(i, level))).parse_next(i);
         let (i, expr) = alt((
-            range_right.map(|(op, right)| {
+            range_right.map(move |(op, right)| {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
             }),
-            (move |i| Self::or(i, level), opt(range_right)).map(|(left, right)| match right {
+            (move |i| Self::or(i, level), opt(range_right)).map(move |(left, right)| match right {
                 Some((op, right)) => WithSpan::new(
                     Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
                     start,

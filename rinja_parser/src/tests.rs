@@ -1,9 +1,14 @@
 use crate::node::{Lit, Whitespace, Ws};
-use crate::{Ast, Expr, Filter, InnerSyntax, Node, Num, StrLit, Syntax, SyntaxBuilder, WithSpan};
+use crate::{
+    Ast, Expr, Filter, InnerSyntax, Node, Num, Span, StrLit, Syntax, SyntaxBuilder, WithSpan,
+};
 
 impl<T> WithSpan<'static, T> {
     fn no_span(inner: T) -> Self {
-        Self { inner, span: "" }
+        Self {
+            inner,
+            span: Span::default(),
+        }
     }
 }
 
@@ -1121,4 +1126,13 @@ fn extends_with_whitespace_control() {
             assert_eq!(expected.nodes(), actual.nodes(), "source: {:?}", src);
         }
     }
+}
+
+#[test]
+fn fuzzed_span_is_not_substring_of_source() {
+    let _: Result<Ast<'_>, crate::ParseError> = Ast::from_str(
+        include_str!("../tests/fuzzed_span_is_not_substring_of_source.bin"),
+        None,
+        &Syntax::default(),
+    );
 }

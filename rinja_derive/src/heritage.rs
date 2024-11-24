@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use parser::node::{BlockDef, Macro};
-use parser::{Node, Parsed, WithSpan};
+use parser::{Node, Parsed, Span};
 use rustc_hash::FxBuildHasher;
 
 use crate::config::Config;
@@ -80,29 +80,29 @@ impl Context<'_> {
             for n in nodes {
                 match n {
                     Node::Extends(e) => {
-                        ensure_top(top, e, path, parsed, "extends")?;
+                        ensure_top(top, e.span(), path, parsed, "extends")?;
                         if extends.is_some() {
                             return Err(CompileError::new(
                                 "multiple extend blocks found",
-                                Some(FileInfo::of(e, path, parsed)),
+                                Some(FileInfo::of(e.span(), path, parsed)),
                             ));
                         }
                         extends = Some(config.find_template(
                             e.path,
                             Some(path),
-                            Some(FileInfo::of(e, path, parsed)),
+                            Some(FileInfo::of(e.span(), path, parsed)),
                         )?);
                     }
                     Node::Macro(m) => {
-                        ensure_top(top, m, path, parsed, "macro")?;
+                        ensure_top(top, m.span(), path, parsed, "macro")?;
                         macros.insert(m.name, &**m);
                     }
                     Node::Import(import) => {
-                        ensure_top(top, import, path, parsed, "import")?;
+                        ensure_top(top, import.span(), path, parsed, "import")?;
                         let path = config.find_template(
                             import.path,
                             Some(path),
-                            Some(FileInfo::of(import, path, parsed)),
+                            Some(FileInfo::of(import.span(), path, parsed)),
                         )?;
                         imports.insert(import.scope, path);
                     }
@@ -141,11 +141,7 @@ impl Context<'_> {
         })
     }
 
-    pub(crate) fn generate_error<T>(
-        &self,
-        msg: impl fmt::Display,
-        node: &WithSpan<'_, T>,
-    ) -> CompileError {
+    pub(crate) fn generate_error(&self, msg: impl fmt::Display, node: Span<'_>) -> CompileError {
         CompileError::new(
             msg,
             self.path.map(|path| FileInfo::of(node, path, self.parsed)),
@@ -153,9 +149,9 @@ impl Context<'_> {
     }
 }
 
-fn ensure_top<T>(
+fn ensure_top(
     top: bool,
-    node: &WithSpan<'_, T>,
+    node: Span<'_>,
     path: &Path,
     parsed: &Parsed,
     kind: &str,

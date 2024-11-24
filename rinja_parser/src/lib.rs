@@ -114,11 +114,11 @@ impl<'a> Ast<'a> {
             Ok(("", nodes)) => Ok(Self { nodes }),
             Ok(_) | Err(winnow::error::ErrMode::Incomplete(_)) => unreachable!(),
             Err(
-                winnow::error::ErrMode::Backtrack(ErrorContext { input, message, .. })
-                | winnow::error::ErrMode::Cut(ErrorContext { input, message, .. }),
+                winnow::error::ErrMode::Backtrack(ErrorContext { span, message, .. })
+                | winnow::error::ErrMode::Cut(ErrorContext { span, message, .. }),
             ) => Err(ParseError {
                 message,
-                offset: src.len() - input.len(),
+                offset: span.offset_from(src).unwrap_or_default(),
                 file_path,
             }),
         }
@@ -134,19 +134,76 @@ impl<'a> Ast<'a> {
 /// in the code generation.
 pub struct WithSpan<'a, T> {
     inner: T,
-    span: &'a str,
+    span: Span<'a>,
+}
+
+/// An location in `&'a str`
+#[derive(Debug, Clone, Copy)]
+pub struct Span<'a>(&'a [u8; 0]);
+
+impl Default for Span<'static> {
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<'a> Span<'a> {
+    #[inline]
+    pub const fn empty() -> Self {
+        Self(&[])
+    }
+
+    pub fn offset_from(self, start: &'a str) -> Option<usize> {
+        let start_range = start.as_bytes().as_ptr_range();
+        let this_ptr = self.0.as_slice().as_ptr();
+        match start_range.contains(&this_ptr) {
+            // SAFETY: we just checked that `this_ptr` is inside `start_range`
+            true => Some(unsafe { this_ptr.offset_from(start_range.start) as usize }),
+            false => None,
+        }
+    }
+
+    pub fn as_suffix_of(self, start: &'a str) -> Option<&'a str> {
+        let offset = self.offset_from(start)?;
+        match start.is_char_boundary(offset) {
+            true => Some(&start[offset..]),
+            false => None,
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Span<'a> {
+    #[inline]
+    fn from(value: &'a str) -> Self {
+        Self(value[..0].as_bytes().try_into().unwrap())
+    }
 }
 
 impl<'a, T> WithSpan<'a, T> {
-    pub const fn new(inner: T, span: &'a str) -> Self {
-        Self { inner, span }
+    #[inline]
+    pub fn new(inner: T, span: impl Into<Span<'a>>) -> Self {
+        Self {
+            inner,
+            span: span.into(),
+        }
     }
 
-    pub fn span(&self) -> &'a str {
+    #[inline]
+    pub const fn new_without_span(inner: T) -> Self {
+        Self {
+            inner,
+            span: Span::empty(),
+        }
+    }
+
+    #[inline]
+    pub fn span(&self) -> Span<'a> {
         self.span
     }
 
-    pub fn deconstruct(self) -> (T, &'a str) {
+    #[inline]
+    pub fn deconstruct(self) -> (T, Span<'a>) {
         let Self { inner, span } = self;
         (inner, span)
     }
@@ -229,18 +286,18 @@ pub(crate) type ParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>
 /// `rinja`'s users experience less good (since this generic is only needed for `nom`).
 #[derive(Debug)]
 pub(crate) struct ErrorContext<'a> {
-    pub(crate) input: &'a str,
+    pub(crate) span: Span<'a>,
     pub(crate) message: Option<Cow<'static, str>>,
 }
 
 impl<'a> ErrorContext<'a> {
-    fn unclosed(kind: &str, tag: &str, i: &'a str) -> Self {
-        Self::new(format!("unclosed {kind}, missing {tag:?}"), i)
+    fn unclosed(kind: &str, tag: &str, span: impl Into<Span<'a>>) -> Self {
+        Self::new(format!("unclosed {kind}, missing {tag:?}"), span)
     }
 
-    fn new(message: impl Into<Cow<'static, str>>, input: &'a str) -> Self {
+    fn new(message: impl Into<Cow<'static, str>>, span: impl Into<Span<'a>>) -> Self {
         Self {
-            input,
+            span: span.into(),
             message: Some(message.into()),
         }
     }
@@ -249,7 +306,7 @@ impl<'a> ErrorContext<'a> {
 impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
     fn from_error_kind(input: &'a str, _code: ErrorKind) -> Self {
         Self {
-            input,
+            span: input.into(),
             message: None,
         }
     }
@@ -262,7 +319,7 @@ impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
 impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a> {
     fn from_external_error(input: &'a str, _kind: ErrorKind, e: E) -> Self {
         Self {
-            input,
+            span: input.into(),
             message: Some(Cow::Owned(e.to_string())),
         }
     }
@@ -1212,4 +1269,12 @@ mod test {
         );
         assert!(str_lit.parse_next(r#"d"hello""#).is_err());
     }
+}
+
+#[test]
+fn assert_span_size() {
+    assert_eq!(
+        std::mem::size_of::<Span<'static>>(),
+        std::mem::size_of::<*const ()>()
+    );
 }

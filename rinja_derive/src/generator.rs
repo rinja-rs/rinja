@@ -10,8 +10,8 @@ use parser::node::{
     Whitespace, Ws,
 };
 use parser::{
-    CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, StrLit, StrPrefix, Target,
-    WithSpan,
+    CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, Span, StrLit, StrPrefix,
+    Target, WithSpan,
 };
 use rustc_hash::FxBuildHasher;
 
@@ -263,7 +263,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                 }
                 Node::BlockDef(ref b) => {
                     size_hint +=
-                        self.write_block(ctx, buf, Some(b.name), Ws(b.ws1.0, b.ws2.1), b)?;
+                        self.write_block(ctx, buf, Some(b.name), Ws(b.ws1.0, b.ws2.1), b.span())?;
                 }
                 Node::Include(ref i) => {
                     size_hint += self.handle_include(ctx, buf, i)?;
@@ -276,9 +276,10 @@ impl<'a, 'h> Generator<'a, 'h> {
                 }
                 Node::Macro(ref m) => {
                     if level != AstLevel::Top {
-                        return Err(
-                            ctx.generate_error("macro blocks only allowed at the top level", m)
-                        );
+                        return Err(ctx.generate_error(
+                            "macro blocks only allowed at the top level",
+                            m.span(),
+                        ));
                     }
                     self.flush_ws(m.ws1);
                     self.prepare_ws(m.ws2);
@@ -290,17 +291,19 @@ impl<'a, 'h> Generator<'a, 'h> {
                 }
                 Node::Import(ref i) => {
                     if level != AstLevel::Top {
-                        return Err(
-                            ctx.generate_error("import blocks only allowed at the top level", i)
-                        );
+                        return Err(ctx.generate_error(
+                            "import blocks only allowed at the top level",
+                            i.span(),
+                        ));
                     }
                     self.handle_ws(i.ws);
                 }
                 Node::Extends(ref e) => {
                     if level != AstLevel::Top {
-                        return Err(
-                            ctx.generate_error("extend blocks only allowed at the top level", e)
-                        );
+                        return Err(ctx.generate_error(
+                            "extend blocks only allowed at the top level",
+                            e.span(),
+                        ));
                     }
                     // No whitespace handling: child template top-level is not used,
                     // except for the blocks defined in it.
@@ -746,26 +749,26 @@ impl<'a, 'h> Generator<'a, 'h> {
             ref args,
         } = **call;
         if name == "super" {
-            return self.write_block(ctx, buf, None, ws, call);
+            return self.write_block(ctx, buf, None, ws, call.span());
         }
 
         let (def, own_ctx) = if let Some(s) = scope {
             let path = ctx.imports.get(s).ok_or_else(|| {
-                ctx.generate_error(format_args!("no import found for scope {s:?}"), call)
+                ctx.generate_error(format_args!("no import found for scope {s:?}"), call.span())
             })?;
             let mctx = self.contexts.get(path).ok_or_else(|| {
-                ctx.generate_error(format_args!("context for {path:?} not found"), call)
+                ctx.generate_error(format_args!("context for {path:?} not found"), call.span())
             })?;
             let def = mctx.macros.get(name).ok_or_else(|| {
                 ctx.generate_error(
                     format_args!("macro {name:?} not found in scope {s:?}"),
-                    call,
+                    call.span(),
                 )
             })?;
             (def, mctx)
         } else {
             let def = ctx.macros.get(name).ok_or_else(|| {
-                ctx.generate_error(format_args!("macro {name:?} not found"), call)
+                ctx.generate_error(format_args!("macro {name:?} not found"), call.span())
             })?;
             (def, ctx)
         };
@@ -790,7 +793,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                     if !def.args.iter().any(|(arg, _)| arg == arg_name) {
                         return Err(ctx.generate_error(
                             format_args!("no argument named `{arg_name}` in macro {name:?}"),
-                            call,
+                            call.span(),
                         ));
                     }
                     named_arguments.insert(arg_name, (index, arg));
@@ -824,7 +827,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                                         "cannot have unnamed argument (`{arg}`) after named argument \
                                          in call to macro {name:?}"
                                     ),
-                                    call,
+                                    call.span(),
                                 ));
                             }
                             arg_expr
@@ -833,14 +836,14 @@ impl<'a, 'h> Generator<'a, 'h> {
                             let Expr::NamedArgument(name, _) = **arg_expr else { unreachable!() };
                             return Err(ctx.generate_error(
                                 format_args!("`{name}` is passed more than once"),
-                                call,
+                                call.span(),
                             ));
                         }
                         _ => {
                             if let Some(default_value) = default_value {
                                 default_value
                             } else {
-                                return Err(ctx.generate_error(format_args!("missing `{arg}` argument"), call));
+                                return Err(ctx.generate_error(format_args!("missing `{arg}` argument"), call.span()));
                             }
                         }
                     }
@@ -932,7 +935,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             &mut filter_buf,
             filter.filters.name,
             &filter.filters.arguments,
-            filter,
+            filter.span(),
         )?;
         let filter_buf = match display_wrap {
             DisplayWrap::Wrapped => filter_buf.into_string(),
@@ -961,7 +964,9 @@ impl<'a, 'h> Generator<'a, 'h> {
     ) -> Result<usize, CompileError> {
         self.flush_ws(i.ws);
         self.write_buf_writable(ctx, buf)?;
-        let file_info = ctx.path.map(|path| FileInfo::of(i, path, ctx.parsed));
+        let file_info = ctx
+            .path
+            .map(|path| FileInfo::of(i.span(), path, ctx.parsed));
         let path = self
             .input
             .config
@@ -1006,11 +1011,11 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(size_hint)
     }
 
-    fn is_shadowing_variable<T>(
+    fn is_shadowing_variable(
         &self,
         ctx: &Context<'_>,
         var: &Target<'a>,
-        l: &WithSpan<'_, T>,
+        l: Span<'_>,
     ) -> Result<bool, CompileError> {
         match var {
             Target::Name(name) => {
@@ -1078,7 +1083,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         let mut expr_buf = Buffer::new();
         self.visit_expr(ctx, &mut expr_buf, val)?;
 
-        let shadowed = self.is_shadowing_variable(ctx, &l.var, l)?;
+        let shadowed = self.is_shadowing_variable(ctx, &l.var, l.span())?;
         if shadowed {
             // Need to flush the buffer if the variable is being shadowed,
             // to ensure the old variable is used.
@@ -1104,13 +1109,13 @@ impl<'a, 'h> Generator<'a, 'h> {
     // If `name` is `Some`, this is a call to a block definition, and we have to find
     // the first block for that name from the ancestry chain. If name is `None`, this
     // is from a `super()` call, and we can get the name from `self.super_block`.
-    fn write_block<T>(
+    fn write_block(
         &mut self,
         ctx: &Context<'a>,
         buf: &mut Buffer,
         name: Option<&'a str>,
         outer: Ws,
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<usize, CompileError> {
         if self.is_in_filter_block > 0 {
             return Err(ctx.generate_error("cannot have a block inside a filter block", node));
@@ -1384,7 +1389,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             Expr::Filter(Filter {
                 name,
                 ref arguments,
-            }) => self.visit_filter(ctx, buf, name, arguments, expr)?,
+            }) => self.visit_filter(ctx, buf, name, arguments, expr.span())?,
             Expr::Unary(op, ref inner) => self.visit_unary(ctx, buf, op, inner)?,
             Expr::BinOp(op, ref left, ref right) => self.visit_binop(ctx, buf, op, left, right)?,
             Expr::Range(op, ref left, ref right) => {
@@ -1507,13 +1512,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         DisplayWrap::Unwrapped
     }
 
-    fn visit_filter<T>(
+    fn visit_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let filter = match name {
             "deref" => Self::_visit_deref_filter,
@@ -1534,13 +1539,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         filter(self, ctx, buf, name, args, node)
     }
 
-    fn _visit_custom_filter<T>(
+    fn _visit_custom_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        _node: &WithSpan<'_, T>,
+        _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write(format_args!("filters::{name}("));
         self._visit_args(ctx, buf, args)?;
@@ -1548,13 +1553,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_builtin_filter<T>(
+    fn _visit_builtin_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        _node: &WithSpan<'_, T>,
+        _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write(format_args!("rinja::filters::{name}("));
         self._visit_args(ctx, buf, args)?;
@@ -1562,13 +1567,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_urlencode<T>(
+    fn _visit_urlencode(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "urlencode")) {
             return Err(ctx.generate_error(
@@ -1586,13 +1591,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_humansize<T>(
+    fn _visit_humansize(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        _node: &WithSpan<'_, T>,
+        _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         // All filters return numbers, and any default formatted number is HTML safe.
         buf.write(format_args!(
@@ -1604,28 +1609,24 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_pluralize_filter<T>(
+    fn _visit_pluralize_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        const SINGULAR: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
-            Expr::StrLit(StrLit {
+        const SINGULAR: &WithSpan<'static, Expr<'static>> =
+            &WithSpan::new_without_span(Expr::StrLit(StrLit {
                 prefix: None,
                 content: "",
-            }),
-            "",
-        );
-        const PLURAL: &WithSpan<'static, Expr<'static>> = &WithSpan::new(
-            Expr::StrLit(StrLit {
+            }));
+        const PLURAL: &WithSpan<'static, Expr<'static>> =
+            &WithSpan::new_without_span(Expr::StrLit(StrLit {
                 prefix: None,
                 content: "s",
-            }),
-            "",
-        );
+            }));
 
         let (count, sg, pl) = match args {
             [count] => (count, SINGULAR, PLURAL),
@@ -1652,13 +1653,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Wrapped)
     }
 
-    fn _visit_linebreaks_filter<T>(
+    fn _visit_linebreaks_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if args.len() != 1 {
             return Err(ctx.generate_error(
@@ -1676,13 +1677,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_ref_filter<T>(
+    fn _visit_ref_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let arg = match args {
             [arg] => arg,
@@ -1693,13 +1694,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_deref_filter<T>(
+    fn _visit_deref_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let arg = match args {
             [arg] => arg,
@@ -1710,13 +1711,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_json_filter<T>(
+    fn _visit_json_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "serde_json")) {
             return Err(ctx.generate_error(
@@ -1737,13 +1738,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_safe_filter<T>(
+    fn _visit_safe_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if args.len() != 1 {
             return Err(ctx.generate_error("unexpected argument(s) in `safe` filter", node));
@@ -1754,13 +1755,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Wrapped)
     }
 
-    fn _visit_escape_filter<T>(
+    fn _visit_escape_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if args.len() > 2 {
             return Err(ctx.generate_error("only two arguments allowed to escape filter", node));
@@ -1777,7 +1778,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                         format_args!(
                             "invalid escaper `b{content:?}`. Expected a string, found a {kind}"
                         ),
-                        &args[1],
+                        args[1].span(),
                     ));
                 }
                 Some(content)
@@ -1815,13 +1816,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Ok(DisplayWrap::Wrapped)
     }
 
-    fn _visit_format_filter<T>(
+    fn _visit_format_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if !args.is_empty() {
             if let Expr::StrLit(ref fmt) = *args[0] {
@@ -1838,13 +1839,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         Err(ctx.generate_error(r#"use filter format like `"a={} b={}"|format(a, b)`"#, node))
     }
 
-    fn _visit_fmt_filter<T>(
+    fn _visit_fmt_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        node: &WithSpan<'_, T>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if let [_, arg2] = args {
             if let Expr::StrLit(ref fmt) = **arg2 {
@@ -1860,13 +1861,13 @@ impl<'a, 'h> Generator<'a, 'h> {
     }
 
     // Force type coercion on first argument to `join` filter (see #39).
-    fn _visit_join_filter<T>(
+    fn _visit_join_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        _node: &WithSpan<'_, T>,
+        _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write("rinja::filters::join((&");
         for (i, arg) in args.iter().enumerate() {
@@ -1986,7 +1987,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                     buf.write("_loop_item.last");
                     return Ok(DisplayWrap::Unwrapped);
                 } else {
-                    return Err(ctx.generate_error("unknown loop variable", obj));
+                    return Err(ctx.generate_error("unknown loop variable", obj.span()));
                 }
             }
         }
@@ -2022,9 +2023,10 @@ impl<'a, 'h> Generator<'a, 'h> {
                 "cycle" => match args {
                     [arg] => {
                         if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
-                            return Err(
-                                ctx.generate_error("loop.cycle(…) cannot use an empty array", arg)
-                            );
+                            return Err(ctx.generate_error(
+                                "loop.cycle(…) cannot use an empty array",
+                                arg.span(),
+                            ));
                         }
                         buf.write(
                             "\
@@ -2044,14 +2046,15 @@ impl<'a, 'h> Generator<'a, 'h> {
                         );
                     }
                     _ => {
-                        return Err(
-                            ctx.generate_error("loop.cycle(…) cannot use an empty array", left)
-                        );
+                        return Err(ctx.generate_error(
+                            "loop.cycle(…) cannot use an empty array",
+                            left.span(),
+                        ));
                     }
                 },
                 s => {
                     return Err(
-                        ctx.generate_error(format_args!("unknown loop method: {s:?}"), left)
+                        ctx.generate_error(format_args!("unknown loop method: {s:?}"), left.span())
                     );
                 }
             },
@@ -2421,7 +2424,7 @@ fn macro_call_ensure_arg_count(
             if expected_args != 1 { "s" } else { "" },
             call.args.len(),
         ),
-        call,
+        call.span(),
     ))
 }
 
