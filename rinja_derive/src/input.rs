@@ -309,7 +309,7 @@ impl TemplateArgs {
         Ok(Self {
             source: match args.source {
                 Some(PartialTemplateArgsSource::Path(s)) => {
-                    (Source::Path(s.value()), Some(s.span()))
+                    (Source::Path(s.value().into()), Some(s.span()))
                 }
                 Some(PartialTemplateArgsSource::Source(s)) => {
                     (Source::Source(s.value().into()), Some(s.span()))
@@ -547,9 +547,9 @@ fn extension(path: &Path) -> Option<&str> {
     }
 }
 
-#[derive(Debug, Hash, PartialEq)]
+#[derive(Debug, Clone, Hash, PartialEq)]
 pub(crate) enum Source {
-    Path(String),
+    Path(Arc<str>),
     Source(Arc<str>),
 }
 
