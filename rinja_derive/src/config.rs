@@ -307,7 +307,7 @@ impl RawConfig<'_> {
     }
 }
 
-#[cfg_attr(feature = "config", derive(Deserialize))]
+#[cfg_attr(feature = "config", derive(serde::Deserialize))]
 struct General<'a> {
     #[cfg_attr(feature = "config", serde(borrow))]
     dirs: Option<Vec<&'a str>>,
