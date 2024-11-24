@@ -757,20 +757,22 @@ impl<'a, 'h> Generator<'a, 'h> {
 
         let (def, own_ctx) = if let Some(s) = scope {
             let path = ctx.imports.get(s).ok_or_else(|| {
-                ctx.generate_error(&format!("no import found for scope {s:?}"), call)
+                ctx.generate_error(format_args!("no import found for scope {s:?}"), call)
             })?;
             let mctx = self.contexts.get(path).ok_or_else(|| {
-                ctx.generate_error(&format!("context for {path:?} not found"), call)
+                ctx.generate_error(format_args!("context for {path:?} not found"), call)
             })?;
             let def = mctx.macros.get(name).ok_or_else(|| {
-                ctx.generate_error(&format!("macro {name:?} not found in scope {s:?}"), call)
+                ctx.generate_error(
+                    format_args!("macro {name:?} not found in scope {s:?}"),
+                    call,
+                )
             })?;
             (def, mctx)
         } else {
-            let def = ctx
-                .macros
-                .get(name)
-                .ok_or_else(|| ctx.generate_error(&format!("macro {name:?} not found"), call))?;
+            let def = ctx.macros.get(name).ok_or_else(|| {
+                ctx.generate_error(format_args!("macro {name:?} not found"), call)
+            })?;
             (def, ctx)
         };
 
@@ -793,7 +795,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                     };
                     if !def.args.iter().any(|(arg, _)| arg == arg_name) {
                         return Err(ctx.generate_error(
-                            &format!("no argument named `{arg_name}` in macro {name:?}"),
+                            format_args!("no argument named `{arg_name}` in macro {name:?}"),
                             call,
                         ));
                     }
@@ -824,7 +826,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                             // to use unnamed ones at this point anymore.
                             if !allow_positional {
                                 return Err(ctx.generate_error(
-                                    &format!(
+                                    format_args!(
                                         "cannot have unnamed argument (`{arg}`) after named argument \
                                          in call to macro {name:?}"
                                     ),
@@ -836,7 +838,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                         Some(arg_expr) if used_named_args[index] => {
                             let Expr::NamedArgument(name, _) = **arg_expr else { unreachable!() };
                             return Err(ctx.generate_error(
-                                &format!("`{name}` is passed more than once"),
+                                format_args!("`{name}` is passed more than once"),
                                 call,
                             ));
                         }
@@ -844,7 +846,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                             if let Some(default_value) = default_value {
                                 default_value
                             } else {
-                                return Err(ctx.generate_error(&format!("missing `{arg}` argument"), call));
+                                return Err(ctx.generate_error(format_args!("missing `{arg}` argument"), call));
                             }
                         }
                     }
@@ -1128,7 +1130,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             // A block definition contains a block definition of the same name
             (Some(cur_name), Some((prev_name, _))) if cur_name == prev_name => {
                 return Err(ctx.generate_error(
-                    &format!("cannot define recursive blocks ({cur_name})"),
+                    format_args!("cannot define recursive blocks ({cur_name})"),
                     node,
                 ));
             }
@@ -1576,7 +1578,7 @@ impl<'a, 'h> Generator<'a, 'h> {
     ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "urlencode")) {
             return Err(ctx.generate_error(
-                &format!("the `{name}` filter requires the `urlencode` feature to be enabled"),
+                format_args!("the `{name}` filter requires the `urlencode` feature to be enabled"),
                 node,
             ));
         }
@@ -1665,9 +1667,10 @@ impl<'a, 'h> Generator<'a, 'h> {
         node: &WithSpan<'_, T>,
     ) -> Result<DisplayWrap, CompileError> {
         if args.len() != 1 {
-            return Err(
-                ctx.generate_error(&format!("unexpected argument(s) in `{name}` filter"), node)
-            );
+            return Err(ctx.generate_error(
+                format_args!("unexpected argument(s) in `{name}` filter"),
+                node,
+            ));
         }
         buf.write(format_args!(
             "rinja::filters::{name}(&(&&rinja::filters::AutoEscaper::new(&(",
@@ -1777,7 +1780,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                         "CStr"
                     };
                     return Err(ctx.generate_error(
-                        &format!(
+                        format_args!(
                             "invalid escaper `b{content:?}`. Expected a string, found a {kind}"
                         ),
                         &args[1],
@@ -1803,7 +1806,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                 })
                 .ok_or_else(|| {
                     ctx.generate_error(
-                        &format!(
+                        format_args!(
                             "invalid escaper '{name}' for `escape` filter. {}",
                             MsgValidEscapers(&self.input.config.escapers),
                         ),
@@ -2052,7 +2055,11 @@ impl<'a, 'h> Generator<'a, 'h> {
                         );
                     }
                 },
-                s => return Err(ctx.generate_error(&format!("unknown loop method: {s:?}"), left)),
+                s => {
+                    return Err(
+                        ctx.generate_error(format_args!("unknown loop method: {s:?}"), left)
+                    );
+                }
             },
             sub_left => {
                 match sub_left {
@@ -2413,7 +2420,7 @@ fn macro_call_ensure_arg_count(
         _ => (nb_default_args, "at least "),
     };
     Err(ctx.generate_error(
-        &format!(
+        format_args!(
             "macro {:?} expected {extra}{expected_args} argument{}, found {}",
             def.name,
             if expected_args != 1 { "s" } else { "" },

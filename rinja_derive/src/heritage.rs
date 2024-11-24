@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -140,7 +141,11 @@ impl Context<'_> {
         })
     }
 
-    pub(crate) fn generate_error<T>(&self, msg: &str, node: &WithSpan<'_, T>) -> CompileError {
+    pub(crate) fn generate_error<T>(
+        &self,
+        msg: impl fmt::Display,
+        node: &WithSpan<'_, T>,
+    ) -> CompileError {
         CompileError::new(
             msg,
             self.path.map(|path| FileInfo::of(node, path, self.parsed)),
