@@ -20,7 +20,7 @@ pub(crate) struct Config {
     pub(crate) syntaxes: BTreeMap<String, SyntaxAndCache<'static>>,
     pub(crate) default_syntax: &'static str,
     pub(crate) escapers: Vec<(Vec<Cow<'static, str>>, Cow<'static, str>)>,
-    pub(crate) whitespace: WhitespaceHandling,
+    pub(crate) whitespace: Whitespace,
     // `Config` is self referential and `_key` owns it data, so it must come last
     _key: OwnedConfigKey,
 }
@@ -39,7 +39,7 @@ struct OwnedConfigKey(&'static ConfigKey<'static>);
 struct ConfigKey<'a> {
     source: Cow<'a, str>,
     config_path: Option<Cow<'a, str>>,
-    template_whitespace: Option<Cow<'a, str>>,
+    template_whitespace: Option<Whitespace>,
 }
 
 impl<'a> ToOwned for ConfigKey<'a> {
@@ -52,10 +52,7 @@ impl<'a> ToOwned for ConfigKey<'a> {
                 .config_path
                 .as_ref()
                 .map(|s| Cow::Owned(s.as_ref().to_owned())),
-            template_whitespace: self
-                .template_whitespace
-                .as_ref()
-                .map(|s| Cow::Owned(s.as_ref().to_owned())),
+            template_whitespace: self.template_whitespace,
         };
         OwnedConfigKey(Box::leak(Box::new(owned_key)))
     }
@@ -72,7 +69,7 @@ impl Config {
     pub(crate) fn new(
         source: &str,
         config_path: Option<&str>,
-        template_whitespace: Option<&str>,
+        template_whitespace: Option<Whitespace>,
         config_span: Option<Span>,
     ) -> Result<&'static Config, CompileError> {
         static CACHE: ManuallyDrop<OnceLock<OnceMap<OwnedConfigKey, &'static Config>>> =
@@ -81,7 +78,7 @@ impl Config {
             &ConfigKey {
                 source: source.into(),
                 config_path: config_path.map(Cow::Borrowed),
-                template_whitespace: template_whitespace.map(Cow::Borrowed),
+                template_whitespace,
             },
             |key| {
                 let config = Config::new_uncached(key.to_owned(), config_span)?;
@@ -100,7 +97,6 @@ impl Config {
     ) -> Result<Config, CompileError> {
         let s = key.0.source.as_ref();
         let config_path = key.0.config_path.as_deref();
-        let template_whitespace = key.0.template_whitespace.as_deref();
 
         let root = manifest_root();
         let default_dirs = vec![root.join("templates")];
@@ -114,7 +110,7 @@ impl Config {
             RawConfig::from_toml_str(s)?
         };
 
-        let (dirs, default_syntax, mut whitespace) = match raw.general {
+        let (dirs, default_syntax, whitespace) = match raw.general {
             Some(General {
                 dirs,
                 default_syntax,
@@ -126,26 +122,10 @@ impl Config {
                 default_syntax.unwrap_or(DEFAULT_SYNTAX_NAME),
                 whitespace,
             ),
-            None => (
-                default_dirs,
-                DEFAULT_SYNTAX_NAME,
-                WhitespaceHandling::default(),
-            ),
+            None => (default_dirs, DEFAULT_SYNTAX_NAME, Whitespace::default()),
         };
         let file_info = config_path.map(|path| FileInfo::new(Path::new(path), None, None));
-        if let Some(template_whitespace) = template_whitespace {
-            whitespace = match template_whitespace {
-                "suppress" => WhitespaceHandling::Suppress,
-                "minimize" => WhitespaceHandling::Minimize,
-                "preserve" => WhitespaceHandling::Preserve,
-                s => {
-                    return Err(CompileError::new(
-                        format!("invalid value for `whitespace`: \"{s}\""),
-                        file_info,
-                    ));
-                }
-            };
-        }
+        let whitespace = key.0.template_whitespace.unwrap_or(whitespace);
 
         if let Some(raw_syntaxes) = raw.syntax {
             for raw_s in raw_syntaxes {
@@ -327,38 +307,13 @@ impl RawConfig<'_> {
     }
 }
 
-#[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash)]
-#[cfg_attr(feature = "config", derive(Deserialize))]
-#[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
-pub(crate) enum WhitespaceHandling {
-    /// The default behavior. It will leave the whitespace characters "as is".
-    #[default]
-    Preserve,
-    /// It'll remove all the whitespace characters before and after the jinja block.
-    Suppress,
-    /// It'll remove all the whitespace characters except one before and after the jinja blocks.
-    /// If there is a newline character, the preserved character in the trimmed characters, it will
-    /// the one preserved.
-    Minimize,
-}
-
-impl From<WhitespaceHandling> for Whitespace {
-    fn from(ws: WhitespaceHandling) -> Self {
-        match ws {
-            WhitespaceHandling::Suppress => Whitespace::Suppress,
-            WhitespaceHandling::Preserve => Whitespace::Preserve,
-            WhitespaceHandling::Minimize => Whitespace::Minimize,
-        }
-    }
-}
-
 #[cfg_attr(feature = "config", derive(Deserialize))]
 struct General<'a> {
     #[cfg_attr(feature = "config", serde(borrow))]
     dirs: Option<Vec<&'a str>>,
     default_syntax: Option<&'a str>,
     #[cfg_attr(feature = "config", serde(default))]
-    whitespace: WhitespaceHandling,
+    whitespace: Whitespace,
 }
 
 #[cfg_attr(feature = "config", derive(Deserialize))]
@@ -704,10 +659,10 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Suppress);
+        assert_eq!(config.whitespace, Whitespace::Suppress);
 
         let config = Config::new(r#""#, None, None, None).unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Preserve);
+        assert_eq!(config.whitespace, Whitespace::Preserve);
 
         let config = Config::new(
             r#"
@@ -719,7 +674,7 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Preserve);
+        assert_eq!(config.whitespace, Whitespace::Preserve);
 
         let config = Config::new(
             r#"
@@ -731,7 +686,7 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
+        assert_eq!(config.whitespace, Whitespace::Minimize);
     }
 
     #[cfg(feature = "config")]
@@ -739,30 +694,20 @@ mod tests {
     fn test_whitespace_in_template() {
         // Checking that template arguments have precedence over general configuration.
         // So in here, in the template arguments, there is `whitespace = "minimize"` so
-        // the `WhitespaceHandling` should be `Minimize` as well.
+        // the `Whitespace` should be `Minimize` as well.
         let config = Config::new(
             r#"
             [general]
             whitespace = "suppress"
             "#,
             None,
-            Some("minimize"),
+            Some(Whitespace::Minimize),
             None,
         )
         .unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
+        assert_eq!(config.whitespace, Whitespace::Minimize);
 
-        let config = Config::new(r#""#, None, Some("minimize"), None).unwrap();
-        assert_eq!(config.whitespace, WhitespaceHandling::Minimize);
-    }
-
-    #[test]
-    fn test_config_whitespace_error() {
-        let config = Config::new(r"", None, Some("trim"), None);
-        if let Err(err) = config {
-            assert_eq!(err.msg, "invalid value for `whitespace`: \"trim\"");
-        } else {
-            panic!("Config::new should have return an error");
-        }
+        let config = Config::new(r#""#, None, Some(Whitespace::Minimize), None).unwrap();
+        assert_eq!(config.whitespace, Whitespace::Minimize);
     }
 }

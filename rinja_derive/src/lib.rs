@@ -128,11 +128,7 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     };
     match build_template(&ast) {
         Ok(source) => source.parse().unwrap(),
-        Err(CompileError {
-            msg,
-            span,
-            rendered: _rendered,
-        }) => {
+        Err(CompileError { msg, span }) => {
             let mut ts = compile_error(std::iter::once(msg), span.unwrap_or(ast.ident.span()));
             if let Ok(source) = build_skeleton(&ast) {
                 let source: TokenStream = source.parse().unwrap();
@@ -191,7 +187,7 @@ fn build_template_inner(
     let config = Config::new(
         &s,
         config_path,
-        template_args.whitespace.as_deref(),
+        template_args.whitespace,
         template_args.config_span,
     )?;
     let input = TemplateInput::new(ast, config, template_args)?;
@@ -237,7 +233,6 @@ fn build_template_inner(
 struct CompileError {
     msg: String,
     span: Option<Span>,
-    rendered: bool,
 }
 
 impl CompileError {
@@ -254,18 +249,13 @@ impl CompileError {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
         };
-        Self {
-            msg,
-            span,
-            rendered: false,
-        }
+        Self { msg, span }
     }
 
     fn no_file_info<S: ToString>(msg: S, span: Option<Span>) -> Self {
         Self {
             msg: msg.to_string(),
             span,
-            rendered: false,
         }
     }
 }

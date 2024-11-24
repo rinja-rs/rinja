@@ -7,6 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use mime::Mime;
+use parser::node::Whitespace;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
 use rustc_hash::FxBuildHasher;
@@ -282,7 +283,7 @@ pub(crate) struct TemplateArgs {
     ext_span: Option<Span>,
     syntax: Option<String>,
     config: Option<String>,
-    pub(crate) whitespace: Option<String>,
+    pub(crate) whitespace: Option<Whitespace>,
     pub(crate) template_span: Option<Span>,
     pub(crate) config_span: Option<Span>,
 }
@@ -307,15 +308,15 @@ impl TemplateArgs {
         };
         Ok(Self {
             source: match args.source {
-                Some((_, PartialTemplateArgsSource::Path(s))) => {
+                Some(PartialTemplateArgsSource::Path(s)) => {
                     (Source::Path(s.value()), Some(s.span()))
                 }
-                Some((_, PartialTemplateArgsSource::Source(s))) => {
+                Some(PartialTemplateArgsSource::Source(s)) => {
                     (Source::Source(s.value().into()), Some(s.span()))
                 }
                 #[cfg(feature = "code-in-doc")]
-                Some((ident, PartialTemplateArgsSource::InDoc(_))) => {
-                    source_from_docs(&ident, &args.meta_docs, ast)?
+                Some(PartialTemplateArgsSource::InDoc(s)) => {
+                    source_from_docs(s.span(), &args.meta_docs, ast)?
                 }
                 None => {
                     return Err(CompileError::no_file_info(
@@ -327,16 +328,16 @@ impl TemplateArgs {
                     ));
                 }
             },
-            block: args.block.map(|(_, value)| value.value()),
-            print: args.print.map(|(_, _, value)| value).unwrap_or_default(),
-            escaping: args.escape.map(|(_, value)| value.value()),
-            ext: args.ext.as_ref().map(|(_, s)| s.value()),
-            ext_span: args.ext.as_ref().map(|(_, s)| s.span()),
-            syntax: args.syntax.map(|(_, value)| value.value()),
-            config: args.config.as_ref().map(|(_, s)| s.value()),
-            whitespace: args.whitespace.map(|(_, value)| value.value()),
+            block: args.block.map(|value| value.value()),
+            print: args.print.unwrap_or_default(),
+            escaping: args.escape.map(|value| value.value()),
+            ext: args.ext.as_ref().map(|value| value.value()),
+            ext_span: args.ext.as_ref().map(|value| value.span()),
+            syntax: args.syntax.map(|value| value.value()),
+            config: args.config.as_ref().map(|value| value.value()),
+            whitespace: args.whitespace,
             template_span: Some(template.span()),
-            config_span: args.config.as_ref().map(|(_, s)| s.span()),
+            config_span: args.config.as_ref().map(|value| value.span()),
         })
     }
 
@@ -366,33 +367,33 @@ impl TemplateArgs {
 /// This is only done if no path or source was given in the `#[template]` attribute.
 #[cfg(feature = "code-in-doc")]
 fn source_from_docs(
-    name: &Ident,
+    span: Span,
     docs: &[Attribute],
     ast: &syn::DeriveInput,
 ) -> Result<(Source, Option<Span>), CompileError> {
-    let (span, source) = collect_comment_blocks(name, docs, ast)?;
+    let (source_span, source) = collect_comment_blocks(span, docs, ast)?;
     let source = strip_common_ws_prefix(source);
-    let source = collect_rinja_code_blocks(name, ast, source)?;
-    Ok((source, span))
+    let source = collect_rinja_code_blocks(span, ast, source)?;
+    Ok((source, source_span))
 }
 
 #[cfg(feature = "code-in-doc")]
 fn collect_comment_blocks(
-    name: &Ident,
+    span: Span,
     docs: &[Attribute],
     ast: &syn::DeriveInput,
 ) -> Result<(Option<Span>, String), CompileError> {
-    let mut span: Option<Span> = None;
+    let mut source_span: Option<Span> = None;
     let mut assign_span = |kv: &syn::MetaNameValue| {
         // FIXME: uncomment once <https://github.com/rust-lang/rust/issues/54725> is stable
         // let new_span = kv.path.span();
-        // span = Some(match span {
+        // source_span = Some(match source_span {
         //     Some(cur_span) => cur_span.join(new_span).unwrap_or(cur_span),
         //     None => new_span,
         // });
 
-        if span.is_none() {
-            span = Some(kv.path.span());
+        if source_span.is_none() {
+            source_span = Some(kv.path.span());
         }
     };
 
@@ -424,14 +425,14 @@ fn collect_comment_blocks(
         source.push('\n');
     }
     if source.is_empty() {
-        return Err(no_rinja_code_block(name, ast));
+        return Err(no_rinja_code_block(span, ast));
     }
 
-    Ok((span, source))
+    Ok((source_span, source))
 }
 
 #[cfg(feature = "code-in-doc")]
-fn no_rinja_code_block(name: &Ident, ast: &syn::DeriveInput) -> CompileError {
+fn no_rinja_code_block(span: Span, ast: &syn::DeriveInput) -> CompileError {
     let kind = match &ast.data {
         syn::Data::Struct(_) => "struct",
         syn::Data::Enum(_) => "enum",
@@ -440,9 +441,10 @@ fn no_rinja_code_block(name: &Ident, ast: &syn::DeriveInput) -> CompileError {
     };
     CompileError::no_file_info(
         format!(
-            "when using `in_doc = true`, the {kind}'s documentation needs a `rinja` code block"
+            "when using `in_doc` with the value `true`, the {kind}'s documentation needs a \
+             `rinja` code block"
         ),
-        Some(name.span()),
+        Some(span),
     )
 }
 
@@ -476,7 +478,7 @@ fn strip_common_ws_prefix(source: String) -> String {
 
 #[cfg(feature = "code-in-doc")]
 fn collect_rinja_code_blocks(
-    name: &Ident,
+    span: Span,
     ast: &syn::DeriveInput,
     source: String,
 ) -> Result<Source, CompileError> {
@@ -499,7 +501,7 @@ fn collect_rinja_code_blocks(
         }
     }
     if !had_rinja_code {
-        return Err(no_rinja_code_block(name, ast));
+        return Err(no_rinja_code_block(span, ast));
     }
 
     if tmpl_source.ends_with('\n') {
@@ -651,14 +653,14 @@ pub(crate) fn get_template_source(
 pub(crate) struct PartialTemplateArgs {
     pub(crate) template: Option<Ident>,
     pub(crate) meta_docs: Vec<Attribute>,
-    pub(crate) source: Option<(Ident, PartialTemplateArgsSource)>,
-    pub(crate) block: Option<(Ident, LitStr)>,
-    pub(crate) print: Option<(Ident, LitStr, Print)>,
-    pub(crate) escape: Option<(Ident, LitStr)>,
-    pub(crate) ext: Option<(Ident, LitStr)>,
-    pub(crate) syntax: Option<(Ident, LitStr)>,
-    pub(crate) config: Option<(Ident, LitStr)>,
-    pub(crate) whitespace: Option<(Ident, LitStr)>,
+    pub(crate) source: Option<PartialTemplateArgsSource>,
+    pub(crate) block: Option<LitStr>,
+    pub(crate) print: Option<Print>,
+    pub(crate) escape: Option<LitStr>,
+    pub(crate) ext: Option<LitStr>,
+    pub(crate) syntax: Option<LitStr>,
+    pub(crate) config: Option<LitStr>,
+    pub(crate) whitespace: Option<Whitespace>,
 }
 
 pub(crate) enum PartialTemplateArgsSource {
@@ -719,12 +721,11 @@ const _: () = {
 
                 if ident == "path" {
                     ensure_source_only_once(ident, &this.source)?;
-                    let value = get_strlit(ident, value)?;
-                    this.source = Some((ident.clone(), PartialTemplateArgsSource::Path(value)));
+                    this.source = Some(PartialTemplateArgsSource::Path(get_strlit(ident, value)?));
                 } else if ident == "source" {
                     ensure_source_only_once(ident, &this.source)?;
-                    let value = get_strlit(ident, value)?;
-                    this.source = Some((ident.clone(), PartialTemplateArgsSource::Source(value)));
+                    this.source =
+                        Some(PartialTemplateArgsSource::Source(get_strlit(ident, value)?));
                 } else if ident == "in_doc" {
                     let value = get_boollit(ident, value)?;
                     if !value.value() {
@@ -741,19 +742,12 @@ const _: () = {
                     }
                     #[cfg(feature = "code-in-doc")]
                     {
-                        this.source =
-                            Some((ident.clone(), PartialTemplateArgsSource::InDoc(value)));
+                        this.source = Some(PartialTemplateArgsSource::InDoc(value));
                     }
                 } else if ident == "block" {
                     set_strlit_pair(ident, value, &mut this.block)?;
                 } else if ident == "print" {
-                    ensure_only_once(ident, &mut this.print)?;
-                    let str_value = get_strlit(ident, value)?;
-                    let value = str_value
-                        .value()
-                        .parse()
-                        .map_err(|msg| CompileError::no_file_info(msg, Some(ident.span())))?;
-                    this.print = Some((ident.clone(), str_value, value));
+                    set_parseable_string(ident, value, &mut this.print)?;
                 } else if ident == "escape" {
                     set_strlit_pair(ident, value, &mut this.escape)?;
                 } else if ident == "ext" {
@@ -763,7 +757,7 @@ const _: () = {
                 } else if ident == "config" {
                     set_strlit_pair(ident, value, &mut this.config)?;
                 } else if ident == "whitespace" {
-                    set_strlit_pair(ident, value, &mut this.whitespace)?;
+                    set_parseable_string(ident, value, &mut this.whitespace)?;
                 } else {
                     return Err(CompileError::no_file_info(
                         format!("unsupported template attribute `{ident}` found"),
@@ -778,11 +772,26 @@ const _: () = {
     fn set_strlit_pair(
         name: &Ident,
         value: ExprLit,
-        dest: &mut Option<(Ident, LitStr)>,
+        dest: &mut Option<LitStr>,
     ) -> Result<(), CompileError> {
         ensure_only_once(name, dest)?;
-        let value = get_strlit(name, value)?;
-        *dest = Some((name.clone(), value));
+        *dest = Some(get_strlit(name, value)?);
+        Ok(())
+    }
+
+    fn set_parseable_string<T: FromStr<Err: ToString>>(
+        name: &Ident,
+        value: ExprLit,
+        dest: &mut Option<T>,
+    ) -> Result<(), CompileError> {
+        ensure_only_once(name, dest)?;
+        let str_value = get_strlit(name, value)?;
+        *dest = Some(
+            str_value
+                .value()
+                .parse()
+                .map_err(|msg| CompileError::no_file_info(msg, Some(str_value.span())))?,
+        );
         Ok(())
     }
 
@@ -836,7 +845,7 @@ const _: () = {
 
     fn ensure_source_only_once(
         name: &Ident,
-        source: &Option<(Ident, PartialTemplateArgsSource)>,
+        source: &Option<PartialTemplateArgsSource>,
     ) -> Result<(), CompileError> {
         if source.is_some() {
             return Err(CompileError::no_file_info(

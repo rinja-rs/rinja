@@ -747,7 +747,8 @@ fn test_code_in_comment() {
     let err = build_template(&ast).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "when using `in_doc = true`, the struct's documentation needs a `rinja` code block"
+        "when using `in_doc` with the value `true`, the struct's documentation needs a `rinja` \
+         code block"
     );
 
     let ts = "

@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::str;
+use std::str::{self, FromStr};
 
 use winnow::Parser;
 use winnow::combinator::{
@@ -426,8 +426,11 @@ impl<'a> CondTest<'a> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash)]
+#[cfg_attr(feature = "config", derive(serde::Deserialize))]
+#[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
 pub enum Whitespace {
+    #[default]
     Preserve,
     Suppress,
     Minimize,
@@ -444,6 +447,19 @@ impl Whitespace {
             '-' => Some(Self::Suppress),
             '~' => Some(Self::Minimize),
             _ => None,
+        }
+    }
+}
+
+impl FromStr for Whitespace {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "+" | "preserve" => Ok(Whitespace::Preserve),
+            "-" | "suppress" => Ok(Whitespace::Suppress),
+            "~" | "minimize" => Ok(Whitespace::Minimize),
+            s => Err(format!("invalid value for `whitespace`: {s:?}")),
         }
     }
 }
