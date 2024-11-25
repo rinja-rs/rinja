@@ -163,7 +163,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         buf: &mut Buffer,
         target: &str,
     ) -> Result<usize, CompileError> {
-        write_header(self.input.ast, buf, target, None);
+        write_header(self.input.ast, buf, target);
         buf.write(
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
             where \

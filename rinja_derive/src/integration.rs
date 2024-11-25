@@ -10,25 +10,8 @@ pub(crate) fn impl_everything(ast: &DeriveInput, buf: &mut Buffer) {
 }
 
 /// Writes header for the `impl` for `TraitFromPathName` or `Template` for the given item
-pub(crate) fn write_header(
-    ast: &DeriveInput,
-    buf: &mut Buffer,
-    target: impl Display,
-    params: Option<Vec<syn::GenericParam>>,
-) {
-    let mut generics;
-    let (impl_generics, orig_ty_generics, where_clause) = if let Some(params) = params {
-        generics = ast.generics.clone();
-        for param in params {
-            generics.params.push(param);
-        }
-
-        let (_, orig_ty_generics, _) = ast.generics.split_for_impl();
-        let (impl_generics, _, where_clause) = generics.split_for_impl();
-        (impl_generics, orig_ty_generics, where_clause)
-    } else {
-        ast.generics.split_for_impl()
-    };
+pub(crate) fn write_header(ast: &DeriveInput, buf: &mut Buffer, target: impl Display) {
+    let (impl_generics, orig_ty_generics, where_clause) = ast.generics.split_for_impl();
 
     let ident = &ast.ident;
     buf.write(format_args!(
@@ -51,7 +34,7 @@ fn impl_display(ast: &DeriveInput, buf: &mut Buffer) {
         ",
         quote!(#ident),
     ));
-    write_header(ast, buf, "rinja::helpers::core::fmt::Display", None);
+    write_header(ast, buf, "rinja::helpers::core::fmt::Display");
     buf.write(
         "\
             #[inline]\
@@ -68,7 +51,7 @@ fn impl_display(ast: &DeriveInput, buf: &mut Buffer) {
 
 /// Implement `FastWritable` for the given item.
 fn impl_fast_writable(ast: &DeriveInput, buf: &mut Buffer) {
-    write_header(ast, buf, "rinja::filters::FastWritable", None);
+    write_header(ast, buf, "rinja::filters::FastWritable");
     buf.write(
         "\
             #[inline]\
