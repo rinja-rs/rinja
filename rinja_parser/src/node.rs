@@ -176,7 +176,7 @@ impl<'a> Node<'a> {
                 None,
                 (
                     opt(unpeek(Whitespace::parse)),
-                    ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
+                    ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
                 ),
             ),
         )
@@ -436,7 +436,7 @@ impl<'a> CondTest<'a> {
                 ws(|i: &mut _| Target::parse(i, s)),
                 ws('='),
             )),
-            ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
+            ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
         )
             .parse_peek(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
@@ -528,7 +528,7 @@ impl<'a> Loop<'a> {
             ws(keyword("if")),
             cut_node(
                 Some("for-if"),
-                ws(unpeek(|i| Expr::parse(i, s.level.get(), true))),
+                ws(|i: &mut _| Expr::parse(i, s.level.get(), true)),
             ),
         );
 
@@ -584,7 +584,7 @@ impl<'a> Loop<'a> {
                     cut_node(
                         Some("for"),
                         (
-                            ws(unpeek(|i| Expr::parse(i, s.level.get(), true))),
+                            ws(|i: &mut _| Expr::parse(i, s.level.get(), true)),
                             opt(if_cond),
                             opt(unpeek(Whitespace::parse)),
                             |i: &mut _| s.tag_block_end(i),
@@ -654,7 +654,7 @@ impl<'a> Macro<'a> {
                         separated1(
                             (
                                 ws(identifier),
-                                opt(preceded('=', ws(unpeek(|i| Expr::parse(i, level, false))))),
+                                opt(preceded('=', ws(|i: &mut _| Expr::parse(i, level, false)))),
                             ),
                             ',',
                         ),
@@ -945,7 +945,7 @@ impl<'a> Match<'a> {
             cut_node(
                 Some("match"),
                 (
-                    ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
+                    ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
                     opt(unpeek(Whitespace::parse)),
                     |i: &mut _| s.tag_block_end(i),
                     cut_node(
@@ -1194,7 +1194,7 @@ impl<'a> Let<'a> {
                     ws(|i: &mut _| Target::parse(i, s)),
                     opt(preceded(
                         ws('='),
-                        ws(unpeek(|i| Expr::parse(i, s.level.get(), false))),
+                        ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
                     )),
                     opt(unpeek(Whitespace::parse)),
                 ),

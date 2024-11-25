@@ -160,7 +160,7 @@ impl<'a> Expr<'a> {
                                     is_template_macro,
                                 )
                             }),
-                            unpeek(move |i| Self::parse(i, level, false)),
+                            move |i: &mut _| Self::parse(i, level, false),
                         ))
                         .parse_peek(i)?;
                         if has_named_arguments && !matches!(*expr, Self::NamedArgument(_, _)) {
@@ -194,11 +194,9 @@ impl<'a> Expr<'a> {
         }
 
         let level = level.nest(i)?;
-        let (i, (argument, _, value)) = (
-            identifier,
-            ws('='),
-            unpeek(move |i| Self::parse(i, level, false)),
-        )
+        let (i, (argument, _, value)) = (identifier, ws('='), move |i: &mut _| {
+            Self::parse(i, level, false)
+        })
             .parse_peek(i)?;
         if named_arguments.insert(argument) {
             Ok((
@@ -214,38 +212,36 @@ impl<'a> Expr<'a> {
     }
 
     pub(super) fn parse(
-        i: &'a str,
+        i: &mut &'a str,
         level: Level,
         allow_underscore: bool,
-    ) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    ) -> ParseResult<'a, WithSpan<'a, Self>> {
         let level = level.nest(i)?;
-        let start = Span::from(i);
-        let range_right = move |i| {
+        let start = Span::from(*i);
+        let range_right = move |i: &mut _| {
             (
                 ws(alt(("..=", ".."))),
                 opt(move |i: &mut _| Self::or(i, level)),
             )
-                .parse_peek(i)
+                .parse_next(i)
         };
-        let (i, expr) = alt((
-            unpeek(range_right).map(move |(op, right)| {
+        let expr = alt((
+            range_right.map(move |(op, right)| {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
             }),
-            (
-                move |i: &mut _| Self::or(i, level),
-                opt(unpeek(range_right)),
-            )
-                .map(move |(left, right)| match right {
+            (move |i: &mut _| Self::or(i, level), opt(range_right)).map(move |(left, right)| {
+                match right {
                     Some((op, right)) => WithSpan::new(
                         Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
                         start,
                     ),
                     None => left,
-                }),
+                }
+            }),
         ))
-        .parse_peek(i)?;
+        .parse_next(i)?;
         check_expr(&expr, allow_underscore)?;
-        Ok((i, expr))
+        Ok(expr)
     }
 
     expr_prec_layer!(or, and, "||");
@@ -406,7 +402,7 @@ impl<'a> Expr<'a> {
     fn group(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let level = level.nest(i)?;
         let start = *i;
-        let expr = preceded(ws('('), opt(unpeek(|i| Self::parse(i, level, true)))).parse_next(i)?;
+        let expr = preceded(ws('('), opt(|i: &mut _| Self::parse(i, level, true))).parse_next(i)?;
         let Some(expr) = expr else {
             let _ = ')'.parse_next(i)?;
             return Ok(WithSpan::new(Self::Tuple(vec![]), start));
@@ -421,7 +417,7 @@ impl<'a> Expr<'a> {
         let mut exprs = vec![expr];
         fold_repeat(
             0..,
-            preceded(',', ws(unpeek(|i| Self::parse(i, level, true)))),
+            preceded(',', ws(|i: &mut _| Self::parse(i, level, true))),
             || (),
             |(), expr| {
                 exprs.push(expr);
@@ -439,7 +435,7 @@ impl<'a> Expr<'a> {
             ws('['),
             cut_err(terminated(
                 opt(terminated(
-                    separated1(ws(unpeek(move |i| Self::parse(i, level, true))), ','),
+                    separated1(ws(move |i: &mut _| Self::parse(i, level, true)), ','),
                     ws(opt(',')),
                 )),
                 ']',
@@ -667,7 +663,7 @@ impl<'a> Suffix<'a> {
         preceded(
             ws('['),
             cut_err(terminated(
-                ws(unpeek(move |i| Expr::parse(i, level, true))),
+                ws(move |i: &mut _| Expr::parse(i, level, true)),
                 ']',
             )),
         )
