@@ -151,7 +151,7 @@ impl<'a> Expr<'a> {
                         let has_named_arguments = !named_arguments.is_empty();
 
                         let (i, expr) = alt((
-                            unpeek(move |i| {
+                            move |i: &mut _| {
                                 Self::named_argument(
                                     i,
                                     level,
@@ -159,7 +159,7 @@ impl<'a> Expr<'a> {
                                     start,
                                     is_template_macro,
                                 )
-                            }),
+                            },
                             move |i: &mut _| Self::parse(i, level, false),
                         ))
                         .parse_peek(i)?;
@@ -181,27 +181,27 @@ impl<'a> Expr<'a> {
     }
 
     fn named_argument(
-        i: &'a str,
+        i: &mut &'a str,
         level: Level,
         named_arguments: &mut HashSet<&'a str>,
         start: &'a str,
         is_template_macro: bool,
-    ) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    ) -> ParseResult<'a, WithSpan<'a, Self>> {
         if !is_template_macro {
             // If this is not a template macro, we don't want to parse named arguments so
             // we instead return an error which will allow to continue the parsing.
-            return fail.parse_peek(i);
+            return fail.parse_next(i);
         }
 
         let level = level.nest(i)?;
-        let (i, (argument, _, value)) = (identifier, ws('='), move |i: &mut _| {
+        let (argument, _, value) = (identifier, ws('='), move |i: &mut _| {
             Self::parse(i, level, false)
         })
-            .parse_peek(i)?;
+            .parse_next(i)?;
         if named_arguments.insert(argument) {
-            Ok((
-                i,
-                WithSpan::new(Self::NamedArgument(argument, Box::new(value)), start),
+            Ok(WithSpan::new(
+                Self::NamedArgument(argument, Box::new(value)),
+                start,
             ))
         } else {
             Err(winnow::error::ErrMode::Cut(ErrorContext::new(
