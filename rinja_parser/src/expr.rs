@@ -249,17 +249,19 @@ impl<'a> Expr<'a> {
     fn concat(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         fn concat_expr(i: &str, level: Level) -> ParseResult<'_, Option<WithSpan<'_, Expr<'_>>>> {
             let ws1 = |i| opt(skip_ws1).parse_next(i);
-            let (j, data) = opt((ws1, '~', ws1, |i| Expr::muldivmod(i, level))).parse_next(i)?;
+
+            let start = i;
+            let (i, data) = opt((ws1, '~', ws1, |i| Expr::muldivmod(i, level))).parse_next(i)?;
             if let Some((t1, _, t2, expr)) = data {
                 if t1.is_none() || t2.is_none() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         "the concat operator `~` must be surrounded by spaces",
-                        i,
+                        start,
                     )));
                 }
-                Ok((j, Some(expr)))
+                Ok((i, Some(expr)))
             } else {
-                Ok((j, None))
+                Ok((i, None))
             }
         }
 
