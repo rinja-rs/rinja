@@ -261,20 +261,18 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(addsub, concat, alt(("+", "-")));
 
     fn concat(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        fn concat_expr(
-            i: &str,
-            level: Level,
-        ) -> InputParseResult<'_, Option<WithSpan<'_, Expr<'_>>>> {
-            let ws1 = |i| opt(skip_ws1).parse_peek(i);
+        (|i: &mut _| Self::concat_(i, level)).parse_peek(i)
+    }
 
-            let start = i;
-            let (i, data) = opt((
-                unpeek(ws1),
-                '~',
-                unpeek(ws1),
-                unpeek(|i| Expr::muldivmod(i, level)),
-            ))
-            .parse_peek(i)?;
+    fn concat_(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+        fn concat_expr<'a>(
+            i: &mut &'a str,
+            level: Level,
+        ) -> ParseResult<'a, Option<WithSpan<'a, Expr<'a>>>> {
+            let ws1 = |i: &mut _| opt(skip_ws1).parse_next(i);
+
+            let start = *i;
+            let data = opt((ws1, '~', ws1, unpeek(|i| Expr::muldivmod(i, level)))).parse_next(i)?;
             if let Some((t1, _, t2, expr)) = data {
                 if t1.is_none() || t2.is_none() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -282,24 +280,24 @@ impl<'a> Expr<'a> {
                         start,
                     )));
                 }
-                Ok((i, Some(expr)))
+                Ok(Some(expr))
             } else {
-                Ok((i, None))
+                Ok(None)
             }
         }
 
-        let start = i;
-        let (i, expr) = Self::muldivmod(i, level)?;
-        let (mut i, expr2) = concat_expr(i, level)?;
+        let start = *i;
+        let (j, expr) = Self::muldivmod(*i, level)?;
+        *i = j;
+        let expr2 = concat_expr(i, level)?;
         if let Some(expr2) = expr2 {
             let mut exprs = vec![expr, expr2];
-            while let (j, Some(expr)) = concat_expr(i, level)? {
-                i = j;
+            while let Some(expr) = concat_expr(i, level)? {
                 exprs.push(expr);
             }
-            Ok((i, WithSpan::new(Self::Concat(exprs), start)))
+            Ok(WithSpan::new(Self::Concat(exprs), start))
         } else {
-            Ok((i, expr))
+            Ok(expr)
         }
     }
 
