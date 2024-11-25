@@ -143,11 +143,10 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
 }
 
 fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream {
-    let crate_ = syn::Ident::new(CRATE, Span::call_site());
     quote_spanned! {
         span =>
         const _: () = {
-            extern crate #crate_ as rinja;
+            extern crate rinja as rinja;
             #(rinja::helpers::core::compile_error!(#msgs);)*
         };
     }
@@ -425,15 +424,3 @@ const BUILT_IN_FILTERS: &[&str] = &[
     "urlencode",
     "wordcount",
 ];
-
-const CRATE: &str = if cfg!(feature = "with-actix-web") {
-    "rinja_actix"
-} else if cfg!(feature = "with-axum") {
-    "rinja_axum"
-} else if cfg!(feature = "with-rocket") {
-    "rinja_rocket"
-} else if cfg!(feature = "with-warp") {
-    "rinja_warp"
-} else {
-    "rinja"
-};

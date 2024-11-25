@@ -10,18 +10,16 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 publish = false
 
-[dependencies]
-actix-web = { version = "4.8.0", default-features = false, features = ["macros"] }
 # This is an example application that uses both rinja as template engine,
 # and actix-web as your web-framework.
-# rinja_actix makes it easy to use rinja templates as `Responder` of an actix-web request.
-# The rendered template is simply the response of your handler!
-rinja_actix = { version = "0.3.5", path = "../../rinja_actix" }
-tokio = { version = "1.38.0", features = ["sync", "rt-multi-thread"] }
+[dependencies]
+actix-web = { version = "4.9.0", default-features = false, features = ["macros"] }
+rinja = { version = "0.3.5", path = "../../rinja" }
+tokio = { version = "1.41.1", features = ["sync", "rt-multi-thread"] }
 
 # serde and strum are used to parse (deserialize) and generate (serialize) information
 # between web requests, e.g. to share the selected display language.
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.215", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 
 # These depenendies are simply used for a better user experience, having access logs in the
@@ -29,4 +27,4 @@ strum = { version = "0.26.3", features = ["derive"] }
 env_logger = "0.11.3"
 log = "0.4.22"
 pretty-error-debug = "0.3.0"
-thiserror = "1.0.61"
+thiserror = "2.0.3"

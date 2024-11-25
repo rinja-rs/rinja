@@ -35,9 +35,8 @@ jobs:
     strategy:
       matrix:
         package: [
-          rinja, rinja_actix, rinja_axum, rinja_derive, rinja_derive_standalone,
-          rinja_parser, rinja_rocket, rinja_warp, testing, examples/actix-web-app,
-          fuzzing
+          examples/actix-web-app, fuzzing, rinja, rinja_derive, rinja_derive_standalone,
+          rinja_parser, testing,
         ]
     runs-on: ubuntu-latest
     steps:
@@ -55,10 +54,7 @@ jobs:
   Docs:
     strategy:
       matrix:
-        package: [
-          rinja, rinja_actix, rinja_axum, rinja_derive,
-          rinja_parser, rinja_rocket, rinja_warp,
-        ]
+        package: [rinja, rinja_derive, rinja_parser]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,13 +77,11 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            rinja rinja_actix rinja_axum rinja_derive rinja_derive_standalone \
-            rinja_parser rinja_rocket rinja_warp testing examples/actix-web-app \
-            fuzzing
+            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing
           do
             cd "$PKG"
             echo "Testing: $PKG"
-            cargo fmt -- --check
+            cargo +nightly fmt -- --check
             cd - > /dev/null
           done
 
@@ -150,8 +144,7 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            rinja rinja_actix rinja_axum rinja_derive rinja_derive_standalone \
-            rinja_parser rinja_rocket rinja_warp testing
+            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing
           do
             cd "$PKG"
             cargo sort --check --check-format --grouped

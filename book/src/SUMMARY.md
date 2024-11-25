@@ -7,5 +7,4 @@
 - [Configuration](./configuration.md)
 - [Template syntax](./template_syntax.md)
 - [Filters](./filters.md)
-- [Integrations](./integrations.md)
 - [Performance](./performance.md)

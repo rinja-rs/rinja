@@ -37,7 +37,6 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
                     rinja::Result::Ok(())
                 }
                 const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
-                const MIME_TYPE: &'static rinja::helpers::core::primitive::str = "text/plain; charset=utf-8";
             }
 
             /// Implement the [`format!()`][rinja::helpers::std::format] trait for [`Foo`]
