@@ -18,19 +18,16 @@ use crate::{
 
 macro_rules! expr_prec_layer {
     ( $name:ident, $inner:ident, $op:expr ) => {
-        fn $name(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+        fn $name(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
             let level = level.nest(i)?;
-            let start = i;
-            let (i, left) = Self::$inner(i, level)?;
-            let (i, right) = repeat(0.., (ws($op), unpeek(|i| Self::$inner(i, level))))
+            let start = *i;
+            let left = Self::$inner(i, level)?;
+            let right = repeat(0.., (ws($op), |i: &mut _| Self::$inner(i, level)))
                 .map(|v: Vec<_>| v)
-                .parse_peek(i)?;
-            Ok((
-                i,
-                right.into_iter().fold(left, |left, (op, right)| {
-                    WithSpan::new(Self::BinOp(op, Box::new(left), Box::new(right)), start)
-                }),
-            ))
+                .parse_next(i)?;
+            Ok(right.into_iter().fold(left, |left, (op, right)| {
+                WithSpan::new(Self::BinOp(op, Box::new(left), Box::new(right)), start)
+            }))
         }
     };
 }
@@ -226,7 +223,7 @@ impl<'a> Expr<'a> {
         let range_right = move |i| {
             (
                 ws(alt(("..=", ".."))),
-                opt(unpeek(move |i| Self::or(i, level))),
+                opt(move |i: &mut _| Self::or(i, level)),
             )
                 .parse_peek(i)
         };
@@ -235,7 +232,7 @@ impl<'a> Expr<'a> {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
             }),
             (
-                unpeek(move |i| Self::or(i, level)),
+                move |i: &mut _| Self::or(i, level),
                 opt(unpeek(range_right)),
             )
                 .map(move |(left, right)| match right {
@@ -260,11 +257,7 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
     expr_prec_layer!(addsub, concat, alt(("+", "-")));
 
-    fn concat(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        (|i: &mut _| Self::concat_(i, level)).parse_peek(i)
-    }
-
-    fn concat_(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn concat(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         fn concat_expr<'a>(
             i: &mut &'a str,
             level: Level,
@@ -272,7 +265,7 @@ impl<'a> Expr<'a> {
             let ws1 = |i: &mut _| opt(skip_ws1).parse_next(i);
 
             let start = *i;
-            let data = opt((ws1, '~', ws1, unpeek(|i| Expr::muldivmod(i, level)))).parse_next(i)?;
+            let data = opt((ws1, '~', ws1, |i: &mut _| Expr::muldivmod(i, level))).parse_next(i)?;
             if let Some((t1, _, t2, expr)) = data {
                 if t1.is_none() || t2.is_none() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -287,8 +280,7 @@ impl<'a> Expr<'a> {
         }
 
         let start = *i;
-        let (j, expr) = Self::muldivmod(*i, level)?;
-        *i = j;
+        let expr = Self::muldivmod(i, level)?;
         let expr2 = concat_expr(i, level)?;
         if let Some(expr2) = expr2 {
             let mut exprs = vec![expr, expr2];
@@ -303,11 +295,7 @@ impl<'a> Expr<'a> {
 
     expr_prec_layer!(muldivmod, is_as, alt(("*", "/", "%")));
 
-    fn is_as(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        (|i: &mut _| Self::is_as_(i, level)).parse_peek(i)
-    }
-
-    fn is_as_(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn is_as(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let lhs = Self::filtered(i, level)?;
         let before_keyword = *i;
