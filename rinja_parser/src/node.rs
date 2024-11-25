@@ -267,7 +267,6 @@ pub struct When<'a> {
 
 impl<'a> When<'a> {
     fn r#else(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
         let mut p = (
             |i| s.tag_block_start(i),
             opt(Whitespace::parse),
@@ -281,13 +280,15 @@ impl<'a> When<'a> {
                 ),
             ),
         );
-        let (new_i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
+
+        let start = i;
+        let (i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
         Ok((
-            new_i,
+            i,
             WithSpan::new(
                 Self {
                     ws: Ws(pws, nws),
-                    target: vec![Target::Placeholder(WithSpan::new((), i))],
+                    target: vec![Target::Placeholder(WithSpan::new((), start))],
                     nodes,
                 },
                 start,
