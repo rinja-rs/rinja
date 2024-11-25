@@ -305,18 +305,22 @@ impl<'a> Expr<'a> {
 
     expr_prec_layer!(muldivmod, is_as, alt(("*", "/", "%")));
 
-    fn is_as(mut i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
-        let lhs = Self::filtered(&mut i, level)?;
-        let before_keyword = i;
-        let (i, rhs) = opt(ws(identifier)).parse_peek(i)?;
-        let i = match rhs {
-            Some("is") => i,
+    fn is_as(i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Self>> {
+        (|i: &mut _| Self::is_as_(i, level)).parse_peek(i)
+    }
+
+    fn is_as_(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
+        let lhs = Self::filtered(i, level)?;
+        let before_keyword = *i;
+        let rhs = opt(ws(identifier)).parse_next(i)?;
+        match rhs {
+            Some("is") => {}
             Some("as") => {
-                let (i, target) = opt(identifier).parse_peek(i)?;
+                let target = opt(identifier).parse_next(i)?;
                 let target = target.unwrap_or_default();
                 if crate::PRIMITIVE_TYPES.contains(&target) {
-                    return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
+                    return Ok(WithSpan::new(Self::As(Box::new(lhs), target), start));
                 } else if target.is_empty() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         "`as` operator expects the name of a primitive type on its right-hand side",
@@ -333,13 +337,12 @@ impl<'a> Expr<'a> {
                 }
             }
             _ => {
-                let i = before_keyword;
-                return Ok((i, lhs));
+                *i = before_keyword;
+                return Ok(lhs);
             }
-        };
+        }
 
-        let (i, rhs) =
-            opt(terminated(opt(keyword("not")), ws(keyword("defined")))).parse_peek(i)?;
+        let rhs = opt(terminated(opt(keyword("not")), ws(keyword("defined")))).parse_next(i)?;
         let ctor = match rhs {
             None => {
                 return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -366,7 +369,7 @@ impl<'a> Expr<'a> {
                 )));
             }
         };
-        Ok((i, WithSpan::new(ctor(var_name), start)))
+        Ok(WithSpan::new(ctor(var_name), start))
     }
 
     fn filtered(i: &mut &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
