@@ -979,7 +979,7 @@ fn filter<'a>(
     *level = level.nest(start)?;
     cut_err((
         ws(identifier),
-        opt(unpeek(|i| Expr::arguments(i, *level, false))),
+        opt(|i: &mut _| Expr::arguments(i, *level, false)),
     ))
     .parse_next(i)
 }
