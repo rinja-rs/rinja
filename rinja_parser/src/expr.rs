@@ -551,6 +551,7 @@ impl<'a> Suffix<'a> {
         let (_, level) = level.nest(i)?;
         let (mut i, mut expr) = Expr::single(i, level)?;
         loop {
+            let before_suffix = i;
             let (j, suffix) = opt(alt((
                 Self::attr,
                 |i| Self::index(i, level),
@@ -559,27 +560,36 @@ impl<'a> Suffix<'a> {
                 Self::r#macro,
             )))
             .parse_next(i)?;
+            i = j;
 
             match suffix {
-                Some(Self::Attr(attr)) => expr = WithSpan::new(Expr::Attr(expr.into(), attr), i),
-                Some(Self::Index(index)) => {
-                    expr = WithSpan::new(Expr::Index(expr.into(), index.into()), i);
+                Some(Self::Attr(attr)) => {
+                    expr = WithSpan::new(Expr::Attr(expr.into(), attr), before_suffix)
                 }
-                Some(Self::Call(args)) => expr = WithSpan::new(Expr::Call(expr.into(), args), i),
-                Some(Self::Try) => expr = WithSpan::new(Expr::Try(expr.into()), i),
+                Some(Self::Index(index)) => {
+                    expr = WithSpan::new(Expr::Index(expr.into(), index.into()), before_suffix);
+                }
+                Some(Self::Call(args)) => {
+                    expr = WithSpan::new(Expr::Call(expr.into(), args), before_suffix)
+                }
+                Some(Self::Try) => expr = WithSpan::new(Expr::Try(expr.into()), before_suffix),
                 Some(Self::MacroCall(args)) => match expr.inner {
-                    Expr::Path(path) => expr = WithSpan::new(Expr::RustMacro(path, args), i),
-                    Expr::Var(name) => expr = WithSpan::new(Expr::RustMacro(vec![name], args), i),
+                    Expr::Path(path) => {
+                        expr = WithSpan::new(Expr::RustMacro(path, args), before_suffix)
+                    }
+                    Expr::Var(name) => {
+                        expr = WithSpan::new(Expr::RustMacro(vec![name], args), before_suffix)
+                    }
                     _ => {
-                        return Err(
-                            winnow::error::ErrMode::from_error_kind(i, ErrorKind::Tag).cut()
-                        );
+                        return Err(winnow::error::ErrMode::from_error_kind(
+                            before_suffix,
+                            ErrorKind::Tag,
+                        )
+                        .cut());
                     }
                 },
                 None => break,
             }
-
-            i = j;
         }
         Ok((i, expr))
     }
