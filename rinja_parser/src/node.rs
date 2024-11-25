@@ -149,14 +149,16 @@ impl<'a> Node<'a> {
             ws(keyword("continue")),
             opt(Whitespace::parse),
         );
-        let (j, (pws, _, nws)) = p.parse_next(i)?;
+
+        let start = i;
+        let (i, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "you can only `continue` inside a `for` loop",
-                i,
+                start,
             )));
         }
-        Ok((j, Self::Continue(WithSpan::new(Ws(pws, nws), i))))
+        Ok((i, Self::Continue(WithSpan::new(Ws(pws, nws), start))))
     }
 
     fn expr(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
