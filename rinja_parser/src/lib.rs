@@ -10,12 +10,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, str};
 
+use winnow::Parser;
 use winnow::ascii::escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till1, take_while};
-use winnow::{Parser, unpeek};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -980,7 +980,7 @@ fn filter<'a>(
     *level = level.nest(start)?;
     cut_err((
         ws(identifier),
-        opt(unpeek(|i| Expr::arguments(i, *level, false))),
+        opt(|i: &mut _| Expr::arguments(i, *level, false)),
     ))
     .parse_next(i)
 }

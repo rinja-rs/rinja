@@ -780,7 +780,7 @@ impl<'a> FilterBlock<'a> {
                 Some("filter"),
                 (
                     ws(identifier),
-                    opt(unpeek(|i| Expr::arguments(i, s.level.get(), false))),
+                    opt(|i: &mut _| Expr::arguments(i, s.level.get(), false)),
                     repeat(0.., |i: &mut _| {
                         let start = *i;
                         filter(i, &mut level).map(|(name, params)| (name, params, start))
@@ -903,9 +903,9 @@ impl<'a> Call<'a> {
                 (
                     opt((ws(identifier), ws("::"))),
                     ws(identifier),
-                    opt(ws(unpeek(|nested| {
+                    opt(ws(|nested: &mut _| {
                         Expr::arguments(nested, s.level.get(), true)
-                    }))),
+                    })),
                     opt(unpeek(Whitespace::parse)),
                 ),
             ),
