@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
-use mime::Mime;
 use parser::node::Whitespace;
 use parser::{Node, Parsed};
 use proc_macro2::Span;
@@ -27,7 +26,6 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
-    pub(crate) mime_type: String,
     pub(crate) path: Arc<Path>,
     pub(crate) fields: Vec<String>,
 }
@@ -107,10 +105,6 @@ impl TemplateInput<'_> {
                 )
             })?;
 
-        let mime_type =
-            extension_to_mime_type(ext.as_deref().or_else(|| extension(&path)).unwrap_or("txt"))
-                .to_string();
-
         let empty_punctuated = Punctuated::new();
         let fields = match ast.data {
             syn::Data::Struct(ref struct_) => {
@@ -139,7 +133,6 @@ impl TemplateInput<'_> {
             block: block.as_deref(),
             print: *print,
             escaper,
-            mime_type,
             path,
             fields,
         })
@@ -491,7 +484,9 @@ fn collect_rinja_code_blocks(
     for e in Parser::new(&source) {
         match (in_rinja_code, e) {
             (false, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(s)))) => {
-                if s.split(",").any(|s| JINJA_EXTENSIONS.contains(&s)) {
+                if s.split(",")
+                    .any(|s| JINJA_EXTENSIONS.contains(&s.trim_ascii()))
+                {
                     in_rinja_code = true;
                     had_rinja_code = true;
                 }
@@ -535,19 +530,6 @@ impl<I: Iterator, E> Iterator for ResultIter<I, E> {
 
 impl<I: FusedIterator, E> FusedIterator for ResultIter<I, E> {}
 
-fn extension(path: &Path) -> Option<&str> {
-    let ext = path.extension()?.to_str()?;
-    if JINJA_EXTENSIONS.contains(&ext) {
-        // an extension was found: file stem cannot be absent
-        Path::new(path.file_stem().unwrap())
-            .extension()
-            .and_then(|s| s.to_str())
-            .or(Some(ext))
-    } else {
-        Some(ext)
-    }
-}
-
 #[derive(Debug, Clone, Hash, PartialEq)]
 pub(crate) enum Source {
     Path(Arc<str>),
@@ -581,32 +563,6 @@ impl FromStr for Print {
         }
     }
 }
-
-pub(crate) fn extension_to_mime_type(ext: &str) -> Mime {
-    let basic_type = mime_guess::from_ext(ext).first_or_octet_stream();
-    for (simple, utf_8) in &TEXT_TYPES {
-        if &basic_type == simple {
-            return utf_8.clone();
-        }
-    }
-    basic_type
-}
-
-const TEXT_TYPES: [(Mime, Mime); 7] = [
-    (mime::TEXT_PLAIN, mime::TEXT_PLAIN_UTF_8),
-    (mime::TEXT_HTML, mime::TEXT_HTML_UTF_8),
-    (mime::TEXT_CSS, mime::TEXT_CSS_UTF_8),
-    (mime::TEXT_CSV, mime::TEXT_CSV_UTF_8),
-    (
-        mime::TEXT_TAB_SEPARATED_VALUES,
-        mime::TEXT_TAB_SEPARATED_VALUES_UTF_8,
-    ),
-    (
-        mime::APPLICATION_JAVASCRIPT,
-        mime::APPLICATION_JAVASCRIPT_UTF_8,
-    ),
-    (mime::IMAGE_SVG, mime::IMAGE_SVG),
-];
 
 fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
     Err(CompileError::no_file_info(
@@ -908,62 +864,13 @@ const _: () = {
     }
 };
 
+#[cfg(feature = "code-in-doc")]
 const JINJA_EXTENSIONS: &[&str] = &["j2", "jinja", "jinja2", "rinja"];
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ext() {
-        assert_eq!(extension(Path::new("foo-bar.txt")), Some("txt"));
-        assert_eq!(extension(Path::new("foo-bar.html")), Some("html"));
-        assert_eq!(extension(Path::new("foo-bar.unknown")), Some("unknown"));
-        assert_eq!(extension(Path::new("foo-bar.svg")), Some("svg"));
-
-        assert_eq!(extension(Path::new("foo/bar/baz.txt")), Some("txt"));
-        assert_eq!(extension(Path::new("foo/bar/baz.html")), Some("html"));
-        assert_eq!(extension(Path::new("foo/bar/baz.unknown")), Some("unknown"));
-        assert_eq!(extension(Path::new("foo/bar/baz.svg")), Some("svg"));
-    }
-
-    #[test]
-    fn test_double_ext() {
-        assert_eq!(extension(Path::new("foo-bar.html.txt")), Some("txt"));
-        assert_eq!(extension(Path::new("foo-bar.txt.html")), Some("html"));
-        assert_eq!(extension(Path::new("foo-bar.txt.unknown")), Some("unknown"));
-
-        assert_eq!(extension(Path::new("foo/bar/baz.html.txt")), Some("txt"));
-        assert_eq!(extension(Path::new("foo/bar/baz.txt.html")), Some("html"));
-        assert_eq!(
-            extension(Path::new("foo/bar/baz.txt.unknown")),
-            Some("unknown")
-        );
-    }
-
-    #[test]
-    fn test_skip_jinja_ext() {
-        assert_eq!(extension(Path::new("foo-bar.html.j2")), Some("html"));
-        assert_eq!(extension(Path::new("foo-bar.html.jinja")), Some("html"));
-        assert_eq!(extension(Path::new("foo-bar.html.jinja2")), Some("html"));
-
-        assert_eq!(extension(Path::new("foo/bar/baz.txt.j2")), Some("txt"));
-        assert_eq!(extension(Path::new("foo/bar/baz.txt.jinja")), Some("txt"));
-        assert_eq!(extension(Path::new("foo/bar/baz.txt.jinja2")), Some("txt"));
-    }
-
-    #[test]
-    fn test_only_jinja_ext() {
-        assert_eq!(extension(Path::new("foo-bar.j2")), Some("j2"));
-        assert_eq!(extension(Path::new("foo-bar.jinja")), Some("jinja"));
-        assert_eq!(extension(Path::new("foo-bar.jinja2")), Some("jinja2"));
-    }
-
-    #[test]
-    fn get_source() {
-        let path = Config::new("", None, None, None)
-            .and_then(|config| config.find_template("b.html", None, None))
-            .unwrap();
-        assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
-    }
+#[test]
+fn get_source() {
+    let path = Config::new("", None, None, None)
+        .and_then(|config| config.find_template("b.html", None, None))
+        .unwrap();
+    assert_eq!(get_template_source(&path, None).unwrap(), "bar".into());
 }

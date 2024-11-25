@@ -201,9 +201,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             "\
                 rinja::Result::Ok(())\
             }}\
-            const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;\
-            const MIME_TYPE: &'static rinja::helpers::core::primitive::str = {:?};",
-            self.input.mime_type,
+            const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;",
         ));
 
         buf.write('}');

@@ -144,9 +144,6 @@ pub trait Template: fmt::Display + filters::FastWritable {
     /// [`render_into`]: Template::render_into
     /// [`write_into`]: Template::write_into
     const SIZE_HINT: usize;
-
-    /// The MIME type (Content-Type) of the data that gets rendered by this Template
-    const MIME_TYPE: &'static str;
 }
 
 impl<T: Template + ?Sized> Template for &T {
@@ -166,8 +163,6 @@ impl<T: Template + ?Sized> Template for &T {
     }
 
     const SIZE_HINT: usize = T::SIZE_HINT;
-
-    const MIME_TYPE: &'static str = T::MIME_TYPE;
 }
 
 /// Object-safe wrapper trait around [`Template`] implementers
@@ -185,9 +180,6 @@ pub trait DynTemplate {
 
     /// Provides a conservative estimate of the expanded length of the rendered template
     fn size_hint(&self) -> usize;
-
-    /// The MIME type (Content-Type) of the data that gets rendered by this Template
-    fn mime_type(&self) -> &'static str;
 }
 
 impl<T: Template> DynTemplate for T {
@@ -206,10 +198,6 @@ impl<T: Template> DynTemplate for T {
 
     fn size_hint(&self) -> usize {
         Self::SIZE_HINT
-    }
-
-    fn mime_type(&self) -> &'static str {
-        Self::MIME_TYPE
     }
 }
 
@@ -261,8 +249,6 @@ mod tests {
             }
 
             const SIZE_HINT: usize = 4;
-
-            const MIME_TYPE: &'static str = "text/plain; charset=utf-8";
         }
 
         impl fmt::Display for Test {
