@@ -131,14 +131,16 @@ impl<'a> Node<'a> {
             ws(keyword("break")),
             opt(Whitespace::parse),
         );
-        let (j, (pws, _, nws)) = p.parse_next(i)?;
+
+        let start = i;
+        let (i, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "you can only `break` inside a `for` loop",
-                i,
+                start,
             )));
         }
-        Ok((j, Self::Break(WithSpan::new(Ws(pws, nws), i))))
+        Ok((i, Self::Break(WithSpan::new(Ws(pws, nws), start))))
     }
 
     fn r#continue(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
