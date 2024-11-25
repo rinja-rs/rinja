@@ -375,7 +375,7 @@ impl<'a> Expr<'a> {
         let start = *i;
         let (ops, mut expr) = (
             repeat(0.., ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
-            unpeek(|i| Suffix::parse(i, nested)),
+            |i: &mut _| Suffix::parse(i, nested),
         )
             .parse_next(i)?;
 
@@ -553,20 +553,19 @@ enum Suffix<'a> {
 }
 
 impl<'a> Suffix<'a> {
-    fn parse(mut i: &'a str, level: Level) -> InputParseResult<'a, WithSpan<'a, Expr<'a>>> {
+    fn parse(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Expr<'a>>> {
         let level = level.nest(i)?;
-        let mut expr = Expr::single(&mut i, level)?;
+        let mut expr = Expr::single(i, level)?;
         loop {
-            let before_suffix = i;
-            let (j, suffix) = opt(alt((
+            let before_suffix = *i;
+            let suffix = opt(alt((
                 Self::attr,
                 |i: &mut _| Self::index(i, level),
                 |i: &mut _| Self::call(i, level),
                 Self::r#try,
                 Self::r#macro,
             )))
-            .parse_peek(i)?;
-            i = j;
+            .parse_next(i)?;
 
             match suffix {
                 Some(Self::Attr(attr)) => {
@@ -597,7 +596,7 @@ impl<'a> Suffix<'a> {
                 None => break,
             }
         }
-        Ok((i, expr))
+        Ok(expr)
     }
 
     fn r#macro(i: &mut &'a str) -> ParseResult<'a, Self> {
