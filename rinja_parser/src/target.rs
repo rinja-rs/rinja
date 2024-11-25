@@ -1,5 +1,5 @@
 use winnow::Parser;
-use winnow::combinator::{alt, opt, preceded, separated1};
+use winnow::combinator::{alt, opt, peek, preceded, separated1};
 use winnow::token::one_of;
 
 use crate::{
@@ -27,14 +27,13 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        let (new_i, target) = separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
+        separated1(|i| s.nest(i, |i| Self::parse_one(i, s)), ws("or"))
             .map(|v: Vec<_>| v)
             .map(|mut opts| match opts.len() {
                 1 => opts.pop().unwrap(),
                 _ => Self::OrChain(opts),
             })
-            .parse_next(i)?;
-        Ok((new_i, target))
+            .parse_next(i)
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
@@ -102,12 +101,13 @@ impl<'a> Target<'a> {
         }
 
         // neither literal nor struct nor path
-        let (new_i, name) = identifier.parse_next(i)?;
+        let i_before_identifier = i;
+        let (i, name) = identifier.parse_next(i)?;
         let target = match name {
-            "_" => Self::Placeholder(WithSpan::new((), i)),
-            _ => verify_name(i, name)?,
+            "_" => Self::Placeholder(WithSpan::new((), i_before_identifier)),
+            _ => verify_name(i_before_identifier, name)?,
         };
-        Ok((new_i, target))
+        Ok((i, target))
     }
 
     fn lit(i: &'a str) -> ParseResult<'a, Self> {
@@ -126,10 +126,11 @@ impl<'a> Target<'a> {
         alt((Self::rest, |i| Self::parse(i, s))).parse_next(i)
     }
 
-    fn named(init_i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
-        let (i, rest) = opt(Self::rest.with_recognized()).parse_next(init_i)?;
+    fn named(i: &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
+        let start = i;
+        let (i, rest) = opt(Self::rest.with_recognized()).parse_next(i)?;
         if let Some(rest) = rest {
-            let (_, chr) = ws(opt(one_of([',', ':']))).parse_next(i)?;
+            let (i, chr) = peek(ws(opt(one_of([',', ':'])))).parse_next(i)?;
             if let Some(chr) = chr {
                 return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     format!(
@@ -150,25 +151,28 @@ impl<'a> Target<'a> {
             return Ok((i, (rest.1, rest.0)));
         }
 
+        let i = start;
         let (i, (src, target)) =
-            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(init_i)?;
+            (identifier, opt(preceded(ws(':'), |i| Self::parse(i, s)))).parse_next(i)?;
 
         if src == "_" {
+            let i = start;
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot use placeholder `_` as source in named struct",
-                init_i,
+                i,
             )));
         }
 
         let target = match target {
             Some(target) => target,
-            None => verify_name(init_i, src)?,
+            None => verify_name(start, src)?,
         };
         Ok((i, (src, target)))
     }
 
-    fn rest(start: &'a str) -> ParseResult<'a, Self> {
-        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(start)?;
+    fn rest(i: &'a str) -> ParseResult<'a, Self> {
+        let start = i;
+        let (i, (ident, _)) = (opt((identifier, ws('@'))), "..").parse_next(i)?;
         Ok((
             i,
             Self::Rest(WithSpan::new(ident.map(|(ident, _)| ident), start)),

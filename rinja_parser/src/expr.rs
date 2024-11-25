@@ -249,17 +249,19 @@ impl<'a> Expr<'a> {
     fn concat(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         fn concat_expr(i: &str, level: Level) -> ParseResult<'_, Option<WithSpan<'_, Expr<'_>>>> {
             let ws1 = |i| opt(skip_ws1).parse_next(i);
-            let (j, data) = opt((ws1, '~', ws1, |i| Expr::muldivmod(i, level))).parse_next(i)?;
+
+            let start = i;
+            let (i, data) = opt((ws1, '~', ws1, |i| Expr::muldivmod(i, level))).parse_next(i)?;
             if let Some((t1, _, t2, expr)) = data {
                 if t1.is_none() || t2.is_none() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                         "the concat operator `~` must be surrounded by spaces",
-                        i,
+                        start,
                     )));
                 }
-                Ok((j, Some(expr)))
+                Ok((i, Some(expr)))
             } else {
-                Ok((j, None))
+                Ok((i, None))
             }
         }
 
@@ -282,12 +284,13 @@ impl<'a> Expr<'a> {
 
     fn is_as(i: &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = i;
-        let (before_keyword, lhs) = Self::filtered(i, level)?;
-        let (j, rhs) = opt(ws(identifier)).parse_next(before_keyword)?;
+        let (i, lhs) = Self::filtered(i, level)?;
+        let before_keyword = i;
+        let (i, rhs) = opt(ws(identifier)).parse_next(i)?;
         let i = match rhs {
-            Some("is") => j,
+            Some("is") => i,
             Some("as") => {
-                let (i, target) = opt(identifier).parse_next(j)?;
+                let (i, target) = opt(identifier).parse_next(i)?;
                 let target = target.unwrap_or_default();
                 if crate::PRIMITIVE_TYPES.contains(&target) {
                     return Ok((i, WithSpan::new(Self::As(Box::new(lhs), target), start)));
@@ -306,7 +309,10 @@ impl<'a> Expr<'a> {
                     )));
                 }
             }
-            _ => return Ok((before_keyword, lhs)),
+            _ => {
+                let i = before_keyword;
+                return Ok((i, lhs));
+            }
         };
 
         let (i, rhs) =
@@ -545,6 +551,7 @@ impl<'a> Suffix<'a> {
         let (_, level) = level.nest(i)?;
         let (mut i, mut expr) = Expr::single(i, level)?;
         loop {
+            let before_suffix = i;
             let (j, suffix) = opt(alt((
                 Self::attr,
                 |i| Self::index(i, level),
@@ -553,27 +560,36 @@ impl<'a> Suffix<'a> {
                 Self::r#macro,
             )))
             .parse_next(i)?;
+            i = j;
 
             match suffix {
-                Some(Self::Attr(attr)) => expr = WithSpan::new(Expr::Attr(expr.into(), attr), i),
-                Some(Self::Index(index)) => {
-                    expr = WithSpan::new(Expr::Index(expr.into(), index.into()), i);
+                Some(Self::Attr(attr)) => {
+                    expr = WithSpan::new(Expr::Attr(expr.into(), attr), before_suffix)
                 }
-                Some(Self::Call(args)) => expr = WithSpan::new(Expr::Call(expr.into(), args), i),
-                Some(Self::Try) => expr = WithSpan::new(Expr::Try(expr.into()), i),
+                Some(Self::Index(index)) => {
+                    expr = WithSpan::new(Expr::Index(expr.into(), index.into()), before_suffix);
+                }
+                Some(Self::Call(args)) => {
+                    expr = WithSpan::new(Expr::Call(expr.into(), args), before_suffix)
+                }
+                Some(Self::Try) => expr = WithSpan::new(Expr::Try(expr.into()), before_suffix),
                 Some(Self::MacroCall(args)) => match expr.inner {
-                    Expr::Path(path) => expr = WithSpan::new(Expr::RustMacro(path, args), i),
-                    Expr::Var(name) => expr = WithSpan::new(Expr::RustMacro(vec![name], args), i),
+                    Expr::Path(path) => {
+                        expr = WithSpan::new(Expr::RustMacro(path, args), before_suffix)
+                    }
+                    Expr::Var(name) => {
+                        expr = WithSpan::new(Expr::RustMacro(vec![name], args), before_suffix)
+                    }
                     _ => {
-                        return Err(
-                            winnow::error::ErrMode::from_error_kind(i, ErrorKind::Tag).cut()
-                        );
+                        return Err(winnow::error::ErrMode::from_error_kind(
+                            before_suffix,
+                            ErrorKind::Tag,
+                        )
+                        .cut());
                     }
                 },
                 None => break,
             }
-
-            i = j;
         }
         Ok((i, expr))
     }

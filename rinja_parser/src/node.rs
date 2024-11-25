@@ -131,14 +131,16 @@ impl<'a> Node<'a> {
             ws(keyword("break")),
             opt(Whitespace::parse),
         );
-        let (j, (pws, _, nws)) = p.parse_next(i)?;
+
+        let start = i;
+        let (i, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "you can only `break` inside a `for` loop",
-                i,
+                start,
             )));
         }
-        Ok((j, Self::Break(WithSpan::new(Ws(pws, nws), i))))
+        Ok((i, Self::Break(WithSpan::new(Ws(pws, nws), start))))
     }
 
     fn r#continue(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
@@ -147,14 +149,16 @@ impl<'a> Node<'a> {
             ws(keyword("continue")),
             opt(Whitespace::parse),
         );
-        let (j, (pws, _, nws)) = p.parse_next(i)?;
+
+        let start = i;
+        let (i, (pws, _, nws)) = p.parse_next(i)?;
         if !s.is_in_loop() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "you can only `continue` inside a `for` loop",
-                i,
+                start,
             )));
         }
-        Ok((j, Self::Continue(WithSpan::new(Ws(pws, nws), i))))
+        Ok((i, Self::Continue(WithSpan::new(Ws(pws, nws), start))))
     }
 
     fn expr(i: &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
@@ -263,7 +267,6 @@ pub struct When<'a> {
 
 impl<'a> When<'a> {
     fn r#else(i: &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
         let mut p = (
             |i| s.tag_block_start(i),
             opt(Whitespace::parse),
@@ -277,13 +280,15 @@ impl<'a> When<'a> {
                 ),
             ),
         );
-        let (new_i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
+
+        let start = i;
+        let (i, (_, pws, _, (nws, _, nodes))) = p.parse_next(i)?;
         Ok((
-            new_i,
+            i,
             WithSpan::new(
                 Self {
                     ws: Ws(pws, nws),
-                    target: vec![Target::Placeholder(WithSpan::new((), i))],
+                    target: vec![Target::Placeholder(WithSpan::new((), start))],
                     nodes,
                 },
                 start,
@@ -664,11 +669,11 @@ impl<'a> Macro<'a> {
                 }),
             ),
         );
-        let (j, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
+        let (i, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
         if is_rust_keyword(name) {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("'{name}' is not a valid name for a macro"),
-                i,
+                start_s,
             )));
         }
 
@@ -677,17 +682,17 @@ impl<'a> Macro<'a> {
 
             let mut iter = params.iter();
             while let Some((arg_name, default_value)) = iter.next() {
-                check_duplicated_name(&mut names, arg_name, i)?;
+                check_duplicated_name(&mut names, arg_name, start_s)?;
                 if default_value.is_some() {
                     for (new_arg_name, default_value) in iter.by_ref() {
-                        check_duplicated_name(&mut names, new_arg_name, i)?;
+                        check_duplicated_name(&mut names, new_arg_name, start_s)?;
                         if default_value.is_none() {
                             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 format!(
                                     "all arguments following `{arg_name}` should have a default \
                                          value, `{new_arg_name}` doesn't have a default value"
                                 ),
-                                i,
+                                start_s,
                             )));
                         }
                     }
@@ -719,7 +724,7 @@ impl<'a> Macro<'a> {
                 ),
             ),
         );
-        let (i, (contents, (_, pws2, _, nws2))) = end.parse_next(j)?;
+        let (i, (contents, (_, pws2, _, nws2))) = end.parse_next(i)?;
 
         Ok((
             i,
