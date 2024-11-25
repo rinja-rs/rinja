@@ -19,7 +19,7 @@ use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
 use crate::integration::{Buffer, impl_everything, write_header};
-use crate::{BUILT_IN_FILTERS, CRATE, CompileError, FileInfo, MsgValidEscapers};
+use crate::{BUILT_IN_FILTERS, CompileError, FileInfo, MsgValidEscapers};
 
 pub(crate) fn template_to_string(
     buf: &mut Buffer,
@@ -103,9 +103,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         target: Option<&str>,
     ) -> Result<usize, CompileError> {
         if target.is_none() {
-            buf.write(format_args!(
-                "const _: () = {{ extern crate {CRATE} as rinja;"
-            ));
+            buf.write("const _: () = { extern crate rinja as rinja;");
         }
         let size_hint = self.impl_template(ctx, buf, target.unwrap_or("rinja::Template"))?;
         if target.is_none() {

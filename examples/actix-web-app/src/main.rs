@@ -1,8 +1,10 @@
+use actix_web::http::header::ContentType;
 use actix_web::http::{Method, header};
+use actix_web::web::Html;
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, Responder, Result, get, middleware, web,
 };
-use rinja_actix::Template;
+use rinja::Template;
 use serde::Deserialize;
 use tokio::runtime;
 
@@ -88,18 +90,13 @@ async fn not_found_handler(req: HttpRequest) -> Result<impl Responder> {
     }
 
     if req.method() == Method::GET {
-        // In here we have to render the result to a string manually, because we don't want to
-        // generate a "status 200" result, but "status 404". In other cases you can simply return
-        // the template, wrapped in `Ok()`, and the request gets generated with "status 200",
-        // and the right MIME type.
         let tmpl = Tmpl {
             req,
             lang: Lang::default(),
         };
-        // The MIME type was derived by rinja by the extension of the template file.
         Ok(HttpResponse::NotFound()
-            .append_header((header::CONTENT_TYPE, Tmpl::MIME_TYPE))
-            .body(tmpl.to_string()))
+            .insert_header(ContentType::html())
+            .body(tmpl.render().map_err(<Box<dyn std::error::Error>>::from)?))
     } else {
         Ok(HttpResponse::MethodNotAllowed().finish())
     }
@@ -152,11 +149,16 @@ async fn index_handler(
     }
 
     let (lang,) = path.into_inner();
-    Ok(Tmpl {
+    let template = Tmpl {
         req,
         lang,
         name: query.name,
-    })
+    };
+    Ok(Html::new(
+        template
+            .render()
+            .map_err(<Box<dyn std::error::Error>>::from)?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -184,9 +186,14 @@ async fn greeting_handler(
     }
 
     let (lang,) = path.into_inner();
-    Ok(Tmpl {
+    let template = Tmpl {
         req,
         lang,
         name: query.name,
-    })
+    };
+    Ok(Html::new(
+        template
+            .render()
+            .map_err(<Box<dyn std::error::Error>>::from)?,
+    ))
 }

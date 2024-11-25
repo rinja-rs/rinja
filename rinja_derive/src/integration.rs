@@ -7,15 +7,6 @@ use syn::DeriveInput;
 pub(crate) fn impl_everything(ast: &DeriveInput, buf: &mut Buffer) {
     impl_display(ast, buf);
     impl_fast_writable(ast, buf);
-
-    #[cfg(feature = "with-actix-web")]
-    impl_actix_web_responder(ast, buf);
-    #[cfg(feature = "with-axum")]
-    impl_axum_into_response(ast, buf);
-    #[cfg(feature = "with-rocket")]
-    impl_rocket_responder(ast, buf);
-    #[cfg(feature = "with-warp")]
-    impl_warp_reply(ast, buf);
 }
 
 /// Writes header for the `impl` for `TraitFromPathName` or `Template` for the given item
@@ -86,79 +77,6 @@ fn impl_fast_writable(ast: &DeriveInput, buf: &mut Buffer) {
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,\
             {\
                 rinja::Template::render_into(self, dest)\
-            }\
-        }",
-    );
-}
-
-/// Implement Actix-web's `Responder`.
-#[cfg(feature = "with-actix-web")]
-fn impl_actix_web_responder(ast: &DeriveInput, buf: &mut Buffer) {
-    write_header(ast, buf, "::rinja_actix::actix_web::Responder", None);
-    buf.write(
-        "\
-            type Body = ::rinja_actix::actix_web::body::BoxBody;\
-            #[inline]\
-            fn respond_to(self, _req: &::rinja_actix::actix_web::HttpRequest)\
-            -> ::rinja_actix::actix_web::HttpResponse<Self::Body> {\
-                ::rinja_actix::into_response(&self)\
-            }\
-        }",
-    );
-}
-
-/// Implement Axum's `IntoResponse`.
-#[cfg(feature = "with-axum")]
-fn impl_axum_into_response(ast: &DeriveInput, buf: &mut Buffer) {
-    write_header(
-        ast,
-        buf,
-        "::rinja_axum::axum_core::response::IntoResponse",
-        None,
-    );
-    buf.write(
-        "\
-            #[inline]\
-            fn into_response(self) -> ::rinja_axum::axum_core::response::Response {\
-                ::rinja_axum::into_response(&self)\
-            }\
-        }",
-    );
-}
-
-/// Implement Rocket's `Responder`.
-#[cfg(feature = "with-rocket")]
-fn impl_rocket_responder(ast: &DeriveInput, buf: &mut Buffer) {
-    let lifetime1 = syn::Lifetime::new("'rinja1", proc_macro2::Span::call_site());
-    let param1 = syn::GenericParam::Lifetime(syn::LifetimeParam::new(lifetime1));
-
-    write_header(
-        ast,
-        buf,
-        "::rinja_rocket::rocket::response::Responder<'rinja1, 'static>",
-        Some(vec![param1]),
-    );
-    buf.write(
-        "\
-            #[inline]\
-            fn respond_to(self, _: &'rinja1 ::rinja_rocket::rocket::request::Request<'_>)\
-                -> ::rinja_rocket::rocket::response::Result<'static>\
-            {\
-                ::rinja_rocket::respond(&self)\
-            }\
-        }",
-    );
-}
-
-/// Implement Warp's `Reply`.
-#[cfg(feature = "with-warp")]
-fn impl_warp_reply(ast: &DeriveInput, buf: &mut Buffer) {
-    write_header(ast, buf, "::rinja_warp::warp::reply::Reply", None);
-    buf.write(
-        "\
-            #[inline]\
-            fn into_response(self) -> ::rinja_warp::warp::reply::Response {\
-                ::rinja_warp::into_response(&self)\
             }\
         }",
     );

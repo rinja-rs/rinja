@@ -28,13 +28,6 @@ config = ["rinja_derive/config"]
 serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
 urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
 
-# Please do not depend on the following features manually.
-# Depend on the relevant integration crate instead!
-with-actix-web = ["rinja_derive/with-actix-web"]
-with-axum = ["rinja_derive/with-axum"]
-with-rocket = ["rinja_derive/with-rocket"]
-with-warp = ["rinja_derive/with-warp"]
-
 [dependencies]
 rinja_derive = { version = "=0.3.5", path = "../rinja_derive" }
 

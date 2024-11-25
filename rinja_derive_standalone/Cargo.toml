@@ -25,10 +25,6 @@ code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:serde", "dep:basic-toml", "parser/config"]
 urlencode = []
 serde_json = []
-with-actix-web = []
-with-axum = []
-with-rocket = []
-with-warp = []
 
 [dependencies]
 parser = { package = "rinja_parser", version = "=0.3.5", path = "../rinja_parser" }

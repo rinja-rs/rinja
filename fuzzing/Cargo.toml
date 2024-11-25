@@ -1,3 +1,6 @@
+
+[workspace]
+members = [".", "fuzz"]
 [package]
 name = "rinja_fuzzing"
 version = "0.1.0"
@@ -8,12 +11,9 @@ publish = false
 [dependencies]
 fuzz = { path = "fuzz" }
 
-arbitrary = "1.3.2"
+arbitrary = "1.4.1"
 pretty-error-debug = "0.3.0"
-thiserror = "1.0.63"
-
-[workspace]
-members = [".", "fuzz"]
+thiserror = "2.0.3"
 
 [profile.release]
 debug = 1
