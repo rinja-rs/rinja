@@ -668,11 +668,11 @@ impl<'a> Macro<'a> {
                 }),
             ),
         );
-        let (j, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
+        let (i, (pws1, _, (name, params, nws1, _))) = start.parse_next(i)?;
         if is_rust_keyword(name) {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("'{name}' is not a valid name for a macro"),
-                i,
+                start_s,
             )));
         }
 
@@ -681,17 +681,17 @@ impl<'a> Macro<'a> {
 
             let mut iter = params.iter();
             while let Some((arg_name, default_value)) = iter.next() {
-                check_duplicated_name(&mut names, arg_name, i)?;
+                check_duplicated_name(&mut names, arg_name, start_s)?;
                 if default_value.is_some() {
                     for (new_arg_name, default_value) in iter.by_ref() {
-                        check_duplicated_name(&mut names, new_arg_name, i)?;
+                        check_duplicated_name(&mut names, new_arg_name, start_s)?;
                         if default_value.is_none() {
                             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 format!(
                                     "all arguments following `{arg_name}` should have a default \
                                          value, `{new_arg_name}` doesn't have a default value"
                                 ),
-                                i,
+                                start_s,
                             )));
                         }
                     }
@@ -723,7 +723,7 @@ impl<'a> Macro<'a> {
                 ),
             ),
         );
-        let (i, (contents, (_, pws2, _, nws2))) = end.parse_next(j)?;
+        let (i, (contents, (_, pws2, _, nws2))) = end.parse_next(i)?;
 
         Ok((
             i,
