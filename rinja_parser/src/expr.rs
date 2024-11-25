@@ -11,9 +11,9 @@ use winnow::stream::Stream as _;
 use winnow::{Parser, unpeek};
 
 use crate::{
-    CharLit, ErrorContext, InputParseResult, Level, Num, ParseErr, ParseResult, PathOrIdentifier,
-    Span, StrLit, WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier,
-    skip_ws0, skip_ws1, str_lit, ws,
+    CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
+    WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
+    skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -132,13 +132,13 @@ pub enum Expr<'a> {
 
 impl<'a> Expr<'a> {
     pub(super) fn arguments(
-        i: &'a str,
+        i: &mut &'a str,
         level: Level,
         is_template_macro: bool,
-    ) -> InputParseResult<'a, Vec<WithSpan<'a, Self>>> {
+    ) -> ParseResult<'a, Vec<WithSpan<'a, Self>>> {
         let level = level.nest(i)?;
         let mut named_arguments = HashSet::new();
-        let start = i;
+        let start = *i;
 
         preceded(
             ws('('),
@@ -177,7 +177,7 @@ impl<'a> Expr<'a> {
                 (opt(ws(',')), ')'),
             )),
         )
-        .parse_peek(i)
+        .parse_next(i)
     }
 
     fn named_argument(
@@ -673,7 +673,7 @@ impl<'a> Suffix<'a> {
 
     fn call(i: &mut &'a str, level: Level) -> ParseResult<'a, Self> {
         let level = level.nest(i)?;
-        unpeek(move |i| Expr::arguments(i, level, false))
+        (move |i: &mut _| Expr::arguments(i, level, false))
             .map(Self::Call)
             .parse_next(i)
     }
