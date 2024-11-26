@@ -318,7 +318,7 @@ impl fmt::Display for FileInfo<'_> {
             write!(f, "\n --> {}", match std::env::current_dir() {
                 Ok(cwd) => fmt_left!(move "{}", strip_common(&cwd, self.path)),
                 Err(_) => fmt_right!("{}", self.path.display()),
-            },)
+            })
         }
     }
 }
