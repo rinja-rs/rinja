@@ -119,7 +119,7 @@ fn test_parse_var() {
 
     assert_eq!(Ast::from_str("{{ foo }}", None, &s).unwrap().nodes, vec![
         Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("foo")))
-    ],);
+    ]);
     assert_eq!(
         Ast::from_str("{{ foo_bar }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
@@ -130,7 +130,7 @@ fn test_parse_var() {
 
     assert_eq!(Ast::from_str("{{ none }}", None, &s).unwrap().nodes, vec![
         Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("none")))
-    ],);
+    ]);
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn test_parse_const() {
 
     assert_eq!(Ast::from_str("{{ FOO }}", None, &s).unwrap().nodes, vec![
         Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Path(vec!["FOO"])))
-    ],);
+    ]);
     assert_eq!(
         Ast::from_str("{{ FOO_BAR }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
@@ -150,7 +150,7 @@ fn test_parse_const() {
 
     assert_eq!(Ast::from_str("{{ NONE }}", None, &s).unwrap().nodes, vec![
         Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Path(vec!["NONE"])))
-    ],);
+    ]);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn test_parse_path() {
 
     assert_eq!(Ast::from_str("{{ None }}", None, &s).unwrap().nodes, vec![
         Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Path(vec!["None"])))
-    ],);
+    ]);
     assert_eq!(
         Ast::from_str("{{ Some(123) }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
@@ -235,7 +235,7 @@ fn test_parse_path_call() {
             WithSpan::no_span(Expr::Call(
                 Box::new(WithSpan::no_span(Expr::Path(vec!["Option", "Some"]))),
                 vec![WithSpan::no_span(int_lit("123"))],
-            ),)
+            ))
         )],
     );
 
@@ -254,7 +254,7 @@ fn test_parse_path_call() {
                     })),
                     WithSpan::no_span(int_lit("3"))
                 ],
-            ),)
+            ))
         )],
     );
 }
@@ -318,31 +318,31 @@ fn test_rust_macro() {
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
         )
-    ],);
+    ]);
     assert_eq!(Ast::from_str("{{a !()}}", None, &syntax).unwrap().nodes, [
         Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
         )
-    ],);
+    ]);
     assert_eq!(Ast::from_str("{{a! ()}}", None, &syntax).unwrap().nodes, [
         Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
         )
-    ],);
+    ]);
     assert_eq!(Ast::from_str("{{a ! ()}}", None, &syntax).unwrap().nodes, [
         Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["a"], ""))
         )
-    ],);
+    ]);
     assert_eq!(Ast::from_str("{{A!()}}", None, &syntax).unwrap().nodes, [
         Node::Expr(
             Ws(None, None),
             WithSpan::no_span(Expr::RustMacro(vec!["A"], ""))
         )
-    ],);
+    ]);
     assert_eq!(
         &*Ast::from_str("{{a.b.c!( hello )}}", None, &syntax)
             .unwrap_err()
@@ -378,7 +378,7 @@ fn unicode_delimiters_in_syntax() {
                 val: "Here comes the expression:",
                 rws: " ",
             })),
-            Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("e")),),
+            Node::Expr(Ws(None, None), WithSpan::no_span(Expr::Var("e"))),
             Node::Lit(WithSpan::no_span(Lit {
                 lws: "",
                 val: ".",
@@ -406,7 +406,7 @@ fn test_precedence() {
                 ))
                 .into(),
                 WithSpan::no_span(Expr::Var("c")).into()
-            ),)
+            ))
         )],
     );
     assert_eq!(
@@ -609,7 +609,7 @@ fn test_odd_calls() {
                     Box::new(WithSpan::no_span(Expr::Var("b")))
                 ))),
                 vec![WithSpan::no_span(Expr::Var("c"))],
-            ),)
+            ))
         )],
     );
     assert_eq!(
@@ -627,7 +627,7 @@ fn test_odd_calls() {
                     )
                 ))))),
                 vec![WithSpan::no_span(Expr::Var("c"))],
-            ),)
+            ))
         )],
     );
     assert_eq!(
@@ -655,7 +655,7 @@ fn test_odd_calls() {
                     Expr::Unary("-", Box::new(WithSpan::no_span(Expr::Var("a"))))
                 ))))),
                 vec![WithSpan::no_span(Expr::Var("b"))],
-            ),)
+            ))
         )],
     );
     assert_eq!(
@@ -668,7 +668,7 @@ fn test_odd_calls() {
                     Box::new(WithSpan::no_span(Expr::Var("a"))),
                     vec![WithSpan::no_span(Expr::Var("b"))]
                 )))
-            ),)
+            ))
         )],
     );
     assert_eq!(
@@ -681,7 +681,7 @@ fn test_odd_calls() {
                     Box::new(WithSpan::no_span(Expr::Var("a"))),
                     vec![WithSpan::no_span(Expr::Var("b"))]
                 ))]
-            }),)
+            }))
         )]
     );
     assert_eq!(
@@ -766,14 +766,14 @@ fn test_parse_tuple() {
         Ast::from_str("{{ () }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Tuple(vec![]),)
+            WithSpan::no_span(Expr::Tuple(vec![]))
         )],
     );
     assert_eq!(
         Ast::from_str("{{ (1) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(int_lit("1"))),))
+            WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(int_lit("1")))))
         )],
     );
     assert_eq!(

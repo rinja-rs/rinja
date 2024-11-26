@@ -19,7 +19,7 @@ use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
 use crate::integration::{Buffer, impl_everything, write_header};
-use crate::{BUILT_IN_FILTERS, CompileError, FileInfo, MsgValidEscapers};
+use crate::{BUILT_IN_FILTERS, CompileError, FileInfo, MsgValidEscapers, fmt_left, fmt_right};
 
 pub(crate) fn template_to_string(
     buf: &mut Buffer,
@@ -934,8 +934,8 @@ impl<'a, 'h> Generator<'a, 'h> {
             filter.span(),
         )?;
         let filter_buf = match display_wrap {
-            DisplayWrap::Wrapped => filter_buf.into_string(),
-            DisplayWrap::Unwrapped => format!(
+            DisplayWrap::Wrapped => fmt_left!("{filter_buf}"),
+            DisplayWrap::Unwrapped => fmt_right!(
                 "(&&rinja::filters::AutoEscaper::new(&({filter_buf}), {})).rinja_auto_escape()?",
                 self.input.escaper,
             ),
@@ -1155,9 +1155,9 @@ impl<'a, 'h> Generator<'a, 'h> {
             .ok_or_else(|| ctx.generate_error("no block ancestors available", node))?;
         let (child_ctx, def) = *heritage.blocks[cur.0].get(cur.1).ok_or_else(|| {
             ctx.generate_error(
-                &match name {
-                    None => format!("no super() block found for block '{}'", cur.0),
-                    Some(name) => format!("no block found for name '{name}'"),
+                match name {
+                    None => fmt_left!("no super() block found for block '{}'", cur.0),
+                    Some(name) => fmt_right!(move "no block found for name '{name}'"),
                 },
                 node,
             )

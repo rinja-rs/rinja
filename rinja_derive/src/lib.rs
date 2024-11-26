@@ -213,8 +213,9 @@ fn build_template_item(
 
         if let Some(block_name) = input.block {
             if !heritage.blocks.contains_key(&block_name) {
-                return Err(CompileError::no_file_info(
-                    format!("cannot find block {block_name}"),
+                return Err(CompileError::new(
+                    format_args!("cannot find block {block_name}"),
+                    None,
                     None,
                 ));
             }
@@ -244,27 +245,12 @@ struct CompileError {
 }
 
 impl CompileError {
-    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
-        Self::new_with_span(msg, file_info, None)
-    }
-
-    fn new_with_span<S: fmt::Display>(
-        msg: S,
-        file_info: Option<FileInfo<'_>>,
-        span: Option<Span>,
-    ) -> Self {
+    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>, span: Option<Span>) -> Self {
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
         };
         Self { msg, span }
-    }
-
-    fn no_file_info<S: ToString>(msg: S, span: Option<Span>) -> Self {
-        Self {
-            msg: msg.to_string(),
-            span,
-        }
     }
 }
 
@@ -312,14 +298,13 @@ impl fmt::Display for FileInfo<'_> {
                 "\n  --> {file_path}:{row}:{column}\n{source_after}",
                 row = error_info.row,
                 column = error_info.column,
-                source_after = &error_info.source_after,
+                source_after = error_info.source_after,
             )
         } else {
-            let file_path = match std::env::current_dir() {
-                Ok(cwd) => strip_common(&cwd, self.path),
-                Err(_) => self.path.display().to_string(),
-            };
-            write!(f, "\n --> {file_path}")
+            write!(f, "\n --> {}", match std::env::current_dir() {
+                Ok(cwd) => fmt_left!(move "{}", strip_common(&cwd, self.path)),
+                Err(_) => fmt_right!("{}", self.path.display()),
+            })
         }
     }
 }
@@ -331,11 +316,18 @@ struct ErrorInfo {
 }
 
 fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
+    const MAX_LINE_LEN: usize = 80;
+
     let offset = src.len() - input.len();
     let (source_before, source_after) = src.split_at(offset);
 
-    let source_after = match source_after.char_indices().enumerate().take(41).last() {
-        Some((80, (i, _))) => format!("{:?}...", &source_after[..i]),
+    let source_after = match source_after
+        .char_indices()
+        .enumerate()
+        .take(MAX_LINE_LEN + 1)
+        .last()
+    {
+        Some((MAX_LINE_LEN, (i, _))) => format!("{:?}...", &source_after[..i]),
         _ => format!("{source_after:?}"),
     };
 
@@ -354,7 +346,7 @@ fn generate_error_info(src: &str, input: &str, file_path: &Path) -> (ErrorInfo, 
         Ok(cwd) => strip_common(&cwd, file_path),
         Err(_) => file_path.display().to_string(),
     };
-    let error_info: ErrorInfo = generate_row_and_column(src, input);
+    let error_info = generate_row_and_column(src, input);
     (error_info, file_path)
 }
 
@@ -408,6 +400,57 @@ impl<K: Hash + Eq, V> OnceMap<K, V> {
         }))
     }
 }
+
+enum EitherFormat<L, R>
+where
+    L: for<'a, 'b> Fn(&'a mut fmt::Formatter<'b>) -> fmt::Result,
+    R: for<'a, 'b> Fn(&'a mut fmt::Formatter<'b>) -> fmt::Result,
+{
+    Left(L),
+    Right(R),
+}
+
+impl<L, R> fmt::Display for EitherFormat<L, R>
+where
+    L: for<'a, 'b> Fn(&'a mut fmt::Formatter<'b>) -> fmt::Result,
+    R: for<'a, 'b> Fn(&'a mut fmt::Formatter<'b>) -> fmt::Result,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Left(v) => v(f),
+            Self::Right(v) => v(f),
+        }
+    }
+}
+
+macro_rules! fmt_left {
+    (move $fmt:literal $($tt:tt)*) => {
+        $crate::EitherFormat::Left(move |f: &mut std::fmt::Formatter<'_>| {
+            f.write_fmt(std::format_args!($fmt $($tt)*))
+        })
+    };
+    ($fmt:literal $($tt:tt)*) => {
+        $crate::EitherFormat::Left(|f: &mut std::fmt::Formatter<'_>| {
+            f.write_fmt(std::format_args!($fmt $($tt)*))
+        })
+    };
+}
+
+macro_rules! fmt_right {
+    (move $fmt:literal $($tt:tt)*) => {
+        $crate::EitherFormat::Right(move |f: &mut std::fmt::Formatter<'_>| {
+            f.write_fmt(std::format_args!($fmt $($tt)*))
+        })
+    };
+    ($fmt:literal $($tt:tt)*) => {
+        $crate::EitherFormat::Right(|f: &mut std::fmt::Formatter<'_>| {
+            f.write_fmt(std::format_args!($fmt $($tt)*))
+        })
+    };
+}
+
+pub(crate) use {fmt_left, fmt_right};
 
 // This is used by the code generator to decide whether a named filter is part of
 // Rinja or should refer to a local `filters` module.
