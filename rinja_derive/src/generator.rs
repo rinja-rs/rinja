@@ -1493,9 +1493,9 @@ impl<'a, 'h> Generator<'a, 'h> {
         buf: &mut Buffer,
         expr: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write("rinja::helpers::core::result::Result::map_err(");
+        buf.write("rinja::helpers::map_try(");
         self.visit_expr(ctx, buf, expr)?;
-        buf.write(", |err| rinja::shared::Error::Custom(rinja::helpers::core::convert::Into::into(err)))?");
+        buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
     }
 

@@ -96,7 +96,7 @@ async fn not_found_handler(req: HttpRequest) -> Result<impl Responder> {
         };
         Ok(HttpResponse::NotFound()
             .insert_header(ContentType::html())
-            .body(tmpl.render().map_err(<Box<dyn std::error::Error>>::from)?))
+            .body(tmpl.render().map_err(|err| err.into_io_error())?))
     } else {
         Ok(HttpResponse::MethodNotAllowed().finish())
     }
@@ -155,9 +155,7 @@ async fn index_handler(
         name: query.name,
     };
     Ok(Html::new(
-        template
-            .render()
-            .map_err(<Box<dyn std::error::Error>>::from)?,
+        template.render().map_err(|err| err.into_io_error())?,
     ))
 }
 
@@ -192,8 +190,6 @@ async fn greeting_handler(
         name: query.name,
     };
     Ok(Html::new(
-        template
-            .render()
-            .map_err(<Box<dyn std::error::Error>>::from)?,
+        template.render().map_err(|err| err.into_io_error())?,
     ))
 }

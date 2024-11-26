@@ -263,3 +263,11 @@ impl<L: FastWritable, R: FastWritable> FastWritable for Concat<L, R> {
         self.1.write_into(dest)
     }
 }
+
+#[inline]
+pub fn map_try<T, E>(result: Result<T, E>) -> Result<T, crate::Error>
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    result.map_err(crate::Error::custom)
+}
