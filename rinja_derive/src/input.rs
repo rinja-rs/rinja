@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
+use std::fmt::Display;
 use std::fs::read_to_string;
 use std::iter::FusedIterator;
 use std::path::{Path, PathBuf};
@@ -59,11 +60,12 @@ impl TemplateInput<'_> {
                 PathBuf::from(format!("{}.{}", ast.ident, ext)).into()
             }
             (&Source::Source(_), None) => {
-                return Err(CompileError::no_file_info(
+                return Err(CompileError::new(
                     #[cfg(not(feature = "code-in-doc"))]
                     "must include `ext` attribute when using `source` attribute",
                     #[cfg(feature = "code-in-doc")]
                     "must include `ext` attribute when using `source` or `in_doc` attribute",
+                    None,
                     None,
                 ));
             }
@@ -74,7 +76,7 @@ impl TemplateInput<'_> {
             || Ok(config.syntaxes.get(config.default_syntax).unwrap()),
             |s| {
                 config.syntaxes.get(s).ok_or_else(|| {
-                    CompileError::no_file_info(format!("syntax `{s}` is undefined"), None)
+                    CompileError::new(format_args!("syntax `{s}` is undefined"), None, None)
                 })
             },
         )?;
@@ -95,12 +97,13 @@ impl TemplateInput<'_> {
                     .then_some(path.as_ref())
             })
             .ok_or_else(|| {
-                CompileError::no_file_info(
-                    format!(
+                CompileError::new(
+                    format_args!(
                         "no escaper defined for extension '{escaping}'. You can define an escaper \
                         in the config file (named `rinja.toml` by default). {}",
                         MsgValidEscapers(&config.escapers),
                     ),
+                    None,
                     *ext_span,
                 )
             })?;
@@ -165,7 +168,7 @@ impl TemplateInput<'_> {
                         .unwrap_or(Path::new("<source attribute>"));
                     let file_info =
                         FileInfo::new(file_path, Some(&source), Some(&source[err.offset..]));
-                    return Err(CompileError::new(msg, Some(file_info)));
+                    return Err(CompileError::new(msg, Some(file_info), None));
                 }
             };
 
@@ -296,7 +299,7 @@ impl TemplateArgs {
         args: Option<PartialTemplateArgs>,
     ) -> Result<Self, CompileError> {
         let Some(args) = args else {
-            return Err(CompileError::new_with_span(
+            return Err(CompileError::new(
                 "no attribute `template` found",
                 None,
                 Some(ast.ident.span()),
@@ -313,11 +316,12 @@ impl TemplateArgs {
                 #[cfg(feature = "code-in-doc")]
                 Some(PartialTemplateArgsSource::InDoc(span, source)) => (source, Some(span)),
                 None => {
-                    return Err(CompileError::no_file_info(
+                    return Err(CompileError::new(
                         #[cfg(not(feature = "code-in-doc"))]
                         "specify one template argument `path` or `source`",
                         #[cfg(feature = "code-in-doc")]
                         "specify one template argument `path`, `source` or `in_doc`",
+                        None,
                         Some(args.template.span()),
                     ));
                 }
@@ -433,11 +437,12 @@ fn no_rinja_code_block(span: Span, ast: &syn::DeriveInput) -> CompileError {
         // actually unreachable: `union`s are rejected by `TemplateArgs::new()`
         syn::Data::Union(_) => "union",
     };
-    CompileError::no_file_info(
-        format!(
+    CompileError::new(
+        format_args!(
             "when using `in_doc` with the value `true`, the {kind}'s documentation needs a \
              `rinja` code block"
         ),
+        None,
         Some(span),
     )
 }
@@ -565,14 +570,15 @@ impl FromStr for Print {
 }
 
 fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
-    Err(CompileError::no_file_info(
-        format!(
+    Err(CompileError::new(
+        format_args!(
             "cyclic dependency in graph {:#?}",
             dependency_graph
                 .iter()
                 .map(|e| format!("{:#?} --> {:#?}", e.0, e.1))
                 .collect::<Vec<String>>()
         ),
+        None,
         None,
     ))
 }
@@ -600,6 +606,7 @@ pub(crate) fn get_template_source(
                 import_from.map(|(node_file, file_source, node_source)| {
                     FileInfo::new(node_file, Some(file_source), Some(node_source))
                 }),
+                None,
             )),
         },
         Arc::clone,
@@ -644,7 +651,7 @@ const _: () = {
     ) -> Result<Option<PartialTemplateArgs>, CompileError> {
         // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
         if let syn::Data::Union(data) = &ast.data {
-            return Err(CompileError::new_with_span(
+            return Err(CompileError::new(
                 "rinja templates are not supported for `union` types, only `struct` and `enum`",
                 None,
                 Some(data.union_token.span),
@@ -685,8 +692,9 @@ const _: () = {
             let args = attr
                 .parse_args_with(<Punctuated<Meta, Token![,]>>::parse_terminated)
                 .map_err(|e| {
-                    CompileError::no_file_info(
-                        format!("unable to parse template arguments: {e}"),
+                    CompileError::new(
+                        format_args!("unable to parse template arguments: {e}"),
+                        None,
                         Some(attr.path().span()),
                     )
                 })?;
@@ -694,8 +702,9 @@ const _: () = {
                 let pair = match arg {
                     Meta::NameValue(pair) => pair,
                     v => {
-                        return Err(CompileError::no_file_info(
+                        return Err(CompileError::new(
                             "unsupported attribute argument",
+                            None,
                             Some(v.span()),
                         ));
                     }
@@ -723,8 +732,9 @@ const _: () = {
 
                     #[cfg(not(feature = "code-in-doc"))]
                     {
-                        return Err(CompileError::no_file_info(
+                        return Err(CompileError::new(
                             "enable feature `code-in-doc` to use `in_doc` argument",
+                            None,
                             Some(ident.span()),
                         ));
                     }
@@ -750,8 +760,9 @@ const _: () = {
                 } else if ident == "whitespace" {
                     set_parseable_string(ident, value, &mut this.whitespace)?;
                 } else {
-                    return Err(CompileError::no_file_info(
-                        format!("unsupported template attribute `{ident}` found"),
+                    return Err(CompileError::new(
+                        format_args!("unsupported template attribute `{ident}` found"),
+                        None,
                         Some(ident.span()),
                     ));
                 }
@@ -783,7 +794,7 @@ const _: () = {
         Ok(())
     }
 
-    fn set_parseable_string<T: FromStr<Err: ToString>>(
+    fn set_parseable_string<T: FromStr<Err: Display>>(
         name: &Ident,
         value: ExprLit,
         dest: &mut Option<T>,
@@ -794,7 +805,7 @@ const _: () = {
             str_value
                 .value()
                 .parse()
-                .map_err(|msg| CompileError::no_file_info(msg, Some(str_value.span())))?,
+                .map_err(|msg| CompileError::new(msg, None, Some(str_value.span())))?,
         );
         Ok(())
     }
@@ -803,8 +814,9 @@ const _: () = {
         if dest.is_none() {
             Ok(())
         } else {
-            Err(CompileError::no_file_info(
-                format!("template attribute `{name}` already set"),
+            Err(CompileError::new(
+                format_args!("template attribute `{name}` already set"),
+                None,
                 Some(name.span()),
             ))
         }
@@ -816,8 +828,9 @@ const _: () = {
                 Expr::Lit(lit) => return Ok(lit),
                 Expr::Group(group) => expr = *group.expr,
                 v => {
-                    return Err(CompileError::no_file_info(
-                        format!("template attribute `{name}` expects a literal"),
+                    return Err(CompileError::new(
+                        format_args!("template attribute `{name}` expects a literal"),
+                        None,
                         Some(v.span()),
                     ));
                 }
@@ -829,8 +842,9 @@ const _: () = {
         if let Lit::Str(s) = value.lit {
             Ok(s)
         } else {
-            Err(CompileError::no_file_info(
-                format!("template attribute `{name}` expects a string literal"),
+            Err(CompileError::new(
+                format_args!("template attribute `{name}` expects a string literal"),
+                None,
                 Some(value.lit.span()),
             ))
         }
@@ -840,8 +854,9 @@ const _: () = {
         if let Lit::Bool(s) = value.lit {
             Ok(s)
         } else {
-            Err(CompileError::no_file_info(
-                format!("template attribute `{name}` expects a boolean value"),
+            Err(CompileError::new(
+                format_args!("template attribute `{name}` expects a boolean value"),
+                None,
                 Some(value.lit.span()),
             ))
         }
@@ -852,11 +867,12 @@ const _: () = {
         source: &Option<PartialTemplateArgsSource>,
     ) -> Result<(), CompileError> {
         if source.is_some() {
-            return Err(CompileError::no_file_info(
+            return Err(CompileError::new(
                 #[cfg(feature = "code-in-doc")]
                 "must specify `source`, `path` or `is_doc` exactly once",
                 #[cfg(not(feature = "code-in-doc"))]
                 "must specify `source` or `path` exactly once",
+                None,
                 Some(name.span()),
             ));
         }

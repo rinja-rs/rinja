@@ -132,14 +132,18 @@ impl Config {
                 let name = raw_s.name;
                 match syntaxes.entry(name.to_string()) {
                     Entry::Vacant(entry) => {
-                        entry.insert(raw_s.to_syntax().map(SyntaxAndCache::new).map_err(
-                            |err| CompileError::new_with_span(err, file_info, config_span),
-                        )?);
+                        entry.insert(
+                            raw_s
+                                .to_syntax()
+                                .map(SyntaxAndCache::new)
+                                .map_err(|err| CompileError::new(err, file_info, config_span))?,
+                        );
                     }
                     Entry::Occupied(_) => {
                         return Err(CompileError::new(
                             format_args!("syntax {name:?} is already defined"),
                             file_info,
+                            None,
                         ));
                     }
                 }
@@ -148,8 +152,9 @@ impl Config {
 
         if !syntaxes.contains_key(default_syntax) {
             return Err(CompileError::new(
-                format!("default syntax \"{default_syntax}\" not found"),
+                format_args!("default syntax {default_syntax:?} not found"),
                 file_info,
+                None,
             ));
         }
 
@@ -197,11 +202,9 @@ impl Config {
         }
 
         Err(CompileError::new(
-            format!(
-                "template {:?} not found in directories {:?}",
-                path, self.dirs
-            ),
+            format_args!("template {path:?} not found in directories {:?}", self.dirs),
             file_info,
+            None,
         ))
     }
 }
@@ -294,16 +297,17 @@ impl RawConfig<'_> {
     #[cfg(feature = "config")]
     fn from_toml_str(s: &str) -> Result<RawConfig<'_>, CompileError> {
         basic_toml::from_str(s).map_err(|e| {
-            CompileError::no_file_info(format!("invalid TOML in {CONFIG_FILE_NAME}: {e}"), None)
+            CompileError::new(
+                format_args!("invalid TOML in {CONFIG_FILE_NAME}: {e}"),
+                None,
+                None,
+            )
         })
     }
 
     #[cfg(not(feature = "config"))]
     fn from_toml_str(_: &str) -> Result<RawConfig<'_>, CompileError> {
-        Err(CompileError::no_file_info(
-            "TOML support not available",
-            None,
-        ))
+        Err(CompileError::new("TOML support not available", None, None))
     }
 }
 
@@ -334,14 +338,16 @@ pub(crate) fn read_config_file(
 
     if filename.exists() {
         fs::read_to_string(&filename).map_err(|err| {
-            CompileError::no_file_info(
-                format!("unable to read {}: {err}", filename.display()),
+            CompileError::new(
+                format_args!("unable to read {}: {err}", filename.display()),
+                None,
                 span,
             )
         })
     } else if config_path.is_some() {
-        Err(CompileError::no_file_info(
-            format!("`{}` does not exist", filename.display()),
+        Err(CompileError::new(
+            format_args!("`{}` does not exist", filename.display()),
+            None,
             span,
         ))
     } else {

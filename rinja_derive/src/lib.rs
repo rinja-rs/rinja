@@ -213,8 +213,9 @@ fn build_template_item(
 
         if let Some(block_name) = input.block {
             if !heritage.blocks.contains_key(&block_name) {
-                return Err(CompileError::no_file_info(
-                    format!("cannot find block {block_name}"),
+                return Err(CompileError::new(
+                    format_args!("cannot find block {block_name}"),
+                    None,
                     None,
                 ));
             }
@@ -244,27 +245,12 @@ struct CompileError {
 }
 
 impl CompileError {
-    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>) -> Self {
-        Self::new_with_span(msg, file_info, None)
-    }
-
-    fn new_with_span<S: fmt::Display>(
-        msg: S,
-        file_info: Option<FileInfo<'_>>,
-        span: Option<Span>,
-    ) -> Self {
+    fn new<S: fmt::Display>(msg: S, file_info: Option<FileInfo<'_>>, span: Option<Span>) -> Self {
         let msg = match file_info {
             Some(file_info) => format!("{msg}{file_info}"),
             None => msg.to_string(),
         };
         Self { msg, span }
-    }
-
-    fn no_file_info<S: ToString>(msg: S, span: Option<Span>) -> Self {
-        Self {
-            msg: msg.to_string(),
-            span,
-        }
     }
 }
 

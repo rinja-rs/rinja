@@ -85,6 +85,7 @@ impl Context<'_> {
                             return Err(CompileError::new(
                                 "multiple extend blocks found",
                                 Some(FileInfo::of(e.span(), path, parsed)),
+                                None,
                             ));
                         }
                         extends = Some(config.find_template(
@@ -145,6 +146,7 @@ impl Context<'_> {
         CompileError::new(
             msg,
             self.path.map(|path| FileInfo::of(node, path, self.parsed)),
+            None,
         )
     }
 }
@@ -160,8 +162,9 @@ fn ensure_top(
         Ok(())
     } else {
         Err(CompileError::new(
-            format!("`{kind}` blocks are not allowed below top level"),
+            format_args!("`{kind}` blocks are not allowed below top level"),
             Some(FileInfo::of(node, path, parsed)),
+            None,
         ))
     }
 }
