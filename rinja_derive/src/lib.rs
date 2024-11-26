@@ -330,11 +330,18 @@ struct ErrorInfo {
 }
 
 fn generate_row_and_column(src: &str, input: &str) -> ErrorInfo {
+    const MAX_LINE_LEN: usize = 80;
+
     let offset = src.len() - input.len();
     let (source_before, source_after) = src.split_at(offset);
 
-    let source_after = match source_after.char_indices().enumerate().take(41).last() {
-        Some((80, (i, _))) => format!("{:?}...", &source_after[..i]),
+    let source_after = match source_after
+        .char_indices()
+        .enumerate()
+        .take(MAX_LINE_LEN + 1)
+        .last()
+    {
+        Some((MAX_LINE_LEN, (i, _))) => format!("{:?}...", &source_after[..i]),
         _ => format!("{source_after:?}"),
     };
 
