@@ -209,7 +209,7 @@ impl<'a, T> WithSpan<'a, T> {
     }
 }
 
-impl<'a, T> Deref for WithSpan<'a, T> {
+impl<T> Deref for WithSpan<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -217,19 +217,19 @@ impl<'a, T> Deref for WithSpan<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for WithSpan<'a, T> {
+impl<T> DerefMut for WithSpan<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<'a, T: fmt::Debug> fmt::Debug for WithSpan<'a, T> {
+impl<T: fmt::Debug> fmt::Debug for WithSpan<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.inner)
     }
 }
 
-impl<'a, T: Clone> Clone for WithSpan<'a, T> {
+impl<T: Clone> Clone for WithSpan<'_, T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -238,7 +238,7 @@ impl<'a, T: Clone> Clone for WithSpan<'a, T> {
     }
 }
 
-impl<'a, T: PartialEq> PartialEq for WithSpan<'a, T> {
+impl<T: PartialEq> PartialEq for WithSpan<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         // We never want to compare the span information.
         self.inner == other.inner
@@ -822,14 +822,14 @@ impl Default for InnerSyntax<'static> {
     }
 }
 
-impl<'a> fmt::Debug for Syntax<'a> {
+impl fmt::Debug for Syntax<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt_syntax("Syntax", self, f)
     }
 }
 
-impl<'a> fmt::Debug for InnerSyntax<'a> {
+impl fmt::Debug for InnerSyntax<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt_syntax("InnerSyntax", self, f)
