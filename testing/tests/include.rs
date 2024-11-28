@@ -63,11 +63,19 @@ fn test_include_macro() {
     assert_eq!(template.render().unwrap(), "Hello, Alice!\nHowdy, Bob!");
 }
 
-// FIXME: <https://github.com/rinja-rs/rinja/issues/272>
+// Check that if an `extends` has an `include` calling a `block`, then this `block` being the
+// first called, the following ones will be ignored.
+//
+// So in this test:
+// 1. `block_in_include_extended.html` extends `block_in_include_base.html`.
+// 2. `block_in_include_base.html` defines a block called `block_in_base` and includes
+//    `block_in_include_partial.html`.
+// 3. `block_in_include_partial.html` uses the block `block_in_base`.
+// 4. Back to `block_in_include_extended.html`: it uses the block `block_in_base`. However, this
+//    block was already called, so this second call is ignored.
+//
+// Related issue is <https://github.com/rinja-rs/rinja/issues/272>.
 #[test]
-#[should_panic(expected = r#"assertion `left == right` failed
-  left: "block_in_base: from extended!\nblock_in_partial: from partial!\n"
- right: "block_in_base: from extended!\nblock_in_partial: from extended!\n"#)]
 fn block_in_include() {
     #[derive(Template)]
     #[template(path = "block_in_include_extended.html")]
@@ -83,14 +91,14 @@ fn block_in_include() {
 
     assert_eq!(
         TmplExtended.render().unwrap(),
-        "block_in_base: from extended!\nblock_in_partial: from extended!\n"
+        "block_in_base: from extended!\nblock_in_partial: from partial!\n"
     );
     assert_eq!(
         TmplBlockInBase.render().unwrap(),
-        "block_in_base: from extended!\n"
+        "block_in_base: from base!\n"
     );
     assert_eq!(
         TmplBlockInPartial.render().unwrap(),
-        "block_in_partial: from extended!\n"
+        "block_in_partial: from partial!\n"
     );
 }
