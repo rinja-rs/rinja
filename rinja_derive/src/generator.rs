@@ -26,9 +26,12 @@ pub(crate) fn template_to_string(
     input: &TemplateInput<'_>,
     contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
     heritage: Option<&Heritage<'_, '_>>,
-    target: Option<&str>,
+    tmpl_kind: TmplKind,
 ) -> Result<usize, CompileError> {
-    let ctx = &contexts[&input.path];
+    if tmpl_kind == TmplKind::Struct {
+        buf.write("const _: () = { extern crate rinja as rinja;");
+    }
+
     let generator = Generator::new(
         input,
         contexts,
@@ -37,13 +40,27 @@ pub(crate) fn template_to_string(
         input.block.is_some(),
         0,
     );
-    let mut result = generator.build(ctx, buf, target);
-    if let Err(err) = &mut result {
-        if err.span.is_none() {
+    let size_hint = match generator.impl_template(buf, tmpl_kind) {
+        Err(mut err) if err.span.is_none() => {
             err.span = input.source_span;
+            Err(err)
         }
+        result => result,
+    }?;
+
+    if tmpl_kind == TmplKind::Struct {
+        impl_everything(input.ast, buf);
+        buf.write("};");
     }
-    result
+    Ok(size_hint)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TmplKind {
+    /// [`rinja::Template`]
+    Struct,
+    /// [`rinja::helpers::EnumVariantTemplate`]
+    Variant,
 }
 
 struct Generator<'a, 'h> {
@@ -95,24 +112,6 @@ impl<'a, 'h> Generator<'a, 'h> {
         }
     }
 
-    // Takes a Context and generates the relevant implementations.
-    fn build(
-        mut self,
-        ctx: &Context<'a>,
-        buf: &mut Buffer,
-        target: Option<&str>,
-    ) -> Result<usize, CompileError> {
-        if target.is_none() {
-            buf.write("const _: () = { extern crate rinja as rinja;");
-        }
-        let size_hint = self.impl_template(ctx, buf, target.unwrap_or("rinja::Template"))?;
-        if target.is_none() {
-            impl_everything(self.input.ast, buf);
-            buf.write("};");
-        }
-        Ok(size_hint)
-    }
-
     fn push_locals<T, F>(&mut self, callback: F) -> Result<T, CompileError>
     where
         F: FnOnce(&mut Self) -> Result<T, CompileError>,
@@ -158,11 +157,16 @@ impl<'a, 'h> Generator<'a, 'h> {
 
     // Implement `Template` for the given context struct.
     fn impl_template(
-        &mut self,
-        ctx: &Context<'a>,
+        mut self,
         buf: &mut Buffer,
-        target: &str,
+        tmpl_kind: TmplKind,
     ) -> Result<usize, CompileError> {
+        let ctx = &self.contexts[&self.input.path];
+
+        let target = match tmpl_kind {
+            TmplKind::Struct => "rinja::Template",
+            TmplKind::Variant => "rinja::helpers::EnumVariantTemplate",
+        };
         write_header(self.input.ast, buf, target);
         buf.write(
             "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
@@ -173,36 +177,40 @@ impl<'a, 'h> Generator<'a, 'h> {
                 use rinja::helpers::core::fmt::Write as _;",
         );
 
-        // Make sure the compiler understands that the generated code depends on the template files.
+        // Make sure the compiler understands that the generated code depends on the template files,
+        // skipping the fake path of templates defined in rust source.
         let mut paths = self
             .contexts
             .keys()
-            .map(|path| -> &Path { path })
+            .filter_map(|path| {
+                let path: &Path = path;
+                match &self.input.source {
+                    Source::Source(_) if path == &*self.input.path => None,
+                    _ => Some(path),
+                }
+            })
             .collect::<Vec<_>>();
         paths.sort();
         for path in paths {
-            // Skip the fake path of templates defined in rust source.
-            let path_is_valid = match self.input.source {
-                Source::Path(_) => true,
-                Source::Source(_) => path != &*self.input.path,
-            };
-            if path_is_valid {
-                buf.write(format_args!(
-                    "const _: &[rinja::helpers::core::primitive::u8] =\
-                        rinja::helpers::core::include_bytes!({:#?});",
-                    path.canonicalize().as_deref().unwrap_or(path),
-                ));
-            }
+            buf.write(format_args!(
+                "const _: &[rinja::helpers::core::primitive::u8] =\
+                    rinja::helpers::core::include_bytes!({:#?});",
+                path.canonicalize().as_deref().unwrap_or(path),
+            ));
         }
 
         let size_hint = self.impl_template_inner(ctx, buf)?;
 
-        buf.write(format_args!(
+        buf.write(
             "\
                 rinja::Result::Ok(())\
-            }}\
-            const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;",
-        ));
+            }",
+        );
+        if tmpl_kind == TmplKind::Struct {
+            buf.write(format_args!(
+                "const SIZE_HINT: rinja::helpers::core::primitive::usize = {size_hint}usize;",
+            ));
+        }
 
         buf.write('}');
         Ok(size_hint)
