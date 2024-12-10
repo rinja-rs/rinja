@@ -601,14 +601,14 @@ const _: () = {
         }
     }
 
-    impl<'a, S: FastWritable + ?Sized> WriteWritable for &Writable<'a, S> {
+    impl<S: FastWritable + ?Sized> WriteWritable for &Writable<'_, S> {
         #[inline]
         fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             self.0.write_into(dest)
         }
     }
 
-    impl<'a, S: fmt::Display + ?Sized> WriteWritable for &&Writable<'a, S> {
+    impl<S: fmt::Display + ?Sized> WriteWritable for &&Writable<'_, S> {
         #[inline]
         fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             Ok(write!(dest, "{}", self.0)?)

@@ -29,7 +29,7 @@ jobs:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --all-targets --features full
-      - run: cargo nextest run --all-targets --features full
+      - run: cargo nextest run --all-targets --no-tests=warn --features full
 
   Package:
     strategy:
@@ -48,7 +48,7 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-      - run: cd ${{ matrix.package }} && cargo nextest run
+      - run: cd ${{ matrix.package }} && cargo nextest run --no-tests=warn
       - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
 
   Docs:

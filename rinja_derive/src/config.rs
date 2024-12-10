@@ -42,7 +42,7 @@ struct ConfigKey<'a> {
     template_whitespace: Option<Whitespace>,
 }
 
-impl<'a> ToOwned for ConfigKey<'a> {
+impl ToOwned for ConfigKey<'_> {
     type Owned = OwnedConfigKey;
 
     fn to_owned(&self) -> Self::Owned {
