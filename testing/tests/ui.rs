@@ -1,4 +1,5 @@
 #![cfg(not(windows))]
+#![cfg(RUN_UI_TESTS)] // set by `build.rs` if we are running rust stable
 
 use std::os::unix::fs::symlink;
 use std::path::PathBuf;

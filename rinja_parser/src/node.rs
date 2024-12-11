@@ -648,12 +648,10 @@ impl<'a> Macro<'a> {
                 .parse_next(i)?;
                 match args {
                     Some((args, Some(_))) => Ok((i, args)),
-                    Some((_, None)) => {
-                        return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                            "expected `)` to close macro argument list",
-                            i,
-                        )));
-                    }
+                    Some((_, None)) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+                        "expected `)` to close macro argument list",
+                        i,
+                    ))),
                     None => Ok((i, None)),
                 }
             };

@@ -7,7 +7,7 @@ struct SelfMethodTemplate<'a> {
 }
 
 impl<'a> SelfMethodTemplate<'a> {
-    fn get_s(&self) -> &str {
+    fn get_s(&self) -> &'a str {
         self.s
     }
 }
@@ -43,7 +43,7 @@ fn test_nested() {
     }
 
     impl<'a> NestedSelfMethodTemplate<'a> {
-        fn get_s(&self) -> &str {
+        fn get_s(&self) -> &'a str {
             "bar"
         }
     }
