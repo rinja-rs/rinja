@@ -34,3 +34,7 @@ harness = false
 [[bench]]
 name = "normalize_identifier"
 harness = false
+
+[lints.rust]
+# Set in `build.rs` if we are compiling in stable rust, used by `ui.rs`
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(RUN_UI_TESTS)'] }
