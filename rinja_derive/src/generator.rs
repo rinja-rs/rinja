@@ -19,7 +19,10 @@ use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
 use crate::integration::{Buffer, impl_everything, write_header};
-use crate::{BUILTIN_FILTERS, CompileError, FileInfo, MsgValidEscapers, fmt_left, fmt_right};
+use crate::{
+    BUILTIN_FILTERS, BUILTIN_FILTERS_NEED_ALLOC, CompileError, FileInfo, MsgValidEscapers,
+    fmt_left, fmt_right,
+};
 
 pub(crate) fn template_to_string(
     buf: &mut Buffer,
@@ -1493,6 +1496,13 @@ impl<'a, 'h> Generator<'a, 'h> {
         buf: &mut Buffer,
         expr: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
+        if !cfg!(feature = "alloc") {
+            return Err(ctx.generate_error(
+                "the `?` operator requires the `alloc` feature to be enabled",
+                expr.span(),
+            ));
+        }
+
         buf.write("rinja::helpers::map_try(");
         self.visit_expr(ctx, buf, expr)?;
         buf.write(")?");
@@ -1541,8 +1551,11 @@ impl<'a, 'h> Generator<'a, 'h> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
-        _node: Span<'_>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
+        if BUILTIN_FILTERS_NEED_ALLOC.contains(&name) {
+            ensure_filter_has_feature_alloc(ctx, name, node)?;
+        }
         buf.write(format_args!("filters::{name}("));
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
@@ -1657,6 +1670,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         args: &[WithSpan<'_, Expr<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
+        ensure_filter_has_feature_alloc(ctx, name, node)?;
         if args.len() != 1 {
             return Err(ctx.generate_error(
                 format_args!("unexpected argument(s) in `{name}` filter"),
@@ -1816,10 +1830,11 @@ impl<'a, 'h> Generator<'a, 'h> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
+        name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
+        ensure_filter_has_feature_alloc(ctx, name, node)?;
         if !args.is_empty() {
             if let Expr::StrLit(ref fmt) = *args[0] {
                 buf.write("rinja::helpers::std::format!(");
@@ -1839,10 +1854,11 @@ impl<'a, 'h> Generator<'a, 'h> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
+        name: &str,
         args: &[WithSpan<'_, Expr<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
+        ensure_filter_has_feature_alloc(ctx, name, node)?;
         if let [_, arg2] = args {
             if let Expr::StrLit(ref fmt) = **arg2 {
                 buf.write("rinja::helpers::std::format!(");
@@ -2385,6 +2401,20 @@ impl<'a, 'h> Generator<'a, 'h> {
     fn prepare_ws(&mut self, ws: Ws) {
         self.skip_ws = self.should_trim_ws(ws.1);
     }
+}
+
+fn ensure_filter_has_feature_alloc(
+    ctx: &Context<'_>,
+    name: &str,
+    node: Span<'_>,
+) -> Result<(), CompileError> {
+    if !cfg!(feature = "alloc") {
+        return Err(ctx.generate_error(
+            format_args!("the `{name}` filter requires the `alloc` feature to be enabled"),
+            node,
+        ));
+    }
+    Ok(())
 }
 
 fn macro_call_ensure_arg_count(

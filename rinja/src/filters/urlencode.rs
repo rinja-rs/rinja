@@ -127,7 +127,10 @@ impl<W: fmt::Write> fmt::Write for UrlencodeWriter<W> {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_urlencoding() {
+    use alloc::string::ToString;
+
     // Unreserved (https://tools.ietf.org/html/rfc3986.html#section-2.3)
     // alpha / digit
     assert_eq!(urlencode("AZaz09").unwrap().to_string(), "AZaz09");

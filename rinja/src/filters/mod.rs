@@ -10,6 +10,8 @@
 //! The traits [`AutoEscape`] and [`WriteWritable`] are used by [`rinja_derive`]'s generated code
 //! to work with all compatible types.
 
+#[cfg(feature = "alloc")]
+mod alloc;
 mod builtin;
 mod escape;
 mod humansize;
@@ -18,10 +20,12 @@ mod json;
 #[cfg(feature = "urlencode")]
 mod urlencode;
 
-pub use self::builtin::{
-    PluralizeCount, capitalize, center, fmt, format, indent, join, linebreaks, linebreaksbr, lower,
-    lowercase, paragraphbreaks, pluralize, title, trim, truncate, upper, uppercase, wordcount,
+#[cfg(feature = "alloc")]
+pub use self::alloc::{
+    capitalize, fmt, format, indent, linebreaks, linebreaksbr, lower, lowercase, paragraphbreaks,
+    title, trim, upper, uppercase, wordcount,
 };
+pub use self::builtin::{PluralizeCount, center, join, pluralize, truncate};
 pub use self::escape::{
     AutoEscape, AutoEscaper, Escaper, FastWritable, Html, HtmlSafe, HtmlSafeOutput, MaybeSafe,
     Safe, Text, Unsafe, Writable, WriteWritable, e, escape, safe,
@@ -31,3 +35,6 @@ pub use self::humansize::filesizeformat;
 pub use self::json::{AsIndent, json, json_pretty};
 #[cfg(feature = "urlencode")]
 pub use self::urlencode::{urlencode, urlencode_strict};
+
+// MAX_LEN is maximum allowed length for filters.
+const MAX_LEN: usize = 10_000;

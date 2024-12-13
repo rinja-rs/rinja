@@ -119,7 +119,8 @@ impl AsIndent for str {
     }
 }
 
-impl AsIndent for String {
+#[cfg(feature = "alloc")]
+impl AsIndent for alloc::string::String {
     #[inline]
     fn as_indent(&self) -> &str {
         self
@@ -157,7 +158,8 @@ fn spaces(width: usize) -> &'static str {
     &SPACES[..width.min(SPACES.len())]
 }
 
-impl<T: AsIndent + ToOwned + ?Sized> AsIndent for std::borrow::Cow<'_, T> {
+#[cfg(feature = "alloc")]
+impl<T: AsIndent + alloc::borrow::ToOwned + ?Sized> AsIndent for alloc::borrow::Cow<'_, T> {
     #[inline]
     fn as_indent(&self) -> &str {
         T::as_indent(self)
@@ -265,8 +267,11 @@ fn write<W: fmt::Write + ?Sized>(f: &mut W, bytes: &[u8]) -> fmt::Result {
     f.write_str(unsafe { str::from_utf8_unchecked(&bytes[last..]) })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
+    use alloc::string::ToString;
+    use alloc::vec;
+
     use super::*;
 
     #[test]

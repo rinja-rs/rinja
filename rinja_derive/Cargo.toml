@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 workspace = ".."
 readme = "README.md"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.81"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -39,10 +39,12 @@ similar = "2.6.0"
 syn = { version = "2.0.3", features = ["full"] }
 
 [features]
+alloc = []
 code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:serde", "dep:basic-toml", "parser/config"]
 urlencode = []
 serde_json = []
+std = ["alloc"]
 
 [lints.rust]
 # Used in `rinja_derive_standalone` which uses the same source folder, but is not a proc-macro.

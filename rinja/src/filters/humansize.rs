@@ -1,7 +1,7 @@
-use std::convert::Infallible;
-use std::fmt;
-use std::mem::MaybeUninit;
-use std::str::from_utf8_unchecked;
+use core::convert::Infallible;
+use core::fmt;
+use core::mem::MaybeUninit;
+use core::str::from_utf8_unchecked;
 
 use super::FastWritable;
 
@@ -101,8 +101,10 @@ const SI_PREFIXES: &[((u8, f32), f32)] = &[
 ];
 
 #[test]
-#[allow(clippy::needless_borrows_for_generic_args)]
+#[cfg(feature = "alloc")]
 fn test_filesizeformat() {
+    use alloc::string::ToString;
+
     assert_eq!(filesizeformat(0.).unwrap().to_string(), "0 B");
     assert_eq!(filesizeformat(999.).unwrap().to_string(), "999 B");
     assert_eq!(filesizeformat(1000.).unwrap().to_string(), "1 kB");
