@@ -1,1 +1,23 @@
-table_order = ["workspace", "package", "badges", "lib", "features", "dependencies", "build-dependencies", "dev-dependencies", "bench"]
+# Keep in the same order as <https://doc.rust-lang.org/cargo/reference/manifest.html>
+table_order = [
+    "package",
+    # targets
+    "lib",
+    "bin",
+    "example",
+    "test",
+    "bench",
+    # dependencies
+    "dependencies",
+    "dev-dependencies",
+    "build-dependencies",
+    "target",
+    # misc
+    "badges",
+    "features",
+    "lints",
+    "patch",
+    "replace",
+    "profile",
+    "workspace",
+]

@@ -17,8 +17,9 @@ rust-version = "1.80"
 all-features = true
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
-[features]
-config = ["dep:serde"]
+[[bench]]
+name = "from_str"
+harness = false
 
 [dependencies]
 memchr = "2"
@@ -28,6 +29,5 @@ winnow = "0.4"
 [dev-dependencies]
 criterion = "0.5"
 
-[[bench]]
-name = "from_str"
-harness = false
+[features]
+config = ["dep:serde"]

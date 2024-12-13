@@ -17,12 +17,6 @@ rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 [lib]
 proc-macro = true
 
-[features]
-code-in-doc = ["dep:pulldown-cmark"]
-config = ["dep:serde", "dep:basic-toml", "parser/config"]
-urlencode = []
-serde_json = []
-
 [dependencies]
 parser = { package = "rinja_parser", version = "=0.3.5", path = "../rinja_parser" }
 
@@ -43,6 +37,12 @@ console = "0.15.8"
 prettyplease = "0.2.20"
 similar = "2.6.0"
 syn = { version = "2.0.3", features = ["full"] }
+
+[features]
+code-in-doc = ["dep:pulldown-cmark"]
+config = ["dep:serde", "dep:basic-toml", "parser/config"]
+urlencode = []
+serde_json = []
 
 [lints.rust]
 # Used in `rinja_derive_standalone` which uses the same source folder, but is not a proc-macro.

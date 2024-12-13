@@ -1,5 +1,3 @@
-[workspace]
-members = ["."]
 
 [package]
 name = "rinja_derive_standalone"
@@ -17,14 +15,10 @@ publish = false
 all-features = true
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
-[features]
-default = ["__standalone"]
-__standalone = []
-
-code-in-doc = ["dep:pulldown-cmark"]
-config = ["dep:serde", "dep:basic-toml", "parser/config"]
-urlencode = []
-serde_json = []
+[[bench]]
+name = "derive-template"
+harness = false
+required-features = ["__standalone"]
 
 [dependencies]
 parser = { package = "rinja_parser", version = "=0.3.5", path = "../rinja_parser" }
@@ -48,7 +42,14 @@ prettyplease = "0.2.20"
 similar = "2.6.0"
 syn = { version = "2.0.3", features = ["full"] }
 
-[[bench]]
-name = "derive-template"
-harness = false
-required-features = ["__standalone"]
+[features]
+default = ["__standalone"]
+__standalone = []
+
+code-in-doc = ["dep:pulldown-cmark"]
+config = ["dep:serde", "dep:basic-toml", "parser/config"]
+urlencode = []
+serde_json = []
+
+[workspace]
+members = ["."]
