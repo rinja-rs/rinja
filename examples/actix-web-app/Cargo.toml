@@ -1,7 +1,3 @@
-# In a real application you would not need this section. It is only used in here, so that this
-# example can have a more lenient MSRV (minimum supported rust version) than rinja as a whole.
-[workspace]
-members = ["."]
 
 [package]
 name = "actix-web-app"
@@ -28,3 +24,8 @@ env_logger = "0.11.3"
 log = "0.4.22"
 pretty-error-debug = "0.3.0"
 thiserror = "2.0.3"
+
+# In a real application you would not need this section. It is only used in here, so that this
+# example can have a more lenient MSRV (minimum supported rust version) than rinja as a whole.
+[workspace]
+members = ["."]
