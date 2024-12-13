@@ -1,12 +1,16 @@
-use std::cell::Cell;
-use std::fmt;
-use std::iter::{Enumerate, Peekable};
-use std::ops::Deref;
-use std::pin::Pin;
-
 // The re-exports are used in the generated code for macro hygiene. Even if the paths `::core` or
 // `::std` are shadowed, the generated code will still be able to access the crates.
-pub use {core, std};
+#[cfg(feature = "alloc")]
+pub extern crate alloc;
+pub extern crate core;
+#[cfg(feature = "std")]
+pub extern crate std;
+
+use core::cell::Cell;
+use core::fmt;
+use core::iter::{Enumerate, Peekable};
+use core::ops::Deref;
+use core::pin::Pin;
 
 use crate::filters::FastWritable;
 
@@ -177,7 +181,7 @@ impl<T: PrimitiveType + Copy> PrimitiveType for Cell<T> {
     }
 }
 
-impl<T: PrimitiveType> PrimitiveType for std::num::Wrapping<T> {
+impl<T: PrimitiveType> PrimitiveType for core::num::Wrapping<T> {
     type Value = T::Value;
 
     #[inline]
@@ -186,7 +190,7 @@ impl<T: PrimitiveType> PrimitiveType for std::num::Wrapping<T> {
     }
 }
 
-impl<T: PrimitiveType> PrimitiveType for std::num::Saturating<T> {
+impl<T: PrimitiveType> PrimitiveType for core::num::Saturating<T> {
     type Value = T::Value;
 
     #[inline]
@@ -209,18 +213,18 @@ macro_rules! primitize_nz {
 }
 
 primitize_nz! {
-    std::num::NonZeroI8 => i8,
-    std::num::NonZeroI16 => i16,
-    std::num::NonZeroI32 => i32,
-    std::num::NonZeroI64 => i64,
-    std::num::NonZeroI128 => i128,
-    std::num::NonZeroIsize => isize,
-    std::num::NonZeroU8 => u8,
-    std::num::NonZeroU16 => u16,
-    std::num::NonZeroU32 => u32,
-    std::num::NonZeroU64 => u64,
-    std::num::NonZeroU128 => u128,
-    std::num::NonZeroUsize => usize,
+    core::num::NonZeroI8 => i8,
+    core::num::NonZeroI16 => i16,
+    core::num::NonZeroI32 => i32,
+    core::num::NonZeroI64 => i64,
+    core::num::NonZeroI128 => i128,
+    core::num::NonZeroIsize => isize,
+    core::num::NonZeroU8 => u8,
+    core::num::NonZeroU16 => u16,
+    core::num::NonZeroU32 => u32,
+    core::num::NonZeroU64 => u64,
+    core::num::NonZeroU128 => u128,
+    core::num::NonZeroUsize => usize,
 }
 
 /// An empty element, so nothing will be written.
@@ -265,9 +269,10 @@ impl<L: FastWritable, R: FastWritable> FastWritable for Concat<L, R> {
 }
 
 #[inline]
+#[cfg(feature = "alloc")]
 pub fn map_try<T, E>(result: Result<T, E>) -> Result<T, crate::Error>
 where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+    E: Into<alloc::boxed::Box<dyn std::error::Error + Send + Sync>>,
 {
     result.map_err(crate::Error::custom)
 }

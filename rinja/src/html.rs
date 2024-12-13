@@ -1,4 +1,9 @@
-use std::{fmt, str};
+// The file is shared across many crates, not all have this feature.
+// If they don't then the tests won't be compiled in, but that's OK, because they are executed at
+// least in the crate `rinja`. There's no need to run the test multiple times.
+#![allow(unexpected_cfgs)]
+
+use core::{fmt, str};
 
 #[allow(unused)]
 pub(crate) fn write_escaped_str(mut dest: impl fmt::Write, src: &str) -> fmt::Result {
@@ -116,8 +121,11 @@ const ESCAPED_BUF_INIT: [u8; 8] = *b"&#__;\0\0\0";
 const ESCAPED_BUF_LEN: usize = b"&#__;".len();
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_simple_html_string_escaping() {
-    let mut buf = String::new();
+    extern crate alloc;
+
+    let mut buf = alloc::string::String::new();
     write_escaped_str(&mut buf, "<script>").unwrap();
     assert_eq!(buf, "&#60;script&#62;");
 

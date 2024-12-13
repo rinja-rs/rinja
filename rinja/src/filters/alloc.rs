@@ -1,14 +1,9 @@
-use std::cell::Cell;
-use std::convert::Infallible;
-use std::fmt::{self, Write};
-use std::ops::Deref;
-use std::pin::Pin;
+use alloc::string::String;
+use core::fmt::{self, Write};
 
-use super::escape::{FastWritable, HtmlSafeOutput};
-use crate::{Error, Result};
-
-// MAX_LEN is maximum allowed length for filters.
-const MAX_LEN: usize = 10_000;
+use super::MAX_LEN;
+use super::escape::HtmlSafeOutput;
+use crate::Result;
 
 /// Return an ephemeral `&str` for `$src: impl fmt::Display`
 ///
@@ -126,7 +121,7 @@ pub fn format() {}
 pub fn linebreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn linebreaks(s: &str) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace('\n', "<br/>");
-        format!("<p>{linebroken}</p>")
+        alloc::format!("<p>{linebroken}</p>")
     }
 
     let mut buffer;
@@ -191,7 +186,7 @@ pub fn linebreaksbr(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt:
 pub fn paragraphbreaks(s: impl fmt::Display) -> Result<HtmlSafeOutput<String>, fmt::Error> {
     fn paragraphbreaks(s: &str) -> String {
         let linebroken = s.replace("\n\n", "</p><p>").replace("<p></p>", "");
-        format!("<p>{linebroken}</p>")
+        alloc::format!("<p>{linebroken}</p>")
     }
 
     let mut buffer;
@@ -340,6 +335,7 @@ pub fn uppercase(s: impl fmt::Display) -> Result<String, fmt::Error> {
 /// );
 /// # }
 /// ```
+#[cfg(feature = "alloc")]
 pub fn trim<T: fmt::Display>(s: T) -> Result<String> {
     struct Collector(String);
 
@@ -357,112 +353,6 @@ pub fn trim<T: fmt::Display>(s: T) -> Result<String> {
     let Collector(mut s) = collector;
     s.truncate(s.trim_end().len());
     Ok(s)
-}
-
-/// Limit string length, appends '...' if truncated
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// <div>{{ example|truncate(2) }}</div>
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Example<'a> {
-///     example: &'a str,
-/// }
-///
-/// assert_eq!(
-///     Example { example: "hello" }.to_string(),
-///     "<div>he...</div>"
-/// );
-/// # }
-/// ```
-#[inline]
-pub fn truncate<S: fmt::Display>(
-    source: S,
-    remaining: usize,
-) -> Result<TruncateFilter<S>, Infallible> {
-    Ok(TruncateFilter { source, remaining })
-}
-
-pub struct TruncateFilter<S> {
-    source: S,
-    remaining: usize,
-}
-
-impl<S: fmt::Display> fmt::Display for TruncateFilter<S> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(TruncateWriter::new(f, self.remaining), "{}", self.source)
-    }
-}
-
-impl<S: FastWritable> FastWritable for TruncateFilter<S> {
-    #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
-        self.source
-            .write_into(&mut TruncateWriter::new(dest, self.remaining))
-    }
-}
-
-struct TruncateWriter<W> {
-    dest: Option<W>,
-    remaining: usize,
-}
-
-impl<W> TruncateWriter<W> {
-    fn new(dest: W, remaining: usize) -> Self {
-        TruncateWriter {
-            dest: Some(dest),
-            remaining,
-        }
-    }
-}
-
-impl<W: fmt::Write> fmt::Write for TruncateWriter<W> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        let Some(dest) = &mut self.dest else {
-            return Ok(());
-        };
-        let mut rem = self.remaining;
-        if rem >= s.len() {
-            dest.write_str(s)?;
-            self.remaining -= s.len();
-        } else {
-            if rem > 0 {
-                while !s.is_char_boundary(rem) {
-                    rem += 1;
-                }
-                if rem == s.len() {
-                    // Don't write "..." if the char bound extends to the end of string.
-                    self.remaining = 0;
-                    return dest.write_str(s);
-                }
-                dest.write_str(&s[..rem])?;
-            }
-            dest.write_str("...")?;
-            self.dest = None;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn write_char(&mut self, c: char) -> fmt::Result {
-        match self.dest.is_some() {
-            true => self.write_str(c.encode_utf8(&mut [0; 4])),
-            false => Ok(()),
-        }
-    }
-
-    #[inline]
-    fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> fmt::Result {
-        match self.dest.is_some() {
-            true => fmt::write(self, args),
-            false => Ok(()),
-        }
-    }
 }
 
 /// Indent lines with `width` spaces
@@ -494,7 +384,7 @@ pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> 
             return Ok(buffer);
         } else if let Some(s) = args.as_str() {
             if s.len() >= MAX_LEN {
-                return Ok(s.to_owned());
+                return Ok(s.into());
             } else {
                 s
             }
@@ -519,70 +409,6 @@ pub fn indent(s: impl fmt::Display, width: usize) -> Result<String, fmt::Error> 
         Ok(indented)
     }
     indent(format_args!("{s}"), width)
-}
-
-/// Joins iterable into a string separated by provided argument
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// <div>{{ example|join(", ") }}</div>
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Example<'a> {
-///     example: &'a [&'a str],
-/// }
-///
-/// assert_eq!(
-///     Example { example: &["foo", "bar", "bazz"] }.to_string(),
-///     "<div>foo, bar, bazz</div>"
-/// );
-/// # }
-/// ```
-#[inline]
-pub fn join<I, S>(input: I, separator: S) -> Result<JoinFilter<I, S>, Infallible>
-where
-    I: IntoIterator,
-    I::Item: fmt::Display,
-    S: fmt::Display,
-{
-    Ok(JoinFilter(Cell::new(Some((input, separator)))))
-}
-
-/// Result of the filter [`join()`].
-///
-/// ## Note
-///
-/// This struct implements [`fmt::Display`], but only produces a string once.
-/// Any subsequent call to `.to_string()` will result in an empty string, because the iterator is
-/// already consumed.
-// The filter contains a [`Cell`], so we can modify iterator inside a method that takes `self` by
-// reference: [`fmt::Display::fmt()`] normally has the contract that it will produce the same result
-// in multiple invocations for the same object. We break this contract, because have to consume the
-// iterator, unless we want to enforce `I: Clone`, nor do we want to "memorize" the result of the
-// joined data.
-pub struct JoinFilter<I, S>(Cell<Option<(I, S)>>);
-
-impl<I, S> fmt::Display for JoinFilter<I, S>
-where
-    I: IntoIterator,
-    I::Item: fmt::Display,
-    S: fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some((iter, separator)) = self.0.take() else {
-            return Ok(());
-        };
-        for (idx, token) in iter.into_iter().enumerate() {
-            match idx {
-                0 => f.write_fmt(format_args!("{token}"))?,
-                _ => f.write_fmt(format_args!("{separator}{token}"))?,
-            }
-        }
-        Ok(())
-    }
 }
 
 /// Capitalize a value. The first character will be uppercase, all others lowercase.
@@ -626,46 +452,6 @@ pub fn capitalize(s: impl fmt::Display) -> Result<String, fmt::Error> {
 
     let mut buffer;
     capitalize(try_to_str!(s => buffer))
-}
-
-/// Centers the value in a field of a given width
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// <div>-{{ example|center(5) }}-</div>
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Example<'a> {
-///     example: &'a str,
-/// }
-///
-/// assert_eq!(
-///     Example { example: "a" }.to_string(),
-///     "<div>-  a  -</div>"
-/// );
-/// # }
-/// ```
-#[inline]
-pub fn center<T: fmt::Display>(src: T, width: usize) -> Result<Center<T>, Infallible> {
-    Ok(Center { src, width })
-}
-
-pub struct Center<T> {
-    src: T,
-    width: usize,
-}
-
-impl<T: fmt::Display> fmt::Display for Center<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.width < MAX_LEN {
-            write!(f, "{: ^1$}", self.src, self.width)
-        } else {
-            write!(f, "{}", self.src)
-        }
-    }
 }
 
 /// Count the words in that string.
@@ -742,238 +528,10 @@ pub fn title(s: impl fmt::Display) -> Result<String, fmt::Error> {
     Ok(output)
 }
 
-/// For a value of `±1` by default an empty string `""` is returned, otherwise `"s"`.
-///
-/// # Examples
-///
-/// ## With default arguments
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// I have {{dogs}} dog{{dogs|pluralize}} and {{cats}} cat{{cats|pluralize}}.
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Pets {
-///     dogs: i8,
-///     cats: i8,
-/// }
-///
-/// assert_eq!(
-///     Pets { dogs: 0, cats: 0 }.to_string(),
-///     "I have 0 dogs and 0 cats."
-/// );
-/// assert_eq!(
-///     Pets { dogs: 1, cats: 1 }.to_string(),
-///     "I have 1 dog and 1 cat."
-/// );
-/// assert_eq!(
-///     Pets { dogs: -1, cats: 99 }.to_string(),
-///     "I have -1 dog and 99 cats."
-/// );
-/// # }
-/// ```
-///
-/// ## Overriding the singular case
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// I have {{dogs}} dog{{ dogs|pluralize("go") }}.
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Dog {
-///     dogs: i8,
-/// }
-///
-/// assert_eq!(
-///     Dog { dogs: 0 }.to_string(),
-///     "I have 0 dogs."
-/// );
-/// assert_eq!(
-///     Dog { dogs: 1 }.to_string(),
-///     "I have 1 doggo."
-/// );
-/// # }
-/// ```
-///
-/// ## Overriding singular and plural cases
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// I have {{mice}} {{ mice|pluralize("mouse", "mice") }}.
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Mice {
-///     mice: i8,
-/// }
-///
-/// assert_eq!(
-///     Mice { mice: 42 }.to_string(),
-///     "I have 42 mice."
-/// );
-/// assert_eq!(
-///     Mice { mice: 1 }.to_string(),
-///     "I have 1 mouse."
-/// );
-/// # }
-/// ```
-///
-/// ## Arguments get escaped
-///
-/// ```
-/// # #[cfg(feature = "code-in-doc")] {
-/// # use rinja::Template;
-/// /// ```jinja
-/// /// You are number {{ number|pluralize("<b>ONE</b>", number) }}!
-/// /// ```
-/// #[derive(Template)]
-/// #[template(ext = "html", in_doc = true)]
-/// struct Number {
-///     number: usize
-/// }
-///
-/// assert_eq!(
-///     Number { number: 1 }.to_string(),
-///     "You are number &#60;b&#62;ONE&#60;/b&#62;!",
-/// );
-/// assert_eq!(
-///     Number { number: 9000 }.to_string(),
-///     "You are number 9000!",
-/// );
-/// # }
-/// ```
-#[inline]
-pub fn pluralize<C, S, P>(count: C, singular: S, plural: P) -> Result<Pluralize<S, P>, C::Error>
-where
-    C: PluralizeCount,
-{
-    match count.is_singular()? {
-        true => Ok(Pluralize::Singular(singular)),
-        false => Ok(Pluralize::Plural(plural)),
-    }
-}
-
-/// An integer that can have the value `+1` and maybe `-1`.
-pub trait PluralizeCount {
-    /// A possible error that can occur while checking the value.
-    type Error: Into<Error>;
-
-    /// Returns `true` if and only if the value is `±1`.
-    fn is_singular(&self) -> Result<bool, Self::Error>;
-}
-
-const _: () = {
-    crate::impl_for_ref! {
-        impl PluralizeCount for T {
-            type Error = T::Error;
-
-            #[inline]
-            fn is_singular(&self) -> Result<bool, Self::Error> {
-                <T>::is_singular(self)
-            }
-        }
-    }
-
-    impl<T> PluralizeCount for Pin<T>
-    where
-        T: Deref,
-        <T as Deref>::Target: PluralizeCount,
-    {
-        type Error = <<T as Deref>::Target as PluralizeCount>::Error;
-
-        #[inline]
-        fn is_singular(&self) -> Result<bool, Self::Error> {
-            self.as_ref().get_ref().is_singular()
-        }
-    }
-
-    /// implement `PluralizeCount` for unsigned integer types
-    macro_rules! impl_pluralize_for_unsigned_int {
-        ($($ty:ty)*) => { $(
-            impl PluralizeCount for $ty {
-                type Error = Infallible;
-
-                #[inline]
-                fn is_singular(&self) -> Result<bool, Self::Error> {
-                    Ok(*self == 1)
-                }
-            }
-        )* };
-    }
-
-    impl_pluralize_for_unsigned_int!(u8 u16 u32 u64 u128 usize);
-
-    /// implement `PluralizeCount` for signed integer types
-    macro_rules! impl_pluralize_for_signed_int {
-        ($($ty:ty)*) => { $(
-            impl PluralizeCount for $ty {
-                type Error = Infallible;
-
-                #[inline]
-                fn is_singular(&self) -> Result<bool, Self::Error> {
-                    Ok(*self == 1 || *self == -1)
-                }
-            }
-        )* };
-    }
-
-    impl_pluralize_for_signed_int!(i8 i16 i32 i64 i128 isize);
-
-    /// implement `PluralizeCount` for non-zero integer types
-    macro_rules! impl_pluralize_for_non_zero {
-        ($($ty:ident)*) => { $(
-            impl PluralizeCount for std::num::$ty {
-                type Error = Infallible;
-
-                #[inline]
-                fn is_singular(&self) -> Result<bool, Self::Error> {
-                    self.get().is_singular()
-                }
-            }
-        )* };
-    }
-
-    impl_pluralize_for_non_zero! {
-        NonZeroI8 NonZeroI16 NonZeroI32 NonZeroI64 NonZeroI128 NonZeroIsize
-        NonZeroU8 NonZeroU16 NonZeroU32 NonZeroU64 NonZeroU128 NonZeroUsize
-    }
-};
-
-pub enum Pluralize<S, P> {
-    Singular(S),
-    Plural(P),
-}
-
-impl<S: fmt::Display, P: fmt::Display> fmt::Display for Pluralize<S, P> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Pluralize::Singular(value) => write!(f, "{value}"),
-            Pluralize::Plural(value) => write!(f, "{value}"),
-        }
-    }
-}
-
-impl<S: FastWritable, P: FastWritable> FastWritable for Pluralize<S, P> {
-    #[inline]
-    fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
-        match self {
-            Pluralize::Singular(value) => value.write_into(dest),
-            Pluralize::Plural(value) => value.write_into(dest),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
+
     use super::*;
 
     #[test]
@@ -1037,35 +595,6 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate() {
-        assert_eq!(truncate("hello", 2).unwrap().to_string(), "he...");
-        let a = String::from("您好");
-        assert_eq!(a.len(), 6);
-        assert_eq!(String::from("您").len(), 3);
-        assert_eq!(truncate("您好", 1).unwrap().to_string(), "您...");
-        assert_eq!(truncate("您好", 2).unwrap().to_string(), "您...");
-        assert_eq!(truncate("您好", 3).unwrap().to_string(), "您...");
-        assert_eq!(truncate("您好", 4).unwrap().to_string(), "您好");
-        assert_eq!(truncate("您好", 5).unwrap().to_string(), "您好");
-        assert_eq!(truncate("您好", 6).unwrap().to_string(), "您好");
-        assert_eq!(truncate("您好", 7).unwrap().to_string(), "您好");
-        let s = String::from("🤚a🤚");
-        assert_eq!(s.len(), 9);
-        assert_eq!(String::from("🤚").len(), 4);
-        assert_eq!(truncate("🤚a🤚", 1).unwrap().to_string(), "🤚...");
-        assert_eq!(truncate("🤚a🤚", 2).unwrap().to_string(), "🤚...");
-        assert_eq!(truncate("🤚a🤚", 3).unwrap().to_string(), "🤚...");
-        assert_eq!(truncate("🤚a🤚", 4).unwrap().to_string(), "🤚...");
-        assert_eq!(truncate("🤚a🤚", 5).unwrap().to_string(), "🤚a...");
-        assert_eq!(truncate("🤚a🤚", 6).unwrap().to_string(), "🤚a🤚");
-        assert_eq!(truncate("🤚a🤚", 6).unwrap().to_string(), "🤚a🤚");
-        assert_eq!(truncate("🤚a🤚", 7).unwrap().to_string(), "🤚a🤚");
-        assert_eq!(truncate("🤚a🤚", 8).unwrap().to_string(), "🤚a🤚");
-        assert_eq!(truncate("🤚a🤚", 9).unwrap().to_string(), "🤚a🤚");
-        assert_eq!(truncate("🤚a🤚", 10).unwrap().to_string(), "🤚a🤚");
-    }
-
-    #[test]
     fn test_indent() {
         assert_eq!(indent("hello", 2).unwrap().to_string(), "hello");
         assert_eq!(indent("hello\n", 2).unwrap().to_string(), "hello\n");
@@ -1077,41 +606,6 @@ mod tests {
         assert_eq!(
             indent("hello", 267_332_238_858).unwrap().to_string(),
             "hello"
-        );
-    }
-
-    #[allow(clippy::needless_borrow)]
-    #[test]
-    fn test_join() {
-        assert_eq!(
-            join((&["hello", "world"]).iter(), ", ")
-                .unwrap()
-                .to_string(),
-            "hello, world"
-        );
-        assert_eq!(
-            join((&["hello"]).iter(), ", ").unwrap().to_string(),
-            "hello"
-        );
-
-        let empty: &[&str] = &[];
-        assert_eq!(join(empty.iter(), ", ").unwrap().to_string(), "");
-
-        let input: Vec<String> = vec!["foo".into(), "bar".into(), "bazz".into()];
-        assert_eq!(join(input.iter(), ":").unwrap().to_string(), "foo:bar:bazz");
-
-        let input: &[String] = &["foo".into(), "bar".into()];
-        assert_eq!(join(input.iter(), ":").unwrap().to_string(), "foo:bar");
-
-        let real: String = "blah".into();
-        let input: Vec<&str> = vec![&real];
-        assert_eq!(join(input.iter(), ";").unwrap().to_string(), "blah");
-
-        assert_eq!(
-            join((&&&&&["foo", "bar"]).iter(), ", ")
-                .unwrap()
-                .to_string(),
-            "foo, bar"
         );
     }
 
@@ -1132,21 +626,6 @@ mod tests {
         );
         assert_eq!(capitalize("ß").unwrap().to_string(), "SS".to_string());
         assert_eq!(capitalize("ßß").unwrap().to_string(), "SSß".to_string());
-    }
-
-    #[test]
-    fn test_center() {
-        assert_eq!(center("f", 3).unwrap().to_string(), " f ".to_string());
-        assert_eq!(center("f", 4).unwrap().to_string(), " f  ".to_string());
-        assert_eq!(center("foo", 1).unwrap().to_string(), "foo".to_string());
-        assert_eq!(
-            center("foo bar", 8).unwrap().to_string(),
-            "foo bar ".to_string()
-        );
-        assert_eq!(
-            center("foo", 111_669_149_696).unwrap().to_string(),
-            "foo".to_string()
-        );
     }
 
     #[test]
