@@ -19,7 +19,7 @@ use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
 use crate::integration::{Buffer, impl_everything, write_header};
-use crate::{BUILT_IN_FILTERS, CompileError, FileInfo, MsgValidEscapers, fmt_left, fmt_right};
+use crate::{BUILTIN_FILTERS, CompileError, FileInfo, MsgValidEscapers, fmt_left, fmt_right};
 
 pub(crate) fn template_to_string(
     buf: &mut Buffer,
@@ -1528,8 +1528,8 @@ impl<'a, 'h> Generator<'a, 'h> {
             "pluralize" => Self::_visit_pluralize_filter,
             "ref" => Self::_visit_ref_filter,
             "safe" => Self::_visit_safe_filter,
-            "uppercase" | "urlencode_strict" => Self::_visit_urlencode,
-            name if BUILT_IN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
+            "urlencode" | "urlencode_strict" => Self::_visit_urlencode,
+            name if BUILTIN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
             _ => Self::_visit_custom_filter,
         };
         filter(self, ctx, buf, name, args, node)
