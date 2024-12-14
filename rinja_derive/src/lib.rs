@@ -468,7 +468,7 @@ pub(crate) use {fmt_left, fmt_right};
 
 // This is used by the code generator to decide whether a named filter is part of
 // Rinja or should refer to a local `filters` module.
-const BUILT_IN_FILTERS: &[&str] = &[
+const BUILTIN_FILTERS: &[&str] = &[
     "capitalize",
     "center",
     "indent",
@@ -478,6 +478,6 @@ const BUILT_IN_FILTERS: &[&str] = &[
     "trim",
     "truncate",
     "upper",
-    "urlencode",
+    "uppercase",
     "wordcount",
 ];
