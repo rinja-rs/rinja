@@ -1,3 +1,6 @@
+use std::{fmt, io};
+
+use assert_matches::assert_matches;
 use rinja::Template;
 
 #[test]
@@ -15,7 +18,7 @@ fn test_int_parser() {
     }
 
     let template = IntParserTemplate { s: "💯" };
-    assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
+    assert_matches!(template.render(), Err(rinja::Error::Custom(_)));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
         "invalid digit found in string"
@@ -34,17 +37,17 @@ fn fail_fmt() {
     }
 
     impl FailFmt {
-        fn value(&self) -> Result<&'static str, std::fmt::Error> {
+        fn value(&self) -> Result<&'static str, fmt::Error> {
             if let Some(inner) = self.inner {
                 Ok(inner)
             } else {
-                Err(std::fmt::Error)
+                Err(fmt::Error)
             }
         }
     }
 
     let template = FailFmt { inner: None };
-    assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
+    assert_matches!(template.render(), Err(rinja::Error::Fmt));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
         format!("{}", std::fmt::Error)
@@ -75,9 +78,156 @@ fn fail_str() {
     }
 
     let template = FailStr { value: false };
-    assert!(matches!(template.render(), Err(rinja::Error::Custom(_))));
+    assert_matches!(template.render(), Err(rinja::Error::Custom(_)));
     assert_eq!(format!("{}", &template.render().unwrap_err()), "FAIL");
 
     let template = FailStr { value: true };
     assert_eq!(template.render().unwrap(), "hello world");
+}
+
+#[test]
+fn error_conversion_from_fmt() {
+    #[derive(Template)]
+    #[template(source = "{{ value()? }}", ext = "txt")]
+    struct ResultTemplate {
+        succeed: bool,
+    }
+
+    impl ResultTemplate {
+        fn value(&self) -> Result<&'static str, fmt::Error> {
+            match self.succeed {
+                true => Ok("hello"),
+                false => Err(fmt::Error),
+            }
+        }
+    }
+
+    assert_matches!(
+        ResultTemplate { succeed: true }.render().as_deref(),
+        Ok("hello")
+    );
+    assert_matches!(
+        ResultTemplate { succeed: false }.render().as_deref(),
+        Err(rinja::Error::Fmt)
+    );
+}
+
+#[test]
+fn error_conversion_from_rinja_custom() {
+    #[derive(Template)]
+    #[template(source = "{{ value()? }}", ext = "txt")]
+    struct ResultTemplate {
+        succeed: bool,
+    }
+
+    impl ResultTemplate {
+        fn value(&self) -> Result<&'static str, rinja::Error> {
+            match self.succeed {
+                true => Ok("hello"),
+                false => Err(rinja::Error::custom(CustomError)),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct CustomError;
+
+    impl fmt::Display for CustomError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("custom")
+        }
+    }
+
+    impl std::error::Error for CustomError {}
+
+    assert_matches!(
+        ResultTemplate { succeed: true }.render().as_deref(),
+        Ok("hello")
+    );
+
+    let err = match (ResultTemplate { succeed: false }.render().unwrap_err()) {
+        rinja::Error::Custom(err) => err,
+        err => panic!("Expected Error::Custom(_), got {err:#?}"),
+    };
+    assert!(err.is::<CustomError>());
+}
+
+#[test]
+fn error_conversion_from_custom() {
+    #[derive(Template)]
+    #[template(source = "{{ value()? }}", ext = "txt")]
+    struct ResultTemplate {
+        succeed: bool,
+    }
+
+    impl ResultTemplate {
+        fn value(&self) -> Result<&'static str, CustomError> {
+            match self.succeed {
+                true => Ok("hello"),
+                false => Err(CustomError),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct CustomError;
+
+    impl fmt::Display for CustomError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("custom")
+        }
+    }
+
+    impl std::error::Error for CustomError {}
+
+    assert_matches!(
+        ResultTemplate { succeed: true }.render().as_deref(),
+        Ok("hello")
+    );
+
+    let err = match (ResultTemplate { succeed: false }.render().unwrap_err()) {
+        rinja::Error::Custom(err) => err,
+        err => panic!("Expected Error::Custom(_), got {err:#?}"),
+    };
+    assert!(err.is::<CustomError>());
+}
+
+#[test]
+fn error_conversion_from_wrapped_in_io() {
+    #[derive(Template)]
+    #[template(source = "{{ value()? }}", ext = "txt")]
+    struct ResultTemplate {
+        succeed: bool,
+    }
+
+    impl ResultTemplate {
+        fn value(&self) -> Result<&'static str, io::Error> {
+            match self.succeed {
+                true => Ok("hello"),
+                false => Err(io::Error::new(io::ErrorKind::InvalidData, CustomError)),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct CustomError;
+
+    impl fmt::Display for CustomError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("custom")
+        }
+    }
+
+    impl std::error::Error for CustomError {}
+
+    assert_matches!(
+        ResultTemplate { succeed: true }.render().as_deref(),
+        Ok("hello")
+    );
+
+    let err = match (ResultTemplate { succeed: false }.render().unwrap_err()) {
+        rinja::Error::Custom(err) => err,
+        err => panic!("Expected Error::Custom(_), got {err:#?}"),
+    };
+    assert!(err.is::<CustomError>());
 }

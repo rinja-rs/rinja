@@ -173,6 +173,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
                 use rinja::filters::{AutoEscape as _, WriteWritable as _};\
+                use rinja::helpers::ResultConverter as _;
                 use rinja::helpers::core::fmt::Write as _;",
         );
 
@@ -1496,16 +1497,9 @@ impl<'a, 'h> Generator<'a, 'h> {
         buf: &mut Buffer,
         expr: &WithSpan<'_, Expr<'_>>,
     ) -> Result<DisplayWrap, CompileError> {
-        if !cfg!(feature = "alloc") {
-            return Err(ctx.generate_error(
-                "the `?` operator requires the `alloc` feature to be enabled",
-                expr.span(),
-            ));
-        }
-
-        buf.write("rinja::helpers::map_try(");
+        buf.write("match (");
         self.visit_expr(ctx, buf, expr)?;
-        buf.write(")?");
+        buf.write(") { res => (&&rinja::helpers::ErrorMarker::of(&res)).rinja_conv_result(res)? }");
         Ok(DisplayWrap::Unwrapped)
     }
 

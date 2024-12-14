@@ -12,6 +12,7 @@ use core::iter::{Enumerate, Peekable};
 use core::ops::Deref;
 use core::pin::Pin;
 
+pub use crate::error::{ErrorMarker, ResultConverter};
 use crate::filters::FastWritable;
 
 pub struct TemplateLoop<I>
@@ -266,13 +267,4 @@ impl<L: FastWritable, R: FastWritable> FastWritable for Concat<L, R> {
         self.0.write_into(dest)?;
         self.1.write_into(dest)
     }
-}
-
-#[inline]
-#[cfg(feature = "alloc")]
-pub fn map_try<T, E>(result: Result<T, E>) -> Result<T, crate::Error>
-where
-    E: Into<alloc::boxed::Box<dyn std::error::Error + Send + Sync>>,
-{
-    result.map_err(crate::Error::custom)
 }
