@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 use core::convert::Infallible;
 use core::error::Error as StdError;
 use core::fmt;
+use core::marker::PhantomData;
 #[cfg(feature = "std")]
 use std::io;
 
@@ -121,7 +122,7 @@ impl From<Box<dyn StdError + Send + Sync>> for Error {
 impl From<io::Error> for Error {
     #[inline]
     fn from(err: io::Error) -> Self {
-        from_from_io_error(err, MAX_ERROR_UNWRAP_COUNT)
+        error_from_io_error(err, MAX_ERROR_UNWRAP_COUNT)
     }
 }
 
@@ -145,7 +146,7 @@ fn error_from_stderror(err: Box<dyn StdError + Send + Sync>, unwraps: usize) -> 
         },
         #[cfg(feature = "std")]
         ErrorKind::Io => match err.downcast() {
-            Ok(err) => from_from_io_error(*err, unwraps),
+            Ok(err) => error_from_io_error(*err, unwraps),
             Err(_) => Error::Fmt, // unreachable
         },
         ErrorKind::Rinja => match err.downcast() {
@@ -156,7 +157,7 @@ fn error_from_stderror(err: Box<dyn StdError + Send + Sync>, unwraps: usize) -> 
 }
 
 #[cfg(feature = "std")]
-fn from_from_io_error(err: io::Error, unwraps: usize) -> Error {
+fn error_from_io_error(err: io::Error, unwraps: usize) -> Error {
     let Some(inner) = err.get_ref() else {
         return Error::custom(err);
     };
@@ -182,7 +183,7 @@ fn from_from_io_error(err: io::Error, unwraps: usize) -> Error {
             None => Error::Fmt, // unreachable
         },
         ErrorKind::Io => match err.downcast() {
-            Ok(inner) => from_from_io_error(inner, unwraps),
+            Ok(inner) => error_from_io_error(inner, unwraps),
             Err(_) => Error::Fmt, // unreachable
         },
     }
@@ -244,3 +245,53 @@ const _: () = {
     trait AssertSendSyncStatic: Send + Sync + 'static {}
     impl AssertSendSyncStatic for Error {}
 };
+
+/// Helper trait to convert a custom `?` call into a [`crate::Result`]
+pub trait ResultConverter {
+    /// Okay Value type of the output
+    type Value;
+    /// Input type
+    type Input;
+
+    /// Consume an interior mutable `self`, and turn it into a [`crate::Result`]
+    fn rinja_conv_result(self, result: Self::Input) -> Result<Self::Value, Error>;
+}
+
+/// Helper marker to be used with [`ResultConverter`]
+#[derive(Debug, Clone, Copy)]
+pub struct ErrorMarker<T>(PhantomData<Result<T>>);
+
+impl<T> ErrorMarker<T> {
+    /// Get marker for a [`Result`] type
+    #[inline]
+    pub fn of(_: &T) -> Self {
+        Self(PhantomData)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T, E> ResultConverter for &ErrorMarker<Result<T, E>>
+where
+    E: Into<Box<dyn StdError + Send + Sync>>,
+{
+    type Value = T;
+    type Input = Result<T, E>;
+
+    #[inline]
+    fn rinja_conv_result(self, result: Self::Input) -> Result<Self::Value, Error> {
+        result.map_err(Error::custom)
+    }
+}
+
+impl<T, E> ResultConverter for &&ErrorMarker<Result<T, E>>
+where
+    E: Into<Error>,
+{
+    type Value = T;
+    type Input = Result<T, E>;
+
+    #[inline]
+    fn rinja_conv_result(self, result: Self::Input) -> Result<Self::Value, Error> {
+        result.map_err(Into::into)
+    }
+}

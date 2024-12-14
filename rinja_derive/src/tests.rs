@@ -32,6 +32,7 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
                     RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
                 {
                     use rinja::filters::{AutoEscape as _, WriteWritable as _};
+                    use rinja::helpers::ResultConverter as _;
                     use rinja::helpers::core::fmt::Write as _;
                     #expected
                     rinja::Result::Ok(())
