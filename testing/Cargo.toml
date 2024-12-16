@@ -4,7 +4,7 @@ version = "0.3.5"
 authors = ["rinja-rs developers"]
 workspace = ".."
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.81"
 publish = false
 
 [features]
@@ -23,6 +23,7 @@ core = { package = "intentionally-empty", version = "1.0.0" }
 [dev-dependencies]
 rinja = { path = "../rinja", version = "0.3.5", features = ["code-in-doc", "serde_json"] }
 
+assert_matches = "1.5.0"
 criterion = "0.5"
 phf = { version = "0.11", features = ["macros" ] }
 trybuild = "1.0.100"

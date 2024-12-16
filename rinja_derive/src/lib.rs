@@ -481,3 +481,6 @@ const BUILTIN_FILTERS: &[&str] = &[
     "uppercase",
     "wordcount",
 ];
+
+// Built-in filters that need the `alloc` feature.
+const BUILTIN_FILTERS_NEED_ALLOC: &[&str] = &["center", "truncate"];

@@ -8,7 +8,7 @@ repository = "https://github.com/rinja-rs/rinja"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.81"
 publish = false
 
 [package.metadata.docs.rs]
@@ -50,6 +50,10 @@ code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:serde", "dep:basic-toml", "parser/config"]
 urlencode = []
 serde_json = []
+
+[lints.rust]
+# Used in `rinja_derive` which uses the same source folder, but is a proc-macro.
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("alloc"))'] }
 
 [workspace]
 members = ["."]

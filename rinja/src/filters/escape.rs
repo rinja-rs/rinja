@@ -1,8 +1,8 @@
-use std::convert::Infallible;
-use std::fmt::{self, Formatter, Write};
-use std::ops::Deref;
-use std::pin::Pin;
-use std::{borrow, str};
+use core::convert::Infallible;
+use core::fmt::{self, Formatter, Write};
+use core::ops::Deref;
+use core::pin::Pin;
+use core::str;
 
 /// Marks a string (or other `Display` type) as safe
 ///
@@ -460,18 +460,19 @@ mark_html_safe! {
     f32, f64,
     i8, i16, i32, i64, i128, isize,
     u8, u16, u32, u64, u128, usize,
-    std::num::NonZeroI8, std::num::NonZeroI16, std::num::NonZeroI32,
-    std::num::NonZeroI64, std::num::NonZeroI128, std::num::NonZeroIsize,
-    std::num::NonZeroU8, std::num::NonZeroU16, std::num::NonZeroU32,
-    std::num::NonZeroU64, std::num::NonZeroU128, std::num::NonZeroUsize,
+    core::num::NonZeroI8, core::num::NonZeroI16, core::num::NonZeroI32,
+    core::num::NonZeroI64, core::num::NonZeroI128, core::num::NonZeroIsize,
+    core::num::NonZeroU8, core::num::NonZeroU16, core::num::NonZeroU32,
+    core::num::NonZeroU64, core::num::NonZeroU128, core::num::NonZeroUsize,
 }
 
-impl<T: HtmlSafe> HtmlSafe for std::num::Wrapping<T> {}
+impl<T: HtmlSafe> HtmlSafe for core::num::Wrapping<T> {}
 impl<T: fmt::Display> HtmlSafe for HtmlSafeOutput<T> {}
 
-impl<T> HtmlSafe for borrow::Cow<'_, T>
+#[cfg(feature = "alloc")]
+impl<T> HtmlSafe for alloc::borrow::Cow<'_, T>
 where
-    T: HtmlSafe + borrow::ToOwned + ?Sized,
+    T: HtmlSafe + alloc::borrow::ToOwned + ?Sized,
     T::Owned: HtmlSafe,
 {
 }
@@ -520,7 +521,8 @@ const _: () = {
         }
     }
 
-    impl<T: FastWritable + ToOwned> FastWritable for borrow::Cow<'_, T> {
+    #[cfg(feature = "alloc")]
+    impl<T: FastWritable + alloc::borrow::ToOwned> FastWritable for alloc::borrow::Cow<'_, T> {
         #[inline]
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             T::write_into(self.as_ref(), dest)
@@ -568,7 +570,8 @@ const _: () = {
         }
     }
 
-    impl FastWritable for String {
+    #[cfg(feature = "alloc")]
+    impl FastWritable for alloc::string::String {
         #[inline]
         fn write_into<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
             self.as_str().write_into(dest)
@@ -617,7 +620,10 @@ const _: () = {
 };
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_escape() {
+    use alloc::string::ToString;
+
     assert_eq!(escape("", Html).unwrap().to_string(), "");
     assert_eq!(escape("<&>", Html).unwrap().to_string(), "&#60;&#38;&#62;");
     assert_eq!(escape("bla&", Html).unwrap().to_string(), "bla&#38;");
@@ -632,7 +638,10 @@ fn test_escape() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_html_safe_marker() {
+    use alloc::string::ToString;
+
     struct Script1;
     struct Script2;
 
