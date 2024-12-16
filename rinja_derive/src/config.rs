@@ -182,38 +182,32 @@ impl Config {
         start_at: Option<&Path>,
         file_info: Option<FileInfo<'_>>,
     ) -> Result<Arc<Path>, CompileError> {
-        fn _find_template(config: &Config, path: &str, start_at: Option<&Path>) -> Option<PathBuf> {
+        let path = 'find_path: {
             if let Some(root) = start_at {
                 let relative = root.with_file_name(path);
                 if relative.exists() {
-                    return Some(relative);
+                    break 'find_path relative;
                 }
             }
-
-            for dir in &config.dirs {
+            for dir in &self.dirs {
                 let rooted = dir.join(path);
                 if rooted.exists() {
-                    return Some(rooted);
+                    break 'find_path rooted;
                 }
             }
-
-            None
-        }
-
-        let Some(path) = _find_template(self, path, start_at) else {
             return Err(CompileError::new(
-                format!(
+                format_args!(
                     "template {:?} not found in directories {:?}",
-                    path, self.dirs
+                    path, self.dirs,
                 ),
                 file_info,
             ));
         };
         match path.canonicalize() {
-            Ok(p) => Ok(p.into()),
-            Err(e) => Err(CompileError::no_file_info(
-                format_args!("could not canonicalize path {path:?}: {e}"),
-                None,
+            Ok(path) => Ok(path.into()),
+            Err(err) => Err(CompileError::new(
+                format_args!("could not canonicalize path {path:?}: {err}"),
+                file_info,
             )),
         }
     }
