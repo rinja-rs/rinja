@@ -14,6 +14,15 @@ fn test_include() {
 }
 
 #[test]
+fn test_include_with_nested_paths() {
+    #[derive(Template)]
+    #[template(path = "leaf-templates/includer.html")]
+    struct LeafTemplate;
+
+    assert!(LeafTemplate.render().is_ok());
+}
+
+#[test]
 fn test_include_extends() {
     #[derive(Template)]
     #[template(path = "include-extends.html")]

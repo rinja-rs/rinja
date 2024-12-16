@@ -182,27 +182,40 @@ impl Config {
         start_at: Option<&Path>,
         file_info: Option<FileInfo<'_>>,
     ) -> Result<Arc<Path>, CompileError> {
-        if let Some(root) = start_at {
-            let relative = root.with_file_name(path);
-            if relative.exists() {
-                return Ok(relative.into());
+        fn _find_template(config: &Config, path: &str, start_at: Option<&Path>) -> Option<PathBuf> {
+            if let Some(root) = start_at {
+                let relative = root.with_file_name(path);
+                if relative.exists() {
+                    return Some(relative);
+                }
             }
+
+            for dir in &config.dirs {
+                let rooted = dir.join(path);
+                if rooted.exists() {
+                    return Some(rooted);
+                }
+            }
+
+            None
         }
 
-        for dir in &self.dirs {
-            let rooted = dir.join(path);
-            if rooted.exists() {
-                return Ok(rooted.into());
-            }
+        let Some(path) = _find_template(self, path, start_at) else {
+            return Err(CompileError::new(
+                format!(
+                    "template {:?} not found in directories {:?}",
+                    path, self.dirs
+                ),
+                file_info,
+            ));
+        };
+        match path.canonicalize() {
+            Ok(p) => Ok(p.into()),
+            Err(e) => Err(CompileError::no_file_info(
+                format_args!("could not canonicalize path {path:?}: {e}"),
+                None,
+            )),
         }
-
-        Err(CompileError::new(
-            format!(
-                "template {:?} not found in directories {:?}",
-                path, self.dirs
-            ),
-            file_info,
-        ))
     }
 }
 
@@ -394,7 +407,14 @@ mod tests {
     }
 
     fn assert_eq_rooted(actual: &Path, expected: &str) {
-        let mut root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let mut root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .canonicalize()
+            .unwrap();
+        if root.ends_with("rinja_derive_standalone") {
+            root.pop();
+            root.push("rinja_derive");
+        }
+
         root.push("templates");
         let mut inner = PathBuf::new();
         inner.push(expected);
