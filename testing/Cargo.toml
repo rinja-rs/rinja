@@ -25,7 +25,7 @@ rinja = { path = "../rinja", version = "0.3.5", features = ["code-in-doc", "serd
 
 criterion = "0.5"
 phf = { version = "0.11", features = ["macros" ] }
-trybuild = "1.0.76"
+trybuild = "1.0.100"
 
 [[bench]]
 name = "all"

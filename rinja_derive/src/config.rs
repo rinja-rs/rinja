@@ -407,7 +407,14 @@ mod tests {
     }
 
     fn assert_eq_rooted(actual: &Path, expected: &str) {
-        let mut root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let mut root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .canonicalize()
+            .unwrap();
+        if root.ends_with("rinja_derive_standalone") {
+            root.pop();
+            root.push("rinja_derive");
+        }
+
         root.push("templates");
         let mut inner = PathBuf::new();
         inner.push(expected);
