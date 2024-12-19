@@ -104,7 +104,7 @@ impl<'a> Node<'a> {
             "if" => |i, s| wrap(Self::If, If::parse(i, s)),
             "for" => |i, s| wrap(|n| Self::Loop(Box::new(n)), Loop::parse(i, s)),
             "match" => |i, s| wrap(Self::Match, Match::parse(i, s)),
-            "extends" => |i, _s| wrap(Self::Extends, Extends::parse(i)),
+            "extends" => |i, _s| wrap(Self::Extends, Extends::parse.parse_peek(i)),
             "include" => |i, _s| wrap(Self::Include, Include::parse(i)),
             "import" => |i, _s| wrap(Self::Import, Import::parse(i)),
             "block" => |i, s| wrap(Self::BlockDef, BlockDef::parse(i, s)),
@@ -1314,8 +1314,8 @@ pub struct Extends<'a> {
 }
 
 impl<'a> Extends<'a> {
-    fn parse(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn parse(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         preceded(
             (opt(unpeek(Whitespace::parse)), ws(keyword("extends"))),
             cut_node(
@@ -1324,7 +1324,7 @@ impl<'a> Extends<'a> {
             ),
         )
         .map(|path| WithSpan::new(Self { path }, start))
-        .parse_peek(i)
+        .parse_next(i)
     }
 }
 
