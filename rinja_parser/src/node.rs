@@ -72,7 +72,7 @@ impl<'a> Node<'a> {
             alt((
                 |i: &mut _| Lit::parse(i, s).map(Self::Lit),
                 |i: &mut _| Comment::parse(i, s).map(Self::Comment),
-                unpeek(|i| Self::expr(i, s)),
+                |i: &mut _| Self::expr(i, s),
                 unpeek(|i| Self::parse(i, s)),
             )),
         )
@@ -166,9 +166,9 @@ impl<'a> Node<'a> {
         Ok((i, Self::Continue(WithSpan::new(Ws(pws, nws), start))))
     }
 
-    fn expr(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
-        let start = i;
-        let (i, (pws, expr)) = preceded(
+    fn expr(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+        let start = *i;
+        let (pws, expr) = preceded(
             |i: &mut _| s.tag_expr_start(i),
             cut_node(
                 None,
@@ -178,9 +178,9 @@ impl<'a> Node<'a> {
                 ),
             ),
         )
-        .parse_peek(i)?;
+        .parse_next(i)?;
 
-        let (i, (nws, closed)) = cut_node(
+        let (nws, closed) = cut_node(
             None,
             (
                 opt(Whitespace::parse),
@@ -190,9 +190,9 @@ impl<'a> Node<'a> {
                 )),
             ),
         )
-        .parse_peek(i)?;
+        .parse_next(i)?;
         match closed {
-            true => Ok((i, Self::Expr(Ws(pws, nws), expr))),
+            true => Ok(Self::Expr(Ws(pws, nws), expr)),
             false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).into()),
         }
     }
