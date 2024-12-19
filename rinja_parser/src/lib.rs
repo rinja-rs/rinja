@@ -106,19 +106,20 @@ impl<'a> Ast<'a> {
     /// If `file_path` is `None`, it means the `source` is an inline template. Therefore, if
     /// a parsing error occurs, we won't display the path as it wouldn't be useful.
     pub fn from_str(
-        src: &'a str,
+        mut src: &'a str,
         file_path: Option<Arc<Path>>,
         syntax: &Syntax<'_>,
     ) -> Result<Self, ParseError> {
-        match Node::parse_template(src, &State::new(syntax)) {
-            Ok(("", nodes)) => Ok(Self { nodes }),
+        let start = src;
+        match Node::parse_template(&mut src, &State::new(syntax)) {
+            Ok(nodes) if src.is_empty() => Ok(Self { nodes }),
             Ok(_) | Err(winnow::error::ErrMode::Incomplete(_)) => unreachable!(),
             Err(
                 winnow::error::ErrMode::Backtrack(ErrorContext { span, message, .. })
                 | winnow::error::ErrMode::Cut(ErrorContext { span, message, .. }),
             ) => Err(ParseError {
                 message,
-                offset: span.offset_from(src).unwrap_or_default(),
+                offset: span.offset_from(start).unwrap_or_default(),
                 file_path,
             }),
         }

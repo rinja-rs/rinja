@@ -37,33 +37,35 @@ pub enum Node<'a> {
 }
 
 impl<'a> Node<'a> {
-    pub(super) fn parse_template(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Vec<Self>> {
-        let (i, result) = match (|i: &mut _| Self::many(i, s)).parse_peek(i) {
-            Ok((i, result)) => (i, result),
+    pub(super) fn parse_template(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
+        let start = *i;
+        let result = match (|i: &mut _| Self::many(i, s)).parse_next(i) {
+            Ok(result) => result,
             Err(err) => {
                 if let winnow::error::ErrMode::Backtrack(err) | winnow::error::ErrMode::Cut(err) =
                     &err
                 {
                     if err.message.is_none() {
-                        if let Some(span) = err.span.as_suffix_of(i) {
-                            opt(unpeek(|i| unexpected_tag(i, s))).parse_peek(span)?;
+                        *i = start;
+                        if let Some(mut span) = err.span.as_suffix_of(i) {
+                            opt(unpeek(|i| unexpected_tag(i, s))).parse_next(&mut span)?;
                         }
                     }
                 }
                 return Err(err);
             }
         };
-        let (i, _) = opt(unpeek(|i| unexpected_tag(i, s))).parse_peek(i)?;
-        let (i, is_eof) = opt(eof).parse_peek(i)?;
+        opt(unpeek(|i| unexpected_tag(i, s))).parse_next(i)?;
+        let is_eof = opt(eof).parse_next(i)?;
         if is_eof.is_none() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot parse entire template\n\
                  you should never encounter this error\n\
                  please report this error to <https://github.com/rinja-rs/rinja/issues>",
-                i,
+                *i,
             )));
         }
-        Ok((i, result))
+        Ok(result)
     }
 
     fn many(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
