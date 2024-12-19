@@ -73,14 +73,14 @@ impl<'a> Node<'a> {
                 |i: &mut _| Lit::parse(i, s).map(Self::Lit),
                 |i: &mut _| Comment::parse(i, s).map(Self::Comment),
                 |i: &mut _| Self::expr(i, s),
-                unpeek(|i| Self::parse(i, s)),
+                |i: &mut _| Self::parse(i, s),
             )),
         )
         .map(|v: Vec<_>| v)
         .parse_next(i)
     }
 
-    fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
+    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
         #[inline]
         fn wrap<'a, T>(
             func: impl FnOnce(T) -> Node<'a>,
@@ -89,12 +89,12 @@ impl<'a> Node<'a> {
             result.map(|(i, n)| (i, func(n)))
         }
 
-        let start = i;
-        let (mut i, tag) = preceded(
+        let mut start = *i;
+        let tag = preceded(
             |i: &mut _| s.tag_block_start(i),
             peek(preceded((opt(Whitespace::parse), skip_ws0), identifier)),
         )
-        .parse_peek(i)?;
+        .parse_next(i)?;
 
         let func = match tag {
             "call" => |i, s| wrap(Self::Call, Call::parse(i, s)),
@@ -111,21 +111,21 @@ impl<'a> Node<'a> {
             "break" => |i, s| Self::r#break(i, s),
             "continue" => |i, s| Self::r#continue(i, s),
             "filter" => |i, s| wrap(Self::FilterBlock, FilterBlock::parse(i, s)),
-            _ => return fail.parse_peek(start),
+            _ => return fail.parse_next(&mut start),
         };
 
-        let node = s.nest(&mut i, unpeek(|i| func(i, s)))?;
+        let node = s.nest(i, unpeek(|i| func(i, s)))?;
 
-        let (i, closed) = cut_node(
+        let closed = cut_node(
             None,
             alt((
                 ws(eof).value(false),
                 (|i: &mut _| s.tag_block_end(i)).value(true),
             )),
         )
-        .parse_peek(i)?;
+        .parse_next(i)?;
         match closed {
-            true => Ok((i, node)),
+            true => Ok(node),
             false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).into()),
         }
     }
