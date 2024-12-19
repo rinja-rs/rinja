@@ -371,8 +371,8 @@ fn skip_till<'a, 'b, O>(
                 }
             };
             i = match next.parse_next(i)? {
-                (j, Some(lookahead)) => return Ok((i, (j, lookahead))),
-                (j, None) => j,
+                (inclusive, Some(lookahead)) => return Ok((i, (inclusive, lookahead))),
+                (inclusive, None) => inclusive,
             };
         }
     }
