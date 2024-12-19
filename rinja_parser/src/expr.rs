@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::str;
 
+use winnow::Parser;
 use winnow::ascii::digit1;
 use winnow::combinator::{
     alt, cut_err, fail, fold_repeat, not, opt, peek, preceded, repeat, separated0, separated1,
@@ -8,7 +9,6 @@ use winnow::combinator::{
 };
 use winnow::error::{ErrorKind, ParserError as _};
 use winnow::stream::Stream as _;
-use winnow::{Parser, unpeek};
 
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
@@ -144,13 +144,13 @@ impl<'a> Expr<'a> {
             ws('('),
             cut_err(terminated(
                 separated0(
-                    ws(unpeek(move |i| {
+                    ws(move |i: &mut _| {
                         // Needed to prevent borrowing it twice between this closure and the one
                         // calling `Self::named_arguments`.
                         let named_arguments = &mut named_arguments;
                         let has_named_arguments = !named_arguments.is_empty();
 
-                        let (i, expr) = alt((
+                        let expr = alt((
                             move |i: &mut _| {
                                 Self::named_argument(
                                     i,
@@ -162,16 +162,16 @@ impl<'a> Expr<'a> {
                             },
                             move |i: &mut _| Self::parse(i, level, false),
                         ))
-                        .parse_peek(i)?;
+                        .parse_next(i)?;
                         if has_named_arguments && !matches!(*expr, Self::NamedArgument(_, _)) {
                             Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                                 "named arguments must always be passed last",
                                 start,
                             )))
                         } else {
-                            Ok((i, expr))
+                            Ok(expr)
                         }
-                    })),
+                    }),
                     ',',
                 ),
                 (opt(ws(',')), ')'),
