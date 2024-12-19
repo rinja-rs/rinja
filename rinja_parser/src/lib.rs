@@ -499,10 +499,10 @@ fn separated_digits<'a>(
     start: bool,
 ) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
     (
-        unpeek(move |i: &'a _| match start {
-            true => Ok((i, ())),
-            false => repeat(0.., '_').parse_peek(i),
-        }),
+        move |i: &mut &'a _| match start {
+            true => Ok(()),
+            false => repeat(0.., '_').parse_next(i),
+        },
         one_of(move |ch: char| ch.is_digit(radix)),
         repeat(0.., one_of(move |ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
     )
