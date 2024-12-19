@@ -105,7 +105,7 @@ impl<'a> Node<'a> {
             "for" => |i, s| wrap(|n| Self::Loop(Box::new(n)), Loop::parse(i, s)),
             "match" => |i, s| wrap(Self::Match, Match::parse(i, s)),
             "extends" => |i, _s| wrap(Self::Extends, Extends::parse.parse_peek(i)),
-            "include" => |i, _s| wrap(Self::Include, Include::parse(i)),
+            "include" => |i, _s| wrap(Self::Include, Include::parse.parse_peek(i)),
             "import" => |i, _s| wrap(Self::Import, Import::parse(i)),
             "block" => |i, s| wrap(Self::BlockDef, BlockDef::parse(i, s)),
             "macro" => |i, s| wrap(Self::Macro, Macro::parse(i, s)),
@@ -1284,8 +1284,8 @@ pub struct Include<'a> {
 }
 
 impl<'a> Include<'a> {
-    fn parse(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn parse(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         let mut p = (
             opt(unpeek(Whitespace::parse)),
             ws(keyword("include")),
@@ -1294,16 +1294,13 @@ impl<'a> Include<'a> {
                 (ws(str_lit_without_prefix), opt(unpeek(Whitespace::parse))),
             ),
         );
-        let (i, (pws, _, (path, nws))) = p.parse_peek(i)?;
-        Ok((
-            i,
-            WithSpan::new(
-                Self {
-                    ws: Ws(pws, nws),
-                    path,
-                },
-                start,
-            ),
+        let (pws, _, (path, nws)) = p.parse_next(i)?;
+        Ok(WithSpan::new(
+            Self {
+                ws: Ws(pws, nws),
+                path,
+            },
+            start,
         ))
     }
 }
