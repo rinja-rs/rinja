@@ -106,7 +106,7 @@ impl<'a> Node<'a> {
             "match" => |i, s| wrap(Self::Match, Match::parse(i, s)),
             "extends" => |i, _s| wrap(Self::Extends, Extends::parse.parse_peek(i)),
             "include" => |i, _s| wrap(Self::Include, Include::parse.parse_peek(i)),
-            "import" => |i, _s| wrap(Self::Import, Import::parse(i)),
+            "import" => |i, _s| wrap(Self::Import, Import::parse.parse_peek(i)),
             "block" => |i, s| wrap(Self::BlockDef, BlockDef::parse(i, s)),
             "macro" => |i, s| wrap(Self::Macro, Macro::parse(i, s)),
             "raw" => |i, s| wrap(Self::Raw, Raw::parse(i, s)),
@@ -852,8 +852,8 @@ pub struct Import<'a> {
 }
 
 impl<'a> Import<'a> {
-    fn parse(i: &'a str) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
+    fn parse(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
         let mut p = (
             opt(unpeek(Whitespace::parse)),
             ws(keyword("import")),
@@ -869,17 +869,14 @@ impl<'a> Import<'a> {
                 ),
             ),
         );
-        let (i, (pws, _, (path, _, (scope, nws)))) = p.parse_peek(i)?;
-        Ok((
-            i,
-            WithSpan::new(
-                Self {
-                    ws: Ws(pws, nws),
-                    path,
-                    scope,
-                },
-                start,
-            ),
+        let (pws, _, (path, _, (scope, nws))) = p.parse_next(i)?;
+        Ok(WithSpan::new(
+            Self {
+                ws: Ws(pws, nws),
+                path,
+                scope,
+            },
+            start,
         ))
     }
 }
