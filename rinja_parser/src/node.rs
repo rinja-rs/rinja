@@ -10,8 +10,8 @@ use winnow::{Parser, unpeek};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
-    ErrorContext, Expr, Filter, InputParseResult, Span, State, Target, WithSpan, filter,
-    identifier, keyword, skip_till, skip_ws0, str_lit_without_prefix, ws,
+    ErrorContext, Expr, Filter, InputParseResult, ParseResult, Span, State, Target, WithSpan,
+    filter, identifier, keyword, skip_till, skip_ws0, str_lit_without_prefix, ws,
 };
 
 #[derive(Debug, PartialEq)]
@@ -1342,12 +1342,12 @@ impl<'a> Comment<'a> {
             Close,
         }
 
-        fn tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Tag> {
+        fn tag<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Tag> {
             alt((
                 (|i: &mut _| s.tag_comment_start(i)).value(Tag::Open),
                 (|i: &mut _| s.tag_comment_end(i)).value(Tag::Close),
             ))
-            .parse_peek(i)
+            .parse_next(i)
         }
 
         fn content<'a>(mut i: &'a str, s: &State<'_>) -> InputParseResult<'a> {
@@ -1355,7 +1355,7 @@ impl<'a> Comment<'a> {
             let start = i;
             loop {
                 let splitter = Splitter2::new(s.syntax.comment_start, s.syntax.comment_end);
-                let (k, tag) = opt(skip_till(splitter, unpeek(|i| tag(i, s)))).parse_peek(i)?;
+                let (k, tag) = opt(skip_till(splitter, |i: &mut _| tag(i, s))).parse_peek(i)?;
                 i = k;
                 let Some((inclusive, tag)) = tag else {
                     return Err(
