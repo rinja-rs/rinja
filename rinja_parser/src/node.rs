@@ -1350,13 +1350,12 @@ impl<'a> Comment<'a> {
             .parse_next(i)
         }
 
-        fn content<'a>(mut i: &'a str, s: &State<'_>) -> InputParseResult<'a> {
+        fn content<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a> {
             let mut depth = 0usize;
-            let start = i;
+            let start = *i;
             loop {
                 let splitter = Splitter2::new(s.syntax.comment_start, s.syntax.comment_end);
-                let (k, tag) = opt(skip_till(splitter, |i: &mut _| tag(i, s))).parse_peek(i)?;
-                i = k;
+                let tag = opt(skip_till(splitter, |i: &mut _| tag(i, s))).parse_next(i)?;
                 let Some((inclusive, tag)) = tag else {
                     return Err(
                         ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),
@@ -1374,17 +1373,21 @@ impl<'a> Comment<'a> {
                     },
                     Tag::Close => match depth.checked_sub(1) {
                         Some(new_depth) => depth = new_depth,
-                        None => return Ok((inclusive, &start[..start.len() - i.len()])),
+                        None => {
+                            let exclusive = *i;
+                            *i = inclusive;
+                            return Ok(&start[..start.len() - exclusive.len()]);
+                        }
                     },
                 }
-                i = inclusive;
+                *i = inclusive;
             }
         }
 
         let start = i;
         let (i, content) = preceded(
             |i: &mut _| s.tag_comment_start(i),
-            cut_node(Some("comment"), unpeek(|i| content(i, s))),
+            cut_node(Some("comment"), |i: &mut _| content(i, s)),
         )
         .parse_peek(i)?;
 
