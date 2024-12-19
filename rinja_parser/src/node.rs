@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use std::str::{self, FromStr};
 
 use winnow::combinator::{
-    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, separated1, terminated,
+    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, rest, separated1,
+    terminated,
 };
 use winnow::stream::Stream as _;
 use winnow::token::{any, tag};
@@ -69,7 +70,7 @@ impl<'a> Node<'a> {
         repeat(
             0..,
             alt((
-                unpeek(|i| Lit::parse(i, s)).map(Self::Lit),
+                |i: &mut _| Lit::parse(i, s).map(Self::Lit),
                 |i: &mut _| Comment::parse(i, s).map(Self::Comment),
                 unpeek(|i| Self::expr(i, s)),
                 unpeek(|i| Self::parse(i, s)),
@@ -1086,9 +1087,9 @@ pub struct Lit<'a> {
 }
 
 impl<'a> Lit<'a> {
-    fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        let start = i;
-        let (i, ()) = not(eof).parse_peek(i)?;
+    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let start = *i;
+        not(eof).parse_next(i)?;
 
         let candidate_finder = Splitter3::new(
             s.syntax.block_start,
@@ -1101,16 +1102,16 @@ impl<'a> Lit<'a> {
             tag(s.syntax.expr_start),
         ));
 
-        let (i, content) = opt(skip_till(candidate_finder, p_start).recognize()).parse_peek(i)?;
-        let (i, content) = match content {
+        let content = opt(skip_till(candidate_finder, p_start).recognize()).parse_next(i)?;
+        let content = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
-                return fail.parse_peek(i);
+                return fail.parse_next(i);
             }
-            Some(content) => (i, content),
-            None => ("", i), // there is no {block,comment,expr}_start: take everything
+            Some(content) => content,
+            None => rest.parse_next(i)?, // there is no {block,comment,expr}_start: take everything
         };
-        Ok((i, WithSpan::new(Self::split_ws_parts(content), start)))
+        Ok(WithSpan::new(Self::split_ws_parts(content), start))
     }
 
     pub(crate) fn split_ws_parts(s: &'a str) -> Self {
