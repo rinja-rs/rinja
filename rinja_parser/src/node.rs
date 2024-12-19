@@ -70,7 +70,7 @@ impl<'a> Node<'a> {
             0..,
             alt((
                 unpeek(|i| Lit::parse(i, s)).map(Self::Lit),
-                unpeek(|i| Comment::parse(i, s)).map(Self::Comment),
+                |i: &mut _| Comment::parse(i, s).map(Self::Comment),
                 unpeek(|i| Self::expr(i, s)),
                 unpeek(|i| Self::parse(i, s)),
             )),
@@ -320,7 +320,7 @@ impl<'a> When<'a> {
                 (
                     opt(unpeek(Whitespace::parse)),
                     |i: &mut _| s.tag_block_end(i),
-                    repeat(0.., ws(unpeek(|i| Comment::parse(i, s)))).map(|()| ()),
+                    repeat(0.., ws(|i: &mut _| Comment::parse(i, s))).map(|()| ()),
                 ),
             ),
         ))
@@ -951,7 +951,7 @@ impl<'a> Match<'a> {
                     cut_node(
                         Some("match"),
                         (
-                            ws(repeat(0.., ws(unpeek(|i| Comment::parse(i, s))))).map(|()| ()),
+                            ws(repeat(0.., ws(|i: &mut _| Comment::parse(i, s)))).map(|()| ()),
                             repeat(0.., unpeek(|i| When::when(i, s))).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("match"),
@@ -1335,7 +1335,7 @@ pub struct Comment<'a> {
 }
 
 impl<'a> Comment<'a> {
-    fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         #[derive(Debug, Clone, Copy)]
         enum Tag {
             Open,
@@ -1384,12 +1384,12 @@ impl<'a> Comment<'a> {
             }
         }
 
-        let start = i;
-        let (i, content) = preceded(
+        let start = *i;
+        let content = preceded(
             |i: &mut _| s.tag_comment_start(i),
             cut_node(Some("comment"), |i: &mut _| content(i, s)),
         )
-        .parse_peek(i)?;
+        .parse_next(i)?;
 
         let mut ws = Ws(None, None);
         if content.len() == 1 && matches!(content, "-" | "+" | "~") {
@@ -1407,7 +1407,7 @@ impl<'a> Comment<'a> {
             ws.1 = Whitespace::parse_char(content.chars().next_back().unwrap_or_default());
         }
 
-        Ok((i, WithSpan::new(Self { ws, content }, start)))
+        Ok(WithSpan::new(Self { ws, content }, start))
     }
 }
 
