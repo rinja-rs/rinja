@@ -38,7 +38,7 @@ pub enum Node<'a> {
 
 impl<'a> Node<'a> {
     pub(super) fn parse_template(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Vec<Self>> {
-        let (i, result) = match unpeek(|i| Self::many(i, s)).parse_peek(i) {
+        let (i, result) = match (|i: &mut _| Self::many(i, s)).parse_peek(i) {
             Ok((i, result)) => (i, result),
             Err(err) => {
                 if let winnow::error::ErrMode::Backtrack(err) | winnow::error::ErrMode::Cut(err) =
@@ -66,7 +66,7 @@ impl<'a> Node<'a> {
         Ok((i, result))
     }
 
-    fn many(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Vec<Self>> {
+    fn many(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
         repeat(
             0..,
             alt((
@@ -77,7 +77,7 @@ impl<'a> Node<'a> {
             )),
         )
         .map(|v: Vec<_>| v)
-        .parse_peek(i)
+        .parse_next(i)
     }
 
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
@@ -284,7 +284,7 @@ impl<'a> When<'a> {
                 (
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
-                    cut_node(Some("match-else"), unpeek(|i| Node::many(i, s))),
+                    cut_node(Some("match-else"), |i: &mut _| Node::many(i, s)),
                 ),
             ),
         );
@@ -346,7 +346,7 @@ impl<'a> When<'a> {
                     separated1(ws(|i: &mut _| Target::parse(i, s)), '|'),
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
-                    cut_node(Some("match-when"), unpeek(|i| Node::many(i, s))),
+                    cut_node(Some("match-when"), |i: &mut _| Node::many(i, s)),
                     opt(endwhen),
                 ),
             ),
@@ -394,7 +394,7 @@ impl<'a> Cond<'a> {
             )),
             opt(Whitespace::parse),
             cut_node(Some("if"), |i: &mut _| s.tag_block_end(i)),
-            cut_node(Some("if"), unpeek(|i| Node::many(i, s))),
+            cut_node(Some("if"), |i: &mut _| Node::many(i, s)),
         )
             .parse_peek(i)?;
         Ok((
@@ -516,7 +516,7 @@ impl<'a> Loop<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         fn content<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Vec<Node<'a>>> {
             s.enter_loop();
-            let result = Node::many(i, s);
+            let result = (|i: &mut _| Node::many(i, s)).parse_peek(i);
             s.leave_loop();
             result
         }
@@ -539,7 +539,7 @@ impl<'a> Loop<'a> {
                         opt(Whitespace::parse),
                         delimited(
                             |i: &mut _| s.tag_block_end(i),
-                            unpeek(|i| Node::many(i, s)),
+                            |i: &mut _| Node::many(i, s),
                             |i: &mut _| s.tag_block_start(i),
                         ),
                         opt(Whitespace::parse),
@@ -720,7 +720,7 @@ impl<'a> Macro<'a> {
         let mut end = cut_node(
             Some("macro"),
             (
-                unpeek(|i| Node::many(i, s)),
+                |i: &mut _| Node::many(i, s),
                 cut_node(
                     Some("macro"),
                     (
@@ -813,7 +813,7 @@ impl<'a> FilterBlock<'a> {
         let mut end = cut_node(
             Some("filter"),
             (
-                unpeek(|i| Node::many(i, s)),
+                |i: &mut _| Node::many(i, s),
                 cut_node(
                     Some("filter"),
                     (
@@ -1021,7 +1021,7 @@ impl<'a> BlockDef<'a> {
         let mut end = cut_node(
             Some("block"),
             (
-                unpeek(|i| Node::many(i, s)),
+                |i: &mut _| Node::many(i, s),
                 cut_node(
                     Some("block"),
                     (
@@ -1226,7 +1226,7 @@ impl<'a> If<'a> {
                     cut_node(
                         Some("if"),
                         (
-                            unpeek(|i| Node::many(i, s)),
+                            |i: &mut _| Node::many(i, s),
                             repeat(0.., unpeek(|i| Cond::parse(i, s))).map(|v: Vec<_>| v),
                             cut_node(
                                 Some("if"),
