@@ -359,11 +359,10 @@ fn skip_till<'a, 'b, O>(
     end: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
     let mut next = alt((end.map(Some), any.map(|_| None)));
-    move |start: &'a str| {
-        let mut i = start;
+    move |mut i: &'a str| {
         loop {
             i = match candidate_finder.split(i) {
-                Some((_, j)) => j,
+                Some((_, i)) => i,
                 None => {
                     return Err(winnow::error::ErrMode::Backtrack(ErrorContext::new(
                         "`end` not found`",
