@@ -362,23 +362,25 @@ fn skip_till<'a, 'b, O>(
     end: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
     let mut next = alt((end.map(Some), any.map(|_| None)));
-    unpeek(move |mut i: &'a str| {
+    move |i: &mut &'a str| {
         loop {
-            i = match candidate_finder.split(i) {
+            *i = match candidate_finder.split(i) {
                 Some((_, i)) => i,
                 None => {
                     return Err(winnow::error::ErrMode::Backtrack(ErrorContext::new(
                         "`end` not found`",
-                        i,
+                        *i,
                     )));
                 }
             };
-            i = match next.parse_peek(i)? {
-                (inclusive, Some(lookahead)) => return Ok((i, (inclusive, lookahead))),
-                (inclusive, None) => inclusive,
-            };
+            let exclusive = *i;
+            if let Some(lookahead) = next.parse_next(i)? {
+                let inclusive = *i;
+                *i = exclusive;
+                return Ok((inclusive, lookahead));
+            }
         }
-    })
+    }
 }
 
 fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
