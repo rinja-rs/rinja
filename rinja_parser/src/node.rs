@@ -517,9 +517,9 @@ pub struct Loop<'a> {
 
 impl<'a> Loop<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
-        fn content<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Vec<Node<'a>>> {
+        fn content<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Node<'a>>> {
             s.enter_loop();
-            let result = (|i: &mut _| Node::many(i, s)).parse_peek(i);
+            let result = (|i: &mut _| Node::many(i, s)).parse_next(i);
             s.leave_loop();
             result
         }
@@ -557,7 +557,7 @@ impl<'a> Loop<'a> {
             let (i, (body, (_, pws, else_block, _, nws))) = cut_node(
                 Some("for"),
                 (
-                    unpeek(|i| content(i, s)),
+                    |i: &mut _| content(i, s),
                     cut_node(
                         Some("for"),
                         (
