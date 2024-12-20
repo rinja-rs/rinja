@@ -48,14 +48,14 @@ impl<'a> Node<'a> {
                     if err.message.is_none() {
                         *i = start;
                         if let Some(mut span) = err.span.as_suffix_of(i) {
-                            opt(unpeek(|i| unexpected_tag(i, s))).parse_next(&mut span)?;
+                            opt(|i: &mut _| unexpected_tag(i, s)).parse_next(&mut span)?;
                         }
                     }
                 }
                 return Err(err);
             }
         };
-        opt(unpeek(|i| unexpected_tag(i, s))).parse_next(i)?;
+        opt(|i: &mut _| unexpected_tag(i, s)).parse_next(i)?;
         let is_eof = opt(eof).parse_next(i)?;
         if is_eof.is_none() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -245,14 +245,14 @@ fn cut_node<'a, O>(
     }
 }
 
-fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, ()> {
+fn unexpected_tag<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, ()> {
     (
         |i: &mut _| s.tag_block_start(i),
         opt(Whitespace::parse),
         |i: &mut _| unexpected_raw_tag(None, i),
     )
         .void()
-        .parse_peek(i)
+        .parse_next(i)
 }
 
 fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &mut &'a str) -> ParseResult<'a, ()> {
