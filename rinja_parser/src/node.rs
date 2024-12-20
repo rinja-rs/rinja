@@ -553,8 +553,8 @@ impl<'a> Loop<'a> {
             Ok((pws, nodes, nws))
         };
 
-        let body_and_end = |i| {
-            let (i, (body, (_, pws, else_block, _, nws))) = cut_node(
+        let body_and_end = |i: &mut _| {
+            let (body, (_, pws, else_block, _, nws)) = cut_node(
                 Some("for"),
                 (
                     |i: &mut _| content(i, s),
@@ -570,8 +570,8 @@ impl<'a> Loop<'a> {
                     ),
                 ),
             )
-            .parse_peek(i)?;
-            Ok((i, (body, pws, else_block, nws)))
+            .parse_next(i)?;
+            Ok((body, pws, else_block, nws))
         };
 
         let mut p = (
@@ -589,7 +589,7 @@ impl<'a> Loop<'a> {
                             opt(if_cond),
                             opt(Whitespace::parse),
                             |i: &mut _| s.tag_block_end(i),
-                            unpeek(body_and_end),
+                            body_and_end,
                         ),
                     ),
                 ),
