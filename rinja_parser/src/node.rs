@@ -644,11 +644,11 @@ impl<'a> Macro<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, WithSpan<'a, Self>> {
         let level = s.level.get();
         #[allow(clippy::type_complexity)]
-        let parameters = |i| -> InputParseResult<
+        let parameters = |i: &mut _| -> ParseResult<
             '_,
             Option<Vec<(&str, Option<WithSpan<'_, Expr<'_>>>)>>,
         > {
-            let (i, args) = opt(preceded(
+            let args = opt(preceded(
                 '(',
                 (
                     opt(terminated(
@@ -664,14 +664,14 @@ impl<'a> Macro<'a> {
                     ws(opt(')')),
                 ),
             ))
-            .parse_peek(i)?;
+            .parse_next(i)?;
             match args {
-                Some((args, Some(_))) => Ok((i, args)),
+                Some((args, Some(_))) => Ok(args),
                 Some((_, None)) => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                     "expected `)` to close macro argument list",
-                    i,
+                    *i,
                 ))),
-                None => Ok((i, None)),
+                None => Ok(None),
             }
         };
 
@@ -683,7 +683,7 @@ impl<'a> Macro<'a> {
                 Some("macro"),
                 (
                     ws(identifier),
-                    unpeek(parameters),
+                    parameters,
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
                 ),
