@@ -390,10 +390,9 @@ impl<'a> Cond<'a> {
                 preceded(ws(keyword("else")), opt(unpeek(|i| CondTest::parse(i, s)))),
                 preceded(
                     ws(keyword("elif")),
-                    cut_node(
-                        Some("if-elif"),
-                        unpeek(|i| CondTest::parse_cond(i, s)).map(Some),
-                    ),
+                    cut_node(Some("if-elif"), |i: &mut _| {
+                        CondTest::parse_cond(i, s).map(Some)
+                    }),
                 ),
             )),
             opt(Whitespace::parse),
@@ -426,13 +425,13 @@ impl<'a> CondTest<'a> {
     fn parse(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
         preceded(
             ws(keyword("if")),
-            cut_node(Some("if"), unpeek(|i| Self::parse_cond(i, s))),
+            cut_node(Some("if"), |i: &mut _| Self::parse_cond(i, s)),
         )
         .parse_peek(i)
     }
 
-    fn parse_cond(i: &'a str, s: &State<'_>) -> InputParseResult<'a, Self> {
-        let (i, (target, expr)) = (
+    fn parse_cond(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+        let (target, expr) = (
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
                 ws(|i: &mut _| Target::parse(i, s)),
@@ -440,13 +439,13 @@ impl<'a> CondTest<'a> {
             )),
             ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
         )
-            .parse_peek(i)?;
+            .parse_next(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
-        Ok((i, Self {
+        Ok(Self {
             target,
             expr,
             contains_bool_lit_or_is_defined,
-        }))
+        })
     }
 }
 
