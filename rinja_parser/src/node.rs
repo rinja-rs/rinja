@@ -236,8 +236,8 @@ fn cut_node<'a, O>(
         {
             if err.message.is_none() {
                 *i = start;
-                if let Some(span) = err.span.as_suffix_of(i) {
-                    opt(unpeek(|i| unexpected_raw_tag(kind, i))).parse_peek(span)?;
+                if let Some(mut span) = err.span.as_suffix_of(i) {
+                    opt(unpeek(|i| unexpected_raw_tag(kind, i))).parse_next(&mut span)?;
                 }
             }
         }
