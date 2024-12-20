@@ -228,19 +228,21 @@ fn cut_node<'a, O>(
     inner: impl Parser<&'a str, O, ErrorContext<'a>>,
 ) -> impl Parser<&'a str, O, ErrorContext<'a>> {
     let mut inner = cut_err(inner);
-    unpeek(move |i: &'a str| {
-        let result = inner.parse_peek(i);
+    move |i: &mut &'a str| {
+        let start = *i;
+        let result = inner.parse_next(i);
         if let Err(winnow::error::ErrMode::Cut(err) | winnow::error::ErrMode::Backtrack(err)) =
             &result
         {
             if err.message.is_none() {
+                *i = start;
                 if let Some(span) = err.span.as_suffix_of(i) {
                     opt(unpeek(|i| unexpected_raw_tag(kind, i))).parse_peek(span)?;
                 }
             }
         }
         result
-    })
+    }
 }
 
 fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, ()> {
