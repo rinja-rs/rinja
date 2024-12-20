@@ -1,5 +1,5 @@
 use winnow::Parser;
-use winnow::combinator::{alt, opt, peek, preceded, separated1};
+use winnow::combinator::{alt, opt, peek, preceded, separated};
 use winnow::token::one_of;
 
 use crate::{
@@ -27,7 +27,8 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        separated1(
+        separated(
+            1..,
             |i: &mut _| s.nest(i, |i: &mut _| Self::parse_one(i, s)),
             ws("or"),
         )
@@ -215,7 +216,7 @@ fn collect_targets<'a, T>(
         return Ok((false, Vec::new()));
     }
 
-    let targets = opt(separated1(one, ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
+    let targets = opt(separated(1.., one, ws(',')).map(|v: Vec<_>| v)).parse_next(i)?;
     let Some(targets) = targets else {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "expected comma separated list of members",

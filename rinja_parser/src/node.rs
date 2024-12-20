@@ -3,11 +3,11 @@ use std::str::{self, FromStr};
 
 use winnow::Parser;
 use winnow::combinator::{
-    alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, rest, separated1,
+    alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, rest, separated,
     terminated,
 };
 use winnow::stream::Stream as _;
-use winnow::token::{any, tag};
+use winnow::token::{any, literal};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -336,7 +336,7 @@ impl<'a> When<'a> {
             cut_node(
                 Some("match-when"),
                 (
-                    separated1(ws(|i: &mut _| Target::parse(i, s)), '|'),
+                    separated(1.., ws(|i: &mut _| Target::parse(i, s)), '|'),
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
                     cut_node(Some("match-when"), |i: &mut _| Node::many(i, s)),
@@ -632,7 +632,8 @@ impl<'a> Macro<'a> {
                 '(',
                 (
                     opt(terminated(
-                        separated1(
+                        separated(
+                            1..,
                             (
                                 ws(identifier),
                                 opt(preceded('=', ws(|i: &mut _| Expr::parse(i, level, false)))),
@@ -1065,9 +1066,9 @@ impl<'a> Lit<'a> {
             s.syntax.expr_start,
         );
         let p_start = alt((
-            tag(s.syntax.block_start),
-            tag(s.syntax.comment_start),
-            tag(s.syntax.expr_start),
+            literal(s.syntax.block_start),
+            literal(s.syntax.comment_start),
+            literal(s.syntax.expr_start),
         ));
 
         let content = opt(skip_till(candidate_finder, p_start).recognize()).parse_next(i)?;

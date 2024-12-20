@@ -4,8 +4,7 @@ use std::str;
 use winnow::Parser;
 use winnow::ascii::digit1;
 use winnow::combinator::{
-    alt, cut_err, fail, fold_repeat, not, opt, peek, preceded, repeat, separated0, separated1,
-    terminated,
+    alt, cut_err, fail, not, opt, peek, preceded, repeat, separated, terminated,
 };
 use winnow::error::{ErrorKind, ParserError as _};
 use winnow::stream::Stream as _;
@@ -143,7 +142,8 @@ impl<'a> Expr<'a> {
         preceded(
             ws('('),
             cut_err(terminated(
-                separated0(
+                separated(
+                    0..,
                     ws(move |i: &mut _| {
                         // Needed to prevent borrowing it twice between this closure and the one
                         // calling `Self::named_arguments`.
@@ -415,9 +415,11 @@ impl<'a> Expr<'a> {
         }
 
         let mut exprs = vec![expr];
-        fold_repeat(
+        repeat(
             0..,
             preceded(',', ws(|i: &mut _| Self::parse(i, level, true))),
+        )
+        .fold(
             || (),
             |(), expr| {
                 exprs.push(expr);
@@ -435,7 +437,7 @@ impl<'a> Expr<'a> {
             ws('['),
             cut_err(terminated(
                 opt(terminated(
-                    separated1(ws(move |i: &mut _| Self::parse(i, level, true)), ','),
+                    separated(1.., ws(move |i: &mut _| Self::parse(i, level, true)), ','),
                     ws(opt(',')),
                 )),
                 ']',

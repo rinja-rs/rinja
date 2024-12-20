@@ -15,7 +15,7 @@ use winnow::ascii::escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::{AsChar, Stream as _};
-use winnow::token::{any, one_of, take_till1, take_while};
+use winnow::token::{any, one_of, take_till, take_while};
 
 pub mod expr;
 pub use expr::{Expr, Filter};
@@ -542,7 +542,12 @@ pub struct StrLit<'a> {
 }
 
 fn str_lit_without_prefix<'a>(i: &mut &'a str) -> ParseResult<'a> {
-    let s = delimited('"', opt(escaped(take_till1(['\\', '"']), '\\', any)), '"').parse_next(i)?;
+    let s = delimited(
+        '"',
+        opt(escaped(take_till(1.., ['\\', '"']), '\\', any)),
+        '"',
+    )
+    .parse_next(i)?;
     Ok(s.unwrap_or_default())
 }
 
@@ -575,7 +580,7 @@ fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
         opt('b'),
         delimited(
             '\'',
-            opt(escaped(take_till1(['\\', '\'']), '\\', any)),
+            opt(escaped(take_till(1.., ['\\', '\'']), '\\', any)),
             '\'',
         ),
     )
