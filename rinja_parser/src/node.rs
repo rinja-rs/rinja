@@ -734,10 +734,11 @@ impl<'a> Macro<'a> {
                         cut_node(
                             Some("macro"),
                             preceded(
-                                opt(unpeek(|before| {
-                                    let (after, end_name) = ws(identifier).parse_peek(before)?;
-                                    check_end_name(before, after, name, end_name, "macro")
-                                })),
+                                opt(|i: &mut _| {
+                                    let before = *i;
+                                    let end_name = ws(identifier).parse_next(i)?;
+                                    check_end_name(before, name, end_name, "macro")
+                                }),
                                 opt(Whitespace::parse),
                             ),
                         ),
@@ -1035,10 +1036,11 @@ impl<'a> BlockDef<'a> {
                         cut_node(
                             Some("block"),
                             (
-                                opt(unpeek(|before| {
-                                    let (after, end_name) = ws(identifier).parse_peek(before)?;
-                                    check_end_name(before, after, name, end_name, "block")
-                                })),
+                                opt(|i: &mut _| {
+                                    let before = *i;
+                                    let end_name = ws(identifier).parse_next(i)?;
+                                    check_end_name(before, name, end_name, "block")
+                                }),
                                 opt(Whitespace::parse),
                             ),
                         ),
@@ -1065,13 +1067,12 @@ impl<'a> BlockDef<'a> {
 
 fn check_end_name<'a>(
     before: &'a str,
-    after: &'a str,
     name: &'a str,
     end_name: &'a str,
     kind: &str,
-) -> InputParseResult<'a> {
+) -> ParseResult<'a> {
     if name == end_name {
-        return Ok((after, end_name));
+        return Ok(end_name);
     }
 
     Err(winnow::error::ErrMode::Cut(ErrorContext::new(
