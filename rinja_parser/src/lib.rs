@@ -279,7 +279,6 @@ impl fmt::Display for ParseError {
 
 pub(crate) type ParseErr<'a> = winnow::error::ErrMode<ErrorContext<'a>>;
 pub(crate) type ParseResult<'a, T = &'a str> = Result<T, ParseErr<'a>>;
-pub(crate) type InputParseResult<'a, T = &'a str> = Result<(&'a str, T), ParseErr<'a>>;
 
 /// This type is used to handle `nom` errors and in particular to add custom error messages.
 /// It used to generate `ParserError`.
