@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::str::{self, FromStr};
 
 use winnow::combinator::{
-    alt, cut_err, delimited, eof, fail, not, opt, peek, preceded, repeat, rest, separated1,
+    alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, rest, separated1,
     terminated,
 };
 use winnow::stream::Stream as _;
@@ -788,7 +788,7 @@ impl<'a> FilterBlock<'a> {
                         filter(i, &mut level).map(|(name, params)| (name, params, start))
                     })
                     .map(|v: Vec<_>| v),
-                    ws(unpeek(|i| Ok((i, ())))),
+                    ws(empty),
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
                 ),
