@@ -533,7 +533,7 @@ impl<'a> Loop<'a> {
             ),
         );
 
-        let else_block = |i| {
+        let else_block = |i: &mut _| {
             let mut p = preceded(
                 ws(keyword("else")),
                 cut_node(
@@ -549,8 +549,8 @@ impl<'a> Loop<'a> {
                     ),
                 ),
             );
-            let (i, (pws, nodes, nws)) = p.parse_peek(i)?;
-            Ok((i, (pws, nodes, nws)))
+            let (pws, nodes, nws) = p.parse_next(i)?;
+            Ok((pws, nodes, nws))
         };
 
         let body_and_end = |i| {
@@ -563,7 +563,7 @@ impl<'a> Loop<'a> {
                         (
                             |i: &mut _| check_block_start(i, start, s, "for", "endfor"),
                             opt(Whitespace::parse),
-                            opt(unpeek(else_block)),
+                            opt(else_block),
                             end_node("for", "endfor"),
                             opt(Whitespace::parse),
                         ),
