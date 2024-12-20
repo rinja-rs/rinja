@@ -237,7 +237,7 @@ fn cut_node<'a, O>(
             if err.message.is_none() {
                 *i = start;
                 if let Some(mut span) = err.span.as_suffix_of(i) {
-                    opt(unpeek(|i| unexpected_raw_tag(kind, i))).parse_next(&mut span)?;
+                    opt(|i: &mut _| unexpected_raw_tag(kind, i)).parse_next(&mut span)?;
                 }
             }
         }
@@ -249,14 +249,14 @@ fn unexpected_tag<'a>(i: &'a str, s: &State<'_>) -> InputParseResult<'a, ()> {
     (
         |i: &mut _| s.tag_block_start(i),
         opt(Whitespace::parse),
-        unpeek(|i| unexpected_raw_tag(None, i)),
+        |i: &mut _| unexpected_raw_tag(None, i),
     )
         .void()
         .parse_peek(i)
 }
 
-fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> InputParseResult<'a, ()> {
-    let (_, tag) = ws(identifier).parse_peek(i)?;
+fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &mut &'a str) -> ParseResult<'a, ()> {
+    let tag = peek(ws(identifier)).parse_next(i)?;
     let msg = match tag {
         "end" | "elif" | "else" | "when" => match kind {
             Some(kind) => {
@@ -267,7 +267,7 @@ fn unexpected_raw_tag<'a>(kind: Option<&'static str>, i: &'a str) -> InputParseR
         tag if tag.starts_with("end") => format!("unexpected closing tag `{tag}`"),
         tag => format!("unknown node `{tag}`"),
     };
-    Err(winnow::error::ErrMode::Cut(ErrorContext::new(msg, i)))
+    Err(winnow::error::ErrMode::Cut(ErrorContext::new(msg, *i)))
 }
 
 #[derive(Debug, PartialEq)]
