@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::{fmt, str};
 
 use winnow::Parser;
-use winnow::ascii::escaped;
+use winnow::ascii::take_escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
 use winnow::stream::{AsChar, Stream as _};
@@ -312,7 +312,12 @@ impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
         }
     }
 
-    fn append(self, _: &&'a str, _: ErrorKind) -> Self {
+    fn append(
+        self,
+        _: &&'a str,
+        _: &<&str as winnow::stream::Stream>::Checkpoint,
+        _: ErrorKind,
+    ) -> Self {
         self
     }
 }
@@ -394,7 +399,7 @@ fn identifier<'i>(input: &mut &'i str) -> ParseResult<'i> {
         c.is_alphanum() || c == '_' || c >= '\u{0080}'
     });
 
-    (start, opt(tail)).recognize().parse_next(input)
+    (start, opt(tail)).take().parse_next(input)
 }
 
 fn bool_lit<'i>(i: &mut &'i str) -> ParseResult<'i> {
@@ -434,7 +439,7 @@ fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
     // Equivalent to <https://github.com/rust-lang/rust/blob/e3f909b2bbd0b10db6f164d466db237c582d3045/compiler/rustc_lexer/src/lib.rs#L587-L620>.
     let int_with_base = (opt('-'), |i: &mut _| {
         let (base, kind) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
-            .with_recognized()
+            .with_taken()
             .parse_next(i)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
             Some(_) => Ok(()),
@@ -469,13 +474,13 @@ fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
         }
     };
 
-    let num = if let Ok(Some(num)) = opt(int_with_base.recognize()).parse_next(i) {
+    let num = if let Ok(Some(num)) = opt(int_with_base.take()).parse_next(i) {
         let suffix =
             opt(|i: &mut _| num_lit_suffix("integer", INTEGER_TYPES, start, i)).parse_next(i)?;
         Num::Int(num, suffix)
     } else {
         let (float, num) = preceded((opt('-'), separated_digits(10, true)), opt(float))
-            .with_recognized()
+            .with_taken()
             .parse_next(i)?;
         if float.is_some() {
             let suffix =
@@ -508,7 +513,7 @@ fn separated_digits<'a>(
         one_of(move |ch: char| ch.is_digit(radix)),
         repeat(0.., one_of(move |ch: char| ch == '_' || ch.is_digit(radix))).map(|()| ()),
     )
-        .recognize()
+        .take()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -544,7 +549,7 @@ pub struct StrLit<'a> {
 fn str_lit_without_prefix<'a>(i: &mut &'a str) -> ParseResult<'a> {
     let s = delimited(
         '"',
-        opt(escaped(take_till(1.., ['\\', '"']), '\\', any)),
+        opt(take_escaped(take_till(1.., ['\\', '"']), '\\', any)),
         '"',
     )
     .parse_next(i)?;
@@ -580,14 +585,14 @@ fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
         opt('b'),
         delimited(
             '\'',
-            opt(escaped(take_till(1.., ['\\', '\'']), '\\', any)),
+            opt(take_escaped(take_till(1.., ['\\', '\'']), '\\', any)),
             '\'',
         ),
     )
         .parse_next(i)?;
 
     let Some(s) = s else {
-        i.reset(start);
+        i.reset(&start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "empty character literal",
             *i,
@@ -595,7 +600,7 @@ fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
     };
     let mut is = s;
     let Ok(c) = Char::parse(&mut is) else {
-        i.reset(start);
+        i.reset(&start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             "invalid character",
             *i,
@@ -626,11 +631,11 @@ fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
     };
 
     let Ok(nb) = u32::from_str_radix(nb, 16) else {
-        i.reset(start);
+        i.reset(&start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err1, *i)));
     };
     if nb > max_value {
-        i.reset(start);
+        i.reset(&start);
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(err2, *i)));
     }
 
