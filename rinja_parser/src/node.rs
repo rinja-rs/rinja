@@ -315,7 +315,7 @@ impl<'a> When<'a> {
                 ),
             ),
         ))
-        .with_recognized()
+        .with_taken()
         .map(|((pws, _), span)| {
             // A comment node is used to pass the whitespace suppressing information to the
             // generator. This way we don't have to fix up the next `when` node or the closing
@@ -1071,7 +1071,7 @@ impl<'a> Lit<'a> {
             literal(s.syntax.expr_start),
         ));
 
-        let content = opt(skip_till(candidate_finder, p_start).recognize()).parse_next(i)?;
+        let content = opt(skip_till(candidate_finder, p_start).take()).parse_next(i)?;
         let content = match content {
             Some("") => {
                 // {block,comment,expr}_start follows immediately.
@@ -1121,7 +1121,7 @@ impl<'a> Raw<'a> {
                 (
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
-                    skip_till(Splitter1::new(s.syntax.block_start), endraw).with_recognized(),
+                    skip_till(Splitter1::new(s.syntax.block_start), endraw).with_taken(),
                 ),
             ),
         );
@@ -1378,13 +1378,13 @@ fn end_node<'a, 'g: 'a>(
         if actual == expected {
             Ok(actual)
         } else if actual.starts_with("end") {
-            i.reset(start);
+            i.reset(&start);
             Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 format!("expected `{expected}` to terminate `{node}` node, found `{actual}`"),
                 *i,
             )))
         } else {
-            i.reset(start);
+            i.reset(&start);
             fail.parse_next(i)
         }
     }

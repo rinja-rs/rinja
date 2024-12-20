@@ -469,7 +469,7 @@ impl<'a> Expr<'a> {
 
     fn num(i: &mut &'a str) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
-        let (num, full) = num_lit.with_recognized().parse_next(i)?;
+        let (num, full) = num_lit.with_taken().parse_next(i)?;
         Ok(WithSpan::new(Expr::NumLit(full, num), start))
     }
 
@@ -647,7 +647,7 @@ impl<'a> Suffix<'a> {
         preceded(
             (ws('!'), '('),
             cut_err(terminated(
-                nested_parenthesis.recognize().map(Self::MacroCall),
+                nested_parenthesis.take().map(Self::MacroCall),
                 ')',
             )),
         )

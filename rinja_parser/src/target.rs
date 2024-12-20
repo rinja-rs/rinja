@@ -122,7 +122,7 @@ impl<'a> Target<'a> {
             str_lit.map(Self::StrLit),
             char_lit.map(Self::CharLit),
             num_lit
-                .with_recognized()
+                .with_taken()
                 .map(|(num, full)| Target::NumLit(full, num)),
             bool_lit.map(Self::BoolLit),
         ))
@@ -135,7 +135,7 @@ impl<'a> Target<'a> {
 
     fn named(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
         let start = *i;
-        let rest = opt(Self::rest.with_recognized()).parse_next(i)?;
+        let rest = opt(Self::rest.with_taken()).parse_next(i)?;
         if let Some(rest) = rest {
             let chr = peek(ws(opt(one_of([',', ':'])))).parse_next(i)?;
             if let Some(chr) = chr {
