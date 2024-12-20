@@ -488,19 +488,19 @@ impl FromStr for Whitespace {
 }
 
 fn check_block_start<'a>(
-    i: &'a str,
+    i: &mut &'a str,
     start: &'a str,
     s: &State<'_>,
     node: &str,
     expected: &str,
-) -> InputParseResult<'a, ()> {
+) -> ParseResult<'a, ()> {
     if i.is_empty() {
         return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             format!("expected `{expected}` to terminate `{node}` node, found nothing"),
             start,
         )));
     }
-    (|i: &mut _| s.tag_block_start(i)).parse_peek(i)
+    (|i: &mut _| s.tag_block_start(i)).parse_next(i)
 }
 
 #[derive(Debug, PartialEq)]
@@ -561,7 +561,7 @@ impl<'a> Loop<'a> {
                     cut_node(
                         Some("for"),
                         (
-                            unpeek(|i| check_block_start(i, start, s, "for", "endfor")),
+                            |i: &mut _| check_block_start(i, start, s, "for", "endfor"),
                             opt(Whitespace::parse),
                             opt(unpeek(else_block)),
                             end_node("for", "endfor"),
@@ -727,7 +727,7 @@ impl<'a> Macro<'a> {
                 cut_node(
                     Some("macro"),
                     (
-                        unpeek(|i| check_block_start(i, start_s, s, "macro", "endmacro")),
+                        |i: &mut _| check_block_start(i, start_s, s, "macro", "endmacro"),
                         opt(Whitespace::parse),
                         end_node("macro", "endmacro"),
                         cut_node(
@@ -821,7 +821,7 @@ impl<'a> FilterBlock<'a> {
                 cut_node(
                     Some("filter"),
                     (
-                        unpeek(|i| check_block_start(i, start_s, s, "filter", "endfilter")),
+                        |i: &mut _| check_block_start(i, start_s, s, "filter", "endfilter"),
                         opt(Whitespace::parse),
                         end_node("filter", "endfilter"),
                         opt(Whitespace::parse),
@@ -956,9 +956,9 @@ impl<'a> Match<'a> {
                                     cut_node(
                                         Some("match"),
                                         (
-                                            ws(unpeek(|i| {
+                                            ws(|i: &mut _| {
                                                 check_block_start(i, start, s, "match", "endmatch")
-                                            })),
+                                            }),
                                             opt(Whitespace::parse),
                                             end_node("match", "endmatch"),
                                             opt(Whitespace::parse),
@@ -1029,7 +1029,7 @@ impl<'a> BlockDef<'a> {
                 cut_node(
                     Some("block"),
                     (
-                        unpeek(|i| check_block_start(i, start_s, s, "block", "endblock")),
+                        |i: &mut _| check_block_start(i, start_s, s, "block", "endblock"),
                         opt(Whitespace::parse),
                         end_node("block", "endblock"),
                         cut_node(
@@ -1235,7 +1235,7 @@ impl<'a> If<'a> {
                             cut_node(
                                 Some("if"),
                                 (
-                                    unpeek(|i| check_block_start(i, start, s, "if", "endif")),
+                                    |i: &mut _| check_block_start(i, start, s, "if", "endif"),
                                     opt(Whitespace::parse),
                                     end_node("if", "endif"),
                                     opt(Whitespace::parse),
