@@ -194,9 +194,14 @@ fn verify_name<'a>(
     input: &'a str,
     name: &'a str,
 ) -> Result<Target<'a>, winnow::error::ErrMode<ErrorContext<'a>>> {
-    if name == "self" || name.starts_with("__rinja") {
+    if name == "self" {
         Err(winnow::error::ErrMode::Cut(ErrorContext::new(
             format!("cannot use `{name}` as a name"),
+            input,
+        )))
+    } else if name.starts_with("__rinja") {
+        Err(winnow::error::ErrMode::Cut(ErrorContext::new(
+            format!("cannot use `{name}` as a name: it's reserved for `rinja`"),
             input,
         )))
     } else {
