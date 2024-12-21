@@ -36,7 +36,7 @@ jobs:
       matrix:
         package: [
           examples/actix-web-app, fuzzing, rinja, rinja_derive, rinja_derive_standalone,
-          rinja_parser, testing,
+          rinja_parser, testing, testing-alloc, testing-no-std,
         ]
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +77,7 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing
+            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing testing-alloc testing-no-std
           do
             cd "$PKG"
             echo "Testing: $PKG"
@@ -91,7 +91,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.80.0"
+          toolchain: "1.81.0"
       - run: cargo check --lib -p rinja --all-features
 
   Audit:
@@ -144,7 +144,7 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing
+            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing testing-alloc testing-no-std
           do
             cd "$PKG"
             cargo sort --check --check-format --grouped

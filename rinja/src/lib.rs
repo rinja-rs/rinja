@@ -58,6 +58,12 @@
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
 #![deny(missing_docs)]
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
 mod error;
 pub mod filters;
@@ -65,7 +71,11 @@ pub mod filters;
 pub mod helpers;
 mod html;
 
-use std::{fmt, io};
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+use core::fmt;
+#[cfg(feature = "std")]
+use std::io;
 
 pub use rinja_derive::Template;
 
@@ -86,9 +96,9 @@ pub use crate::helpers::PrimitiveType;
 /// * [`.render_into()`][Template::render_into] (to render the content into an [`fmt::Write`]
 ///   object, e.g. [`String`]) or
 /// * [`.write_into()`][Template::write_into] (to render the content into an [`io::Write`] object,
-///   e.g. [`Vec<u8>`])
+///   e.g. [`Vec<u8>`][alloc::vec::Vec])
 ///
-/// over [`.to_string()`][std::string::ToString::to_string] or [`format!()`].
+/// over [`.to_string()`][std::string::ToString::to_string] or [`format!()`][alloc::format].
 /// While `.to_string()` and `format!()` give you the same result, they generally perform much worse
 /// than rinja's own methods, because [`fmt::Write`] uses [dynamic methods calls] instead of
 /// monomorphised code. On average, expect `.to_string()` to be 100% to 200% slower than
@@ -97,6 +107,7 @@ pub use crate::helpers::PrimitiveType;
 /// [dynamic methods calls]: <https://doc.rust-lang.org/stable/std/keyword.dyn.html>
 pub trait Template: fmt::Display + filters::FastWritable {
     /// Helper method which allocates a new `String` and renders into it
+    #[cfg(feature = "alloc")]
     fn render(&self) -> Result<String> {
         let mut buf = String::new();
         let _ = buf.try_reserve(Self::SIZE_HINT);
@@ -108,6 +119,7 @@ pub trait Template: fmt::Display + filters::FastWritable {
     fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()>;
 
     /// Renders the template to the given `writer` io buffer
+    #[cfg(feature = "std")]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         struct Wrapped<W: io::Write> {
             writer: W,
@@ -143,6 +155,7 @@ pub trait Template: fmt::Display + filters::FastWritable {
     /// [`render`]: Template::render
     /// [`render_into`]: Template::render_into
     /// [`write_into`]: Template::write_into
+    /// [`ToString::to_string`]: alloc::string::ToString::to_string
     const SIZE_HINT: usize;
 }
 
@@ -153,11 +166,13 @@ impl<T: Template + ?Sized> Template for &T {
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn render(&self) -> Result<String> {
         <T as Template>::render(self)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         <T as Template>::write_into(self, writer)
     }
@@ -170,12 +185,14 @@ impl<T: Template + ?Sized> Template for &T {
 /// This trades reduced performance (mostly due to writing into `dyn Write`) for object safety.
 pub trait DynTemplate {
     /// Helper method which allocates a new `String` and renders into it
+    #[cfg(feature = "alloc")]
     fn dyn_render(&self) -> Result<String>;
 
     /// Renders the template to the given `writer` fmt buffer
     fn dyn_render_into(&self, writer: &mut dyn fmt::Write) -> Result<()>;
 
     /// Renders the template to the given `writer` io buffer
+    #[cfg(feature = "std")]
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()>;
 
     /// Provides a conservative estimate of the expanded length of the rendered template
@@ -183,6 +200,7 @@ pub trait DynTemplate {
 }
 
 impl<T: Template> DynTemplate for T {
+    #[cfg(feature = "alloc")]
     fn dyn_render(&self) -> Result<String> {
         <Self as Template>::render(self)
     }
@@ -192,6 +210,7 @@ impl<T: Template> DynTemplate for T {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         <Self as Template>::write_into(self, writer)
     }
@@ -210,20 +229,36 @@ impl fmt::Display for dyn DynTemplate {
 /// Implement the trait `$Trait` for a list of reference (wrapper) types to `$T: $Trait + ?Sized`
 macro_rules! impl_for_ref {
     (impl $Trait:ident for $T:ident $body:tt) => {
-        crate::impl_for_ref! {
-            impl<$T> $Trait for [
-                &T
-                &mut T
-                Box<T>
-                std::cell::Ref<'_, T>
-                std::cell::RefMut<'_, T>
-                std::rc::Rc<T>
-                std::sync::Arc<T>
-                std::sync::MutexGuard<'_, T>
-                std::sync::RwLockReadGuard<'_, T>
-                std::sync::RwLockWriteGuard<'_, T>
-            ] $body
-        }
+        const _: () = {
+            crate::impl_for_ref! {
+                impl<$T> $Trait for [
+                    &T
+                    &mut T
+                    core::cell::Ref<'_, T>
+                    core::cell::RefMut<'_, T>
+                ] $body
+            }
+        };
+        #[cfg(feature = "alloc")]
+        const _: () = {
+            crate::impl_for_ref! {
+                impl<$T> $Trait for [
+                    alloc::boxed::Box<T>
+                    alloc::rc::Rc<T>
+                    alloc::sync::Arc<T>
+                ] $body
+            }
+        };
+        #[cfg(feature = "std")]
+        const _: () = {
+            crate::impl_for_ref! {
+                impl<$T> $Trait for [
+                    std::sync::MutexGuard<'_, T>
+                    std::sync::RwLockReadGuard<'_, T>
+                    std::sync::RwLockWriteGuard<'_, T>
+                ] $body
+            }
+        };
     };
     (impl<$T:ident> $Trait:ident for [$($ty:ty)*] $body:tt) => {
         $(impl<$T: $Trait + ?Sized> $Trait for $ty $body)*
@@ -232,7 +267,7 @@ macro_rules! impl_for_ref {
 
 pub(crate) use impl_for_ref;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use std::fmt;
 
@@ -241,6 +276,8 @@ mod tests {
 
     #[test]
     fn dyn_template() {
+        use alloc::string::ToString;
+
         struct Test;
 
         impl Template for Test {
@@ -275,10 +312,10 @@ mod tests {
 
         assert_eq!(test.to_string(), "test");
 
-        assert_eq!(format!("{test}"), "test");
+        assert_eq!(alloc::format!("{test}"), "test");
 
-        let mut vec = Vec::new();
+        let mut vec = alloc::vec![];
         test.dyn_write_into(&mut vec).unwrap();
-        assert_eq!(vec, vec![b't', b'e', b's', b't']);
+        assert_eq!(vec, alloc::vec![b't', b'e', b's', b't']);
     }
 }

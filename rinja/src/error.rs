@@ -1,9 +1,14 @@
-use std::convert::Infallible;
-use std::error::Error as StdError;
-use std::{fmt, io};
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+use core::convert::Infallible;
+use core::error::Error as StdError;
+use core::fmt;
+use core::marker::PhantomData;
+#[cfg(feature = "std")]
+use std::io;
 
 /// The [`Result`](std::result::Result) type with [`Error`] as default error type
-pub type Result<I, E = Error> = std::result::Result<I, E>;
+pub type Result<I, E = Error> = core::result::Result<I, E>;
 
 /// rinja's error type
 ///
@@ -15,6 +20,7 @@ pub enum Error {
     /// Generic, unspecified formatting error
     Fmt,
     /// An error raised by using `?` in a template
+    #[cfg(feature = "alloc")]
     Custom(Box<dyn StdError + Send + Sync>),
     /// JSON conversion error
     #[cfg(feature = "serde_json")]
@@ -24,12 +30,14 @@ pub enum Error {
 impl Error {
     /// Capture an [`StdError`]
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn custom(err: impl Into<Box<dyn StdError + Send + Sync>>) -> Self {
         Self::Custom(err.into())
     }
 
     /// Convert this [`Error`] into a
     /// <code>[Box]&lt;dyn [StdError] + [Send] + [Sync]&gt;</code>
+    #[cfg(feature = "alloc")]
     pub fn into_box(self) -> Box<dyn StdError + Send + Sync> {
         match self {
             Error::Fmt => fmt::Error.into(),
@@ -42,6 +50,7 @@ impl Error {
     /// Convert this [`Error`] into an [`io::Error`]
     ///
     /// Not this error itself, but the contained [`source`][StdError::source] is returned.
+    #[cfg(feature = "std")]
     pub fn into_io_error(self) -> io::Error {
         io::Error::other(match self {
             Error::Custom(err) => match err.downcast() {
@@ -57,6 +66,7 @@ impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Error::Fmt => Some(&fmt::Error),
+            #[cfg(feature = "alloc")]
             Error::Custom(err) => Some(err.as_ref()),
             #[cfg(feature = "serde_json")]
             Error::Json(err) => Some(err),
@@ -68,6 +78,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Fmt => fmt::Error.fmt(f),
+            #[cfg(feature = "alloc")]
             Error::Custom(err) => err.fmt(f),
             #[cfg(feature = "serde_json")]
             Error::Json(err) => err.fmt(f),
@@ -82,6 +93,7 @@ impl From<Error> for fmt::Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<Error> for io::Error {
     #[inline]
     fn from(err: Error) -> Self {
@@ -97,6 +109,7 @@ impl From<fmt::Error> for Error {
 }
 
 /// This conversion inspects the argument and chooses the best fitting [`Error`] variant
+#[cfg(feature = "alloc")]
 impl From<Box<dyn StdError + Send + Sync>> for Error {
     #[inline]
     fn from(err: Box<dyn StdError + Send + Sync>) -> Self {
@@ -105,19 +118,24 @@ impl From<Box<dyn StdError + Send + Sync>> for Error {
 }
 
 /// This conversion inspects the argument and chooses the best fitting [`Error`] variant
+#[cfg(feature = "std")]
 impl From<io::Error> for Error {
     #[inline]
     fn from(err: io::Error) -> Self {
-        from_from_io_error(err, MAX_ERROR_UNWRAP_COUNT)
+        error_from_io_error(err, MAX_ERROR_UNWRAP_COUNT)
     }
 }
 
+#[cfg(feature = "alloc")]
 const MAX_ERROR_UNWRAP_COUNT: usize = 5;
 
+#[cfg(feature = "alloc")]
 fn error_from_stderror(err: Box<dyn StdError + Send + Sync>, unwraps: usize) -> Error {
     let Some(unwraps) = unwraps.checked_sub(1) else {
         return Error::Custom(err);
     };
+    #[cfg(not(feature = "std"))]
+    let _ = unwraps;
     match ErrorKind::inspect(err.as_ref()) {
         ErrorKind::Fmt => Error::Fmt,
         ErrorKind::Custom => Error::Custom(err),
@@ -126,8 +144,9 @@ fn error_from_stderror(err: Box<dyn StdError + Send + Sync>, unwraps: usize) -> 
             Ok(err) => Error::Json(*err),
             Err(_) => Error::Fmt, // unreachable
         },
+        #[cfg(feature = "std")]
         ErrorKind::Io => match err.downcast() {
-            Ok(err) => from_from_io_error(*err, unwraps),
+            Ok(err) => error_from_io_error(*err, unwraps),
             Err(_) => Error::Fmt, // unreachable
         },
         ErrorKind::Rinja => match err.downcast() {
@@ -137,7 +156,8 @@ fn error_from_stderror(err: Box<dyn StdError + Send + Sync>, unwraps: usize) -> 
     }
 }
 
-fn from_from_io_error(err: io::Error, unwraps: usize) -> Error {
+#[cfg(feature = "std")]
+fn error_from_io_error(err: io::Error, unwraps: usize) -> Error {
     let Some(inner) = err.get_ref() else {
         return Error::custom(err);
     };
@@ -163,36 +183,45 @@ fn from_from_io_error(err: io::Error, unwraps: usize) -> Error {
             None => Error::Fmt, // unreachable
         },
         ErrorKind::Io => match err.downcast() {
-            Ok(inner) => from_from_io_error(inner, unwraps),
+            Ok(inner) => error_from_io_error(inner, unwraps),
             Err(_) => Error::Fmt, // unreachable
         },
     }
 }
 
+#[cfg(feature = "alloc")]
 enum ErrorKind {
     Fmt,
     Custom,
     #[cfg(feature = "serde_json")]
     Json,
+    #[cfg(feature = "std")]
     Io,
     Rinja,
 }
 
+#[cfg(feature = "alloc")]
 impl ErrorKind {
     fn inspect(err: &(dyn StdError + 'static)) -> ErrorKind {
         if err.is::<fmt::Error>() {
-            ErrorKind::Fmt
-        } else if err.is::<io::Error>() {
-            ErrorKind::Io
-        } else if err.is::<Error>() {
-            ErrorKind::Rinja
-        } else {
-            #[cfg(feature = "serde_json")]
-            if err.is::<serde_json::Error>() {
-                return ErrorKind::Json;
-            }
-            ErrorKind::Custom
+            return ErrorKind::Fmt;
         }
+
+        #[cfg(feature = "std")]
+        if err.is::<io::Error>() {
+            return ErrorKind::Io;
+        }
+
+        if err.is::<Error>() {
+            return ErrorKind::Rinja;
+        }
+
+        #[cfg(feature = "serde_json")]
+        if err.is::<serde_json::Error>() {
+            return ErrorKind::Json;
+        }
+
+        ErrorKind::Custom
     }
 }
 
@@ -216,3 +245,53 @@ const _: () = {
     trait AssertSendSyncStatic: Send + Sync + 'static {}
     impl AssertSendSyncStatic for Error {}
 };
+
+/// Helper trait to convert a custom `?` call into a [`crate::Result`]
+pub trait ResultConverter {
+    /// Okay Value type of the output
+    type Value;
+    /// Input type
+    type Input;
+
+    /// Consume an interior mutable `self`, and turn it into a [`crate::Result`]
+    fn rinja_conv_result(self, result: Self::Input) -> Result<Self::Value, Error>;
+}
+
+/// Helper marker to be used with [`ResultConverter`]
+#[derive(Debug, Clone, Copy)]
+pub struct ErrorMarker<T>(PhantomData<Result<T>>);
+
+impl<T> ErrorMarker<T> {
+    /// Get marker for a [`Result`] type
+    #[inline]
+    pub fn of(_: &T) -> Self {
+        Self(PhantomData)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T, E> ResultConverter for &ErrorMarker<Result<T, E>>
+where
+    E: Into<Box<dyn StdError + Send + Sync>>,
+{
+    type Value = T;
+    type Input = Result<T, E>;
+
+    #[inline]
+    fn rinja_conv_result(self, result: Self::Input) -> Result<Self::Value, Error> {
+        result.map_err(Error::custom)
+    }
+}
+
+impl<T, E> ResultConverter for &&ErrorMarker<Result<T, E>>
+where
+    E: Into<Error>,
+{
+    type Value = T;
+    type Input = Result<T, E>;
+
+    #[inline]
+    fn rinja_conv_result(self, result: Self::Input) -> Result<Self::Value, Error> {
+        result.map_err(Into::into)
+    }
+}

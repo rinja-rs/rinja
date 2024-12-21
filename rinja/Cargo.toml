@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 workspace = ".."
 readme = "../README.md"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.81"
 
 [package.metadata.docs.rs]
 features = ["full"]
@@ -21,20 +21,21 @@ rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["config", "urlencode"]
+default = ["config", "std", "urlencode"]
+alloc = ["rinja_derive/alloc", "serde?/alloc", "serde_json?/alloc", "percent-encoding?/alloc"]
 full = ["default", "code-in-doc", "serde_json"]
 code-in-doc = ["rinja_derive/code-in-doc"]
 config = ["rinja_derive/config"]
 serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
+std = ["alloc", "rinja_derive/std", "serde?/std", "serde_json?/std", "percent-encoding?/std"]
 urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
 
 [dependencies]
 rinja_derive = { version = "=0.3.5", path = "../rinja_derive" }
 
-num-traits = { version = "0.2.6", optional = true }
-percent-encoding = { version = "2.1.0", optional = true }
-serde = { version = "1.0", optional = true }
-serde_json = { version = "1.0", optional = true }
+percent-encoding = { version = "2.1.0", optional = true, default-features = false }
+serde = { version = "1.0", optional = true, default-features = false }
+serde_json = { version = "1.0", optional = true, default-features = false, features = [] }
 
 itoa = "1.0.11"
 
