@@ -1,4 +1,4 @@
-error: cannot use `__rinja_var` as a name
+error: cannot use `__rinja_var` as a name: it's reserved for `rinja`
  --> <source attribute>:1:7
        "__rinja_var %}"
  --> tests/ui/assign-to-rinja.rs:4:21
@@ -6,7 +6,7 @@ error: cannot use `__rinja_var` as a name
 4 | #[template(source = r#"{% let __rinja_var %}"#, ext = "html")]
   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: cannot use `__rinja_var` as a name
+error: cannot use `__rinja_var` as a name: it's reserved for `rinja`
  --> <source attribute>:1:7
        "__rinja_var = \"var\" %}"
  --> tests/ui/assign-to-rinja.rs:8:21
