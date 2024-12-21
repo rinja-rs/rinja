@@ -4,7 +4,8 @@ use winnow::token::one_of;
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
-    bool_lit, char_lit, identifier, keyword, num_lit, path_or_identifier, str_lit, ws,
+    bool_lit, char_lit, identifier, is_rust_keyword, keyword, num_lit, path_or_identifier, str_lit,
+    ws,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -194,14 +195,14 @@ fn verify_name<'a>(
     input: &'a str,
     name: &'a str,
 ) -> Result<Target<'a>, winnow::error::ErrMode<ErrorContext<'a>>> {
-    if name == "self" {
+    if is_rust_keyword(name) {
         Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-            format!("cannot use `{name}` as a name"),
+            format!("cannot use `{name}` as a name: it is a rust keyword"),
             input,
         )))
     } else if name.starts_with("__rinja") {
         Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-            format!("cannot use `{name}` as a name: it's reserved for `rinja`"),
+            format!("cannot use `{name}` as a name: it is reserved for `rinja`"),
             input,
         )))
     } else {
