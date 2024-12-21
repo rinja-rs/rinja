@@ -1,0 +1,15 @@
+error: cannot use `__rinja_var` as a name
+ --> <source attribute>:1:7
+       "__rinja_var %}"
+ --> tests/ui/assign-to-rinja.rs:4:21
+  |
+4 | #[template(source = r#"{% let __rinja_var %}"#, ext = "html")]
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `__rinja_var` as a name
+ --> <source attribute>:1:7
+       "__rinja_var = \"var\" %}"
+ --> tests/ui/assign-to-rinja.rs:8:21
+  |
+8 | #[template(source = r#"{% let __rinja_var = "var" %}"#, ext = "html")]
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
