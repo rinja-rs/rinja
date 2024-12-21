@@ -136,7 +136,7 @@ impl Buffer {
     }
 
     pub(crate) fn write_writer(&mut self, s: &str) -> usize {
-        const OPEN: &str = r#"writer.write_str(""#;
+        const OPEN: &str = r#"__rinja_writer.write_str(""#;
         const CLOSE: &str = r#"")?;"#;
 
         if !s.is_empty() && !self.discard {

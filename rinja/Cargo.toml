@@ -2,14 +2,11 @@
 name = "rinja"
 version = "0.3.5"
 description = "Type-safe, compiled Jinja-like templates for Rust"
-documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
 categories = ["template-engine"]
 homepage = "https://rinja.readthedocs.io/"
 repository = "https://github.com/rinja-rs/rinja"
 license = "MIT OR Apache-2.0"
-workspace = ".."
-readme = "../README.md"
 edition = "2021"
 rust-version = "1.81"
 
@@ -17,18 +14,14 @@ rust-version = "1.81"
 features = ["full"]
 rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
-[badges]
-maintenance = { status = "actively-developed" }
+[[bench]]
+name = "to-json"
+harness = false
+required-features = ["serde_json"]
 
-[features]
-default = ["config", "std", "urlencode"]
-alloc = ["rinja_derive/alloc", "serde?/alloc", "serde_json?/alloc", "percent-encoding?/alloc"]
-full = ["default", "code-in-doc", "serde_json"]
-code-in-doc = ["rinja_derive/code-in-doc"]
-config = ["rinja_derive/config"]
-serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
-std = ["alloc", "rinja_derive/std", "serde?/std", "serde_json?/std", "percent-encoding?/std"]
-urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
+[[bench]]
+name = "escape"
+harness = false
 
 [dependencies]
 rinja_derive = { version = "=0.3.5", path = "../rinja_derive" }
@@ -42,11 +35,27 @@ itoa = "1.0.11"
 [dev-dependencies]
 criterion = "0.5"
 
-[[bench]]
-name = "to-json"
-harness = false
-required-features = ["serde_json"]
+[badges]
+maintenance = { status = "actively-developed" }
 
-[[bench]]
-name = "escape"
-harness = false
+[features]
+default = ["config", "std", "urlencode"]
+full = ["default", "code-in-doc", "serde_json"]
+
+alloc = [
+    "rinja_derive/alloc",
+    "serde?/alloc",
+    "serde_json?/alloc",
+    "percent-encoding?/alloc"
+]
+code-in-doc = ["rinja_derive/code-in-doc"]
+config = ["rinja_derive/config"]
+serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
+std = [
+    "alloc",
+    "rinja_derive/std",
+    "serde?/std",
+    "serde_json?/std",
+    "percent-encoding?/std"
+]
+urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
