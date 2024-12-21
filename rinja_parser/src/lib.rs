@@ -1141,6 +1141,7 @@ pub const RUST_KEYWORDS: &[&[[u8; MAX_RUST_RAW_KEYWORD_LEN]]] = {
         *b"r#box_____",
         *b"r#dyn_____",
         *b"r#for_____",
+        *b"r#gen_____",
         *b"r#let_____",
         *b"r#mod_____",
         *b"r#mut_____",

@@ -166,266 +166,274 @@ error: cannot use `for` as a name: it is a rust keyword
 37 | test_kw!(For "{% let for %}");
    |              ^^^^^^^^^^^^^^^
 
+error: cannot use `gen` as a name: it is a rust keyword
+ --> <source attribute>:1:7
+       "gen %}"
+  --> tests/ui/assign-to-rinja.rs:38:14
+   |
+38 | test_kw!(Gen "{% let gen %}");
+   |              ^^^^^^^^^^^^^^^
+
 error: cannot use `if` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "if %}"
-  --> tests/ui/assign-to-rinja.rs:38:13
+  --> tests/ui/assign-to-rinja.rs:39:13
    |
-38 | test_kw!(If "{% let if %}");
+39 | test_kw!(If "{% let if %}");
    |             ^^^^^^^^^^^^^^
 
 error: cannot use `impl` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "impl %}"
-  --> tests/ui/assign-to-rinja.rs:39:15
+  --> tests/ui/assign-to-rinja.rs:40:15
    |
-39 | test_kw!(Impl "{% let impl %}");
+40 | test_kw!(Impl "{% let impl %}");
    |               ^^^^^^^^^^^^^^^^
 
 error: cannot use `in` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "in %}"
-  --> tests/ui/assign-to-rinja.rs:40:13
+  --> tests/ui/assign-to-rinja.rs:41:13
    |
-40 | test_kw!(In "{% let in %}");
+41 | test_kw!(In "{% let in %}");
    |             ^^^^^^^^^^^^^^
 
 error: cannot use `let` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "let %}"
-  --> tests/ui/assign-to-rinja.rs:41:14
+  --> tests/ui/assign-to-rinja.rs:42:14
    |
-41 | test_kw!(Let "{% let let %}");
+42 | test_kw!(Let "{% let let %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `loop` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "loop %}"
-  --> tests/ui/assign-to-rinja.rs:42:15
+  --> tests/ui/assign-to-rinja.rs:43:15
    |
-42 | test_kw!(Loop "{% let loop %}");
+43 | test_kw!(Loop "{% let loop %}");
    |               ^^^^^^^^^^^^^^^^
 
 error: cannot use `macro` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "macro %}"
-  --> tests/ui/assign-to-rinja.rs:43:16
+  --> tests/ui/assign-to-rinja.rs:44:16
    |
-43 | test_kw!(Macro "{% let macro %}");
+44 | test_kw!(Macro "{% let macro %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: cannot use `match` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "match %}"
-  --> tests/ui/assign-to-rinja.rs:44:16
+  --> tests/ui/assign-to-rinja.rs:45:16
    |
-44 | test_kw!(Match "{% let match %}");
+45 | test_kw!(Match "{% let match %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: cannot use `mod` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "mod %}"
-  --> tests/ui/assign-to-rinja.rs:45:14
+  --> tests/ui/assign-to-rinja.rs:46:14
    |
-45 | test_kw!(Mod "{% let mod %}");
+46 | test_kw!(Mod "{% let mod %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `move` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "move %}"
-  --> tests/ui/assign-to-rinja.rs:46:15
+  --> tests/ui/assign-to-rinja.rs:47:15
    |
-46 | test_kw!(Move "{% let move %}");
+47 | test_kw!(Move "{% let move %}");
    |               ^^^^^^^^^^^^^^^^
 
 error: cannot use `mut` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "mut %}"
-  --> tests/ui/assign-to-rinja.rs:47:14
+  --> tests/ui/assign-to-rinja.rs:48:14
    |
-47 | test_kw!(Mut "{% let mut %}");
+48 | test_kw!(Mut "{% let mut %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `override` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "override %}"
-  --> tests/ui/assign-to-rinja.rs:48:19
+  --> tests/ui/assign-to-rinja.rs:49:19
    |
-48 | test_kw!(Override "{% let override %}");
+49 | test_kw!(Override "{% let override %}");
    |                   ^^^^^^^^^^^^^^^^^^^^
 
 error: cannot use `priv` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "priv %}"
-  --> tests/ui/assign-to-rinja.rs:49:15
+  --> tests/ui/assign-to-rinja.rs:50:15
    |
-49 | test_kw!(Priv "{% let priv %}");
+50 | test_kw!(Priv "{% let priv %}");
    |               ^^^^^^^^^^^^^^^^
 
 error: cannot use `pub` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "pub %}"
-  --> tests/ui/assign-to-rinja.rs:50:14
+  --> tests/ui/assign-to-rinja.rs:51:14
    |
-50 | test_kw!(Pub "{% let pub %}");
+51 | test_kw!(Pub "{% let pub %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `ref` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "ref %}"
-  --> tests/ui/assign-to-rinja.rs:51:14
+  --> tests/ui/assign-to-rinja.rs:52:14
    |
-51 | test_kw!(Ref "{% let ref %}");
+52 | test_kw!(Ref "{% let ref %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `return` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "return %}"
-  --> tests/ui/assign-to-rinja.rs:52:17
+  --> tests/ui/assign-to-rinja.rs:53:17
    |
-52 | test_kw!(Return "{% let return %}");
+53 | test_kw!(Return "{% let return %}");
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: cannot use `self` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "self %}"
-  --> tests/ui/assign-to-rinja.rs:53:20
+  --> tests/ui/assign-to-rinja.rs:54:20
    |
-53 | test_kw!(LowerSelf "{% let self %}");
+54 | test_kw!(LowerSelf "{% let self %}");
    |                    ^^^^^^^^^^^^^^^^
 
 error: when you forward-define a variable, you cannot use a path or enum variant in place of a variable name
  --> <source attribute>:1:2
        " let Self %}"
-  --> tests/ui/assign-to-rinja.rs:54:20
+  --> tests/ui/assign-to-rinja.rs:55:20
    |
-54 | test_kw!(UpperSelf "{% let Self %}");
+55 | test_kw!(UpperSelf "{% let Self %}");
    |                    ^^^^^^^^^^^^^^^^
 
 error: cannot use `static` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "static %}"
-  --> tests/ui/assign-to-rinja.rs:55:17
+  --> tests/ui/assign-to-rinja.rs:56:17
    |
-55 | test_kw!(Static "{% let static %}");
+56 | test_kw!(Static "{% let static %}");
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: cannot use `struct` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "struct %}"
-  --> tests/ui/assign-to-rinja.rs:56:17
+  --> tests/ui/assign-to-rinja.rs:57:17
    |
-56 | test_kw!(Struct "{% let struct %}");
+57 | test_kw!(Struct "{% let struct %}");
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: cannot use `super` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "super %}"
-  --> tests/ui/assign-to-rinja.rs:57:16
+  --> tests/ui/assign-to-rinja.rs:58:16
    |
-57 | test_kw!(Super "{% let super %}");
+58 | test_kw!(Super "{% let super %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: cannot use `trait` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "trait %}"
-  --> tests/ui/assign-to-rinja.rs:58:16
+  --> tests/ui/assign-to-rinja.rs:59:16
    |
-58 | test_kw!(Trait "{% let trait %}");
+59 | test_kw!(Trait "{% let trait %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: when you forward-define a variable, you cannot use a literal in place of a variable name
  --> <source attribute>:1:2
        " let true %}"
-  --> tests/ui/assign-to-rinja.rs:59:15
+  --> tests/ui/assign-to-rinja.rs:60:15
    |
-59 | test_kw!(True "{% let true %}");
+60 | test_kw!(True "{% let true %}");
    |               ^^^^^^^^^^^^^^^^
 
 error: cannot use `try` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "try %}"
-  --> tests/ui/assign-to-rinja.rs:60:14
+  --> tests/ui/assign-to-rinja.rs:61:14
    |
-60 | test_kw!(Try "{% let try %}");
+61 | test_kw!(Try "{% let try %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `type` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "type %}"
-  --> tests/ui/assign-to-rinja.rs:61:15
+  --> tests/ui/assign-to-rinja.rs:62:15
    |
-61 | test_kw!(Type "{% let type %}");
+62 | test_kw!(Type "{% let type %}");
    |               ^^^^^^^^^^^^^^^^
 
 error: cannot use `typeof` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "typeof %}"
-  --> tests/ui/assign-to-rinja.rs:62:17
+  --> tests/ui/assign-to-rinja.rs:63:17
    |
-62 | test_kw!(Typeof "{% let typeof %}");
+63 | test_kw!(Typeof "{% let typeof %}");
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: cannot use `union` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "union %}"
-  --> tests/ui/assign-to-rinja.rs:63:16
+  --> tests/ui/assign-to-rinja.rs:64:16
    |
-63 | test_kw!(Union "{% let union %}");
+64 | test_kw!(Union "{% let union %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: cannot use `unsafe` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "unsafe %}"
-  --> tests/ui/assign-to-rinja.rs:64:17
+  --> tests/ui/assign-to-rinja.rs:65:17
    |
-64 | test_kw!(Unsafe "{% let unsafe %}");
+65 | test_kw!(Unsafe "{% let unsafe %}");
    |                 ^^^^^^^^^^^^^^^^^^
 
 error: cannot use `unsized` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "unsized %}"
-  --> tests/ui/assign-to-rinja.rs:65:18
+  --> tests/ui/assign-to-rinja.rs:66:18
    |
-65 | test_kw!(Unsized "{% let unsized %}");
+66 | test_kw!(Unsized "{% let unsized %}");
    |                  ^^^^^^^^^^^^^^^^^^^
 
 error: cannot use `use` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "use %}"
-  --> tests/ui/assign-to-rinja.rs:66:14
+  --> tests/ui/assign-to-rinja.rs:67:14
    |
-66 | test_kw!(Use "{% let use %}");
+67 | test_kw!(Use "{% let use %}");
    |              ^^^^^^^^^^^^^^^
 
 error: cannot use `virtual` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "virtual %}"
-  --> tests/ui/assign-to-rinja.rs:67:18
+  --> tests/ui/assign-to-rinja.rs:68:18
    |
-67 | test_kw!(Virtual "{% let virtual %}");
+68 | test_kw!(Virtual "{% let virtual %}");
    |                  ^^^^^^^^^^^^^^^^^^^
 
 error: cannot use `where` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "where %}"
-  --> tests/ui/assign-to-rinja.rs:68:16
+  --> tests/ui/assign-to-rinja.rs:69:16
    |
-68 | test_kw!(Where "{% let where %}");
+69 | test_kw!(Where "{% let where %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: cannot use `while` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "while %}"
-  --> tests/ui/assign-to-rinja.rs:69:16
+  --> tests/ui/assign-to-rinja.rs:70:16
    |
-69 | test_kw!(While "{% let while %}");
+70 | test_kw!(While "{% let while %}");
    |                ^^^^^^^^^^^^^^^^^
 
 error: cannot use `yield` as a name: it is a rust keyword
  --> <source attribute>:1:7
        "yield %}"
-  --> tests/ui/assign-to-rinja.rs:70:16
+  --> tests/ui/assign-to-rinja.rs:71:16
    |
-70 | test_kw!(Yield "{% let yield %}");
+71 | test_kw!(Yield "{% let yield %}");
    |                ^^^^^^^^^^^^^^^^^

@@ -35,6 +35,7 @@ test_kw!(False "{% let false %}");
 test_kw!(Final "{% let final %}");
 test_kw!(Fn "{% let fn %}");
 test_kw!(For "{% let for %}");
+test_kw!(Gen "{% let gen %}");
 test_kw!(If "{% let if %}");
 test_kw!(Impl "{% let impl %}");
 test_kw!(In "{% let in %}");
