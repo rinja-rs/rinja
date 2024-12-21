@@ -10,8 +10,8 @@ use parser::node::{
     Whitespace, Ws,
 };
 use parser::{
-    CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, Node, Num, Span, StrLit, StrPrefix,
-    Target, WithSpan,
+    CharLit, CharPrefix, Expr, Filter, FloatKind, IntKind, MAX_RUST_KEYWORD_LEN, Node, Num,
+    RUST_KEYWORDS, Span, StrLit, StrPrefix, Target, WithSpan,
 };
 use rustc_hash::FxBuildHasher;
 
@@ -2999,18 +2999,19 @@ fn normalize_identifier(ident: &str) -> &str {
     // While the code does not need it, please keep the list sorted when adding new
     // keywords.
 
-    if ident.len() > parser::node::MAX_KW_LEN {
+    if ident.len() > MAX_RUST_KEYWORD_LEN {
         return ident;
     }
-    let kws = parser::node::KWS[ident.len()];
+    let kws = RUST_KEYWORDS[ident.len()];
 
-    let mut padded_ident = [b'_'; parser::node::MAX_KW_LEN];
+    let mut padded_ident = [b'_'; MAX_RUST_KEYWORD_LEN];
     padded_ident[..ident.len()].copy_from_slice(ident.as_bytes());
 
     // Since the individual buckets are quite short, a linear search is faster than a binary search.
-    let replacement = match kws.iter().find(|probe| {
-        padded_ident == <[u8; parser::node::MAX_KW_LEN]>::try_from(&probe[2..]).unwrap()
-    }) {
+    let replacement = match kws
+        .iter()
+        .find(|probe| padded_ident == <[u8; MAX_RUST_KEYWORD_LEN]>::try_from(&probe[2..]).unwrap())
+    {
         Some(replacement) => replacement,
         None => return ident,
     };
