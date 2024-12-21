@@ -168,7 +168,7 @@ impl<'a, 'h> Generator<'a, 'h> {
     ) -> Result<usize, CompileError> {
         write_header(self.input.ast, buf, target);
         buf.write(
-            "fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>\
+            "fn render_into<RinjaW>(&self, __rinja_writer: &mut RinjaW) -> rinja::Result<()>\
             where \
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
@@ -913,7 +913,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         // build `FmtCell` that contains the inner block
         buf.write(format_args!(
             "let {FILTER_SOURCE} = rinja::helpers::FmtCell::new(\
-                |writer: &mut rinja::helpers::core::fmt::Formatter<'_>| -> rinja::Result<()> {{"
+                |__rinja_writer: &mut rinja::helpers::core::fmt::Formatter<'_>| -> rinja::Result<()> {{"
         ));
         let size_hint = self.push_locals(|this| {
             this.prepare_ws(filter.ws1);
@@ -945,7 +945,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             ),
         };
         buf.write(format_args!(
-            "if rinja::helpers::core::write!(writer, \"{{}}\", {filter_buf}).is_err() {{\
+            "if rinja::helpers::core::write!(__rinja_writer, \"{{}}\", {filter_buf}).is_err() {{\
                 return {FILTER_SOURCE}.take_err();\
             }}"
         ));
@@ -1300,7 +1300,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                         idx
                     };
                     lines.write(format_args!(
-                        "(&&rinja::filters::Writable(expr{idx})).rinja_write(writer)?;",
+                        "(&&rinja::filters::Writable(expr{idx})).rinja_write(__rinja_writer)?;",
                     ));
                 }
             }

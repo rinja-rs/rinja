@@ -27,7 +27,7 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
             extern crate rinja as rinja;
 
             impl rinja::Template for Foo {
-                fn render_into<RinjaW>(&self, writer: &mut RinjaW) -> rinja::Result<()>
+                fn render_into<RinjaW>(&self, __rinja_writer: &mut RinjaW) -> rinja::Result<()>
                 where
                     RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
                 {
@@ -153,7 +153,7 @@ fn check_if_let() {
         &((&&rinja::filters::AutoEscaper::new(&(query), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }",
@@ -170,7 +170,7 @@ fn check_if_let() {
         &((&&rinja::filters::AutoEscaper::new(&(s), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }",
@@ -187,7 +187,7 @@ fn check_if_let() {
         &((&&rinja::filters::AutoEscaper::new(&(s), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }",
@@ -206,7 +206,7 @@ fn check_if_let() {
             r#"const _: &[rinja::helpers::core::primitive::u8] = rinja::helpers::core::include_bytes!({path1:#?});
             const _: &[rinja::helpers::core::primitive::u8] = rinja::helpers::core::include_bytes!({path2:#?});
             const _: &[rinja::helpers::core::primitive::u8] = rinja::helpers::core::include_bytes!({path3:#?});
-            writer.write_str("3333")?;"#
+            __rinja_writer.write_str("3333")?;"#
         ),
         &[],
         4,
@@ -220,19 +220,19 @@ fn check_is_defined() {
     // We're forced to add `bla` otherwise `compare` assert fails in weird ways...
     compare(
         "{% if y is defined %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if x is not defined %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[("x", "u32")],
         3,
     );
     compare(
         "{% if y is defined && x is not defined %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[("x", "u32")],
         3,
     );
@@ -242,7 +242,7 @@ fn check_is_defined() {
         "{% set y = 12 %}
          {%- if y is not defined %}{{query}}{% endif %}bla",
         r#"let y = 12;
-writer.write_str("bla")?;"#,
+__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
@@ -250,7 +250,7 @@ writer.write_str("bla")?;"#,
         "{% set y = 12 %}
          {%- if y is not defined && x is defined %}{{query}}{% endif %}bla",
         r#"let y = 12;
-writer.write_str("bla")?;"#,
+__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
@@ -259,13 +259,13 @@ writer.write_str("bla")?;"#,
     // remove the condition.
     compare(
         "{% if y is defined %}bla{% endif %}",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[("y", "u32")],
         3,
     );
     compare(
         "{% if x is not defined %}bla{% endif %}",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
@@ -274,7 +274,7 @@ writer.write_str("bla")?;"#,
         "{% set y = 12 %}
          {%- if y is defined %}bla{% endif %}",
         r#"let y = 12;
-writer.write_str("bla")?;"#,
+__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
@@ -284,7 +284,7 @@ writer.write_str("bla")?;"#,
     compare(
         "{% if x is defined %}bli
          {%- else if x == 12 %}12{% endif %}bla",
-        r#"writer.write_str("blibla")?;"#,
+        r#"__rinja_writer.write_str("blibla")?;"#,
         &[("x", "u32")],
         6,
     );
@@ -292,7 +292,7 @@ writer.write_str("bla")?;"#,
         "{% if x is defined %}bli
          {%- else if x == 12 %}12
          {%- else %}nope{% endif %}bla",
-        r#"writer.write_str("blibla")?;"#,
+        r#"__rinja_writer.write_str("blibla")?;"#,
         &[("x", "u32")],
         6,
     );
@@ -302,9 +302,9 @@ writer.write_str("bla")?;"#,
          {%- else if x is defined %}12
          {%- else %}nope{% endif %}",
         r#"if rinja::helpers::as_bool(&(self.x == 12)) {
-writer.write_str("bli")?;
+__rinja_writer.write_str("bli")?;
 } else {
-writer.write_str("12")?;
+__rinja_writer.write_str("12")?;
 }"#,
         &[("x", "u32")],
         5,
@@ -319,7 +319,7 @@ writer.write_str("12")?;
         &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }
@@ -333,7 +333,7 @@ writer.write_str("12")?;
     &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
     }
 }
 ",
@@ -348,7 +348,7 @@ writer.write_str("12")?;
     );
     compare(
         "{% if y is defined && y == 12 %}{{y}}{% else %}bli{% endif %}",
-        r#"writer.write_str("bli")?;"#,
+        r#"__rinja_writer.write_str("bli")?;"#,
         &[],
         3,
     );
@@ -364,11 +364,11 @@ if rinja::helpers::as_bool(&(self.y == 12)) {
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 } else {
-    writer.write_str("bli")?;
+    __rinja_writer.write_str("bli")?;
 }
 "#,
         &[("y", "u32")],
@@ -386,7 +386,7 @@ match (
         .rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
     }
 }
 ",
@@ -400,25 +400,25 @@ match (
     // to encounter cases like that in the wild so better have a check.
     compare(
         "{% if !(y is defined) %}bla{% endif %}",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if !(y is not defined) %}bli{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if !(y is defined) %}bli{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[("y", "u32")],
         3,
     );
     compare(
         "{% if !(y is not defined) %}bla{% endif %}",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[("y", "u32")],
         3,
     );
@@ -427,7 +427,7 @@ match (
     compare(
         "{% if y is defined && !y %}bla{% endif %}",
         r#"if !rinja::helpers::as_bool(&(self.y)) {
-    writer.write_str("bla")?;
+    __rinja_writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
         3,
@@ -435,7 +435,7 @@ match (
     compare(
         "{% if y is defined && !(y) %}bla{% endif %}",
         r#"if !(rinja::helpers::as_bool(&(self.y))) {
-    writer.write_str("bla")?;
+    __rinja_writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
         3,
@@ -443,7 +443,7 @@ match (
     compare(
         "{% if y is not defined || !y %}bla{% endif %}",
         r#"if !rinja::helpers::as_bool(&(self.y)) {
-    writer.write_str("bla")?;
+    __rinja_writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
         3,
@@ -451,7 +451,7 @@ match (
     compare(
         "{% if y is not defined || !(y) %}bla{% endif %}",
         r#"if !(rinja::helpers::as_bool(&(self.y))) {
-    writer.write_str("bla")?;
+    __rinja_writer.write_str("bla")?;
 }"#,
         &[("y", "bool")],
         3,
@@ -465,37 +465,37 @@ fn check_bool_conditions() {
     // We're forced to add `bla` otherwise `compare` assert fails in weird ways...
     compare(
         "{% if false %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if false && false %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if false && true %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if true && false %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if false || true %}bli{% endif %}bla",
-        r#"writer.write_str("blibla")?;"#,
+        r#"__rinja_writer.write_str("blibla")?;"#,
         &[],
         6,
     );
     compare(
         "{% if true || false %}bli{% endif %}bla",
-        r#"writer.write_str("blibla")?;"#,
+        r#"__rinja_writer.write_str("blibla")?;"#,
         &[],
         6,
     );
@@ -506,7 +506,7 @@ fn check_bool_conditions() {
     &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
     }
 }
 ",
@@ -524,7 +524,7 @@ fn check_bool_conditions() {
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }
@@ -548,7 +548,7 @@ fn check_bool_conditions() {
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }
@@ -568,7 +568,7 @@ fn check_bool_conditions() {
         .rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
     }
 }
 ",
@@ -589,7 +589,7 @@ if rinja::helpers::as_bool(&(self.y == 3))
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
         }
     }
 }
@@ -601,13 +601,13 @@ if rinja::helpers::as_bool(&(self.y == 3))
     // Some funny cases.
     compare(
         "{% if !(false) %}bla{% endif %}",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
     compare(
         "{% if !(true) %}{{query}}{% endif %}bla",
-        r#"writer.write_str("bla")?;"#,
+        r#"__rinja_writer.write_str("bla")?;"#,
         &[],
         3,
     );
@@ -623,7 +623,7 @@ if rinja::helpers::as_bool(&(self.y == 3))
                 rinja::helpers::as_bool(&(self.c))
                 || !rinja::helpers::as_bool(&(self.d))
             ) {
-                writer.write_str("x")?;
+                __rinja_writer.write_str("x")?;
             }"#,
         &[("a", "i32"), ("b", "i32"), ("c", "i32"), ("d", "i32")],
         1,
@@ -640,13 +640,13 @@ fn check_escaping_at_compile_time() {
             {%- when Suit::Diamonds or Suit::Hearts -%}
                 {{ " red" }}
         {%- endmatch %}"#,
-        r#"writer.write_str("The card is")?;
+        r#"__rinja_writer.write_str("The card is")?;
         match &self.suit {
             Suit::Clubs {} | Suit::Spades {} => {
-                writer.write_str(" black")?;
+                __rinja_writer.write_str(" black")?;
             }
             Suit::Diamonds {} | Suit::Hearts {} => {
-                writer.write_str(" red")?;
+                __rinja_writer.write_str(" red")?;
             }
         }"#,
         &[("suit", "Suit")],
@@ -656,7 +656,7 @@ fn check_escaping_at_compile_time() {
     compare(
         r#"{{ '\x41' }}{{ '\n' }}{{ '\r' }}{{ '\t' }}{{ '\\' }}{{ '\u{2665}' }}{{ '\'' }}{{ '\"' }}{{ '"' }}
 {{ "\x41\n\r\t\\\u{2665}\'\"'" }}"#,
-        r#"writer.write_str("A
+        r#"__rinja_writer.write_str("A
 \r	\\♥'\"\"
 A
 \r	\\♥'\"'")?;"#,
@@ -666,7 +666,7 @@ A
 
     compare(
         r"{{ 1_2_3_4 }} {{ 4e3 }} {{ false }}",
-        r#"writer.write_str("1234 4000 false")?;"#,
+        r#"__rinja_writer.write_str("1234 4000 false")?;"#,
         &[],
         15,
     );
@@ -789,9 +789,9 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0, expr3) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
-                writer.write_str(" dog")?;
-                (&&rinja::filters::Writable(expr3)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                __rinja_writer.write_str(" dog")?;
+                (&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer)?;
             }
         }"#,
         &[("dogs", "i8")],
@@ -813,9 +813,9 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0, expr3) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
-                writer.write_str(" dog")?;
-                (&&rinja::filters::Writable(expr3)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                __rinja_writer.write_str(" dog")?;
+                (&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer)?;
             }
         }"#,
         &[("dogs", "i8")],
@@ -837,9 +837,9 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0, expr2) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
-                writer.write_str(" ")?;
-                (&&rinja::filters::Writable(expr2)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                __rinja_writer.write_str(" ")?;
+                (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
             }
         }"#,
         &[("dogs", "i8")],
@@ -865,7 +865,7 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         ",
@@ -881,7 +881,7 @@ fn test_pluralize() {
                 .rinja_auto_escape()?),
         ) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         ",
@@ -896,7 +896,7 @@ fn test_pluralize() {
                 .rinja_auto_escape()?),
         ) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         ",
@@ -909,7 +909,7 @@ fn test_pluralize() {
         r#"
         match (&(rinja::filters::Safe("pl")),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         "#,
@@ -921,7 +921,7 @@ fn test_pluralize() {
         r#"
         match (&(rinja::filters::Safe("sg")),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         "#,
@@ -934,7 +934,7 @@ fn test_pluralize() {
         r#"
         match (&(rinja::filters::Safe("s")),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         "#,
@@ -946,7 +946,7 @@ fn test_pluralize() {
         r"
         match (&(rinja::helpers::Empty),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
             }
         }
         ",
@@ -960,7 +960,7 @@ fn test_concat() {
     compare(
         r#"{{ "<" ~ a ~ "|" ~ b ~ '>' }}"#,
         r#"
-            writer.write_str("<")?;
+            __rinja_writer.write_str("<")?;
             match (
                 &((&&rinja::filters::AutoEscaper::new(&(self.a), rinja::filters::Text))
                     .rinja_auto_escape()?),
@@ -968,12 +968,12 @@ fn test_concat() {
                     .rinja_auto_escape()?),
             ) {
                 (expr1, expr3) => {
-                    (&&rinja::filters::Writable(expr1)).rinja_write(writer)?;
-                    writer.write_str("|")?;
-                    (&&rinja::filters::Writable(expr3)).rinja_write(writer)?;
+                    (&&rinja::filters::Writable(expr1)).rinja_write(__rinja_writer)?;
+                    __rinja_writer.write_str("|")?;
+                    (&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer)?;
                 }
             }
-            writer.write_str(">")?;
+            __rinja_writer.write_str(">")?;
         "#,
         &[("a", "&'static str"), ("b", "u32")],
         9,
@@ -995,7 +995,7 @@ fn test_concat() {
                     .rinja_auto_escape()?),
             ) {
                 (expr0,) => {
-                    (&&rinja::filters::Writable(expr0)).rinja_write(writer)?;
+                    (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
                 }
             }
         "#,
