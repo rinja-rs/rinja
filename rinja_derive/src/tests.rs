@@ -194,7 +194,10 @@ fn check_if_let() {
         &[],
         3,
     );
+}
 
+#[test]
+fn check_includes_only_once() {
     // In this test we make sure that every used template gets referenced exactly once.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
     let path1 = path.join("include1.html").canonicalize().unwrap();

@@ -384,18 +384,24 @@ impl<'a> Generator<'a, '_> {
                         // left expression has been handled but before the right expression is handled
                         // but this one should have access to the let-bound variable.
                         match &**expr {
-                            Expr::BinOp(op, ref left, ref right) if *op == "||" || *op == "&&" => {
-                                this.visit_expr(ctx, &mut expr_buf, left)?;
+                            Expr::BinOp(op @ ("||" | "&&"), ref left, ref right) => {
+                                let display_wrap =
+                                    this.visit_expr_first(ctx, &mut expr_buf, left)?;
                                 this.visit_target(buf, true, true, target);
-                                expr_buf.write(format_args!(" {op} "));
-                                this.visit_condition(ctx, &mut expr_buf, right)?;
+                                this.visit_expr_not_first(ctx, &mut expr_buf, left, display_wrap)?;
+                                buf.write(format_args!("= &{expr_buf}"));
+                                buf.write(format_args!(" {op} "));
+                                this.visit_condition(ctx, buf, right)?;
                             }
                             _ => {
-                                this.visit_expr(ctx, &mut expr_buf, expr)?;
+                                let display_wrap =
+                                    this.visit_expr_first(ctx, &mut expr_buf, expr)?;
                                 this.visit_target(buf, true, true, target);
+                                this.visit_expr_not_first(ctx, &mut expr_buf, expr, display_wrap)?;
+                                buf.write(format_args!("= &{expr_buf}"));
                             }
                         }
-                        buf.write(format_args!("= &{expr_buf} {{"));
+                        buf.write("{");
                     } else if cond_info.generate_condition {
                         this.visit_condition(ctx, buf, expr)?;
                         buf.write('{');
