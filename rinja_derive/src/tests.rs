@@ -196,6 +196,80 @@ fn check_if_let() {
     );
 }
 
+// Since this feature is not stable yet, we can't add a "normal" test for it so instead we check
+// the generated code.
+#[test]
+fn check_if_let_chain() {
+    // Both `bla` and `blob` variables must exist in this `if`.
+    compare(
+        "{% if let Some(bla) = y && x && let Some(blob) = y %}{{bla}} {{blob}}{% endif %}",
+        r#"if let Some(bla) = &self.y && self.x && let Some(blob) = &self.y {
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(bla), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(blob), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+
+    compare(
+        r#"{% if let Some(bla) = y
+            && bla == "x"
+            && let Some(blob) = z
+            && blob == "z" %}{{bla}} {{blob}}{% endif %}"#,
+        r#"if let Some(bla) = &self.y && bla == "x" && let Some(blob) = &self.z && blob == "z" {
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(bla), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(blob), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+
+    // Bindings variables with the same name as the bound variable should be declared in the right
+    // order.
+    compare(
+        r#"{% if let Some(y) = y
+            && y == "x"
+            && let Some(z) = z
+            && z == "z" %}{{y}} {{z}}{% endif %}"#,
+        r#"if let Some(y) = &self.y && y == "x" && let Some(z) = &self.z && z == "z" {
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(y), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(z), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+}
+
 #[test]
 fn check_includes_only_once() {
     // In this test we make sure that every used template gets referenced exactly once.
