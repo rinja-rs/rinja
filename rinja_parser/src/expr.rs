@@ -9,6 +9,7 @@ use winnow::combinator::{
 use winnow::error::{ErrorKind, ParserError as _};
 use winnow::stream::Stream as _;
 
+use crate::node::CondTest;
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
     WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
@@ -61,7 +62,8 @@ fn check_expr<'a>(
         | Expr::Var(_)
         | Expr::RustMacro(_, _)
         | Expr::Try(_)
-        | Expr::FilterSource => Ok(()),
+        | Expr::FilterSource
+        | Expr::LetCond(_) => Ok(()),
         Expr::Array(elems) | Expr::Tuple(elems) | Expr::Concat(elems) => {
             for elem in elems {
                 check_expr(elem, allow_underscore)?;
@@ -127,6 +129,8 @@ pub enum Expr<'a> {
     IsDefined(&'a str),
     IsNotDefined(&'a str),
     Concat(Vec<WithSpan<'a, Expr<'a>>>),
+    /// If you have `&& let Some(y)`, this variant handles it.
+    LetCond(Box<WithSpan<'a, CondTest<'a>>>),
 }
 
 impl<'a> Expr<'a> {
@@ -506,7 +510,8 @@ impl<'a> Expr<'a> {
             | Self::Array(_)
             | Self::BinOp(_, _, _)
             | Self::Path(_)
-            | Self::Concat(_) => false,
+            | Self::Concat(_)
+            | Self::LetCond(_) => false,
         }
     }
 }

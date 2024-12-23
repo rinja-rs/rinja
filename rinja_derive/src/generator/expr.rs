@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use parser::node::CondTest;
 use parser::{
     CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target, WithSpan,
 };
@@ -59,6 +60,7 @@ impl<'a> Generator<'a, '_> {
             Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
             Expr::As(ref expr, target) => self.visit_as(ctx, buf, expr, target)?,
             Expr::Concat(ref exprs) => self.visit_concat(ctx, buf, exprs)?,
+            Expr::LetCond(_) => unreachable!("should only be called in visit_condition"),
         })
     }
 
@@ -66,7 +68,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
     ) -> Result<(), CompileError> {
         match &**expr {
             Expr::BoolLit(_) | Expr::IsDefined(_) | Expr::IsNotDefined(_) => {
@@ -85,6 +87,9 @@ impl<'a> Generator<'a, '_> {
                 buf.write('(');
                 self.visit_condition(ctx, buf, expr)?;
                 buf.write(')');
+            }
+            Expr::LetCond(cond) => {
+                self.visit_let_cond(ctx, buf, cond)?;
             }
             _ => {
                 buf.write("rinja::helpers::as_bool(&(");
@@ -142,6 +147,20 @@ impl<'a> Generator<'a, '_> {
                 Ok(DisplayWrap::Unwrapped)
             }
         }
+    }
+
+    fn visit_let_cond(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        cond: &WithSpan<'_, CondTest<'a>>,
+    ) -> Result<DisplayWrap, CompileError> {
+        buf.write(" let ");
+        if let Some(ref target) = cond.target {
+            self.visit_target(buf, true, true, target);
+        }
+        buf.write("= &");
+        self.visit_expr(ctx, buf, &cond.expr)
     }
 
     fn visit_try(

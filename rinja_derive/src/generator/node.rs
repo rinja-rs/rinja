@@ -205,7 +205,8 @@ impl<'a> Generator<'a, '_> {
             | Expr::NamedArgument(_, _)
             | Expr::FilterSource
             | Expr::As(_, _)
-            | Expr::Concat(_) => {
+            | Expr::Concat(_)
+            | Expr::LetCond(_) => {
                 *only_contains_is_defined = false;
                 (EvaluatedResult::Unknown, WithSpan::new(expr, span))
             }
@@ -1466,6 +1467,8 @@ fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         Expr::As(expr, _) => is_cacheable(expr),
         Expr::Try(expr) => is_cacheable(expr),
         Expr::Concat(args) => args.iter().all(is_cacheable),
+        // Doesn't make sense in this context.
+        Expr::LetCond(_) => false,
         // We have too little information to tell if the expression is pure:
         Expr::Call(_, _) => false,
         Expr::RustMacro(_, _) => false,

@@ -397,7 +397,7 @@ impl<'a> Cond<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CondTest<'a> {
     pub target: Option<Target<'a>>,
     pub expr: WithSpan<'a, Expr<'a>>,
@@ -420,7 +420,19 @@ impl<'a> CondTest<'a> {
                 ws(|i: &mut _| Target::parse(i, s)),
                 ws('='),
             )),
-            ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
+            ws(|i: &mut _| {
+                let start = *i;
+                let mut expr = Expr::parse(i, s.level.get(), false)?;
+                if let Expr::BinOp(_, _, ref mut right) = expr.inner {
+                    if matches!(right.inner, Expr::Var("set" | "let")) {
+                        *i = right.span.as_suffix_of(start).unwrap();
+                        let start_span = Span::from(*i);
+                        let new_right = Self::parse_cond(i, s)?;
+                        right.inner = Expr::LetCond(Box::new(WithSpan::new(new_right, start_span)));
+                    }
+                }
+                Ok(expr)
+            }),
         )
             .parse_next(i)?;
         let contains_bool_lit_or_is_defined = expr.contains_bool_lit_or_is_defined();
