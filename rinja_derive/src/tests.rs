@@ -203,7 +203,7 @@ fn check_if_let_chain() {
     // Both `bla` and `blob` variables must exist in this `if`.
     compare(
         "{% if let Some(bla) = y && x && let Some(blob) = y %}{{bla}} {{blob}}{% endif %}",
-        r#"if let Some(bla) = &self.y && self.x && let Some(blob) = &self.y {
+        r#"if let Some(bla) = &self.y && rinja::helpers::as_bool(&(self.x)) && let Some(blob) = &self.y {
     match (
         &((&&rinja::filters::AutoEscaper::new(&(bla), rinja::filters::Text))
             .rinja_auto_escape()?),
@@ -226,7 +226,9 @@ fn check_if_let_chain() {
             && bla == "x"
             && let Some(blob) = z
             && blob == "z" %}{{bla}} {{blob}}{% endif %}"#,
-        r#"if let Some(bla) = &self.y && bla == "x" && let Some(blob) = &self.z && blob == "z" {
+        r#"if let Some(bla) = &self.y && rinja::helpers::as_bool(&(bla == "x"))
+             && let Some(blob) = &self.z && rinja::helpers::as_bool(&(blob == "z"))
+{
     match (
         &((&&rinja::filters::AutoEscaper::new(&(bla), rinja::filters::Text))
             .rinja_auto_escape()?),
@@ -249,9 +251,40 @@ fn check_if_let_chain() {
     compare(
         r#"{% if let Some(y) = y
             && y == "x"
+            && w
             && let Some(z) = z
             && z == "z" %}{{y}} {{z}}{% endif %}"#,
-        r#"if let Some(y) = &self.y && y == "x" && let Some(z) = &self.z && z == "z" {
+        r#"if let Some(y) = &self.y && self.y == "x"
+    && rinja::helpers::as_bool(&(self.w)) && let Some(z) = &self.z
+    && rinja::helpers::as_bool(&(z == "z"))
+{
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(y), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(z), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+
+    compare(
+        r#"{% if w
+            && let Some(y) = y
+            && y == "x"
+            && let Some(z) = z
+            && z == "z" %}{{y}} {{z}}{% endif %}"#,
+        r#"if rinja::helpers::as_bool(&(self.w)) && let Some(y) = &self.y
+    && self.y == "x" && let Some(z) = &self.z
+    && rinja::helpers::as_bool(&(z == "z"))
+{
     match (
         &((&&rinja::filters::AutoEscaper::new(&(y), rinja::filters::Text))
             .rinja_auto_escape()?),

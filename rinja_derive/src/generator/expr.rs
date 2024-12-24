@@ -100,7 +100,10 @@ impl<'a> Generator<'a, '_> {
         prev_display_wrap: DisplayWrap,
     ) -> Result<DisplayWrap, CompileError> {
         match **expr {
-            Expr::BinOp("||" | "&&", _, ref right) => self.visit_expr(ctx, buf, right),
+            Expr::BinOp("||" | "&&", _, ref right) => {
+                self.visit_condition(ctx, buf, right)?;
+                Ok(DisplayWrap::Unwrapped)
+            }
             Expr::Unary(_, ref inner) => {
                 self.visit_expr_not_first(ctx, buf, inner, prev_display_wrap)
             }
