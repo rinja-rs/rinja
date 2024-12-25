@@ -18,16 +18,18 @@ use crate::{
 
 macro_rules! expr_prec_layer {
     ( $name:ident, $inner:ident, $op:expr ) => {
-        fn $name(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-            let level = level.nest(i)?;
+        fn $name(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+            let mut level_guard = level.guard();
             let start = *i;
-            let left = Self::$inner(i, level)?;
-            let right = repeat(0.., (ws($op), |i: &mut _| Self::$inner(i, level)))
-                .map(|v: Vec<_>| v)
-                .parse_next(i)?;
-            Ok(right.into_iter().fold(left, |left, (op, right)| {
-                WithSpan::new(Self::BinOp(op, Box::new(left), Box::new(right)), start)
-            }))
+            let mut expr = Self::$inner(i, level)?;
+            let mut i_before = *i;
+            let mut right = opt((ws($op), |i: &mut _| Self::$inner(i, level)));
+            while let Some((op, right)) = right.parse_next(i)? {
+                level_guard.nest(i_before)?;
+                i_before = *i;
+                expr = WithSpan::new(Self::BinOp(op, Box::new(expr), Box::new(right)), start);
+            }
+            Ok(expr)
         }
     };
 }
@@ -136,10 +138,10 @@ pub enum Expr<'a> {
 impl<'a> Expr<'a> {
     pub(super) fn arguments(
         i: &mut &'a str,
-        level: Level,
+        level: Level<'_>,
         is_template_macro: bool,
     ) -> ParseResult<'a, Vec<WithSpan<'a, Self>>> {
-        let level = level.nest(i)?;
+        let _level_guard = level.nest(i)?;
         let mut named_arguments = HashSet::new();
         let start = *i;
 
@@ -186,7 +188,7 @@ impl<'a> Expr<'a> {
 
     fn named_argument(
         i: &mut &'a str,
-        level: Level,
+        level: Level<'_>,
         named_arguments: &mut HashSet<&'a str>,
         start: &'a str,
         is_template_macro: bool,
@@ -197,7 +199,6 @@ impl<'a> Expr<'a> {
             return fail.parse_next(i);
         }
 
-        let level = level.nest(i)?;
         let (argument, _, value) = (identifier, ws('='), move |i: &mut _| {
             Self::parse(i, level, false)
         })
@@ -217,10 +218,10 @@ impl<'a> Expr<'a> {
 
     pub(super) fn parse(
         i: &mut &'a str,
-        level: Level,
+        level: Level<'_>,
         allow_underscore: bool,
     ) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let level = level.nest(i)?;
+        let _level_guard = level.nest(i)?;
         let start = Span::from(*i);
         let range_right = move |i: &mut _| {
             (
@@ -257,10 +258,10 @@ impl<'a> Expr<'a> {
     expr_prec_layer!(shifts, addsub, alt((">>", "<<")));
     expr_prec_layer!(addsub, concat, alt(("+", "-")));
 
-    fn concat(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn concat(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         fn concat_expr<'a>(
             i: &mut &'a str,
-            level: Level,
+            level: Level<'_>,
         ) -> ParseResult<'a, Option<WithSpan<'a, Expr<'a>>>> {
             let ws1 = |i: &mut _| opt(skip_ws1).parse_next(i);
 
@@ -295,7 +296,7 @@ impl<'a> Expr<'a> {
 
     expr_prec_layer!(muldivmod, is_as, alt(("*", "/", "%")));
 
-    fn is_as(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn is_as(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let lhs = Self::filtered(i, level)?;
         let before_keyword = *i;
@@ -358,10 +359,13 @@ impl<'a> Expr<'a> {
         Ok(WithSpan::new(ctor(var_name), start))
     }
 
-    fn filtered(i: &mut &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn filtered(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let mut level_guard = level.guard();
         let start = *i;
         let mut res = Self::prefix(i, level)?;
-        while let Some((name, args)) = opt(|i: &mut _| filter(i, &mut level)).parse_next(i)? {
+        while let Some((name, args)) = opt(|i: &mut _| filter(i, level)).parse_next(i)? {
+            level_guard.nest(i)?;
+
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
             arguments.insert(0, res);
 
@@ -370,28 +374,30 @@ impl<'a> Expr<'a> {
         Ok(res)
     }
 
-    fn prefix(i: &mut &'a str, mut level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let nested = level.nest(i)?;
+    fn prefix(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
-        let (ops, mut expr) = (
-            repeat(0.., ws(alt(("!", "-", "*", "&")))).map(|v: Vec<_>| v),
-            |i: &mut _| Suffix::parse(i, nested),
-        )
-            .parse_next(i)?;
 
+        // This is a rare place where we create recursion in the parsed AST
+        // without recursing the parser call stack. However, this can lead
+        // to stack overflows in drop glue when the AST is very deep.
+        let mut level_guard = level.guard();
+        let mut ops = vec![];
+        let mut i_before = *i;
+        while let Some(op) = opt(ws(alt(("!", "-", "*", "&")))).parse_next(i)? {
+            level_guard.nest(i_before)?;
+            ops.push(op);
+            i_before = *i;
+        }
+
+        let mut expr = Suffix::parse(i, level)?;
         for op in ops.iter().rev() {
-            // This is a rare place where we create recursion in the parsed AST
-            // without recursing the parser call stack. However, this can lead
-            // to stack overflows in drop glue when the AST is very deep.
-            level = level.nest(i)?;
             expr = WithSpan::new(Self::Unary(op, Box::new(expr)), start);
         }
 
         Ok(expr)
     }
 
-    fn single(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let level = level.nest(i)?;
+    fn single(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         alt((
             Self::num,
             Self::str,
@@ -403,8 +409,7 @@ impl<'a> Expr<'a> {
         .parse_next(i)
     }
 
-    fn group(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let level = level.nest(i)?;
+    fn group(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let expr = preceded(ws('('), opt(|i: &mut _| Self::parse(i, level, true))).parse_next(i)?;
         let Some(expr) = expr else {
@@ -434,9 +439,8 @@ impl<'a> Expr<'a> {
         Ok(WithSpan::new(Self::Tuple(exprs), start))
     }
 
-    fn array(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn array(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
-        let level = level.nest(i)?;
         let array = preceded(
             ws('['),
             cut_err(terminated(
@@ -556,32 +560,36 @@ enum Suffix<'a> {
 }
 
 impl<'a> Suffix<'a> {
-    fn parse(i: &mut &'a str, level: Level) -> ParseResult<'a, WithSpan<'a, Expr<'a>>> {
-        let level = level.nest(i)?;
+    fn parse(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Expr<'a>>> {
+        let mut level_guard = level.guard();
         let mut expr = Expr::single(i, level)?;
+        let mut right = opt(alt((
+            Self::attr,
+            |i: &mut _| Self::index(i, level),
+            |i: &mut _| Self::call(i, level),
+            Self::r#try,
+            Self::r#macro,
+        )));
         loop {
             let before_suffix = *i;
-            let suffix = opt(alt((
-                Self::attr,
-                |i: &mut _| Self::index(i, level),
-                |i: &mut _| Self::call(i, level),
-                Self::r#try,
-                Self::r#macro,
-            )))
-            .parse_next(i)?;
+            let suffix = right.parse_next(i)?;
+            let Some(suffix) = suffix else {
+                break;
+            };
+            level_guard.nest(before_suffix)?;
 
             match suffix {
-                Some(Self::Attr(attr)) => {
+                Self::Attr(attr) => {
                     expr = WithSpan::new(Expr::Attr(expr.into(), attr), before_suffix)
                 }
-                Some(Self::Index(index)) => {
+                Self::Index(index) => {
                     expr = WithSpan::new(Expr::Index(expr.into(), index.into()), before_suffix);
                 }
-                Some(Self::Call(args)) => {
+                Self::Call(args) => {
                     expr = WithSpan::new(Expr::Call(expr.into(), args), before_suffix)
                 }
-                Some(Self::Try) => expr = WithSpan::new(Expr::Try(expr.into()), before_suffix),
-                Some(Self::MacroCall(args)) => match expr.inner {
+                Self::Try => expr = WithSpan::new(Expr::Try(expr.into()), before_suffix),
+                Self::MacroCall(args) => match expr.inner {
                     Expr::Path(path) => {
                         expr = WithSpan::new(Expr::RustMacro(path, args), before_suffix)
                     }
@@ -596,7 +604,6 @@ impl<'a> Suffix<'a> {
                         .cut());
                     }
                 },
-                None => break,
             }
         }
         Ok(expr)
@@ -665,8 +672,7 @@ impl<'a> Suffix<'a> {
             .parse_next(i)
     }
 
-    fn index(i: &mut &'a str, level: Level) -> ParseResult<'a, Self> {
-        let level = level.nest(i)?;
+    fn index(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
         preceded(
             ws('['),
             cut_err(terminated(
@@ -678,8 +684,7 @@ impl<'a> Suffix<'a> {
         .parse_next(i)
     }
 
-    fn call(i: &mut &'a str, level: Level) -> ParseResult<'a, Self> {
-        let level = level.nest(i)?;
+    fn call(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
         (move |i: &mut _| Expr::arguments(i, level, false))
             .map(Self::Call)
             .parse_next(i)

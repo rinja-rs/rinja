@@ -37,7 +37,7 @@ pub enum Node<'a> {
 }
 
 impl<'a> Node<'a> {
-    pub(super) fn parse_template(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
+    pub(super) fn parse_template(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Vec<Self>> {
         let start = *i;
         let result = match (|i: &mut _| Self::many(i, s)).parse_next(i) {
             Ok(result) => result,
@@ -68,7 +68,7 @@ impl<'a> Node<'a> {
         Ok(result)
     }
 
-    fn many(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Self>> {
+    fn many(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Vec<Self>> {
         repeat(
             0..,
             alt((
@@ -82,7 +82,7 @@ impl<'a> Node<'a> {
         .parse_next(i)
     }
 
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let mut start = *i;
         let tag = preceded(
             |i: &mut _| s.tag_block_start(i),
@@ -108,8 +108,8 @@ impl<'a> Node<'a> {
             _ => return fail.parse_next(&mut start),
         };
 
-        let node = s.nest(i, |i: &mut _| func(i, s))?;
-
+        let _level_guard = s.level.nest(i)?;
+        let node = func(i, s)?;
         let closed = cut_node(
             None,
             alt((
@@ -124,7 +124,7 @@ impl<'a> Node<'a> {
         }
     }
 
-    fn r#break(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn r#break(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let mut p = (
             opt(Whitespace::parse),
             ws(keyword("break")),
@@ -142,7 +142,7 @@ impl<'a> Node<'a> {
         Ok(Self::Break(WithSpan::new(Ws(pws, nws), start)))
     }
 
-    fn r#continue(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn r#continue(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let mut p = (
             opt(Whitespace::parse),
             ws(keyword("continue")),
@@ -160,15 +160,16 @@ impl<'a> Node<'a> {
         Ok(Self::Continue(WithSpan::new(Ws(pws, nws), start)))
     }
 
-    fn expr(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn expr(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let start = *i;
+        let level = s.level;
         let (pws, expr) = preceded(
             |i: &mut _| s.tag_expr_start(i),
             cut_node(
                 None,
                 (
                     opt(Whitespace::parse),
-                    ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
+                    ws(|i: &mut _| Expr::parse(i, level, false)),
                 ),
             ),
         )
@@ -237,7 +238,7 @@ fn cut_node<'a, O>(
     }
 }
 
-fn unexpected_tag<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, ()> {
+fn unexpected_tag<'a>(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, ()> {
     (
         |i: &mut _| s.tag_block_start(i),
         opt(Whitespace::parse),
@@ -270,7 +271,7 @@ pub struct When<'a> {
 }
 
 impl<'a> When<'a> {
-    fn r#else(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn r#else(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let mut p = (
             |i: &mut _| s.tag_block_start(i),
             opt(Whitespace::parse),
@@ -298,7 +299,7 @@ impl<'a> When<'a> {
     }
 
     #[allow(clippy::self_named_constructors)]
-    fn when(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn when(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let endwhen = ws((
             delimited(
@@ -367,7 +368,7 @@ pub struct Cond<'a> {
 }
 
 impl<'a> Cond<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let (_, pws, cond, nws, _, nodes) = (
             |i: &mut _| s.tag_block_start(i),
@@ -405,7 +406,7 @@ pub struct CondTest<'a> {
 }
 
 impl<'a> CondTest<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         preceded(
             ws(keyword("if")),
             cut_node(Some("if"), |i: &mut _| Self::parse_cond(i, s)),
@@ -413,7 +414,7 @@ impl<'a> CondTest<'a> {
         .parse_next(i)
     }
 
-    fn parse_cond(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn parse_cond(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let (target, expr) = (
             opt(delimited(
                 ws(alt((keyword("let"), keyword("set")))),
@@ -422,7 +423,7 @@ impl<'a> CondTest<'a> {
             )),
             ws(|i: &mut _| {
                 let start = *i;
-                let mut expr = Expr::parse(i, s.level.get(), false)?;
+                let mut expr = Expr::parse(i, s.level, false)?;
                 if let Expr::BinOp(_, _, ref mut right) = expr.inner {
                     if matches!(right.inner, Expr::Var("set" | "let")) {
                         *i = right.span.as_suffix_of(start).unwrap();
@@ -485,7 +486,7 @@ impl FromStr for Whitespace {
 fn check_block_start<'a>(
     i: &mut &'a str,
     start: &'a str,
-    s: &State<'_>,
+    s: &State<'_, '_>,
     node: &str,
     expected: &str,
 ) -> ParseResult<'a, ()> {
@@ -511,8 +512,8 @@ pub struct Loop<'a> {
 }
 
 impl<'a> Loop<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        fn content<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Vec<Node<'a>>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        fn content<'a>(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Vec<Node<'a>>> {
             s.enter_loop();
             let result = (|i: &mut _| Node::many(i, s)).parse_next(i);
             s.leave_loop();
@@ -524,7 +525,7 @@ impl<'a> Loop<'a> {
             ws(keyword("if")),
             cut_node(
                 Some("for-if"),
-                ws(|i: &mut _| Expr::parse(i, s.level.get(), true)),
+                ws(|i: &mut _| Expr::parse(i, s.level, true)),
             ),
         );
 
@@ -580,7 +581,7 @@ impl<'a> Loop<'a> {
                     cut_node(
                         Some("for"),
                         (
-                            ws(|i: &mut _| Expr::parse(i, s.level.get(), true)),
+                            ws(|i: &mut _| Expr::parse(i, s.level, true)),
                             opt(if_cond),
                             opt(Whitespace::parse),
                             |i: &mut _| s.tag_block_end(i),
@@ -633,8 +634,8 @@ fn check_duplicated_name<'a>(
 }
 
 impl<'a> Macro<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let level = s.level.get();
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+        let level = s.level;
         #[allow(clippy::type_complexity)]
         let parameters = |i: &mut _| -> ParseResult<
             '_,
@@ -762,8 +763,7 @@ pub struct FilterBlock<'a> {
 }
 
 impl<'a> FilterBlock<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
-        let mut level = s.level.get();
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start_s = *i;
         let mut start = (
             opt(Whitespace::parse),
@@ -772,10 +772,10 @@ impl<'a> FilterBlock<'a> {
                 Some("filter"),
                 (
                     ws(identifier),
-                    opt(|i: &mut _| Expr::arguments(i, s.level.get(), false)),
+                    opt(|i: &mut _| Expr::arguments(i, s.level, false)),
                     repeat(0.., |i: &mut _| {
                         let start = *i;
-                        filter(i, &mut level).map(|(name, params)| (name, params, start))
+                        filter(i, s.level).map(|(name, params)| (name, params, start))
                     })
                     .map(|v: Vec<_>| v),
                     ws(empty),
@@ -875,7 +875,7 @@ pub struct Call<'a> {
 }
 
 impl<'a> Call<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let mut p = (
             opt(Whitespace::parse),
@@ -885,9 +885,7 @@ impl<'a> Call<'a> {
                 (
                     opt((ws(identifier), ws("::"))),
                     ws(identifier),
-                    opt(ws(|nested: &mut _| {
-                        Expr::arguments(nested, s.level.get(), true)
-                    })),
+                    opt(ws(|nested: &mut _| Expr::arguments(nested, s.level, true))),
                     opt(Whitespace::parse),
                 ),
             ),
@@ -916,7 +914,7 @@ pub struct Match<'a> {
 }
 
 impl<'a> Match<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let mut p = (
             opt(Whitespace::parse),
@@ -924,7 +922,7 @@ impl<'a> Match<'a> {
             cut_node(
                 Some("match"),
                 (
-                    ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
+                    ws(|i: &mut _| Expr::parse(i, s.level, false)),
                     opt(Whitespace::parse),
                     |i: &mut _| s.tag_block_end(i),
                     cut_node(
@@ -988,7 +986,7 @@ pub struct BlockDef<'a> {
 }
 
 impl<'a> BlockDef<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start_s = *i;
         let mut start = (
             opt(Whitespace::parse),
@@ -1068,7 +1066,7 @@ pub struct Lit<'a> {
 }
 
 impl<'a> Lit<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         not(eof).parse_next(i)?;
 
@@ -1115,7 +1113,7 @@ pub struct Raw<'a> {
 }
 
 impl<'a> Raw<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let endraw = (
             |i: &mut _| s.tag_block_start(i),
@@ -1155,7 +1153,7 @@ pub struct Let<'a> {
 }
 
 impl<'a> Let<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let mut p = (
             opt(Whitespace::parse),
@@ -1166,7 +1164,7 @@ impl<'a> Let<'a> {
                     ws(|i: &mut _| Target::parse(i, s)),
                     opt(preceded(
                         ws('='),
-                        ws(|i: &mut _| Expr::parse(i, s.level.get(), false)),
+                        ws(|i: &mut _| Expr::parse(i, s.level, false)),
                     )),
                     opt(Whitespace::parse),
                 ),
@@ -1217,7 +1215,7 @@ pub struct If<'a> {
 }
 
 impl<'a> If<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
         let mut p = (
             opt(Whitespace::parse),
@@ -1323,14 +1321,14 @@ pub struct Comment<'a> {
 }
 
 impl<'a> Comment<'a> {
-    fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
+    fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         #[derive(Debug, Clone, Copy)]
         enum Tag {
             Open,
             Close,
         }
 
-        fn tag<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Tag> {
+        fn tag<'a>(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Tag> {
             alt((
                 (|i: &mut _| s.tag_comment_start(i)).value(Tag::Open),
                 (|i: &mut _| s.tag_comment_end(i)).value(Tag::Close),
@@ -1338,7 +1336,7 @@ impl<'a> Comment<'a> {
             .parse_next(i)
         }
 
-        fn content<'a>(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a> {
+        fn content<'a>(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a> {
             let mut depth = 0usize;
             let start = *i;
             loop {
