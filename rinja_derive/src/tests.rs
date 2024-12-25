@@ -194,7 +194,117 @@ fn check_if_let() {
         &[],
         3,
     );
+}
 
+// Since this feature is not stable yet, we can't add a "normal" test for it so instead we check
+// the generated code.
+#[test]
+fn check_if_let_chain() {
+    // Both `bla` and `blob` variables must exist in this `if`.
+    compare(
+        "{% if let Some(bla) = y && x && let Some(blob) = y %}{{bla}} {{blob}}{% endif %}",
+        r#"if let Some(bla) = &self.y && rinja::helpers::as_bool(&(self.x)) && let Some(blob) = &self.y {
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(bla), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(blob), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+
+    compare(
+        r#"{% if let Some(bla) = y
+            && bla == "x"
+            && let Some(blob) = z
+            && blob == "z" %}{{bla}} {{blob}}{% endif %}"#,
+        r#"if let Some(bla) = &self.y && rinja::helpers::as_bool(&(bla == "x"))
+             && let Some(blob) = &self.z && rinja::helpers::as_bool(&(blob == "z"))
+{
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(bla), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(blob), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+
+    // Bindings variables with the same name as the bound variable should be declared in the right
+    // order.
+    compare(
+        r#"{% if let Some(y) = y
+            && y == "x"
+            && w
+            && let Some(z) = z
+            && z == "z" %}{{y}} {{z}}{% endif %}"#,
+        r#"if let Some(y) = &self.y && self.y == "x"
+    && rinja::helpers::as_bool(&(self.w)) && let Some(z) = &self.z
+    && rinja::helpers::as_bool(&(z == "z"))
+{
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(y), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(z), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+
+    compare(
+        r#"{% if w
+            && let Some(y) = y
+            && y == "x"
+            && let Some(z) = z
+            && z == "z" %}{{y}} {{z}}{% endif %}"#,
+        r#"if rinja::helpers::as_bool(&(self.w)) && let Some(y) = &self.y
+    && self.y == "x" && let Some(z) = &self.z
+    && rinja::helpers::as_bool(&(z == "z"))
+{
+    match (
+        &((&&rinja::filters::AutoEscaper::new(&(y), rinja::filters::Text))
+            .rinja_auto_escape()?),
+        &((&&rinja::filters::AutoEscaper::new(&(z), rinja::filters::Text))
+            .rinja_auto_escape()?),
+    ) {
+        (expr0, expr2) => {
+            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            __rinja_writer.write_str(" ")?;
+            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+        }
+    }
+}"#,
+        &[],
+        7,
+    );
+}
+
+#[test]
+fn check_includes_only_once() {
     // In this test we make sure that every used template gets referenced exactly once.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
     let path1 = path.join("include1.html").canonicalize().unwrap();

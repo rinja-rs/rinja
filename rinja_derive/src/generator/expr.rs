@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use parser::node::CondTest;
 use parser::{
     CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target, WithSpan,
 };
@@ -16,7 +17,7 @@ impl<'a> Generator<'a, '_> {
     pub(crate) fn visit_expr_root(
         &mut self,
         ctx: &Context<'_>,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
     ) -> Result<String, CompileError> {
         let mut buf = Buffer::new();
         self.visit_expr(ctx, &mut buf, expr)?;
@@ -27,7 +28,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         Ok(match **expr {
             Expr::BoolLit(s) => self.visit_bool_lit(buf, s),
@@ -59,14 +60,62 @@ impl<'a> Generator<'a, '_> {
             Expr::IsNotDefined(var_name) => self.visit_is_defined(buf, false, var_name)?,
             Expr::As(ref expr, target) => self.visit_as(ctx, buf, expr, target)?,
             Expr::Concat(ref exprs) => self.visit_concat(ctx, buf, exprs)?,
+            Expr::LetCond(ref cond) => self.visit_let_cond(ctx, buf, cond)?,
         })
+    }
+
+    /// This method and `visit_expr_not_first` are needed because in case we have
+    /// `{% if let Some(x) = x && x == "a" %}`, if we first start to visit `Some(x)`, then we end
+    /// up with `if let Some(x) = x && x == "a"`, however if we first visit the expr, we end up with
+    /// `if let Some(x) = self.x && self.x == "a"`. It's all a big "variable declaration" mess.
+    ///
+    /// So instead, we first visit the expression, but only the first "level" to ensure we won't
+    /// go after the `&&` and badly generate the rest of the expression.
+    pub(super) fn visit_expr_first(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        expr: &WithSpan<'_, Expr<'a>>,
+    ) -> Result<DisplayWrap, CompileError> {
+        match **expr {
+            Expr::BinOp(op @ ("||" | "&&"), ref left, _) => {
+                let ret = self.visit_expr(ctx, buf, left)?;
+                buf.write(format_args!(" {op} "));
+                return Ok(ret);
+            }
+            Expr::Unary(op, ref inner) => {
+                buf.write(op);
+                return self.visit_expr_first(ctx, buf, inner);
+            }
+            _ => {}
+        }
+        self.visit_expr(ctx, buf, expr)
+    }
+
+    pub(super) fn visit_expr_not_first(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        expr: &WithSpan<'_, Expr<'a>>,
+        prev_display_wrap: DisplayWrap,
+    ) -> Result<DisplayWrap, CompileError> {
+        match **expr {
+            Expr::BinOp("||" | "&&", _, ref right) => {
+                self.visit_condition(ctx, buf, right)?;
+                Ok(DisplayWrap::Unwrapped)
+            }
+            Expr::Unary(_, ref inner) => {
+                self.visit_expr_not_first(ctx, buf, inner, prev_display_wrap)
+            }
+            _ => Ok(prev_display_wrap),
+        }
     }
 
     pub(super) fn visit_condition(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
     ) -> Result<(), CompileError> {
         match &**expr {
             Expr::BoolLit(_) | Expr::IsDefined(_) | Expr::IsNotDefined(_) => {
@@ -85,6 +134,9 @@ impl<'a> Generator<'a, '_> {
                 buf.write('(');
                 self.visit_condition(ctx, buf, expr)?;
                 buf.write(')');
+            }
+            Expr::LetCond(cond) => {
+                self.visit_let_cond(ctx, buf, cond)?;
             }
             _ => {
                 buf.write("rinja::helpers::as_bool(&(");
@@ -112,7 +164,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
         target: &str,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write("rinja::helpers::get_primitive_value(&(");
@@ -127,7 +179,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        exprs: &[WithSpan<'_, Expr<'_>>],
+        exprs: &[WithSpan<'_, Expr<'a>>],
     ) -> Result<DisplayWrap, CompileError> {
         match exprs {
             [] => unreachable!(),
@@ -144,11 +196,27 @@ impl<'a> Generator<'a, '_> {
         }
     }
 
+    fn visit_let_cond(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        cond: &WithSpan<'_, CondTest<'a>>,
+    ) -> Result<DisplayWrap, CompileError> {
+        let mut expr_buf = Buffer::new();
+        let display_wrap = self.visit_expr_first(ctx, &mut expr_buf, &cond.expr)?;
+        buf.write(" let ");
+        if let Some(ref target) = cond.target {
+            self.visit_target(buf, true, true, target);
+        }
+        buf.write(format_args!("= &{expr_buf}"));
+        self.visit_expr_not_first(ctx, buf, &cond.expr, display_wrap)
+    }
+
     fn visit_try(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write("match (");
         self.visit_expr(ctx, buf, expr)?;
@@ -170,7 +238,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let filter = match name {
@@ -197,7 +265,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if BUILTIN_FILTERS_NEED_ALLOC.contains(&name) {
@@ -214,7 +282,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write(format_args!("rinja::filters::{name}("));
@@ -228,7 +296,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "urlencode")) {
@@ -252,7 +320,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         // All filters return numbers, and any default formatted number is HTML safe.
@@ -270,7 +338,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         const SINGULAR: &WithSpan<'static, Expr<'static>> =
@@ -314,7 +382,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         ensure_filter_has_feature_alloc(ctx, name, node)?;
@@ -339,7 +407,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let arg = match args {
@@ -356,7 +424,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let arg = match args {
@@ -373,7 +441,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "serde_json")) {
@@ -400,7 +468,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if args.len() != 1 {
@@ -417,7 +485,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if args.len() > 2 {
@@ -478,7 +546,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         ensure_filter_has_feature_alloc(ctx, name, node)?;
@@ -502,7 +570,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         ensure_filter_has_feature_alloc(ctx, name, node)?;
@@ -525,7 +593,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         _name: &str,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
         _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write("rinja::filters::join((&");
@@ -546,7 +614,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        args: &[WithSpan<'_, Expr<'_>>],
+        args: &[WithSpan<'_, Expr<'a>>],
     ) -> Result<(), CompileError> {
         for (i, arg) in args.iter().enumerate() {
             if i > 0 {
@@ -561,7 +629,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        arg: &WithSpan<'_, Expr<'_>>,
+        arg: &WithSpan<'_, Expr<'a>>,
     ) -> Result<(), CompileError> {
         self._visit_arg_inner(ctx, buf, arg, false)
     }
@@ -570,7 +638,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        arg: &WithSpan<'_, Expr<'_>>,
+        arg: &WithSpan<'_, Expr<'a>>,
         // This parameter is needed because even though Expr::Unary is not copyable, we might still
         // be able to skip a few levels.
         need_borrow: bool,
@@ -603,7 +671,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        arg: &WithSpan<'_, Expr<'_>>,
+        arg: &WithSpan<'_, Expr<'a>>,
     ) -> Result<(), CompileError> {
         if let Some(Writable::Lit(arg)) = compile_time_escape(arg, self.input.escaper) {
             if !arg.is_empty() {
@@ -628,7 +696,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        obj: &WithSpan<'_, Expr<'_>>,
+        obj: &WithSpan<'_, Expr<'a>>,
         attr: &str,
     ) -> Result<DisplayWrap, CompileError> {
         if let Expr::Var(name) = **obj {
@@ -659,8 +727,8 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        obj: &WithSpan<'_, Expr<'_>>,
-        key: &WithSpan<'_, Expr<'_>>,
+        obj: &WithSpan<'_, Expr<'a>>,
+        key: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write('&');
         self.visit_expr(ctx, buf, obj)?;
@@ -674,8 +742,8 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        left: &WithSpan<'_, Expr<'_>>,
-        args: &[WithSpan<'_, Expr<'_>>],
+        left: &WithSpan<'_, Expr<'a>>,
+        args: &[WithSpan<'_, Expr<'a>>],
     ) -> Result<DisplayWrap, CompileError> {
         match &**left {
             Expr::Attr(sub_left, method) if ***sub_left == Expr::Var("loop") => match *method {
@@ -740,7 +808,7 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         op: &str,
-        inner: &WithSpan<'_, Expr<'_>>,
+        inner: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write(op);
         self.visit_expr(ctx, buf, inner)?;
@@ -752,8 +820,8 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         op: &str,
-        left: Option<&WithSpan<'_, Expr<'_>>>,
-        right: Option<&WithSpan<'_, Expr<'_>>>,
+        left: Option<&WithSpan<'_, Expr<'a>>>,
+        right: Option<&WithSpan<'_, Expr<'a>>>,
     ) -> Result<DisplayWrap, CompileError> {
         if let Some(left) = left {
             self.visit_expr(ctx, buf, left)?;
@@ -770,8 +838,8 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         op: &str,
-        left: &WithSpan<'_, Expr<'_>>,
-        right: &WithSpan<'_, Expr<'_>>,
+        left: &WithSpan<'_, Expr<'a>>,
+        right: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         self.visit_expr(ctx, buf, left)?;
         buf.write(format_args!(" {op} "));
@@ -783,7 +851,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        inner: &WithSpan<'_, Expr<'_>>,
+        inner: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         buf.write('(');
         self.visit_expr(ctx, buf, inner)?;
@@ -795,7 +863,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        exprs: &[WithSpan<'_, Expr<'_>>],
+        exprs: &[WithSpan<'_, Expr<'a>>],
     ) -> Result<DisplayWrap, CompileError> {
         buf.write('(');
         for (index, expr) in exprs.iter().enumerate() {
@@ -813,7 +881,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        expr: &WithSpan<'_, Expr<'_>>,
+        expr: &WithSpan<'_, Expr<'a>>,
     ) -> Result<DisplayWrap, CompileError> {
         self.visit_expr(ctx, buf, expr)?;
         Ok(DisplayWrap::Unwrapped)
@@ -823,7 +891,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        elements: &[WithSpan<'_, Expr<'_>>],
+        elements: &[WithSpan<'_, Expr<'a>>],
     ) -> Result<DisplayWrap, CompileError> {
         buf.write('[');
         for (i, el) in elements.iter().enumerate() {
