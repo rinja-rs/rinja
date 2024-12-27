@@ -148,7 +148,7 @@ impl Config {
 
         if !syntaxes.contains_key(default_syntax) {
             return Err(CompileError::new(
-                format!("default syntax \"{default_syntax}\" not found"),
+                format_args!("default syntax \"{default_syntax}\" not found"),
                 file_info,
             ));
         }
@@ -342,13 +342,13 @@ pub(crate) fn read_config_file(
     if filename.exists() {
         fs::read_to_string(&filename).map_err(|err| {
             CompileError::no_file_info(
-                format!("unable to read {}: {err}", filename.display()),
+                format_args!("unable to read {}: {err}", filename.display()),
                 span,
             )
         })
     } else if config_path.is_some() {
         Err(CompileError::no_file_info(
-            format!("`{}` does not exist", filename.display()),
+            format_args!("`{}` does not exist", filename.display()),
             span,
         ))
     } else {
