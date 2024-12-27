@@ -3,9 +3,9 @@ use winnow::combinator::{alt, opt, peek, preceded, separated};
 use winnow::token::one_of;
 
 use crate::{
-    CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
-    bool_lit, char_lit, identifier, is_rust_keyword, keyword, num_lit, path_or_identifier, str_lit,
-    ws,
+    CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit,
+    UnboundParser, WithSpan, bool_lit, char_lit, identifier, is_rust_keyword, keyword, num_lit,
+    path_or_identifier, str_lit, ws,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,9 +29,7 @@ impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
     pub(super) fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let _level_guard = s.level.nest(i)?;
-        let mut p = opt(preceded(ws(keyword("or")), |i: &mut _| {
-            Self::parse_one(i, s)
-        }));
+        let mut p = opt(preceded(ws(keyword("or")), Self::parse_one.bind(s)));
 
         let target = Self::parse_one(i, s)?;
         let Some(snd_target) = p.parse_next(i)? else {
@@ -59,8 +57,7 @@ impl<'a> Target<'a> {
         // match tuples and unused parentheses
         let target_is_tuple = opt_opening_paren.parse_next(i)?;
         if target_is_tuple {
-            let (singleton, mut targets) =
-                collect_targets(i, ')', |i: &mut _| Self::unnamed(i, s))?;
+            let (singleton, mut targets) = collect_targets(i, ')', Self::unnamed.bind(s))?;
             if singleton {
                 return Ok(targets.pop().unwrap());
             }
@@ -71,8 +68,7 @@ impl<'a> Target<'a> {
         }
         let target_is_array = opt_opening_bracket.parse_next(i)?;
         if target_is_array {
-            let (singleton, mut targets) =
-                collect_targets(i, ']', |i: &mut _| Self::unnamed(i, s))?;
+            let (singleton, mut targets) = collect_targets(i, ']', Self::unnamed.bind(s))?;
             if singleton {
                 return Ok(targets.pop().unwrap());
             }
@@ -95,7 +91,7 @@ impl<'a> Target<'a> {
 
             let is_unnamed_struct = opt_opening_paren.parse_next(i)?;
             if is_unnamed_struct {
-                let (_, targets) = collect_targets(i, ')', |i: &mut _| Self::unnamed(i, s))?;
+                let (_, targets) = collect_targets(i, ')', Self::unnamed.bind(s))?;
                 return Ok(Self::Tuple(
                     path,
                     only_one_rest_pattern(targets, false, "struct")?,
@@ -104,7 +100,7 @@ impl<'a> Target<'a> {
 
             let is_named_struct = opt_opening_brace.parse_next(i)?;
             if is_named_struct {
-                let (_, targets) = collect_targets(i, '}', |i: &mut _| Self::named(i, s))?;
+                let (_, targets) = collect_targets(i, '}', Self::named.bind(s))?;
                 return Ok(Self::Struct(path, targets));
             }
 
@@ -135,7 +131,7 @@ impl<'a> Target<'a> {
     }
 
     fn unnamed(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
-        alt((Self::rest, |i: &mut _| Self::parse(i, s))).parse_next(i)
+        alt((Self::rest, Self::parse.bind(s))).parse_next(i)
     }
 
     fn named(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, (&'a str, Self)> {
@@ -164,11 +160,8 @@ impl<'a> Target<'a> {
         }
 
         *i = start;
-        let (src, target) = (
-            identifier,
-            opt(preceded(ws(':'), |i: &mut _| Self::parse(i, s))),
-        )
-            .parse_next(i)?;
+        let (src, target) =
+            (identifier, opt(preceded(ws(':'), Self::parse.bind(s)))).parse_next(i)?;
 
         if src == "_" {
             *i = start;

@@ -12,8 +12,8 @@ use winnow::stream::Stream as _;
 use crate::node::CondTest;
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
-    WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
-    skip_ws1, str_lit, ws,
+    UnboundParser, UnboundParser2, WithSpan, char_lit, filter, identifier, keyword, num_lit,
+    path_or_identifier, skip_ws0, skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -23,7 +23,7 @@ macro_rules! expr_prec_layer {
             let start = *i;
             let mut expr = Self::$inner(i, level)?;
             let mut i_before = *i;
-            let mut right = opt((ws($op), |i: &mut _| Self::$inner(i, level)));
+            let mut right = opt((ws($op), Self::$inner.bind(level)));
             while let Some((op, right)) = right.parse_next(i)? {
                 level_guard.nest(i_before)?;
                 i_before = *i;
@@ -166,7 +166,7 @@ impl<'a> Expr<'a> {
                                     is_template_macro,
                                 )
                             },
-                            move |i: &mut _| Self::parse(i, level, false),
+                            Self::parse.bind(level, false),
                         ))
                         .parse_next(i)?;
                         if has_named_arguments && !matches!(*expr, Self::NamedArgument(_, _)) {
@@ -199,10 +199,8 @@ impl<'a> Expr<'a> {
             return fail.parse_next(i);
         }
 
-        let (argument, _, value) = (identifier, ws('='), move |i: &mut _| {
-            Self::parse(i, level, false)
-        })
-            .parse_next(i)?;
+        let (argument, _, value) =
+            (identifier, ws('='), Self::parse.bind(level, false)).parse_next(i)?;
         if named_arguments.insert(argument) {
             Ok(WithSpan::new(
                 Self::NamedArgument(argument, Box::new(value)),
@@ -223,25 +221,18 @@ impl<'a> Expr<'a> {
     ) -> ParseResult<'a, WithSpan<'a, Self>> {
         let _level_guard = level.nest(i)?;
         let start = Span::from(*i);
-        let range_right = move |i: &mut _| {
-            (
-                ws(alt(("..=", ".."))),
-                opt(move |i: &mut _| Self::or(i, level)),
-            )
-                .parse_next(i)
-        };
+        let range_right =
+            move |i: &mut _| (ws(alt(("..=", ".."))), opt(Self::or.bind(level))).parse_next(i);
         let expr = alt((
             range_right.map(move |(op, right)| {
                 WithSpan::new(Self::Range(op, None, right.map(Box::new)), start)
             }),
-            (move |i: &mut _| Self::or(i, level), opt(range_right)).map(move |(left, right)| {
-                match right {
-                    Some((op, right)) => WithSpan::new(
-                        Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
-                        start,
-                    ),
-                    None => left,
-                }
+            (Self::or.bind(level), opt(range_right)).map(move |(left, right)| match right {
+                Some((op, right)) => WithSpan::new(
+                    Self::Range(op, Some(Box::new(left)), right.map(Box::new)),
+                    start,
+                ),
+                None => left,
             }),
         ))
         .parse_next(i)?;
@@ -263,10 +254,14 @@ impl<'a> Expr<'a> {
             i: &mut &'a str,
             level: Level<'_>,
         ) -> ParseResult<'a, Option<WithSpan<'a, Expr<'a>>>> {
-            let ws1 = |i: &mut _| opt(skip_ws1).parse_next(i);
-
             let start = *i;
-            let data = opt((ws1, '~', ws1, |i: &mut _| Expr::muldivmod(i, level))).parse_next(i)?;
+            let data = opt((
+                opt(skip_ws1),
+                '~',
+                opt(skip_ws1),
+                Expr::muldivmod.bind(level),
+            ))
+            .parse_next(i)?;
             if let Some((t1, _, t2, expr)) = data {
                 if t1.is_none() || t2.is_none() {
                     return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -363,7 +358,7 @@ impl<'a> Expr<'a> {
         let mut level_guard = level.guard();
         let start = *i;
         let mut res = Self::prefix(i, level)?;
-        while let Some((name, args)) = opt(|i: &mut _| filter(i, level)).parse_next(i)? {
+        while let Some((name, args)) = opt(filter.bind(level)).parse_next(i)? {
             level_guard.nest(i)?;
 
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
@@ -403,15 +398,15 @@ impl<'a> Expr<'a> {
             Self::str,
             Self::char,
             Self::path_var_bool,
-            move |i: &mut _| Self::array(i, level),
-            move |i: &mut _| Self::group(i, level),
+            Self::array.bind(level),
+            Self::group.bind(level),
         ))
         .parse_next(i)
     }
 
     fn group(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
-        let expr = preceded(ws('('), opt(|i: &mut _| Self::parse(i, level, true))).parse_next(i)?;
+        let expr = preceded(ws('('), opt(Self::parse.bind(level, true))).parse_next(i)?;
         let Some(expr) = expr else {
             let _ = ')'.parse_next(i)?;
             return Ok(WithSpan::new(Self::Tuple(vec![]), start));
@@ -424,17 +419,9 @@ impl<'a> Expr<'a> {
         }
 
         let mut exprs = vec![expr];
-        repeat(
-            0..,
-            preceded(',', ws(|i: &mut _| Self::parse(i, level, true))),
-        )
-        .fold(
-            || (),
-            |(), expr| {
-                exprs.push(expr);
-            },
-        )
-        .parse_next(i)?;
+        repeat(0.., preceded(',', ws(Self::parse.bind(level, true))))
+            .fold(|| (), |(), expr| exprs.push(expr))
+            .parse_next(i)?;
         let _ = (ws(opt(',')), ')').parse_next(i)?;
         Ok(WithSpan::new(Self::Tuple(exprs), start))
     }
@@ -445,7 +432,7 @@ impl<'a> Expr<'a> {
             ws('['),
             cut_err(terminated(
                 opt(terminated(
-                    separated(1.., ws(move |i: &mut _| Self::parse(i, level, true)), ','),
+                    separated(1.., ws(Self::parse.bind(level, true)), ','),
                     ws(opt(',')),
                 )),
                 ']',
@@ -565,8 +552,8 @@ impl<'a> Suffix<'a> {
         let mut expr = Expr::single(i, level)?;
         let mut right = opt(alt((
             Self::attr,
-            |i: &mut _| Self::index(i, level),
-            |i: &mut _| Self::call(i, level),
+            Self::index.bind(level),
+            Self::call.bind(level),
             Self::r#try,
             Self::r#macro,
         )));
@@ -675,17 +662,15 @@ impl<'a> Suffix<'a> {
     fn index(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
         preceded(
             ws('['),
-            cut_err(terminated(
-                ws(move |i: &mut _| Expr::parse(i, level, true)),
-                ']',
-            )),
+            cut_err(terminated(ws(Expr::parse.bind(level, true)), ']')),
         )
         .map(Self::Index)
         .parse_next(i)
     }
 
     fn call(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
-        (move |i: &mut _| Expr::arguments(i, level, false))
+        Expr::arguments
+            .bind(level, false)
             .map(Self::Call)
             .parse_next(i)
     }

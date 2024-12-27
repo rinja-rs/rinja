@@ -1258,6 +1258,40 @@ fn is_rust_keyword(ident: &str) -> bool {
         || is_rust_keyword_inner(KWS_EXTRA, &padded_ident, ident_len)
 }
 
+/// If your parser function needs a state / extra argument in addition to the input stream,
+/// you can use this trait to bind the argument instead of using a manual closure.
+trait UnboundParser<'a, I, O, A> {
+    fn bind(self, arg: A) -> impl Parser<I, O, ErrorContext<'a>>;
+}
+
+impl<'a, F, I, O, A> UnboundParser<'a, I, O, A> for F
+where
+    F: FnMut(&mut I, A) -> ParseResult<'a, O>,
+    A: Clone,
+    I: winnow::stream::Stream + 'a,
+{
+    fn bind(mut self, arg: A) -> impl Parser<I, O, ErrorContext<'a>> {
+        move |i: &mut _| self(i, arg.clone())
+    }
+}
+
+/// Like [`UnboundParser`] but with 2 free arguments.
+trait UnboundParser2<'a, I, O, A0, A1> {
+    fn bind(self, a0: A0, a1: A1) -> impl Parser<I, O, ErrorContext<'a>>;
+}
+
+impl<'a, F, I, O, A0, A1> UnboundParser2<'a, I, O, A0, A1> for F
+where
+    F: FnMut(&mut I, A0, A1) -> ParseResult<'a, O>,
+    A0: Clone,
+    A1: Clone,
+    I: winnow::stream::Stream + 'a,
+{
+    fn bind(mut self, a0: A0, a1: A1) -> impl Parser<I, O, ErrorContext<'a>> {
+        move |i: &mut _| self(i, a0.clone(), a1.clone())
+    }
+}
+
 #[cfg(not(windows))]
 #[cfg(test)]
 mod test {
