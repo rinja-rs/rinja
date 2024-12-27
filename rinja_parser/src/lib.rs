@@ -111,7 +111,13 @@ impl<'a> Ast<'a> {
         syntax: &Syntax<'_>,
     ) -> Result<Self, ParseError> {
         let start = src;
-        match Node::parse_template(&mut src, &State::new(syntax)) {
+        let level = Cell::new(Level::MAX_DEPTH);
+        let state = State {
+            syntax,
+            loop_depth: Cell::new(0),
+            level: Level(&level),
+        };
+        match Node::parse_template(&mut src, &state) {
             Ok(nodes) if src.is_empty() => Ok(Self { nodes }),
             Ok(_) | Err(winnow::error::ErrMode::Incomplete(_)) => unreachable!(),
             Err(
@@ -728,34 +734,13 @@ fn path_or_identifier<'a>(i: &mut &'a str) -> ParseResult<'a, PathOrIdentifier<'
     }
 }
 
-struct State<'a> {
-    syntax: &'a Syntax<'a>,
+struct State<'a, 'l> {
+    syntax: &'l Syntax<'a>,
     loop_depth: Cell<usize>,
-    level: Cell<Level>,
+    level: Level<'l>,
 }
 
-impl<'a> State<'a> {
-    fn new(syntax: &'a Syntax<'a>) -> State<'a> {
-        State {
-            syntax,
-            loop_depth: Cell::new(0),
-            level: Cell::new(Level::default()),
-        }
-    }
-
-    fn nest<'b, T, F: Parser<&'b str, T, ErrorContext<'b>>>(
-        &self,
-        i: &mut &'b str,
-        mut callback: F,
-    ) -> ParseResult<'b, T> {
-        let prev_level = self.level.get();
-        let level = prev_level.nest(i)?;
-        self.level.set(level);
-        let ret = callback.parse_next(i);
-        self.level.set(prev_level);
-        ret
-    }
-
+impl State<'_, '_> {
     fn tag_block_start<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
         self.syntax.block_start.value(()).parse_next(i)
     }
@@ -960,35 +945,87 @@ impl<'a> SyntaxBuilder<'a> {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-pub(crate) struct Level(u8);
+/// The nesting level of nodes and expressions.
+///
+/// The level counts down from [`Level::MAX_DEPTH`] to 0. Once the value would reach below 0,
+/// [`Level::nest()`] / [`LevelGuard::nest()`] will return an error. The same [`Level`] instance is
+/// shared across all usages in a [`Parsed::new()`] / [`Ast::from_str()`] call, using a reference
+/// to an interior mutable counter.
+#[derive(Debug, Clone, Copy)]
+struct Level<'l>(&'l Cell<usize>);
 
-impl Level {
-    fn nest(self, i: &str) -> ParseResult<'_, Level> {
-        if self.0 >= Self::MAX_DEPTH {
-            return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
-                "your template code is too deeply nested, or last expression is too complex",
-                i,
-            )));
+impl Level<'_> {
+    const MAX_DEPTH: usize = 128;
+
+    /// Acquire a [`LevelGuard`] without decrementing the counter, to be used with loops.
+    fn guard(&self) -> LevelGuard<'_> {
+        LevelGuard {
+            level: *self,
+            count: 0,
         }
-
-        Ok(Level(self.0 + 1))
     }
 
-    const MAX_DEPTH: u8 = 128;
+    /// Decrement the remaining level counter, and return a [`LevelGuard`] that increments it again
+    /// when it's dropped.
+    fn nest<'a>(&self, i: &'a str) -> ParseResult<'a, LevelGuard<'_>> {
+        if let Some(new_level) = self.0.get().checked_sub(1) {
+            self.0.set(new_level);
+            Ok(LevelGuard {
+                level: *self,
+                count: 1,
+            })
+        } else {
+            Err(Self::_fail(i))
+        }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn _fail(i: &str) -> ParseErr<'_> {
+        winnow::error::ErrMode::Cut(ErrorContext::new(
+            "your template code is too deeply nested, or the last expression is too complex",
+            i,
+        ))
+    }
+}
+
+/// Used to keep track how often [`LevelGuard::nest()`] was called and to re-increment the
+/// remaining level counter when it is dropped / falls out of scope.
+#[must_use]
+struct LevelGuard<'l> {
+    level: Level<'l>,
+    count: usize,
+}
+
+impl Drop for LevelGuard<'_> {
+    fn drop(&mut self) {
+        self.level.0.set(self.level.0.get() + self.count);
+    }
+}
+
+impl LevelGuard<'_> {
+    /// Used to decrement the level multiple times, e.g. for every iteration of a loop.
+    fn nest<'a>(&mut self, i: &'a str) -> ParseResult<'a, ()> {
+        if let Some(new_level) = self.level.0.get().checked_sub(1) {
+            self.level.0.set(new_level);
+            self.count += 1;
+            Ok(())
+        } else {
+            Err(Level::_fail(i))
+        }
+    }
 }
 
 fn filter<'a>(
     i: &mut &'a str,
-    level: &mut Level,
+    level: Level<'_>,
 ) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
-    let start = *i;
-    let _ = ws(('|', not('|'))).parse_next(i)?;
+    ws(('|', not('|'))).parse_next(i)?;
 
-    *level = level.nest(start)?;
+    let _level_guard = level.nest(i)?;
     cut_err((
         ws(identifier),
-        opt(|i: &mut _| Expr::arguments(i, *level, false)),
+        opt(|i: &mut _| Expr::arguments(i, level, false)),
     ))
     .parse_next(i)
 }

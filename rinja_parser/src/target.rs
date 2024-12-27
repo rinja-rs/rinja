@@ -27,22 +27,26 @@ pub enum Target<'a> {
 
 impl<'a> Target<'a> {
     /// Parses multiple targets with `or` separating them
-    pub(super) fn parse(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
-        separated(
-            1..,
-            |i: &mut _| s.nest(i, |i: &mut _| Self::parse_one(i, s)),
-            ws("or"),
-        )
-        .map(|v: Vec<_>| v)
-        .map(|mut opts| match opts.len() {
-            1 => opts.pop().unwrap(),
-            _ => Self::OrChain(opts),
-        })
-        .parse_next(i)
+    pub(super) fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
+        let _level_guard = s.level.nest(i)?;
+        let mut p = opt(preceded(ws(keyword("or")), |i: &mut _| {
+            Self::parse_one(i, s)
+        }));
+
+        let target = Self::parse_one(i, s)?;
+        let Some(snd_target) = p.parse_next(i)? else {
+            return Ok(target);
+        };
+
+        let mut targets = vec![target, snd_target];
+        while let Some(target) = p.parse_next(i)? {
+            targets.push(target);
+        }
+        Ok(Self::OrChain(targets))
     }
 
     /// Parses a single target without an `or`, unless it is wrapped in parentheses.
-    fn parse_one(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn parse_one(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         let mut opt_opening_paren = opt(ws('(')).map(|o| o.is_some());
         let mut opt_opening_brace = opt(ws('{')).map(|o| o.is_some());
         let mut opt_opening_bracket = opt(ws('[')).map(|o| o.is_some());
@@ -130,11 +134,11 @@ impl<'a> Target<'a> {
         .parse_next(i)
     }
 
-    fn unnamed(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, Self> {
+    fn unnamed(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, Self> {
         alt((Self::rest, |i: &mut _| Self::parse(i, s))).parse_next(i)
     }
 
-    fn named(i: &mut &'a str, s: &State<'_>) -> ParseResult<'a, (&'a str, Self)> {
+    fn named(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, (&'a str, Self)> {
         let start = *i;
         let rest = opt(Self::rest.with_taken()).parse_next(i)?;
         if let Some(rest) = rest {
