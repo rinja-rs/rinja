@@ -752,8 +752,9 @@ impl<'a> State<'a, '_> {
             .parse_next(i)?;
             if let Some(control) = control {
                 let message = format!(
-                    "unclosed block, you likely meant to apply whitespace control: {:?}",
-                    format!("{control}{}", block_end),
+                    r#"unclosed block, you likely meant to apply whitespace control: "{}{}""#,
+                    control.escape_default(),
+                    block_end.escape_default(),
                 );
                 Err(ParseErr::backtrack(ErrorContext::new(message, *i).into()))
             } else {
