@@ -51,7 +51,7 @@ pub(crate) struct Context<'a> {
     pub(crate) parsed: &'a Parsed,
 }
 
-impl Context<'_> {
+impl<'a> Context<'a> {
     pub(crate) fn empty(parsed: &Parsed) -> Context<'_> {
         Context {
             nodes: &[],
@@ -64,11 +64,11 @@ impl Context<'_> {
         }
     }
 
-    pub(crate) fn new<'n>(
+    pub(crate) fn new(
         config: &Config,
-        path: &'n Path,
-        parsed: &'n Parsed,
-    ) -> Result<Context<'n>, CompileError> {
+        path: &'a Path,
+        parsed: &'a Parsed,
+    ) -> Result<Self, CompileError> {
         let mut extends = None;
         let mut blocks = HashMap::default();
         let mut macros = HashMap::default();
@@ -142,10 +142,11 @@ impl Context<'_> {
     }
 
     pub(crate) fn generate_error(&self, msg: impl fmt::Display, node: Span<'_>) -> CompileError {
-        CompileError::new(
-            msg,
-            self.path.map(|path| FileInfo::of(node, path, self.parsed)),
-        )
+        CompileError::new(msg, self.file_info_of(node))
+    }
+
+    pub(crate) fn file_info_of(&self, node: Span<'a>) -> Option<FileInfo<'a>> {
+        self.path.map(|path| FileInfo::of(node, path, self.parsed))
     }
 }
 

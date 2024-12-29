@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
+use std::fmt::Write;
 use std::mem;
 
 use parser::node::{
@@ -616,13 +617,27 @@ impl<'a> Generator<'a, '_> {
                     call.span(),
                 )
             })?;
-            (def, mctx)
+            (*def, mctx)
         } else {
             let def = ctx.macros.get(name).ok_or_else(|| {
                 ctx.generate_error(format_args!("macro {name:?} not found"), call.span())
             })?;
-            (def, ctx)
+            (*def, ctx)
         };
+
+        if self.seen_macros.iter().any(|(s, _)| std::ptr::eq(*s, def)) {
+            let mut message = "Found recursion in macro calls:".to_owned();
+            for (m, f) in &self.seen_macros {
+                if let Some(f) = f {
+                    write!(message, "{f}").unwrap();
+                } else {
+                    write!(message, "\n`{}`", m.name.escape_debug()).unwrap();
+                }
+            }
+            return Err(ctx.generate_error(message, call.span()));
+        } else {
+            self.seen_macros.push((def, ctx.file_info_of(call.span())));
+        }
 
         self.flush_ws(ws); // Cannot handle_ws() here: whitespace from macro definition comes first
         let size_hint = self.push_locals(|this| {
@@ -746,6 +761,7 @@ impl<'a> Generator<'a, '_> {
             Ok(size_hint)
         })?;
         self.prepare_ws(ws);
+        self.seen_macros.pop();
         Ok(size_hint)
     }
 
