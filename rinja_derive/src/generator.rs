@@ -8,17 +8,17 @@ use std::path::Path;
 use std::str;
 use std::sync::Arc;
 
-use parser::node::Whitespace;
+use parser::node::{Macro, Whitespace};
 use parser::{
     CharLit, Expr, FloatKind, IntKind, MAX_RUST_KEYWORD_LEN, Num, RUST_KEYWORDS, StrLit, WithSpan,
 };
 use rustc_hash::FxBuildHasher;
 
-use crate::CompileError;
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
 use crate::integration::{Buffer, impl_everything, write_header};
+use crate::{CompileError, FileInfo};
 
 pub(crate) fn template_to_string(
     buf: &mut Buffer,
@@ -46,27 +46,29 @@ pub(crate) fn template_to_string(
 }
 
 struct Generator<'a, 'h> {
-    // The template input state: original struct AST and attributes
+    /// The template input state: original struct AST and attributes
     input: &'a TemplateInput<'a>,
-    // All contexts, keyed by the package-relative template path
+    /// All contexts, keyed by the package-relative template path
     contexts: &'a HashMap<&'a Arc<Path>, Context<'a>, FxBuildHasher>,
-    // The heritage contains references to blocks and their ancestry
+    /// The heritage contains references to blocks and their ancestry
     heritage: Option<&'h Heritage<'a, 'h>>,
-    // Variables accessible directly from the current scope (not redirected to context)
+    /// Variables accessible directly from the current scope (not redirected to context)
     locals: MapChain<'a>,
-    // Suffix whitespace from the previous literal. Will be flushed to the
-    // output buffer unless suppressed by whitespace suppression on the next
-    // non-literal.
+    /// Suffix whitespace from the previous literal. Will be flushed to the
+    /// output buffer unless suppressed by whitespace suppression on the next
+    /// non-literal.
     next_ws: Option<&'a str>,
-    // Whitespace suppression from the previous non-literal. Will be used to
-    // determine whether to flush prefix whitespace from the next literal.
+    /// Whitespace suppression from the previous non-literal. Will be used to
+    /// determine whether to flush prefix whitespace from the next literal.
     skip_ws: Whitespace,
-    // If currently in a block, this will contain the name of a potential parent block
+    /// If currently in a block, this will contain the name of a potential parent block
     super_block: Option<(&'a str, usize)>,
-    // Buffer for writable
+    /// Buffer for writable
     buf_writable: WritableBuffer<'a>,
-    // Used in blocks to check if we are inside a filter block.
+    /// Used in blocks to check if we are inside a filter block.
     is_in_filter_block: usize,
+    /// Set of called macros we are currently in. Used to prevent (indirect) recursions.
+    seen_macros: Vec<(&'a Macro<'a>, Option<FileInfo<'a>>)>,
 }
 
 impl<'a, 'h> Generator<'a, 'h> {
@@ -91,6 +93,7 @@ impl<'a, 'h> Generator<'a, 'h> {
                 ..Default::default()
             },
             is_in_filter_block,
+            seen_macros: Vec::new(),
         }
     }
 
