@@ -14,7 +14,7 @@ use winnow::Parser;
 use winnow::ascii::take_escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::{ErrorKind, FromExternalError};
-use winnow::stream::{AsChar, Stream as _};
+use winnow::stream::{AsChar, Stream};
 use winnow::token::{any, one_of, take_till, take_while};
 
 pub mod expr;
@@ -318,12 +318,7 @@ impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
         }
     }
 
-    fn append(
-        self,
-        _: &&'a str,
-        _: &<&str as winnow::stream::Stream>::Checkpoint,
-        _: ErrorKind,
-    ) -> Self {
+    fn append(self, _: &&'a str, _: &<&str as Stream>::Checkpoint, _: ErrorKind) -> Self {
         self
     }
 }
@@ -740,26 +735,31 @@ struct State<'a, 'l> {
     level: Level<'l>,
 }
 
-impl State<'_, '_> {
-    fn tag_block_start<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
-        self.syntax.block_start.value(()).parse_next(i)
+impl<'a> State<'a, '_> {
+    fn tag_block_start<'i>(&self) -> impl Parser<&'i str, (), ErrorContext<'i>> + 'a {
+        let block_start = self.syntax.block_start;
+        |i: &mut _| block_start.value(()).parse_next(i)
     }
 
-    fn tag_block_end<'i>(&self, i: &mut &'i str) -> ParseResult<'i, ()> {
-        let control = alt((
-            self.syntax.block_end.value(None),
-            peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
-            fail, // rollback on partial matches in the previous line
-        ))
-        .parse_next(i)?;
-        if let Some(control) = control {
-            let message = format!(
-                "unclosed block, you likely meant to apply whitespace control: {:?}",
-                format!("{control}{}", self.syntax.block_end),
-            );
-            Err(ParseErr::backtrack(ErrorContext::new(message, *i).into()))
-        } else {
-            Ok(())
+    fn tag_block_end<'i>(&self) -> impl Parser<&'i str, (), ErrorContext<'i>> + 'a {
+        let block_end = self.syntax.block_end;
+        move |i: &mut _| {
+            let control = alt((
+                block_end.value(None),
+                peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
+                fail, // rollback on partial matches in the previous line
+            ))
+            .parse_next(i)?;
+            if let Some(control) = control {
+                let message = format!(
+                    r#"unclosed block, you likely meant to apply whitespace control: "{}{}""#,
+                    control.escape_default(),
+                    block_end.escape_default(),
+                );
+                Err(ParseErr::backtrack(ErrorContext::new(message, *i).into()))
+            } else {
+                Ok(())
+            }
         }
     }
 
@@ -1256,6 +1256,40 @@ fn is_rust_keyword(ident: &str) -> bool {
 
     is_rust_keyword_inner(RUST_KEYWORDS, &padded_ident, ident_len)
         || is_rust_keyword_inner(KWS_EXTRA, &padded_ident, ident_len)
+}
+
+/// If your parser function needs a state / extra argument in addition to the input stream,
+/// you can use this trait to bind the argument instead of using a manual closure.
+trait UnboundParser<'a, I, O, A> {
+    fn bind(self, arg: A) -> impl Parser<I, O, ErrorContext<'a>>;
+}
+
+impl<'a, F, I, O, A> UnboundParser<'a, I, O, A> for F
+where
+    F: FnMut(&mut I, A) -> ParseResult<'a, O>,
+    A: Clone,
+    I: Stream + 'a,
+{
+    fn bind(mut self, arg: A) -> impl Parser<I, O, ErrorContext<'a>> {
+        move |i: &mut _| self(i, arg.clone())
+    }
+}
+
+/// Like [`UnboundParser`] but with 2 free arguments.
+trait UnboundParser2<'a, I, O, A0, A1> {
+    fn bind(self, a0: A0, a1: A1) -> impl Parser<I, O, ErrorContext<'a>>;
+}
+
+impl<'a, F, I, O, A0, A1> UnboundParser2<'a, I, O, A0, A1> for F
+where
+    F: FnMut(&mut I, A0, A1) -> ParseResult<'a, O>,
+    A0: Clone,
+    A1: Clone,
+    I: Stream + 'a,
+{
+    fn bind(mut self, a0: A0, a1: A1) -> impl Parser<I, O, ErrorContext<'a>> {
+        move |i: &mut _| self(i, a0.clone(), a1.clone())
+    }
 }
 
 #[cfg(not(windows))]
