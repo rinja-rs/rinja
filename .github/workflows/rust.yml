@@ -211,3 +211,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: crate-ci/typos@master
+
+  Jinja2-Assumptions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@v5
+      - run: testing/jinja2-assumptions/test.sh
