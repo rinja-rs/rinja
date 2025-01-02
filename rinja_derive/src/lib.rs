@@ -19,10 +19,10 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use config::{Config, read_config_file};
-use generator::template_to_string;
+use generator::{TmplKind, template_to_string};
 use heritage::{Context, Heritage};
-use input::{Print, TemplateArgs, TemplateInput};
-use integration::Buffer;
+use input::{AnyTemplateArgs, Print, TemplateArgs, TemplateInput};
+use integration::{Buffer, build_template_enum};
 use parser::{Parsed, strip_common};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
@@ -159,7 +159,7 @@ fn build_skeleton(buf: &mut Buffer, ast: &syn::DeriveInput) -> Result<usize, Com
     let mut contexts = HashMap::default();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
-    template_to_string(buf, &input, &contexts, None, None)
+    template_to_string(buf, &input, &contexts, None, TmplKind::Struct)
 }
 
 /// Takes a `syn::DeriveInput` and generates source code for it
@@ -173,11 +173,28 @@ pub(crate) fn build_template(
     buf: &mut Buffer,
     ast: &syn::DeriveInput,
 ) -> Result<usize, CompileError> {
-    let template_args = TemplateArgs::new(ast)?;
-    let mut result = build_template_item(buf, ast, &template_args, None);
+    let err_span;
+    let mut result = match AnyTemplateArgs::new(ast)? {
+        AnyTemplateArgs::Struct(item) => {
+            err_span = item.source.1.or(item.template_span);
+            build_template_item(buf, ast, &item, TmplKind::Struct)
+        }
+        AnyTemplateArgs::Enum {
+            enum_args,
+            vars_args,
+            has_default_impl,
+        } => {
+            err_span = enum_args
+                .as_ref()
+                .and_then(|v| v.source.as_ref())
+                .map(|s| s.span())
+                .or_else(|| enum_args.as_ref().map(|v| v.template.span()));
+            build_template_enum(buf, ast, enum_args, vars_args, has_default_impl)
+        }
+    };
     if let Err(err) = &mut result {
         if err.span.is_none() {
-            err.span = template_args.source.1.or(template_args.template_span);
+            err.span = err_span;
         }
     }
     result
@@ -187,7 +204,7 @@ fn build_template_item(
     buf: &mut Buffer,
     ast: &syn::DeriveInput,
     template_args: &TemplateArgs,
-    target: Option<&str>,
+    tmpl_kind: TmplKind,
 ) -> Result<usize, CompileError> {
     let config_path = template_args.config_path();
     let s = read_config_file(config_path, template_args.config_span)?;
@@ -230,7 +247,7 @@ fn build_template_item(
     }
 
     let mark = buf.get_mark();
-    let size_hint = template_to_string(buf, &input, &contexts, heritage.as_ref(), target)?;
+    let size_hint = template_to_string(buf, &input, &contexts, heritage.as_ref(), tmpl_kind)?;
     if input.print == Print::Code || input.print == Print::All {
         eprintln!("{}", buf.marked_text(mark));
     }
