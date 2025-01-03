@@ -8,3 +8,4 @@
 - [Template syntax](./template_syntax.md)
 - [Filters](./filters.md)
 - [Performance](./performance.md)
+- [Upgrading](./upgrading.md)
