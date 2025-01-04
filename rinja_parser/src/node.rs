@@ -765,6 +765,7 @@ pub struct FilterBlock<'a> {
 impl<'a> FilterBlock<'a> {
     fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start_s = *i;
+        let mut level_guard = s.level.guard();
         let mut start = (
             opt(Whitespace::parse),
             ws(keyword("filter")),
@@ -774,6 +775,8 @@ impl<'a> FilterBlock<'a> {
                     ws(identifier),
                     opt(|i: &mut _| Expr::arguments(i, s.level, false)),
                     repeat(0.., |i: &mut _| {
+                        #[allow(clippy::explicit_auto_deref)] // false positive
+                        level_guard.nest(*i)?;
                         let start = *i;
                         filter(i, s.level).map(|(name, params)| (name, params, start))
                     })

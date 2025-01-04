@@ -1136,3 +1136,20 @@ fn fuzzed_span_is_not_substring_of_source() {
         &Syntax::default(),
     );
 }
+
+#[test]
+fn fuzzed_excessive_filter_block() {
+    let src = include_str!("../tests/excessive_filter_block.txt");
+    let err = Ast::from_str(src, None, &Syntax::default()).unwrap_err();
+    assert_eq!(
+        err.to_string().lines().next(),
+        Some("your template code is too deeply nested, or the last expression is too complex"),
+    );
+
+    let src = include!("../tests/fuzzed_excessive_filter_block.inc");
+    let err = Ast::from_str(src, None, &Syntax::default()).unwrap_err();
+    assert_eq!(
+        err.to_string().lines().next(),
+        Some("your template code is too deeply nested, or the last expression is too complex"),
+    );
+}
