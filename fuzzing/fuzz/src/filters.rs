@@ -1,3 +1,5 @@
+use std::fmt;
+
 use arbitrary::{Arbitrary, Unstructured};
 use rinja::filters;
 
@@ -42,6 +44,42 @@ fn run_text(filter: Text<'_>) -> Result<(), rinja::Error> {
         TextFilter::UrlencodeStrict => filters::urlencode_strict(input)?.to_string(),
     };
     Ok(())
+}
+
+impl fmt::Display for Scenario<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Scenario::Text(Text { input, filter }) = self;
+        let text = match filter {
+            TextFilter::Capitalize => format!("capitalize({input:?})"),
+            TextFilter::Center(a) => format!("center({input:?}, {a:?})"),
+            TextFilter::Indent(a) => format!("indent({input:?}, {a:?})"),
+            TextFilter::Linebreaks => format!("linebreaks({input:?})"),
+            TextFilter::LinebreaksBr => format!("linebreaksbr({input:?})"),
+            TextFilter::Lowercase => format!("lowercase({input:?})"),
+            TextFilter::ParagraphBreaks => format!("paragraphbreaks({input:?})"),
+            TextFilter::Safe(e) => match e {
+                Escaper::Html => format!("safe({input:?}, filters::Html)"),
+                Escaper::Text => format!("safe({input:?}, filters::Text)"),
+            },
+            TextFilter::Title => format!("title({input:?})"),
+            TextFilter::Trim => format!("trim({input:?})"),
+            TextFilter::Truncate(a) => format!("truncate({input:?}, {a:?})"),
+            TextFilter::Uppercase => format!("uppercase({input:?})"),
+            TextFilter::Urlencode => format!("urlencode({input:?})"),
+            TextFilter::UrlencodeStrict => format!("urlencode_strict({input:?})"),
+        };
+        write!(
+            f,
+            "\
+use rinja::filters;
+
+#[test]
+fn test() {{
+    let _: String = filters::{text}?.to_string();
+}}\
+            ",
+        )
+    }
 }
 
 #[derive(Arbitrary, Debug, Clone, Copy)]

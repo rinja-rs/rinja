@@ -23,7 +23,7 @@ pub const TARGETS: &[(&str, TargetBuilder)] = &[
 
 pub type TargetBuilder = for<'a> fn(&'a [u8]) -> Result<NamedTarget<'a>, arbitrary::Error>;
 
-pub trait Scenario<'a>: fmt::Debug + Sized {
+pub trait Scenario<'a>: fmt::Debug + fmt::Display + Sized {
     type RunError: Error + Send + 'static;
 
     fn fuzz(data: &'a [u8]) -> Result<(), FuzzError<Self::RunError>> {
@@ -76,6 +76,13 @@ impl fmt::Debug for NamedTarget<'_> {
     }
 }
 
+impl fmt::Display for NamedTarget<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.as_test(f)
+    }
+}
+
 impl<'a> NamedTarget<'a> {
     #[inline]
     fn new<S: Scenario<'a> + 'a>(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
@@ -86,13 +93,20 @@ impl<'a> NamedTarget<'a> {
 trait RunScenario<'a> {
     fn debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
+    fn as_test(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
     fn run(&self) -> Result<(), Box<dyn Error + Send + 'static>>;
 }
 
 impl<'a, T: Scenario<'a>> RunScenario<'a> for T {
     #[inline]
     fn debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt(f)
+        fmt::Debug::fmt(self, f)
+    }
+
+    #[inline]
+    fn as_test(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 
     #[inline]

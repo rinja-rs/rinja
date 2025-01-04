@@ -29,6 +29,14 @@ macro_rules! this_file {
             }
         }
 
+        impl fmt::Display for Scenario<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $(Self::$ty(scenario) => fmt::Display::fmt(scenario, f),)*
+                }
+            }
+        }
+
         #[derive(Arbitrary)]
         enum Target {
             $($ty,)*
