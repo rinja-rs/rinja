@@ -1,5 +1,8 @@
+use std::borrow::Cow;
+use std::fmt;
+
 use arbitrary::{Arbitrary, Unstructured};
-use rinja_parser::{Ast, Syntax, SyntaxBuilder};
+use rinja_parser::{Ast, InnerSyntax, Syntax, SyntaxBuilder};
 
 #[derive(Debug, Default)]
 pub struct Scenario<'a> {
@@ -36,7 +39,50 @@ impl<'a> super::Scenario<'a> for Scenario<'a> {
 
     fn run(&self) -> Result<(), Self::RunError> {
         let Scenario { syntax, src } = self;
-        Ast::from_str(src, None, syntax)?;
+        let _: Ast<'_> = Ast::from_str(src, None, syntax)?;
         Ok(())
+    }
+}
+
+impl fmt::Display for Scenario<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Scenario { syntax, src } = self;
+        let syntax = if *syntax == Syntax::default() {
+            Cow::Borrowed("Syntax::default()")
+        } else {
+            let InnerSyntax {
+                block_start,
+                block_end,
+                expr_start,
+                expr_end,
+                comment_start,
+                comment_end,
+            } = **syntax;
+            Cow::Owned(format!(
+                "\
+SyntaxBuilder {{
+        name: \"test\",
+        block_start: {block_start:?},
+        block_end: {block_end:?},
+        expr_start: {expr_start:?},
+        expr_end: {expr_end:?},
+        comment_start: {comment_start:?},
+        comment_end: {comment_end:?},
+    }}.to_syntax().unwrap()",
+            ))
+        };
+        write!(
+            f,
+            "\
+use rinja_parser::{{Ast, ParseError}};
+
+#[test]
+fn test() -> Result<(), ParseError> {{
+    let src = {src:?};
+    let syntax = {syntax};
+    Ast::from_str(src, None, &syntax).map(|_| ())
+}}\
+            ",
+        )
     }
 }

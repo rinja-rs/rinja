@@ -1,6 +1,8 @@
 #[allow(clippy::module_inception)]
 mod html;
 
+use std::fmt;
+
 use arbitrary::{Arbitrary, Unstructured};
 use html_escape::decode_html_entities_to_string;
 
@@ -39,5 +41,47 @@ impl<'a> super::Scenario<'a> for Scenario<'a> {
             }
         }
         Ok(())
+    }
+}
+
+impl fmt::Display for Scenario<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Scenario::String(src) => {
+                write!(
+                    f,
+                    "\
+#[test]
+fn test() {{
+    let mut dest = String::with_capacity({len});
+    html::write_escaped_str(&mut dest, {src:?}).unwrap();
+
+    let mut unescaped = String::with_capacity(src.len());
+    let unescaped = html_escape::decode_html_entities_to_string(dest, &mut unescaped);
+    assert_eq!(src, unescaped);
+}}\
+                    ",
+                    len = src.len(),
+                )
+            }
+            Scenario::Char(c) => {
+                write!(
+                    f,
+                    "\
+#[test]
+fn test() {{
+    let mut dest = String::with_capacity(6);
+    html::write_escaped_char(&mut dest, {c:?}).unwrap();
+
+    let mut src = [0; 4];
+    let src = c.encode_utf8(&mut src);
+    let mut unescaped = String::with_capacity(4);
+    let unescaped = decode_html_entities_to_string(dest, &mut unescaped);
+    assert_eq!(src, unescaped);
+}}\
+                    ",
+                )
+            }
+        }
     }
 }
