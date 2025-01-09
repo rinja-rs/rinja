@@ -12,8 +12,8 @@ use winnow::stream::Stream as _;
 use crate::node::CondTest;
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
-    WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
-    skip_ws1, str_lit, ws,
+    WithSpan, char_lit, filter, identifier, identifier_with_refs, keyword, num_lit,
+    path_or_identifier, skip_ws0, skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -105,7 +105,7 @@ pub enum Expr<'a> {
     Var(&'a str),
     Path(Vec<&'a str>),
     Array(Vec<WithSpan<'a, Expr<'a>>>),
-    Attr(Box<WithSpan<'a, Expr<'a>>>, &'a str),
+    Attr(Box<WithSpan<'a, Expr<'a>>>, Attr<'a>),
     Index(Box<WithSpan<'a, Expr<'a>>>, Box<WithSpan<'a, Expr<'a>>>),
     Filter(Filter<'a>),
     As(Box<WithSpan<'a, Expr<'a>>>, &'a str),
@@ -550,8 +550,14 @@ pub struct Filter<'a> {
     pub arguments: Vec<WithSpan<'a, Expr<'a>>>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attr<'a> {
+    pub name: &'a str,
+    pub generics: Vec<&'a str>,
+}
+
 enum Suffix<'a> {
-    Attr(&'a str),
+    Attr(Attr<'a>),
     Index(WithSpan<'a, Expr<'a>>),
     Call(Vec<WithSpan<'a, Expr<'a>>>),
     // The value is the arguments of the macro call.
@@ -667,9 +673,17 @@ impl<'a> Suffix<'a> {
     }
 
     fn attr(i: &mut &'a str) -> ParseResult<'a, Self> {
-        preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier))))
-            .map(Self::Attr)
-            .parse_next(i)
+        preceded(
+            ws(('.', not('.'))),
+            cut_err((alt((digit1, identifier)), opt(generics))),
+        )
+        .map(|(name, generics)| {
+            Self::Attr(Attr {
+                name,
+                generics: generics.unwrap_or_default(),
+            })
+        })
+        .parse_next(i)
     }
 
     fn index(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
@@ -693,4 +707,15 @@ impl<'a> Suffix<'a> {
     fn r#try(i: &mut &'a str) -> ParseResult<'a, Self> {
         preceded(skip_ws0, '?').map(|_| Self::Try).parse_next(i)
     }
+}
+
+fn generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<&'i str>> {
+    preceded(
+        (ws("::"), ws('<')),
+        cut_err(terminated(
+            terminated(separated(0.., ws(identifier_with_refs), ','), ws(opt(','))),
+            '>',
+        )),
+    )
+    .parse_next(input)
 }
