@@ -18,7 +18,7 @@ use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till, take_while};
 
 pub mod expr;
-pub use expr::{Expr, Filter};
+pub use expr::{Attr, Expr, Filter};
 mod memchr_splitter;
 pub mod node;
 pub use node::Node;
@@ -404,6 +404,12 @@ fn identifier<'i>(input: &mut &'i str) -> ParseResult<'i> {
     });
 
     (start, opt(tail)).take().parse_next(input)
+}
+
+fn identifier_with_refs<'i>(input: &mut &'i str) -> ParseResult<'i> {
+    let refs = take_while(0.., |c: char| c.is_ascii_whitespace() || c == '&');
+
+    (refs, identifier).take().parse_next(input)
 }
 
 fn bool_lit<'i>(i: &mut &'i str) -> ParseResult<'i> {

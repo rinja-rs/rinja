@@ -30,14 +30,7 @@ pub(crate) fn template_to_string(
     let ctx = &contexts[&input.path];
     let mut vars = MapChain::default();
     vars.insert(Cow::Borrowed("VALUES"), LocalMeta::initialized());
-    let generator = Generator::new(
-        input,
-        contexts,
-        heritage,
-        vars,
-        input.block.is_some(),
-        0,
-    );
+    let generator = Generator::new(input, contexts, heritage, vars, input.block.is_some(), 0);
     let mut result = generator.build(ctx, buf, target);
     if let Err(err) = &mut result {
         if err.span.is_none() {
