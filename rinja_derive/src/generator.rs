@@ -28,11 +28,13 @@ pub(crate) fn template_to_string(
     target: Option<&str>,
 ) -> Result<usize, CompileError> {
     let ctx = &contexts[&input.path];
+    let mut vars = MapChain::default();
+    vars.insert(Cow::Borrowed("VALUES"), LocalMeta::initialized());
     let generator = Generator::new(
         input,
         contexts,
         heritage,
-        MapChain::default(),
+        vars,
         input.block.is_some(),
         0,
     );
@@ -124,12 +126,12 @@ impl<'a, 'h> Generator<'a, 'h> {
     ) -> Result<usize, CompileError> {
         write_header(self.input.ast, buf, target);
         buf.write(
-            "fn render_into<RinjaW>(&self, __rinja_writer: &mut RinjaW) -> rinja::Result<()>\
+            "fn render_into_with_values<RinjaW>(&self, __rinja_writer: &mut RinjaW, VALUES: &rinja::Values) -> rinja::Result<()>\
             where \
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
                 use rinja::filters::{AutoEscape as _, WriteWritable as _};\
-                use rinja::helpers::ResultConverter as _;
+                use rinja::helpers::ResultConverter as _;\
                 use rinja::helpers::core::fmt::Write as _;",
         );
 
