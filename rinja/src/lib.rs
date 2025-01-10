@@ -111,7 +111,7 @@ pub trait Template: fmt::Display + filters::FastWritable {
     /// Helper method which allocates a new `String` and renders into it.
     #[cfg(feature = "alloc")]
     fn render(&self) -> Result<String> {
-        self.render_with_values(&Values::new())
+        self.render_with_values(&Values::default())
     }
 
     /// Helper method which allocates a new `String` and renders into it with provided [`Values`].
@@ -125,7 +125,7 @@ pub trait Template: fmt::Display + filters::FastWritable {
 
     /// Renders the template to the given `writer` fmt buffer.
     fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
-        self.render_into_with_values(writer, &Values::new())
+        self.render_into_with_values(writer, &Values::default())
     }
 
     /// Renders the template to the given `writer` fmt buffer with provided [`Values`].
@@ -138,7 +138,7 @@ pub trait Template: fmt::Display + filters::FastWritable {
     /// Renders the template to the given `writer` io buffer.
     #[cfg(feature = "std")]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
-        self.write_into_with_values(writer, &Values::new())
+        self.write_into_with_values(writer, &Values::default())
     }
 
     /// Renders the template to the given `writer` io buffer with provided [`Values`].

@@ -9,7 +9,7 @@ fn test_values() {
     )]
     struct V;
 
-    let mut values = Values::new();
+    let mut values = Values::default();
 
     values.add("a", 12u32);
     assert_eq!(V.render_with_values(&values).unwrap(), "12");
@@ -28,7 +28,7 @@ fn test_values2() {
     )]
     struct V;
 
-    let mut values = Values::new();
+    let mut values = Values::default();
 
     values.add("a", "hey");
     values.add("b", false);
