@@ -2,7 +2,7 @@ error[E0277]: the trait bound `str: PluralizeCount` is not satisfied
  --> tests/ui/pluralize.rs:3:10
   |
 3 | #[derive(Template)]
-  |          ^^^^^^^^ the trait `PluralizeCount` is not implemented for `str`, which is required by `&str: PluralizeCount`
+  |          ^^^^^^^^ the trait `PluralizeCount` is not implemented for `str`
   |
   = help: the following other types implement trait `PluralizeCount`:
             &T
