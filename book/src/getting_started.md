@@ -34,25 +34,3 @@ fn main() {
 ```
 
 You should now be able to compile and run this code.
-
-## Using integrations
-
-To use one of the [integrations](./integrations.md), with axum as an example:
-
-First, add this to your `Cargo.toml` instead:
-
-```toml
-# in section [dependencies]
-rinja_axum = "0.3.5"
-```
-
-Then, import from rinja_axum instead of rinja:
-
-```rust
-use rinja_axum::Template;
-```
-
-This enables the implementation for axum's `IntoResponse` trait,
-so an instance of the template can be returned as a response.
-
-For other integrations, import and use their crate accordingly.
