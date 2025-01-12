@@ -1,4 +1,3 @@
-
 [package]
 name = "actix-web-app"
 version = "0.3.5"
@@ -11,19 +10,20 @@ publish = false
 [dependencies]
 actix-web = { version = "4.9.0", default-features = false, features = ["macros"] }
 rinja = { version = "0.3.5", path = "../../rinja" }
-tokio = { version = "1.41.1", features = ["sync", "rt-multi-thread"] }
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 
 # serde and strum are used to parse (deserialize) and generate (serialize) information
 # between web requests, e.g. to share the selected display language.
-serde = { version = "1.0.215", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 
 # These depenendies are simply used for a better user experience, having access logs in the
 # console, and error messages if anything goes wrong, e.g. if the port is already in use.
-env_logger = "0.11.3"
+displaydoc = "0.2.5"
+env_logger = "0.11.6"
 log = "0.4.22"
-pretty-error-debug = "0.3.0"
-thiserror = "2.0.3"
+pretty-error-debug = "0.3.1"
+thiserror = "2.0.11"
 
 # In a real application you would not need this section. It is only used in here, so that this
 # example can have a more lenient MSRV (minimum supported rust version) than rinja as a whole.
