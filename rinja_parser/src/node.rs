@@ -3,11 +3,11 @@ use std::str::{self, FromStr};
 
 use winnow::Parser;
 use winnow::combinator::{
-    alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, rest, separated,
+    alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, separated,
     terminated,
 };
 use winnow::stream::Stream as _;
-use winnow::token::{any, literal};
+use winnow::token::{any, literal, rest};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
