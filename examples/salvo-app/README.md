@@ -1,7 +1,7 @@
-# rinja + rocket example web app
+# rinja + salvo example web app
 
 This is a simple web application that uses rinja as template engine, and
-[rocket](https://crates.io/crates/rocket) as web framework.
+[salvo](https://crates.io/crates/salvo) as web framework.
 It lets the user of the web page select a display language, and asks for their name.
 The example shows the interaction between both projects, and serves as an example to use
 basic rinja features such as base templates to a unified layout skeleton for your page,

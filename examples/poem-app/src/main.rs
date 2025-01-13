@@ -61,7 +61,7 @@ enum AppError {
 
 impl ResponseError for AppError {
     fn status(&self) -> StatusCode {
-        match &self {
+        match self {
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Render(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

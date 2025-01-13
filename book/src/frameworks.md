@@ -196,7 +196,6 @@ impl ResponseError for AppError {
     }
 }
 
-/// This is your error handler
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         #[derive(Debug, Template)]
@@ -273,6 +272,66 @@ impl<'r> Responder<'r, 'static> for AppError {
             (status, RawHtml(body)).respond_to(request)
         } else {
             (status, "Something went wrong").respond_to(request)
+        }
+    }
+}
+```
+
+## Salvo
+
+[![our salvo example web-app](
+    https://img.shields.io/badge/salvo-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
+)](
+    https://github.com/rinja-rs/rinja/tree/master/examples/salvo-app "our salvo example web-app"
+)
+[![crates.io: salvo](
+    https://img.shields.io/crates/v/salvo?label=salvo&style=flat-square&logo=rust&logoColor=white&color=informational
+)](
+    https://crates.io/crates/salvo "crates.io: salvo"
+)
+
+To convert the `String` to an HTML response, you can use
+[`Text::Html(_)`](https://docs.rs/salvo/0.76.0/salvo/prelude/enum.Text.html#variant.Html).
+
+```rust
+use salvo::writing::Text;
+use salvo::{Scribe, handler};
+
+#[handler]
+async fn handler() -> Result<impl Scribe, AppError> {
+    …
+    Ok(Text::Html(template.render()?))
+}
+```
+
+To implement your own error type, you can use this boilerplate code:
+
+```rust
+use rinja::Template;
+use salvo::http::StatusCode;
+use salvo::writing::Text;
+use salvo::{Response, Scribe};
+
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+enum AppError {
+    /// could not render template
+    Render(#[from] rinja::Error),
+}
+
+impl Scribe for AppError {
+    fn render(self, res: &mut Response) {
+        #[derive(Debug, Template)]
+        #[template(path = "error.html")]
+        struct Tmpl { … }
+
+        res.status_code(match &self {
+            AppError::Render(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        });
+        let tmpl = Tmpl { … };
+        if let Ok(body) = tmpl.render() {
+            Text::Html(body).render(res);
+        } else {
+            Text::Plain("Something went wrong").render(res);
         }
     }
 }
