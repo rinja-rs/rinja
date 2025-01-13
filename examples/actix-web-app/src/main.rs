@@ -1,26 +1,16 @@
-use actix_web::http::header::ContentType;
-use actix_web::http::{Method, header};
+use actix_web::error::UrlGenerationError;
+use actix_web::http::{StatusCode, header};
 use actix_web::web::Html;
 use actix_web::{
-    App, HttpRequest, HttpResponse, HttpServer, Responder, Result, get, middleware, web,
+    App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError, get, middleware, web,
 };
 use rinja::Template;
 use serde::Deserialize;
-use tokio::runtime;
 
-// This function and the next mostly contains boiler plate to get an actix-web application running.
-fn main() -> Result<(), Error> {
-    let env = env_logger::Env::new().default_filter_or("info");
-    env_logger::try_init_from_env(env).map_err(Error::Log)?;
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .map_err(Error::Rt)?
-        .block_on(amain())
-}
-
-async fn amain() -> Result<(), Error> {
     let server = HttpServer::new(|| {
         // This closure contains the setup of the routing rules of your app.
         App::new()
@@ -41,19 +31,66 @@ async fn amain() -> Result<(), Error> {
     server.run().await.map_err(Error::Run)
 }
 
-#[derive(thiserror::Error, pretty_error_debug::Debug)]
+#[derive(displaydoc::Display, thiserror::Error, pretty_error_debug::Debug)]
 enum Error {
-    #[error("could not setup logger")]
-    Log(#[source] log::SetLoggerError),
-    #[error("could not setup async runtime")]
-    Rt(#[source] std::io::Error),
-    #[error("could not bind socket")]
+    /// could not bind socket
     Bind(#[source] std::io::Error),
-    #[error("could not run server")]
+    /// could not run server
     Run(#[source] std::io::Error),
 }
 
-/// Using this type your user can select the display language of your page.
+/// This enum contains any error that could occur while handling an incoming request.
+///
+/// In a real application you would most likely have multiple error sources, e.g. database errors,
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+enum AppError {
+    /// not found
+    NotFound,
+    /// could not render template
+    Render(#[from] rinja::Error),
+    /// could not generate URL
+    Url(#[from] UrlGenerationError),
+}
+
+impl ResponseError for AppError {
+    fn status_code(&self) -> StatusCode {
+        match &self {
+            AppError::NotFound => StatusCode::NOT_FOUND,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+impl Responder for AppError {
+    type Body = String;
+
+    fn respond_to(self, req: &HttpRequest) -> HttpResponse<Self::Body> {
+        // The error handler uses a rinja template to display its content.
+        // The member `lang` is used by "_layout.html" which "error.html" extends. Even though it
+        // is always the fallback language English in here, "_layout.html" expects to be able to
+        // access this field, so you have to provide it.
+        #[derive(Debug, Template)]
+        #[template(path = "error.html")]
+        struct Tmpl<'a> {
+            req: &'a HttpRequest,
+            lang: Lang,
+            err: &'a AppError,
+        }
+
+        let tmpl = Tmpl {
+            req,
+            lang: Lang::default(),
+            err: &self,
+        };
+        if let Ok(body) = tmpl.render() {
+            (Html::new(body), self.status_code()).respond_to(req)
+        } else {
+            ("Something went wrong".to_string(), self.status_code()).respond_to(req)
+        }
+    }
+}
+
+/// Thanks to this type, your user can select the display language of your page.
 ///
 /// The same type is used by actix-web as part of the URL, and in rinja to select what content to
 /// show, and also as an HTML attribute in `<html lang=`. To make it possible to use the same type
@@ -76,36 +113,14 @@ enum Lang {
 }
 
 /// This is your "Error: 404 - not found" handler
-async fn not_found_handler(req: HttpRequest) -> Result<impl Responder> {
-    // It uses a rinja template to display its content.
-    // The member `req` contains the request, and is used e.g. to generate URLs in our template.
-    // The member `lang` is used by "_layout.html" which "404.html" extends. Even though it
-    // is always the fallback language English in here, "_layout.html" expects to be able to access
-    // this field, so you have to provide it.
-    #[derive(Debug, Template)]
-    #[template(path = "404.html")]
-    struct Tmpl {
-        req: HttpRequest,
-        lang: Lang,
-    }
-
-    if req.method() == Method::GET {
-        let tmpl = Tmpl {
-            req,
-            lang: Lang::default(),
-        };
-        Ok(HttpResponse::NotFound()
-            .insert_header(ContentType::html())
-            .body(tmpl.render().map_err(|err| err.into_io_error())?))
-    } else {
-        Ok(HttpResponse::MethodNotAllowed().finish())
-    }
+async fn not_found_handler() -> AppError {
+    AppError::NotFound
 }
 
-/// The is first page your user hits does not contain language information, so we redirect them
-/// to a URL that does contain the default language.
+/// This is the first page your user hits, meaning it does not contain language information,
+/// so we redirect them.
 #[get("/")]
-async fn start_handler(req: HttpRequest) -> Result<impl Responder> {
+async fn start_handler(req: HttpRequest) -> Result<impl Responder, AppError> {
     // This example show how the type `Lang` can be used to construct a URL in actix-web.
     let url = req.url_for("index_handler", [Lang::default()])?;
     Ok(HttpResponse::Found()
@@ -130,7 +145,7 @@ async fn index_handler(
     req: HttpRequest,
     path: web::Path<(Lang,)>,
     web::Query(query): web::Query<IndexHandlerQuery>,
-) -> Result<impl Responder> {
+) -> Result<impl Responder, AppError> {
     // Same as in `not_found_handler`, we have `req` to build URLs in the template, and
     // `lang` to select the display language. In the template we both use `{% match lang %}` and
     // `{% if lang !=`, the former to select the text of a specific language, e.g. in the `<title>`;
@@ -154,9 +169,7 @@ async fn index_handler(
         lang,
         name: query.name,
     };
-    Ok(Html::new(
-        template.render().map_err(|err| err.into_io_error())?,
-    ))
+    Ok(Html::new(template.render()?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,7 +187,7 @@ async fn greeting_handler(
     req: HttpRequest,
     path: web::Path<(Lang,)>,
     web::Query(query): web::Query<GreetingHandlerQuery>,
-) -> Result<impl Responder> {
+) -> Result<impl Responder, AppError> {
     #[derive(Debug, Template)]
     #[template(path = "greet.html")]
     struct Tmpl {
@@ -189,7 +202,5 @@ async fn greeting_handler(
         lang,
         name: query.name,
     };
-    Ok(Html::new(
-        template.render().map_err(|err| err.into_io_error())?,
-    ))
+    Ok(Html::new(template.render()?))
 }

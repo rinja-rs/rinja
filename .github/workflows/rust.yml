@@ -26,7 +26,9 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing testing-alloc testing-no-std
+            examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/warp-app fuzzing \
+            rinja rinja_derive rinja_derive_standalone rinja_parser \
+            testing testing-alloc testing-no-std
           do
             cd "$PKG"
             echo "Testing: $PKG"
@@ -113,7 +115,9 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            examples/actix-web-app fuzzing rinja rinja_derive rinja_derive_standalone rinja_parser testing testing-alloc testing-no-std
+            examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/warp-app fuzzing \
+            rinja rinja_derive rinja_derive_standalone rinja_parser \
+            testing testing-alloc testing-no-std
           do
             cd "$PKG"
             cargo sort --check --check-format --grouped
@@ -154,8 +158,9 @@ jobs:
     strategy:
       matrix:
         package: [
-          examples/actix-web-app, fuzzing, rinja, rinja_derive, rinja_derive_standalone,
-          rinja_parser, testing, testing-alloc, testing-no-std,
+          examples/actix-web-app, examples/axum-app, examples/poem-app, examples/rocket-app, examples/warp-app, fuzzing,
+          rinja, rinja_derive, rinja_derive_standalone, rinja_parser,
+          testing, testing-alloc, testing-no-std,
         ]
     runs-on: ubuntu-latest
     steps:
