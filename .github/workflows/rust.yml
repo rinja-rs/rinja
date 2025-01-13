@@ -26,7 +26,7 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/warp-app fuzzing \
+            examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/salvo-app examples/warp-app fuzzing \
             rinja rinja_derive rinja_derive_standalone rinja_parser \
             testing testing-alloc testing-no-std
           do
@@ -115,7 +115,7 @@ jobs:
       - run: |
           set -eu
           for PKG in \
-            examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/warp-app fuzzing \
+            examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/salvo-app examples/warp-app fuzzing \
             rinja rinja_derive rinja_derive_standalone rinja_parser \
             testing testing-alloc testing-no-std
           do
@@ -158,7 +158,7 @@ jobs:
     strategy:
       matrix:
         package: [
-          examples/actix-web-app, examples/axum-app, examples/poem-app, examples/rocket-app, examples/warp-app, fuzzing,
+          examples/actix-web-app, examples/axum-app, examples/poem-app, examples/rocket-app, examples/salvo-app, examples/warp-app, fuzzing,
           rinja, rinja_derive, rinja_derive_standalone, rinja_parser,
           testing, testing-alloc, testing-no-std,
         ]
