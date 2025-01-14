@@ -38,7 +38,7 @@ if you want to try out rinja's code generation online.
 First, add the following to your crate's `Cargo.toml`:
 
 ```toml
-# in section [dependencies]
+# in [dependencies] section
 rinja = "0.3.5"
 ```
 
