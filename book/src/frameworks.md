@@ -40,9 +40,10 @@ To convert the `String` to an HTML response, you can use
 [`Html::new(_)`](https://docs.rs/actix-web/4.9.0/actix_web/web/struct.Html.html#method.new).
 
 ```rust
-use actix_web::Responder;
 use actix_web::web::Html;
+use actix_web::{Responder, handler};
 
+#[handler]
 fn handler() -> Result<impl Responder, AppError> {
     …
     Ok(Html::new(template.render()?))
