@@ -2,7 +2,8 @@ use std::borrow::Cow;
 
 use parser::node::CondTest;
 use parser::{
-    CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target, WithSpan,
+    Attr, CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target,
+    WithSpan,
 };
 
 use super::{
@@ -38,7 +39,7 @@ impl<'a> Generator<'a, '_> {
             Expr::Var(s) => self.visit_var(buf, s),
             Expr::Path(ref path) => self.visit_path(buf, path),
             Expr::Array(ref elements) => self.visit_array(ctx, buf, elements)?,
-            Expr::Attr(ref obj, name) => self.visit_attr(ctx, buf, obj, name)?,
+            Expr::Attr(ref obj, ref attr) => self.visit_attr(ctx, buf, obj, attr)?,
             Expr::Index(ref obj, ref key) => self.visit_index(ctx, buf, obj, key)?,
             Expr::Filter(Filter {
                 name,
@@ -697,20 +698,20 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         obj: &WithSpan<'_, Expr<'a>>,
-        attr: &str,
+        attr: &Attr<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if let Expr::Var(name) = **obj {
             if name == "loop" {
-                if attr == "index" {
+                if attr.name == "index" {
                     buf.write("(_loop_item.index + 1)");
                     return Ok(DisplayWrap::Unwrapped);
-                } else if attr == "index0" {
+                } else if attr.name == "index0" {
                     buf.write("_loop_item.index");
                     return Ok(DisplayWrap::Unwrapped);
-                } else if attr == "first" {
+                } else if attr.name == "first" {
                     buf.write("_loop_item.first");
                     return Ok(DisplayWrap::Unwrapped);
-                } else if attr == "last" {
+                } else if attr.name == "last" {
                     buf.write("_loop_item.last");
                     return Ok(DisplayWrap::Unwrapped);
                 } else {
@@ -719,7 +720,15 @@ impl<'a> Generator<'a, '_> {
             }
         }
         self.visit_expr(ctx, buf, obj)?;
-        buf.write(format_args!(".{}", normalize_identifier(attr)));
+        buf.write(format_args!(".{}", normalize_identifier(attr.name)));
+        if !attr.generics.is_empty() {
+            buf.write("::<");
+            for generic in &attr.generics {
+                buf.write(normalize_identifier(generic));
+                buf.write(',');
+            }
+            buf.write('>');
+        }
         Ok(DisplayWrap::Unwrapped)
     }
 
@@ -746,22 +755,23 @@ impl<'a> Generator<'a, '_> {
         args: &[WithSpan<'_, Expr<'a>>],
     ) -> Result<DisplayWrap, CompileError> {
         match &**left {
-            Expr::Attr(sub_left, method) if ***sub_left == Expr::Var("loop") => match *method {
-                "cycle" => match args {
-                    [arg] => {
-                        if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
-                            return Err(ctx.generate_error(
-                                "loop.cycle(…) cannot use an empty array",
-                                arg.span(),
-                            ));
-                        }
-                        buf.write(
-                            "\
+            Expr::Attr(sub_left, Attr { name, .. }) if ***sub_left == Expr::Var("loop") => {
+                match *name {
+                    "cycle" => match args {
+                        [arg] => {
+                            if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
+                                return Err(ctx.generate_error(
+                                    "loop.cycle(…) cannot use an empty array",
+                                    arg.span(),
+                                ));
+                            }
+                            buf.write(
+                                "\
                             ({\
                                 let _cycle = &(",
-                        );
-                        self.visit_expr(ctx, buf, arg)?;
-                        buf.write(
+                            );
+                            self.visit_expr(ctx, buf, arg)?;
+                            buf.write(
                             "\
                                 );\
                                 let _len = _cycle.len();\
@@ -771,20 +781,22 @@ impl<'a> Generator<'a, '_> {
                                 _cycle[_loop_item.index % _len]\
                             })",
                         );
-                    }
-                    _ => {
+                        }
+                        _ => {
+                            return Err(ctx.generate_error(
+                                "loop.cycle(…) cannot use an empty array",
+                                left.span(),
+                            ));
+                        }
+                    },
+                    s => {
                         return Err(ctx.generate_error(
-                            "loop.cycle(…) cannot use an empty array",
+                            format_args!("unknown loop method: {s:?}"),
                             left.span(),
                         ));
                     }
-                },
-                s => {
-                    return Err(
-                        ctx.generate_error(format_args!("unknown loop method: {s:?}"), left.span())
-                    );
                 }
-            },
+            }
             sub_left => {
                 match sub_left {
                     Expr::Var(name) => match self.locals.resolve(name) {

@@ -70,9 +70,11 @@ pub mod filters;
 #[doc(hidden)]
 pub mod helpers;
 mod html;
+mod values;
 
 #[cfg(feature = "alloc")]
 use alloc::string::String;
+use core::any::Any;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::io;
@@ -83,6 +85,7 @@ pub use rinja_derive::Template;
 pub use crate as shared;
 pub use crate::error::{Error, Result};
 pub use crate::helpers::PrimitiveType;
+pub use crate::values::{ValueError, Values};
 
 /// Main `Template` trait; implementations are generally derived
 ///
@@ -106,21 +109,49 @@ pub use crate::helpers::PrimitiveType;
 ///
 /// [dynamic methods calls]: <https://doc.rust-lang.org/stable/std/keyword.dyn.html>
 pub trait Template: fmt::Display + filters::FastWritable {
-    /// Helper method which allocates a new `String` and renders into it
+    /// Helper method which allocates a new `String` and renders into it.
     #[cfg(feature = "alloc")]
     fn render(&self) -> Result<String> {
+        let slice: &[(&str, &dyn Any)] = &[];
+        self.render_with_values(&slice)
+    }
+
+    /// Helper method which allocates a new `String` and renders into it with provided [`Values`].
+    #[cfg(feature = "alloc")]
+    fn render_with_values<V: Values>(&self, values: &V) -> Result<String> {
         let mut buf = String::new();
         let _ = buf.try_reserve(Self::SIZE_HINT);
-        self.render_into(&mut buf)?;
+        self.render_into_with_values(&mut buf, values)?;
         Ok(buf)
     }
 
-    /// Renders the template to the given `writer` fmt buffer
-    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()>;
+    /// Renders the template to the given `writer` fmt buffer.
+    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
+        let slice: &[(&str, &dyn Any)] = &[];
+        self.render_into_with_values(writer, &slice)
+    }
 
-    /// Renders the template to the given `writer` io buffer
+    /// Renders the template to the given `writer` fmt buffer with provided [`Values`].
+    fn render_into_with_values<V: Values, W: fmt::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        values: &V,
+    ) -> Result<()>;
+
+    /// Renders the template to the given `writer` io buffer.
     #[cfg(feature = "std")]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
+        let slice: &[(&str, &dyn Any)] = &[];
+        self.write_into_with_values(writer, &slice)
+    }
+
+    /// Renders the template to the given `writer` io buffer with provided [`Values`].
+    #[cfg(feature = "std")]
+    fn write_into_with_values<V: Values, W: io::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        values: &V,
+    ) -> io::Result<()> {
         struct Wrapped<W: io::Write> {
             writer: W,
             err: Option<io::Error>,
@@ -138,7 +169,7 @@ pub trait Template: fmt::Display + filters::FastWritable {
         }
 
         let mut wrapped = Wrapped { writer, err: None };
-        if self.render_into(&mut wrapped).is_ok() {
+        if self.render_into_with_values(&mut wrapped, values).is_ok() {
             Ok(())
         } else {
             let err = wrapped.err.take();
@@ -161,20 +192,45 @@ pub trait Template: fmt::Display + filters::FastWritable {
 
 impl<T: Template + ?Sized> Template for &T {
     #[inline]
-    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
-        <T as Template>::render_into(self, writer)
-    }
-
-    #[inline]
     #[cfg(feature = "alloc")]
     fn render(&self) -> Result<String> {
         <T as Template>::render(self)
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
+    fn render_with_values<V: Values>(&self, values: &V) -> Result<String> {
+        <T as Template>::render_with_values(self, values)
+    }
+
+    #[inline]
+    fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
+        <T as Template>::render_into(self, writer)
+    }
+
+    #[inline]
+    fn render_into_with_values<V: Values, W: fmt::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        values: &V,
+    ) -> Result<()> {
+        <T as Template>::render_into_with_values(self, writer, values)
+    }
+
+    #[inline]
     #[cfg(feature = "std")]
     fn write_into<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         <T as Template>::write_into(self, writer)
+    }
+
+    #[inline]
+    #[cfg(feature = "std")]
+    fn write_into_with_values<V: Values, W: io::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        values: &V,
+    ) -> io::Result<()> {
+        <T as Template>::write_into_with_values(self, writer, values)
     }
 
     const SIZE_HINT: usize = T::SIZE_HINT;
@@ -184,18 +240,37 @@ impl<T: Template + ?Sized> Template for &T {
 ///
 /// This trades reduced performance (mostly due to writing into `dyn Write`) for object safety.
 pub trait DynTemplate {
-    /// Helper method which allocates a new `String` and renders into it
+    /// Helper method which allocates a new `String` and renders into it.
     #[cfg(feature = "alloc")]
     fn dyn_render(&self) -> Result<String>;
 
-    /// Renders the template to the given `writer` fmt buffer
+    // /// Helper method which allocates a new `String` and renders into it with provided [`Values`].
+    // #[cfg(feature = "alloc")]
+    // fn dyn_render_with_values(&self, values: &impl Values) -> Result<String>;
+
+    /// Renders the template to the given `writer` fmt buffer.
     fn dyn_render_into(&self, writer: &mut dyn fmt::Write) -> Result<()>;
 
-    /// Renders the template to the given `writer` io buffer
+    // /// Renders the template to the given `writer` fmt buffer with provided [`Values`].
+    // fn dyn_render_into_with_values(
+    //     &self,
+    //     writer: &mut dyn fmt::Write,
+    //     values: &impl Values,
+    // ) -> Result<()>;
+
+    /// Renders the template to the given `writer` io buffer.
     #[cfg(feature = "std")]
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()>;
 
-    /// Provides a conservative estimate of the expanded length of the rendered template
+    // /// Renders the template to the given `writer` io buffer with provided [`Values`].
+    // #[cfg(feature = "std")]
+    // fn dyn_write_into_with_values(
+    //     &self,
+    //     writer: &mut dyn io::Write,
+    //     values: &impl Values,
+    // ) -> io::Result<()>;
+
+    /// Provides a conservative estimate of the expanded length of the rendered template.
     fn size_hint(&self) -> usize;
 }
 
@@ -205,15 +280,38 @@ impl<T: Template> DynTemplate for T {
         <Self as Template>::render(self)
     }
 
+    // #[cfg(feature = "alloc")]
+    // fn dyn_render_with_values(&self, values: &impl Values) -> Result<String> {
+    //     <Self as Template>::render_with_values(self, values)
+    // }
+
     fn dyn_render_into(&self, writer: &mut dyn fmt::Write) -> Result<()> {
         <Self as Template>::render_into(self, writer)
     }
+
+    // fn dyn_render_into_with_values(
+    //     &self,
+    //     writer: &mut dyn fmt::Write,
+    //     values: &impl Values,
+    // ) -> Result<()> {
+    //     <Self as Template>::render_into_with_values(self, writer, values)
+    // }
 
     #[inline]
     #[cfg(feature = "std")]
     fn dyn_write_into(&self, writer: &mut dyn io::Write) -> io::Result<()> {
         <Self as Template>::write_into(self, writer)
     }
+
+    // #[inline]
+    // #[cfg(feature = "std")]
+    // fn dyn_write_into_with_values(
+    //     &self,
+    //     writer: &mut dyn io::Write,
+    //     values: &impl Values,
+    // ) -> io::Result<()> {
+    //     <Self as Template>::write_into_with_values(self, writer, values)
+    // }
 
     fn size_hint(&self) -> usize {
         Self::SIZE_HINT
@@ -281,7 +379,11 @@ mod tests {
         struct Test;
 
         impl Template for Test {
-            fn render_into<W: fmt::Write + ?Sized>(&self, writer: &mut W) -> Result<()> {
+            fn render_into_with_values<V: Values, W: fmt::Write + ?Sized>(
+                &self,
+                writer: &mut W,
+                _: &V,
+            ) -> Result<()> {
                 Ok(writer.write_str("test")?)
             }
 
