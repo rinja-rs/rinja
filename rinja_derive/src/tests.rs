@@ -27,10 +27,10 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
             extern crate rinja as rinja;
 
             impl rinja::Template for Foo {
-                fn render_into_with_values<RinjaW>(
+                fn render_into_with_values<V: rinja::Values, RinjaW>(
                     &self,
                     __rinja_writer: &mut RinjaW,
-                    VALUES: &rinja::Values,
+                    VALUES: &V,
                 ) -> rinja::Result<()>
                 where
                     RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,

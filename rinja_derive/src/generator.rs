@@ -119,7 +119,7 @@ impl<'a, 'h> Generator<'a, 'h> {
     ) -> Result<usize, CompileError> {
         write_header(self.input.ast, buf, target);
         buf.write(
-            "fn render_into_with_values<RinjaW>(&self, __rinja_writer: &mut RinjaW, VALUES: &rinja::Values) -> rinja::Result<()>\
+            "fn render_into_with_values<V: rinja::Values, RinjaW>(&self, __rinja_writer: &mut RinjaW, VALUES: &V) -> rinja::Result<()>\
             where \
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
