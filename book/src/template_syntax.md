@@ -797,16 +797,17 @@ A Comment
 Recursive implementations should preferably use a custom iterator and
 use a plain loop. If that is not doable, call `.render()`
 directly by using an expression as shown below.
-Including self does not work, see #105 and #220 .
 
 ```rust
 use rinja::Template;
 
 #[derive(Template)]
 #[template(source = r#"
-//! {% for item in children %}
-   {{ item }}
+{{ name }} {
+{% for item in children %}
+   {{ item.render()? }}
 {% endfor %}
+}
 "#, ext = "html", escape = "none")]
 struct Item<'a> {
     name: &'a str,
