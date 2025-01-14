@@ -379,13 +379,13 @@ Output:
 HELLO
 ```
 
-### urlencode
-[#urlencode]: #urlencode
+### urlencode | urlencode_strict
+[#urlencode]: #urlencode--urlencode_strict
 
 Percent encodes the string. Replaces reserved characters with the % escape character followed by a byte value as two hexadecimal digits.
 
-```text
-hello?world
+```jinja
+{{ "hello?world" | urlencode }}
 ```
 
 Output:
@@ -393,6 +393,9 @@ Output:
 ```text
 hello%3Fworld
 ```
+
+With `|urlencode` all characters except ASCII letters, digits, and `_.-~/` are escaped.
+With `|urlencode_strict` a forward slash `/` is escaped, too.
 
 ### wordcount
 [#wordcount]: #wordcount
