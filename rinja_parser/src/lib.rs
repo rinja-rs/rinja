@@ -1022,6 +1022,7 @@ impl LevelGuard<'_> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn filter<'a>(
     i: &mut &'a str,
     level: Level<'_>,
@@ -1029,7 +1030,7 @@ fn filter<'a>(
     'a,
     (
         &'a str,
-        Vec<TyGenerics<'a>>,
+        Vec<WithSpan<'a, TyGenerics<'a>>>,
         Option<Vec<WithSpan<'a, Expr<'a>>>>,
     ),
 > {
@@ -1038,7 +1039,7 @@ fn filter<'a>(
     let _level_guard = level.nest(i)?;
     cut_err((
         ws(identifier),
-        opt(expr::generics).map(|generics| generics.unwrap_or_default()),
+        opt(expr::call_generics).map(|generics| generics.unwrap_or_default()),
         opt(|i: &mut _| Expr::arguments(i, level, false)),
     ))
     .parse_next(i)

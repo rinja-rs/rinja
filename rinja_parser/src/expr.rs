@@ -86,8 +86,8 @@ fn check_expr<'a>(
             Ok(())
         }
         Expr::As(elem, _) | Expr::Unary(_, elem) | Expr::Group(elem) => check_expr(elem, false),
-        Expr::Call(call, args) => {
-            check_expr(call, false)?;
+        Expr::Call { path, args, .. } => {
+            check_expr(path, false)?;
             for arg in args {
                 check_expr(arg, false)?;
             }
@@ -123,7 +123,11 @@ pub enum Expr<'a> {
     ),
     Group(Box<WithSpan<'a, Expr<'a>>>),
     Tuple(Vec<WithSpan<'a, Expr<'a>>>),
-    Call(Box<WithSpan<'a, Expr<'a>>>, Vec<WithSpan<'a, Expr<'a>>>),
+    Call {
+        path: Box<WithSpan<'a, Expr<'a>>>,
+        args: Vec<WithSpan<'a, Expr<'a>>>,
+        generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
+    },
     RustMacro(Vec<&'a str>, &'a str),
     Try(Box<WithSpan<'a, Expr<'a>>>),
     /// This variant should never be used directly. It is created when generating filter blocks.
@@ -510,7 +514,7 @@ impl<'a> Expr<'a> {
             | Self::FilterSource
             | Self::RustMacro(_, _)
             | Self::As(_, _)
-            | Self::Call(_, _)
+            | Self::Call { .. }
             | Self::Range(_, _, _)
             | Self::Try(_)
             | Self::NamedArgument(_, _)
@@ -555,19 +559,22 @@ fn token_bitand<'a>(i: &mut &'a str) -> ParseResult<'a> {
 pub struct Filter<'a> {
     pub name: &'a str,
     pub arguments: Vec<WithSpan<'a, Expr<'a>>>,
-    pub generics: Vec<TyGenerics<'a>>,
+    pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attr<'a> {
     pub name: &'a str,
-    pub generics: Vec<TyGenerics<'a>>,
+    pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
 }
 
 enum Suffix<'a> {
     Attr(Attr<'a>),
     Index(WithSpan<'a, Expr<'a>>),
-    Call(Vec<WithSpan<'a, Expr<'a>>>),
+    Call {
+        args: Vec<WithSpan<'a, Expr<'a>>>,
+        generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
+    },
     // The value is the arguments of the macro call.
     MacroCall(&'a str),
     Try,
@@ -599,8 +606,15 @@ impl<'a> Suffix<'a> {
                 Self::Index(index) => {
                     expr = WithSpan::new(Expr::Index(expr.into(), index.into()), before_suffix);
                 }
-                Self::Call(args) => {
-                    expr = WithSpan::new(Expr::Call(expr.into(), args), before_suffix)
+                Self::Call { args, generics } => {
+                    expr = WithSpan::new(
+                        Expr::Call {
+                            path: expr.into(),
+                            args,
+                            generics,
+                        },
+                        before_suffix,
+                    )
                 }
                 Self::Try => expr = WithSpan::new(Expr::Try(expr.into()), before_suffix),
                 Self::MacroCall(args) => match expr.inner {
@@ -683,7 +697,7 @@ impl<'a> Suffix<'a> {
     fn attr(i: &mut &'a str) -> ParseResult<'a, Self> {
         preceded(
             ws(('.', not('.'))),
-            cut_err((alt((digit1, identifier)), opt(generics))),
+            cut_err((alt((digit1, identifier)), opt(call_generics))),
         )
         .map(|(name, generics)| {
             Self::Attr(Attr {
@@ -707,8 +721,13 @@ impl<'a> Suffix<'a> {
     }
 
     fn call(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
-        (move |i: &mut _| Expr::arguments(i, level, false))
-            .map(Self::Call)
+        (opt(call_generics), move |i: &mut _| {
+            Expr::arguments(i, level, false)
+        })
+            .map(|(generics, args)| Self::Call {
+                args,
+                generics: generics.unwrap_or_default(),
+            })
             .parse_next(i)
     }
 
@@ -720,21 +739,23 @@ impl<'a> Suffix<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TyGenerics<'a> {
     pub ty: &'a str,
-    pub generics: Vec<TyGenerics<'a>>,
+    pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
 }
 
 impl<'i> TyGenerics<'i> {
-    fn parse(input: &mut &'i str) -> ParseResult<'i, Self> {
-        (ws(identifier_with_refs), ws(opt(ty_generics)))
+    fn parse(input: &mut &'i str) -> ParseResult<'i, WithSpan<'i, Self>> {
+        let start = *input;
+        let generic = (ws(identifier_with_refs), ws(opt(ty_generics)))
             .map(|(ty, generics)| TyGenerics {
                 ty,
                 generics: generics.unwrap_or_default(),
             })
-            .parse_next(input)
+            .parse_next(input)?;
+        Ok(WithSpan::new(generic, start))
     }
 }
 
-fn ty_generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<TyGenerics<'i>>> {
+fn ty_generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
     preceded(
         ws('<'),
         cut_err(terminated(
@@ -745,7 +766,9 @@ fn ty_generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<TyGenerics<'i>>> 
     .parse_next(input)
 }
 
-pub(crate) fn generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<TyGenerics<'i>>> {
+pub(crate) fn call_generics<'i>(
+    input: &mut &'i str,
+) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
     preceded(
         (ws("::"), ws('<')),
         cut_err(terminated(

@@ -52,7 +52,11 @@ impl<'a> Generator<'a, '_> {
                 self.visit_range(ctx, buf, op, left.as_deref(), right.as_deref())?
             }
             Expr::Group(ref inner) => self.visit_group(ctx, buf, inner)?,
-            Expr::Call(ref obj, ref args) => self.visit_call(ctx, buf, obj, args)?,
+            Expr::Call {
+                ref path,
+                ref args,
+                ref generics,
+            } => self.visit_call(ctx, buf, path, args, generics)?,
             Expr::RustMacro(ref path, args) => self.visit_rust_macro(buf, path, args),
             Expr::Try(ref expr) => self.visit_try(ctx, buf, expr)?,
             Expr::Tuple(ref exprs) => self.visit_tuple(ctx, buf, exprs)?,
@@ -241,7 +245,7 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[TyGenerics<'_>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let filter = match name {
@@ -256,7 +260,7 @@ impl<'a> Generator<'a, '_> {
             "pluralize" => Self::_visit_pluralize_filter,
             "ref" => Self::_visit_ref_filter,
             "safe" => Self::_visit_safe_filter,
-            "urlencode" | "urlencode_strict" => Self::_visit_urlencode,
+            "urlencode" | "urlencode_strict" => Self::_visit_urlencode_filter,
             name if BUILTIN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
             _ => return Self::_visit_custom_filter(self, ctx, buf, name, args, generics, node),
         };
@@ -274,7 +278,7 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[TyGenerics<'_>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if BUILTIN_FILTERS_NEED_ALLOC.contains(&name) {
@@ -302,7 +306,7 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_urlencode(
+    fn _visit_urlencode_filter(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -663,7 +667,7 @@ impl<'a> Generator<'a, '_> {
             buf.write("&(");
         }
         match **arg {
-            Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
+            Expr::Call { ref path, .. } if !matches!(***path, Expr::Path(_)) => {
                 buf.write('{');
                 self.visit_expr(ctx, buf, arg)?;
                 buf.write('}');
@@ -735,7 +739,7 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn visit_call_generics(&mut self, buf: &mut Buffer, generics: &[TyGenerics<'_>]) {
+    fn visit_call_generics(&mut self, buf: &mut Buffer, generics: &[WithSpan<'_, TyGenerics<'_>>]) {
         if generics.is_empty() {
             return;
         }
@@ -743,7 +747,7 @@ impl<'a> Generator<'a, '_> {
         self.visit_ty_generics(buf, generics);
     }
 
-    fn visit_ty_generics(&mut self, buf: &mut Buffer, generics: &[TyGenerics<'_>]) {
+    fn visit_ty_generics(&mut self, buf: &mut Buffer, generics: &[WithSpan<'_, TyGenerics<'_>>]) {
         if generics.is_empty() {
             return;
         }
@@ -755,7 +759,7 @@ impl<'a> Generator<'a, '_> {
         buf.write('>');
     }
 
-    fn visit_ty_generic(&mut self, buf: &mut Buffer, generic: &TyGenerics<'_>) {
+    fn visit_ty_generic(&mut self, buf: &mut Buffer, generic: &WithSpan<'_, TyGenerics<'_>>) {
         buf.write(normalize_identifier(generic.ty));
         self.visit_ty_generics(buf, &generic.generics);
     }
@@ -781,42 +785,51 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         left: &WithSpan<'_, Expr<'a>>,
         args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
     ) -> Result<DisplayWrap, CompileError> {
         match &**left {
             Expr::Attr(sub_left, Attr { name, .. }) if ***sub_left == Expr::Var("loop") => {
                 match *name {
-                    "cycle" => match args {
-                        [arg] => {
-                            if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
-                                return Err(ctx.generate_error(
-                                    "loop.cycle(…) cannot use an empty array",
-                                    arg.span(),
-                                ));
-                            }
-                            buf.write(
-                                "\
-                            ({\
-                                let _cycle = &(",
-                            );
-                            self.visit_expr(ctx, buf, arg)?;
-                            buf.write(
-                            "\
-                                );\
-                                let _len = _cycle.len();\
-                                if _len == 0 {\
-                                    return rinja::helpers::core::result::Result::Err(rinja::Error::Fmt);\
-                                }\
-                                _cycle[_loop_item.index % _len]\
-                            })",
-                        );
-                        }
-                        _ => {
+                    "cycle" => {
+                        if let [generic, ..] = generics {
                             return Err(ctx.generate_error(
-                                "loop.cycle(…) cannot use an empty array",
-                                left.span(),
+                                "loop.cycle(…) doesn't use generics",
+                                generic.span(),
                             ));
                         }
-                    },
+                        match args {
+                            [arg] => {
+                                if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
+                                    return Err(ctx.generate_error(
+                                        "loop.cycle(…) cannot use an empty array",
+                                        arg.span(),
+                                    ));
+                                }
+                                buf.write(
+                                    "\
+                                ({\
+                                    let _cycle = &(",
+                                );
+                                self.visit_expr(ctx, buf, arg)?;
+                                buf.write(
+                                "\
+                                    );\
+                                    let _len = _cycle.len();\
+                                    if _len == 0 {\
+                                        return rinja::helpers::core::result::Result::Err(rinja::Error::Fmt);\
+                                    }\
+                                    _cycle[_loop_item.index % _len]\
+                                })",
+                            );
+                            }
+                            _ => {
+                                return Err(ctx.generate_error(
+                                    "loop.cycle(…) cannot use an empty array",
+                                    left.span(),
+                                ));
+                            }
+                        }
+                    }
                     s => {
                         return Err(ctx.generate_error(
                             format_args!("unknown loop method: {s:?}"),
@@ -835,6 +848,7 @@ impl<'a> Generator<'a, '_> {
                         self.visit_expr(ctx, buf, left)?;
                     }
                 }
+                self.visit_call_generics(buf, generics);
                 buf.write('(');
                 self._visit_args(ctx, buf, args)?;
                 buf.write(')');
