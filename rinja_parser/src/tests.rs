@@ -49,7 +49,8 @@ fn test_parse_filter() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "e",
-                arguments: vec![WithSpan::no_span(Expr::Var("strvar"))]
+                arguments: vec![WithSpan::no_span(Expr::Var("strvar"))],
+                generics: vec![],
             })),
         )],
     );
@@ -59,7 +60,8 @@ fn test_parse_filter() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
-                arguments: vec![WithSpan::no_span(int_lit("2"))]
+                arguments: vec![WithSpan::no_span(int_lit("2"))],
+                generics: vec![],
             })),
         )],
     );
@@ -72,7 +74,8 @@ fn test_parse_filter() {
                 arguments: vec![WithSpan::no_span(Expr::Unary(
                     "-",
                     WithSpan::no_span(int_lit("2")).into()
-                ))]
+                ))],
+                generics: vec![],
             })),
         )],
     );
@@ -92,6 +95,7 @@ fn test_parse_filter() {
                     ))
                     .into()
                 ))],
+                generics: vec![],
             })),
         )],
     );
@@ -680,7 +684,8 @@ fn test_odd_calls() {
                 arguments: vec![WithSpan::no_span(Expr::Call(
                     Box::new(WithSpan::no_span(Expr::Var("a"))),
                     vec![WithSpan::no_span(Expr::Var("b"))]
-                ))]
+                ))],
+                generics: vec![],
             }))
         )]
     );
@@ -693,7 +698,8 @@ fn test_odd_calls() {
                 arguments: vec![WithSpan::no_span(Expr::Call(
                     Box::new(WithSpan::no_span(Expr::Var("a"))),
                     vec![WithSpan::no_span(Expr::Var("b"))]
-                ))]
+                ))],
+                generics: vec![],
             })),
         )]
     );
@@ -843,7 +849,8 @@ fn test_parse_tuple() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
-                arguments: vec![WithSpan::no_span(Expr::Tuple(vec![]))]
+                arguments: vec![WithSpan::no_span(Expr::Tuple(vec![]))],
+                generics: vec![],
             })),
         )],
     );
@@ -855,7 +862,8 @@ fn test_parse_tuple() {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
                     int_lit("1")
-                ))))]
+                ))))],
+                generics: vec![],
             })),
         )],
     );
@@ -869,7 +877,8 @@ fn test_parse_tuple() {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(
                     int_lit("1")
-                )]))]
+                )]))],
+                generics: vec![],
             })),
         )],
     );
@@ -884,7 +893,8 @@ fn test_parse_tuple() {
                 arguments: vec![WithSpan::no_span(Expr::Tuple(vec![
                     WithSpan::no_span(int_lit("1")),
                     WithSpan::no_span(int_lit("2"))
-                ]))]
+                ]))],
+                generics: vec![],
             })),
         )],
     );
@@ -977,7 +987,8 @@ fn test_parse_array() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "foo",
-                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))]
+                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))],
+                generics: vec![],
             }))
         )],
     );
@@ -987,7 +998,8 @@ fn test_parse_array() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "foo",
-                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))]
+                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))],
+                generics: vec![],
             }))
         )],
     );
@@ -1151,5 +1163,25 @@ fn fuzzed_excessive_filter_block() {
     assert_eq!(
         err.to_string().lines().next(),
         Some("your template code is too deeply nested, or the last expression is too complex"),
+    );
+}
+
+#[test]
+fn test_generics_parsing() {
+    Ast::from_str("{{ a.b::<&str, H<B<C>>>() }}", None, &Syntax::default()).unwrap();
+    Ast::from_str(
+        "{{ a.b::<&str, H<B<C> , &u32>>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+
+    assert!(
+        Ast::from_str(
+            "{{ a.b::<&str, H<B<C> , &u32>() }}",
+            None,
+            &Syntax::default()
+        )
+        .is_err()
     );
 }

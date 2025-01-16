@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use parser::node::CondTest;
 use parser::{
     Attr, CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target,
-    WithSpan,
+    TyGenerics, WithSpan,
 };
 
 use super::{
@@ -724,12 +724,24 @@ impl<'a> Generator<'a, '_> {
         if !attr.generics.is_empty() {
             buf.write("::<");
             for generic in &attr.generics {
-                buf.write(normalize_identifier(generic));
+                self.visit_ty_generics(buf, generic);
                 buf.write(',');
             }
             buf.write('>');
         }
         Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn visit_ty_generics(&mut self, buf: &mut Buffer, generic: &TyGenerics<'_>) {
+        buf.write(normalize_identifier(generic.ty));
+        if !generic.generics.is_empty() {
+            buf.write('<');
+            for generic in &generic.generics {
+                self.visit_ty_generics(buf, generic);
+                buf.write(',');
+            }
+            buf.write('>');
+        }
     }
 
     fn visit_index(

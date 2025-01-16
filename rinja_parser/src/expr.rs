@@ -363,13 +363,20 @@ impl<'a> Expr<'a> {
         let mut level_guard = level.guard();
         let start = *i;
         let mut res = Self::prefix(i, level)?;
-        while let Some((name, args)) = opt(|i: &mut _| filter(i, level)).parse_next(i)? {
+        while let Some((name, generics, args)) = opt(|i: &mut _| filter(i, level)).parse_next(i)? {
             level_guard.nest(i)?;
 
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
             arguments.insert(0, res);
 
-            res = WithSpan::new(Self::Filter(Filter { name, arguments }), start);
+            res = WithSpan::new(
+                Self::Filter(Filter {
+                    name,
+                    arguments,
+                    generics,
+                }),
+                start,
+            );
         }
         Ok(res)
     }
@@ -548,12 +555,13 @@ fn token_bitand<'a>(i: &mut &'a str) -> ParseResult<'a> {
 pub struct Filter<'a> {
     pub name: &'a str,
     pub arguments: Vec<WithSpan<'a, Expr<'a>>>,
+    pub generics: Vec<TyGenerics<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attr<'a> {
     pub name: &'a str,
-    pub generics: Vec<&'a str>,
+    pub generics: Vec<TyGenerics<'a>>,
 }
 
 enum Suffix<'a> {
@@ -709,11 +717,39 @@ impl<'a> Suffix<'a> {
     }
 }
 
-fn generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<&'i str>> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct TyGenerics<'a> {
+    pub ty: &'a str,
+    pub generics: Vec<TyGenerics<'a>>,
+}
+
+impl<'i> TyGenerics<'i> {
+    fn parse(input: &mut &'i str) -> ParseResult<'i, Self> {
+        (ws(identifier_with_refs), ws(opt(ty_generics)))
+            .map(|(ty, generics)| TyGenerics {
+                ty,
+                generics: generics.unwrap_or_default(),
+            })
+            .parse_next(input)
+    }
+}
+
+fn ty_generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<TyGenerics<'i>>> {
+    preceded(
+        ws('<'),
+        cut_err(terminated(
+            terminated(separated(0.., TyGenerics::parse, ','), ws(opt(','))),
+            '>',
+        )),
+    )
+    .parse_next(input)
+}
+
+pub(crate) fn generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<TyGenerics<'i>>> {
     preceded(
         (ws("::"), ws('<')),
         cut_err(terminated(
-            terminated(separated(0.., ws(identifier_with_refs), ','), ws(opt(','))),
+            terminated(separated(0.., TyGenerics::parse, ','), ws(opt(','))),
             '>',
         )),
     )
