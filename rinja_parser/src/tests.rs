@@ -1183,6 +1183,7 @@ fn fuzzed_excessive_filter_block() {
 
 #[test]
 fn test_generics_parsing() {
+    // Method call.
     Ast::from_str("{{ a.b::<&str, H<B<C>>>() }}", None, &Syntax::default()).unwrap();
     Ast::from_str(
         "{{ a.b::<&str, H<B<C> , &u32>>() }}",
@@ -1191,6 +1192,19 @@ fn test_generics_parsing() {
     )
     .unwrap();
 
+    // Call.
+    Ast::from_str(
+        "{{ a::<&str, H<B<C> , &u32>>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+
+    // Filter.
+    Ast::from_str("{{ 12 | a::<&str> }}", None, &Syntax::default()).unwrap();
+    Ast::from_str("{{ 12 | a::<&str, u32>('a') }}", None, &Syntax::default()).unwrap();
+
+    // Unclosed `<`.
     assert!(
         Ast::from_str(
             "{{ a.b::<&str, H<B<C> , &u32>() }}",
