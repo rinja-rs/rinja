@@ -44,7 +44,8 @@ impl<'a> Generator<'a, '_> {
             Expr::Filter(Filter {
                 name,
                 ref arguments,
-            }) => self.visit_filter(ctx, buf, name, arguments, expr.span())?,
+                ref generics,
+            }) => self.visit_filter(ctx, buf, name, arguments, generics, expr.span())?,
             Expr::Unary(op, ref inner) => self.visit_unary(ctx, buf, op, inner)?,
             Expr::BinOp(op, ref left, ref right) => self.visit_binop(ctx, buf, op, left, right)?,
             Expr::Range(op, ref left, ref right) => {
@@ -240,6 +241,7 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[TyGenerics<'_>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let filter = match name {
@@ -256,8 +258,13 @@ impl<'a> Generator<'a, '_> {
             "safe" => Self::_visit_safe_filter,
             "urlencode" | "urlencode_strict" => Self::_visit_urlencode,
             name if BUILTIN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
-            _ => Self::_visit_custom_filter,
+            _ => return Self::_visit_custom_filter(self, ctx, buf, name, args, generics, node),
         };
+        if !generics.is_empty() {
+            return Err(
+                ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node)
+            );
+        }
         filter(self, ctx, buf, name, args, node)
     }
 
@@ -267,12 +274,15 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[TyGenerics<'_>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if BUILTIN_FILTERS_NEED_ALLOC.contains(&name) {
             ensure_filter_has_feature_alloc(ctx, name, node)?;
         }
-        buf.write(format_args!("filters::{name}("));
+        buf.write(format_args!("filters::{name}"));
+        self.visit_call_generics(buf, generics);
+        buf.write('(');
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
@@ -721,27 +731,33 @@ impl<'a> Generator<'a, '_> {
         }
         self.visit_expr(ctx, buf, obj)?;
         buf.write(format_args!(".{}", normalize_identifier(attr.name)));
-        if !attr.generics.is_empty() {
-            buf.write("::<");
-            for generic in &attr.generics {
-                self.visit_ty_generics(buf, generic);
-                buf.write(',');
-            }
-            buf.write('>');
-        }
+        self.visit_call_generics(buf, &attr.generics);
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn visit_ty_generics(&mut self, buf: &mut Buffer, generic: &TyGenerics<'_>) {
-        buf.write(normalize_identifier(generic.ty));
-        if !generic.generics.is_empty() {
-            buf.write('<');
-            for generic in &generic.generics {
-                self.visit_ty_generics(buf, generic);
-                buf.write(',');
-            }
-            buf.write('>');
+    fn visit_call_generics(&mut self, buf: &mut Buffer, generics: &[TyGenerics<'_>]) {
+        if generics.is_empty() {
+            return;
         }
+        buf.write("::");
+        self.visit_ty_generics(buf, generics);
+    }
+
+    fn visit_ty_generics(&mut self, buf: &mut Buffer, generics: &[TyGenerics<'_>]) {
+        if generics.is_empty() {
+            return;
+        }
+        buf.write('<');
+        for generic in generics {
+            self.visit_ty_generic(buf, generic);
+            buf.write(',');
+        }
+        buf.write('>');
+    }
+
+    fn visit_ty_generic(&mut self, buf: &mut Buffer, generic: &TyGenerics<'_>) {
+        buf.write(normalize_identifier(generic.ty));
+        self.visit_ty_generics(buf, &generic.generics);
     }
 
     fn visit_index(
