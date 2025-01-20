@@ -585,7 +585,7 @@ impl<'a> Suffix<'a> {
         let mut level_guard = level.guard();
         let mut expr = Expr::single(i, level)?;
         let mut right = opt(alt((
-            Self::attr,
+            |i: &mut _| Self::attr(i, level),
             |i: &mut _| Self::index(i, level),
             |i: &mut _| Self::call(i, level),
             Self::r#try,
@@ -694,10 +694,13 @@ impl<'a> Suffix<'a> {
         .parse_next(i)
     }
 
-    fn attr(i: &mut &'a str) -> ParseResult<'a, Self> {
+    fn attr(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
         preceded(
             ws(('.', not('.'))),
-            cut_err((alt((digit1, identifier)), opt(call_generics))),
+            cut_err((
+                alt((digit1, identifier)),
+                opt(|i: &mut _| call_generics(i, level)),
+            )),
         )
         .map(|(name, generics)| {
             Self::Attr(Attr {
@@ -721,7 +724,7 @@ impl<'a> Suffix<'a> {
     }
 
     fn call(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
-        (opt(call_generics), move |i: &mut _| {
+        (opt(|i: &mut _| call_generics(i, level)), |i: &mut _| {
             Expr::arguments(i, level, false)
         })
             .map(|(generics, args)| Self::Call {
@@ -744,39 +747,36 @@ pub struct TyGenerics<'a> {
 }
 
 impl<'i> TyGenerics<'i> {
-    fn parse(input: &mut &'i str) -> ParseResult<'i, WithSpan<'i, Self>> {
-        let start = *input;
-        let generic = (ws(identifier_with_refs), ws(opt(ty_generics)))
-            .map(|((refs, ty), generics)| TyGenerics {
-                refs,
-                ty,
-                generics: generics.unwrap_or_default(),
-            })
-            .parse_next(input)?;
-        Ok(WithSpan::new(generic, start))
+    fn parse(i: &mut &'i str, level: Level<'_>) -> ParseResult<'i, WithSpan<'i, Self>> {
+        let start = *i;
+        (
+            ws(identifier_with_refs),
+            opt(|i: &mut _| Self::args(i, level)).map(|generics| generics.unwrap_or_default()),
+        )
+            .map(|((refs, ty), generics)| WithSpan::new(TyGenerics { refs, ty, generics }, start))
+            .parse_next(i)
+    }
+
+    fn args(
+        i: &mut &'i str,
+        level: Level<'_>,
+    ) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
+        ws('<').parse_next(i)?;
+        let _level_guard = level.nest(i)?;
+        cut_err(terminated(
+            terminated(
+                separated(0.., |i: &mut _| TyGenerics::parse(i, level), ws(',')),
+                ws(opt(',')),
+            ),
+            '>',
+        ))
+        .parse_next(i)
     }
 }
 
-fn ty_generics<'i>(input: &mut &'i str) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
-    preceded(
-        ws('<'),
-        cut_err(terminated(
-            terminated(separated(0.., TyGenerics::parse, ','), ws(opt(','))),
-            '>',
-        )),
-    )
-    .parse_next(input)
-}
-
 pub(crate) fn call_generics<'i>(
-    input: &mut &'i str,
+    i: &mut &'i str,
+    level: Level<'_>,
 ) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
-    preceded(
-        (ws("::"), ws('<')),
-        cut_err(terminated(
-            terminated(separated(0.., TyGenerics::parse, ','), ws(opt(','))),
-            '>',
-        )),
-    )
-    .parse_next(input)
+    preceded(ws("::"), cut_err(|i: &mut _| TyGenerics::args(i, level))).parse_next(i)
 }

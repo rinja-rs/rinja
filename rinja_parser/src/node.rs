@@ -773,7 +773,7 @@ impl<'a> FilterBlock<'a> {
                 Some("filter"),
                 (
                     ws(identifier),
-                    opt(crate::expr::call_generics),
+                    opt(|i: &mut _| crate::expr::call_generics(i, s.level)),
                     opt(|i: &mut _| Expr::arguments(i, s.level, false)),
                     repeat(0.., |i: &mut _| {
                         #[allow(clippy::explicit_auto_deref)] // false positive

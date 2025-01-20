@@ -1037,7 +1037,7 @@ fn filter<'a>(
     let _level_guard = level.nest(i)?;
     cut_err((
         ws(identifier),
-        opt(expr::call_generics).map(|generics| generics.unwrap_or_default()),
+        opt(|i: &mut _| expr::call_generics(i, level)).map(|generics| generics.unwrap_or_default()),
         opt(|i: &mut _| Expr::arguments(i, level, false)),
     ))
     .parse_next(i)
