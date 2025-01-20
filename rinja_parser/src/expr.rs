@@ -12,8 +12,8 @@ use winnow::stream::Stream as _;
 use crate::node::CondTest;
 use crate::{
     CharLit, ErrorContext, Level, Num, ParseErr, ParseResult, PathOrIdentifier, Span, StrLit,
-    WithSpan, char_lit, filter, identifier, identifier_with_refs, keyword, num_lit,
-    path_or_identifier, skip_ws0, skip_ws1, str_lit, ws,
+    WithSpan, char_lit, filter, identifier, keyword, num_lit, path_or_identifier, skip_ws0,
+    skip_ws1, str_lit, ws,
 };
 
 macro_rules! expr_prec_layer {
@@ -742,18 +742,19 @@ impl<'a> Suffix<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TyGenerics<'a> {
     pub refs: usize,
-    pub ty: &'a str,
-    pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
+    pub path: Vec<&'a str>,
+    pub args: Vec<WithSpan<'a, TyGenerics<'a>>>,
 }
 
 impl<'i> TyGenerics<'i> {
     fn parse(i: &mut &'i str, level: Level<'_>) -> ParseResult<'i, WithSpan<'i, Self>> {
         let start = *i;
         (
-            ws(identifier_with_refs),
+            repeat(0.., ws('&')),
+            separated(1.., ws(identifier), "::"),
             opt(|i: &mut _| Self::args(i, level)).map(|generics| generics.unwrap_or_default()),
         )
-            .map(|((refs, ty), generics)| WithSpan::new(TyGenerics { refs, ty, generics }, start))
+            .map(|(refs, path, args)| WithSpan::new(TyGenerics { refs, path, args }, start))
             .parse_next(i)
     }
 

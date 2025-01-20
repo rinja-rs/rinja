@@ -1213,4 +1213,78 @@ fn test_generics_parsing() {
         )
         .is_err()
     );
+
+    // With path and spaces
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b ::<&&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b:: <&&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::< &&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<& &core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&& core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core ::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core:: primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive ::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive:: str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive::str >() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive::str> () }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
 }

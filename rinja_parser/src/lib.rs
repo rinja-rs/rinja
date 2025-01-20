@@ -406,10 +406,6 @@ fn identifier<'i>(input: &mut &'i str) -> ParseResult<'i> {
     (start, opt(tail)).take().parse_next(input)
 }
 
-fn identifier_with_refs<'i>(input: &mut &'i str) -> ParseResult<'i, (usize, &'i str)> {
-    (repeat(0.., ws('&')), identifier).parse_next(input)
-}
-
 fn bool_lit<'i>(i: &mut &'i str) -> ParseResult<'i> {
     alt((keyword("false"), keyword("true"))).parse_next(i)
 }

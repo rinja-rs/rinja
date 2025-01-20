@@ -781,12 +781,12 @@ impl<'a> Generator<'a, '_> {
     }
 
     fn visit_ty_generic(&mut self, buf: &mut Buffer, generic: &WithSpan<'_, TyGenerics<'_>>) {
-        let TyGenerics { refs, ty, generics } = &**generic;
+        let TyGenerics { refs, path, args } = &**generic;
         for _ in 0..*refs {
             buf.write('&');
         }
-        buf.write(normalize_identifier(ty));
-        self.visit_ty_generics(buf, generics);
+        self.visit_path(buf, path);
+        self.visit_ty_generics(buf, args);
     }
 
     fn visit_index(
