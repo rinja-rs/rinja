@@ -738,6 +738,7 @@ impl<'a> Suffix<'a> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TyGenerics<'a> {
+    pub refs: usize,
     pub ty: &'a str,
     pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
 }
@@ -746,7 +747,8 @@ impl<'i> TyGenerics<'i> {
     fn parse(input: &mut &'i str) -> ParseResult<'i, WithSpan<'i, Self>> {
         let start = *input;
         let generic = (ws(identifier_with_refs), ws(opt(ty_generics)))
-            .map(|(ty, generics)| TyGenerics {
+            .map(|((refs, ty), generics)| TyGenerics {
+                refs,
                 ty,
                 generics: generics.unwrap_or_default(),
             })
