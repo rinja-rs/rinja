@@ -552,7 +552,7 @@ impl<'a> Generator<'a, '_> {
         ensure_filter_has_feature_alloc(ctx, name, node)?;
         if !args.is_empty() {
             if let Expr::StrLit(ref fmt) = *args[0] {
-                buf.write("rinja::helpers::std::format!(");
+                buf.write("rinja::helpers::alloc::format!(");
                 self.visit_str_lit(buf, fmt);
                 if args.len() > 1 {
                     buf.write(',');
@@ -576,7 +576,7 @@ impl<'a> Generator<'a, '_> {
         ensure_filter_has_feature_alloc(ctx, name, node)?;
         if let [_, arg2] = args {
             if let Expr::StrLit(ref fmt) = **arg2 {
-                buf.write("rinja::helpers::std::format!(");
+                buf.write("rinja::helpers::alloc::format!(");
                 self.visit_str_lit(buf, fmt);
                 buf.write(',');
                 self._visit_args(ctx, buf, &args[..1])?;
