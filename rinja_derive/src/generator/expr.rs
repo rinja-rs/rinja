@@ -256,15 +256,24 @@ impl<'a> Generator<'a, '_> {
             "format" => Self::_visit_format_filter,
             "join" => Self::_visit_join_filter,
             "json" | "tojson" => Self::_visit_json_filter,
-            "linebreaks" | "linebreaksbr" | "paragraphbreaks" => Self::_visit_linebreaks_filter,
+            "linebreaks" => Self::_visit_linebreaks_filter,
+            "linebreaksbr" => Self::_visit_linebreaksbr_filter,
+            "paragraphbreaks" => Self::_visit_paragraphbreaks_filter,
             "pluralize" => Self::_visit_pluralize_filter,
             "ref" => Self::_visit_ref_filter,
             "safe" => Self::_visit_safe_filter,
-            "urlencode" | "urlencode_strict" => Self::_visit_urlencode_filter,
-            name if BUILTIN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
-            _ => Self::_visit_custom_filter,
+            "urlencode" => Self::_visit_urlencode_filter,
+            "urlencode_strict" => Self::_visit_urlencode_strict_filter,
+            name if BUILTIN_FILTERS.contains(&name) => {
+                return self._visit_builtin_filter(ctx, buf, name, args, generics, node);
+            }
+            _ => return self._visit_custom_filter(ctx, buf, name, args, generics, node),
         };
-        filter(self, ctx, buf, name, args, generics, node)
+        if !generics.is_empty() {
+            Err(ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node))
+        } else {
+            filter(self, ctx, buf, args, node)
+        }
     }
 
     fn _visit_custom_filter(
@@ -294,8 +303,13 @@ impl<'a> Generator<'a, '_> {
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         generics: &[WithSpan<'_, TyGenerics<'_>>],
-        _node: Span<'_>,
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
+        if !generics.is_empty() {
+            return Err(
+                ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node)
+            );
+        }
         buf.write(format_args!("rinja::filters::{name}"));
         self.visit_call_generics(buf, generics);
         buf.write('(');
@@ -308,12 +322,30 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
+        self._visit_urlencode_filter_inner(ctx, buf, "urlencode", args, node)
+    }
+
+    fn _visit_urlencode_strict_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_urlencode_filter_inner(ctx, buf, "urlencode_strict", args, node)
+    }
+
+    fn _visit_urlencode_filter_inner(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        name: &str,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "urlencode")) {
             return Err(ctx.generate_error(
                 format_args!("the `{name}` filter requires the `urlencode` feature to be enabled"),
@@ -334,15 +366,12 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
-        node: Span<'_>,
+        _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         // All filters return numbers, and any default formatted number is HTML safe.
         buf.write(format_args!(
-            "rinja::filters::HtmlSafeOutput(rinja::filters::{name}(\
+            "rinja::filters::HtmlSafeOutput(rinja::filters::filesizeformat(\
                  rinja::helpers::get_primitive_value(&("
         ));
         self._visit_args(ctx, buf, args)?;
@@ -354,9 +383,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         const SINGULAR: &WithSpan<'static, Expr<'static>> =
@@ -370,7 +397,6 @@ impl<'a> Generator<'a, '_> {
                 content: "s",
             }));
 
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         let (count, sg, pl) = match args {
             [count] => (count, SINGULAR, PLURAL),
             [count, sg] => (count, sg, PLURAL),
@@ -396,16 +422,44 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Wrapped)
     }
 
+    fn _visit_paragraphbreaks_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_linebreaks_filters(ctx, buf, "paragraphbreaks", args, node)
+    }
+
+    fn _visit_linebreaksbr_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_linebreaks_filters(ctx, buf, "linebreaksbr", args, node)
+    }
+
     fn _visit_linebreaks_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_linebreaks_filters(ctx, buf, "linebreaks", args, node)
+    }
+
+    fn _visit_linebreaks_filters(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         ensure_filter_has_feature_alloc(ctx, name, node)?;
         if args.len() != 1 {
             return Err(ctx.generate_error(
@@ -427,12 +481,9 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         let arg = match args {
             [arg] => arg,
             _ => return Err(ctx.generate_error("unexpected argument(s) in `as_ref` filter", node)),
@@ -446,12 +497,9 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         let arg = match args {
             [arg] => arg,
             _ => return Err(ctx.generate_error("unexpected argument(s) in `deref` filter", node)),
@@ -465,9 +513,7 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if cfg!(not(feature = "serde_json")) {
@@ -476,7 +522,6 @@ impl<'a> Generator<'a, '_> {
                 node,
             ));
         }
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
 
         let filter = match args.len() {
             1 => "json",
@@ -493,12 +538,9 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         if args.len() != 1 {
             return Err(ctx.generate_error("unexpected argument(s) in `safe` filter", node));
         }
@@ -512,12 +554,9 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         if args.len() > 2 {
             return Err(ctx.generate_error("only two arguments allowed to escape filter", node));
         }
@@ -575,13 +614,10 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
+        ensure_filter_has_feature_alloc(ctx, "format", node)?;
         if !args.is_empty() {
             if let Expr::StrLit(ref fmt) = *args[0] {
                 buf.write("rinja::helpers::std::format!(");
@@ -601,13 +637,10 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
+        ensure_filter_has_feature_alloc(ctx, "fmt", node)?;
         if let [_, arg2] = args {
             if let Expr::StrLit(ref fmt) = **arg2 {
                 buf.write("rinja::helpers::std::format!(");
@@ -626,12 +659,9 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
-        node: Span<'_>,
+        _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
         buf.write("rinja::filters::join((&");
         for (i, arg) in args.iter().enumerate() {
             if i > 0 {
@@ -1141,19 +1171,6 @@ impl<'a> Generator<'a, '_> {
                 buf.write(s);
             }
         }
-    }
-}
-
-fn ensure_filter_has_no_generics(
-    ctx: &Context<'_>,
-    name: &str,
-    generics: &[WithSpan<'_, TyGenerics<'_>>],
-    node: Span<'_>,
-) -> Result<(), CompileError> {
-    if generics.is_empty() {
-        Ok(())
-    } else {
-        Err(ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node))
     }
 }
 
