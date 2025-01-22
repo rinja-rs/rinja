@@ -2,7 +2,8 @@ use std::borrow::Cow;
 
 use parser::node::CondTest;
 use parser::{
-    CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target, WithSpan,
+    Attr, CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target,
+    TyGenerics, WithSpan,
 };
 
 use super::{
@@ -38,19 +39,24 @@ impl<'a> Generator<'a, '_> {
             Expr::Var(s) => self.visit_var(buf, s),
             Expr::Path(ref path) => self.visit_path(buf, path),
             Expr::Array(ref elements) => self.visit_array(ctx, buf, elements)?,
-            Expr::Attr(ref obj, name) => self.visit_attr(ctx, buf, obj, name)?,
+            Expr::Attr(ref obj, ref attr) => self.visit_attr(ctx, buf, obj, attr)?,
             Expr::Index(ref obj, ref key) => self.visit_index(ctx, buf, obj, key)?,
             Expr::Filter(Filter {
                 name,
                 ref arguments,
-            }) => self.visit_filter(ctx, buf, name, arguments, expr.span())?,
+                ref generics,
+            }) => self.visit_filter(ctx, buf, name, arguments, generics, expr.span())?,
             Expr::Unary(op, ref inner) => self.visit_unary(ctx, buf, op, inner)?,
             Expr::BinOp(op, ref left, ref right) => self.visit_binop(ctx, buf, op, left, right)?,
             Expr::Range(op, ref left, ref right) => {
                 self.visit_range(ctx, buf, op, left.as_deref(), right.as_deref())?
             }
             Expr::Group(ref inner) => self.visit_group(ctx, buf, inner)?,
-            Expr::Call(ref obj, ref args) => self.visit_call(ctx, buf, obj, args)?,
+            Expr::Call {
+                ref path,
+                ref args,
+                ref generics,
+            } => self.visit_call(ctx, buf, path, args, generics)?,
             Expr::RustMacro(ref path, args) => self.visit_rust_macro(buf, path, args),
             Expr::Try(ref expr) => self.visit_try(ctx, buf, expr)?,
             Expr::Tuple(ref exprs) => self.visit_tuple(ctx, buf, exprs)?,
@@ -239,6 +245,7 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         let filter = match name {
@@ -249,15 +256,24 @@ impl<'a> Generator<'a, '_> {
             "format" => Self::_visit_format_filter,
             "join" => Self::_visit_join_filter,
             "json" | "tojson" => Self::_visit_json_filter,
-            "linebreaks" | "linebreaksbr" | "paragraphbreaks" => Self::_visit_linebreaks_filter,
+            "linebreaks" => Self::_visit_linebreaks_filter,
+            "linebreaksbr" => Self::_visit_linebreaksbr_filter,
+            "paragraphbreaks" => Self::_visit_paragraphbreaks_filter,
             "pluralize" => Self::_visit_pluralize_filter,
             "ref" => Self::_visit_ref_filter,
             "safe" => Self::_visit_safe_filter,
-            "urlencode" | "urlencode_strict" => Self::_visit_urlencode,
-            name if BUILTIN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
-            _ => Self::_visit_custom_filter,
+            "urlencode" => Self::_visit_urlencode_filter,
+            "urlencode_strict" => Self::_visit_urlencode_strict_filter,
+            name if BUILTIN_FILTERS.contains(&name) => {
+                return self._visit_builtin_filter(ctx, buf, name, args, generics, node);
+            }
+            _ => return self._visit_custom_filter(ctx, buf, name, args, generics, node),
         };
-        filter(self, ctx, buf, name, args, node)
+        if !generics.is_empty() {
+            Err(ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node))
+        } else {
+            filter(self, ctx, buf, args, node)
+        }
     }
 
     fn _visit_custom_filter(
@@ -266,12 +282,15 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if BUILTIN_FILTERS_NEED_ALLOC.contains(&name) {
             ensure_filter_has_feature_alloc(ctx, name, node)?;
         }
-        buf.write(format_args!("filters::{name}("));
+        buf.write(format_args!("filters::{name}"));
+        self.visit_call_generics(buf, generics);
+        buf.write('(');
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
@@ -283,15 +302,43 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
-        _node: Span<'_>,
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
+        node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        buf.write(format_args!("rinja::filters::{name}("));
+        if !generics.is_empty() {
+            return Err(
+                ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node)
+            );
+        }
+        buf.write(format_args!("rinja::filters::{name}"));
+        self.visit_call_generics(buf, generics);
+        buf.write('(');
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_urlencode(
+    fn _visit_urlencode_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_urlencode_filter_inner(ctx, buf, "urlencode", args, node)
+    }
+
+    fn _visit_urlencode_strict_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_urlencode_filter_inner(ctx, buf, "urlencode_strict", args, node)
+    }
+
+    fn _visit_urlencode_filter_inner(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -319,13 +366,12 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         // All filters return numbers, and any default formatted number is HTML safe.
         buf.write(format_args!(
-            "rinja::filters::HtmlSafeOutput(rinja::filters::{name}(\
+            "rinja::filters::HtmlSafeOutput(rinja::filters::filesizeformat(\
                  rinja::helpers::get_primitive_value(&("
         ));
         self._visit_args(ctx, buf, args)?;
@@ -337,7 +383,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -377,7 +422,37 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Wrapped)
     }
 
+    fn _visit_paragraphbreaks_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_linebreaks_filters(ctx, buf, "paragraphbreaks", args, node)
+    }
+
+    fn _visit_linebreaksbr_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_linebreaks_filters(ctx, buf, "linebreaksbr", args, node)
+    }
+
     fn _visit_linebreaks_filter(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        node: Span<'_>,
+    ) -> Result<DisplayWrap, CompileError> {
+        self._visit_linebreaks_filters(ctx, buf, "linebreaks", args, node)
+    }
+
+    fn _visit_linebreaks_filters(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -406,7 +481,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -423,7 +497,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -440,7 +513,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -456,7 +528,6 @@ impl<'a> Generator<'a, '_> {
             2 => "json_pretty",
             _ => return Err(ctx.generate_error("unexpected argument(s) in `json` filter", node)),
         };
-
         buf.write(format_args!("rinja::filters::{filter}("));
         self._visit_args(ctx, buf, args)?;
         buf.write(")?");
@@ -467,7 +538,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -484,7 +554,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -545,11 +614,10 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
+        ensure_filter_has_feature_alloc(ctx, "format", node)?;
         if !args.is_empty() {
             if let Expr::StrLit(ref fmt) = *args[0] {
                 buf.write("rinja::helpers::alloc::format!(");
@@ -569,11 +637,10 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
+        ensure_filter_has_feature_alloc(ctx, "fmt", node)?;
         if let [_, arg2] = args {
             if let Expr::StrLit(ref fmt) = **arg2 {
                 buf.write("rinja::helpers::alloc::format!(");
@@ -592,7 +659,6 @@ impl<'a> Generator<'a, '_> {
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
-        _name: &str,
         args: &[WithSpan<'_, Expr<'a>>],
         _node: Span<'_>,
     ) -> Result<DisplayWrap, CompileError> {
@@ -652,7 +718,7 @@ impl<'a> Generator<'a, '_> {
             buf.write("&(");
         }
         match **arg {
-            Expr::Call(ref left, _) if !matches!(***left, Expr::Path(_)) => {
+            Expr::Call { ref path, .. } if !matches!(***path, Expr::Path(_)) => {
                 buf.write('{');
                 self.visit_expr(ctx, buf, arg)?;
                 buf.write('}');
@@ -697,20 +763,20 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'_>,
         buf: &mut Buffer,
         obj: &WithSpan<'_, Expr<'a>>,
-        attr: &str,
+        attr: &Attr<'_>,
     ) -> Result<DisplayWrap, CompileError> {
         if let Expr::Var(name) = **obj {
             if name == "loop" {
-                if attr == "index" {
+                if attr.name == "index" {
                     buf.write("(_loop_item.index + 1)");
                     return Ok(DisplayWrap::Unwrapped);
-                } else if attr == "index0" {
+                } else if attr.name == "index0" {
                     buf.write("_loop_item.index");
                     return Ok(DisplayWrap::Unwrapped);
-                } else if attr == "first" {
+                } else if attr.name == "first" {
                     buf.write("_loop_item.first");
                     return Ok(DisplayWrap::Unwrapped);
-                } else if attr == "last" {
+                } else if attr.name == "last" {
                     buf.write("_loop_item.last");
                     return Ok(DisplayWrap::Unwrapped);
                 } else {
@@ -719,8 +785,38 @@ impl<'a> Generator<'a, '_> {
             }
         }
         self.visit_expr(ctx, buf, obj)?;
-        buf.write(format_args!(".{}", normalize_identifier(attr)));
+        buf.write(format_args!(".{}", normalize_identifier(attr.name)));
+        self.visit_call_generics(buf, &attr.generics);
         Ok(DisplayWrap::Unwrapped)
+    }
+
+    fn visit_call_generics(&mut self, buf: &mut Buffer, generics: &[WithSpan<'_, TyGenerics<'_>>]) {
+        if generics.is_empty() {
+            return;
+        }
+        buf.write("::");
+        self.visit_ty_generics(buf, generics);
+    }
+
+    fn visit_ty_generics(&mut self, buf: &mut Buffer, generics: &[WithSpan<'_, TyGenerics<'_>>]) {
+        if generics.is_empty() {
+            return;
+        }
+        buf.write('<');
+        for generic in generics {
+            self.visit_ty_generic(buf, generic);
+            buf.write(',');
+        }
+        buf.write('>');
+    }
+
+    fn visit_ty_generic(&mut self, buf: &mut Buffer, generic: &WithSpan<'_, TyGenerics<'_>>) {
+        let TyGenerics { refs, path, args } = &**generic;
+        for _ in 0..*refs {
+            buf.write('&');
+        }
+        self.visit_path(buf, path);
+        self.visit_ty_generics(buf, args);
     }
 
     fn visit_index(
@@ -744,47 +840,59 @@ impl<'a> Generator<'a, '_> {
         buf: &mut Buffer,
         left: &WithSpan<'_, Expr<'a>>,
         args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
     ) -> Result<DisplayWrap, CompileError> {
         match &**left {
-            Expr::Attr(sub_left, method) if ***sub_left == Expr::Var("loop") => match *method {
-                "cycle" => match args {
-                    [arg] => {
-                        if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
+            Expr::Attr(sub_left, Attr { name, .. }) if ***sub_left == Expr::Var("loop") => {
+                match *name {
+                    "cycle" => {
+                        if let [generic, ..] = generics {
                             return Err(ctx.generate_error(
-                                "loop.cycle(…) cannot use an empty array",
-                                arg.span(),
+                                "loop.cycle(…) doesn't use generics",
+                                generic.span(),
                             ));
                         }
-                        buf.write(
-                            "\
-                            ({\
-                                let _cycle = &(",
-                        );
-                        self.visit_expr(ctx, buf, arg)?;
-                        buf.write(
-                            "\
-                                );\
-                                let _len = _cycle.len();\
-                                if _len == 0 {\
-                                    return rinja::helpers::core::result::Result::Err(rinja::Error::Fmt);\
-                                }\
-                                _cycle[_loop_item.index % _len]\
-                            })",
-                        );
+                        match args {
+                            [arg] => {
+                                if matches!(**arg, Expr::Array(ref arr) if arr.is_empty()) {
+                                    return Err(ctx.generate_error(
+                                        "loop.cycle(…) cannot use an empty array",
+                                        arg.span(),
+                                    ));
+                                }
+                                buf.write(
+                                    "\
+                                ({\
+                                    let _cycle = &(",
+                                );
+                                self.visit_expr(ctx, buf, arg)?;
+                                buf.write(
+                                "\
+                                    );\
+                                    let _len = _cycle.len();\
+                                    if _len == 0 {\
+                                        return rinja::helpers::core::result::Result::Err(rinja::Error::Fmt);\
+                                    }\
+                                    _cycle[_loop_item.index % _len]\
+                                })",
+                            );
+                            }
+                            _ => {
+                                return Err(ctx.generate_error(
+                                    "loop.cycle(…) cannot use an empty array",
+                                    left.span(),
+                                ));
+                            }
+                        }
                     }
-                    _ => {
+                    s => {
                         return Err(ctx.generate_error(
-                            "loop.cycle(…) cannot use an empty array",
+                            format_args!("unknown loop method: {s:?}"),
                             left.span(),
                         ));
                     }
-                },
-                s => {
-                    return Err(
-                        ctx.generate_error(format_args!("unknown loop method: {s:?}"), left.span())
-                    );
                 }
-            },
+            }
             sub_left => {
                 match sub_left {
                     Expr::Var(name) => match self.locals.resolve(name) {
@@ -795,6 +903,7 @@ impl<'a> Generator<'a, '_> {
                         self.visit_expr(ctx, buf, left)?;
                     }
                 }
+                self.visit_call_generics(buf, generics);
                 buf.write('(');
                 self._visit_args(ctx, buf, args)?;
                 buf.write(')');

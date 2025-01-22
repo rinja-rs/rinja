@@ -18,7 +18,7 @@ use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till, take_while};
 
 pub mod expr;
-pub use expr::{Expr, Filter};
+pub use expr::{Attr, Expr, Filter, TyGenerics};
 mod memchr_splitter;
 pub mod node;
 pub use node::Node;
@@ -1016,15 +1016,24 @@ impl LevelGuard<'_> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn filter<'a>(
     i: &mut &'a str,
     level: Level<'_>,
-) -> ParseResult<'a, (&'a str, Option<Vec<WithSpan<'a, Expr<'a>>>>)> {
+) -> ParseResult<
+    'a,
+    (
+        &'a str,
+        Vec<WithSpan<'a, TyGenerics<'a>>>,
+        Option<Vec<WithSpan<'a, Expr<'a>>>>,
+    ),
+> {
     ws(('|', not('|'))).parse_next(i)?;
 
     let _level_guard = level.nest(i)?;
     cut_err((
         ws(identifier),
+        opt(|i: &mut _| expr::call_generics(i, level)).map(|generics| generics.unwrap_or_default()),
         opt(|i: &mut _| Expr::arguments(i, level, false)),
     ))
     .parse_next(i)

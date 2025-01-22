@@ -773,12 +773,14 @@ impl<'a> FilterBlock<'a> {
                 Some("filter"),
                 (
                     ws(identifier),
+                    opt(|i: &mut _| crate::expr::call_generics(i, s.level)),
                     opt(|i: &mut _| Expr::arguments(i, s.level, false)),
                     repeat(0.., |i: &mut _| {
                         #[allow(clippy::explicit_auto_deref)] // false positive
                         level_guard.nest(*i)?;
                         let start = *i;
-                        filter(i, s.level).map(|(name, params)| (name, params, start))
+                        filter(i, s.level)
+                            .map(|(name, generics, params)| (name, generics, params, start))
                     })
                     .map(|v: Vec<_>| v),
                     ws(empty),
@@ -787,15 +789,17 @@ impl<'a> FilterBlock<'a> {
                 ),
             ),
         );
-        let (pws1, _, (filter_name, params, extra_filters, (), nws1, _)) = start.parse_next(i)?;
+        let (pws1, _, (filter_name, generics, params, extra_filters, (), nws1, _)) =
+            start.parse_next(i)?;
 
         let mut arguments = params.unwrap_or_default();
         arguments.insert(0, WithSpan::new(Expr::FilterSource, start_s));
         let mut filters = Filter {
             name: filter_name,
             arguments,
+            generics: generics.unwrap_or_default(),
         };
-        for (filter_name, args, span) in extra_filters {
+        for (filter_name, generics, args, span) in extra_filters {
             filters = Filter {
                 name: filter_name,
                 arguments: {
@@ -803,6 +807,7 @@ impl<'a> FilterBlock<'a> {
                     args.insert(0, WithSpan::new(Expr::Filter(filters), span));
                     args
                 },
+                generics,
             };
         }
 

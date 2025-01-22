@@ -86,8 +86,8 @@ fn check_expr<'a>(
             Ok(())
         }
         Expr::As(elem, _) | Expr::Unary(_, elem) | Expr::Group(elem) => check_expr(elem, false),
-        Expr::Call(call, args) => {
-            check_expr(call, false)?;
+        Expr::Call { path, args, .. } => {
+            check_expr(path, false)?;
             for arg in args {
                 check_expr(arg, false)?;
             }
@@ -105,7 +105,7 @@ pub enum Expr<'a> {
     Var(&'a str),
     Path(Vec<&'a str>),
     Array(Vec<WithSpan<'a, Expr<'a>>>),
-    Attr(Box<WithSpan<'a, Expr<'a>>>, &'a str),
+    Attr(Box<WithSpan<'a, Expr<'a>>>, Attr<'a>),
     Index(Box<WithSpan<'a, Expr<'a>>>, Box<WithSpan<'a, Expr<'a>>>),
     Filter(Filter<'a>),
     As(Box<WithSpan<'a, Expr<'a>>>, &'a str),
@@ -123,7 +123,11 @@ pub enum Expr<'a> {
     ),
     Group(Box<WithSpan<'a, Expr<'a>>>),
     Tuple(Vec<WithSpan<'a, Expr<'a>>>),
-    Call(Box<WithSpan<'a, Expr<'a>>>, Vec<WithSpan<'a, Expr<'a>>>),
+    Call {
+        path: Box<WithSpan<'a, Expr<'a>>>,
+        args: Vec<WithSpan<'a, Expr<'a>>>,
+        generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
+    },
     RustMacro(Vec<&'a str>, &'a str),
     Try(Box<WithSpan<'a, Expr<'a>>>),
     /// This variant should never be used directly. It is created when generating filter blocks.
@@ -363,13 +367,20 @@ impl<'a> Expr<'a> {
         let mut level_guard = level.guard();
         let start = *i;
         let mut res = Self::prefix(i, level)?;
-        while let Some((name, args)) = opt(|i: &mut _| filter(i, level)).parse_next(i)? {
+        while let Some((name, generics, args)) = opt(|i: &mut _| filter(i, level)).parse_next(i)? {
             level_guard.nest(i)?;
 
             let mut arguments = args.unwrap_or_else(|| Vec::with_capacity(1));
             arguments.insert(0, res);
 
-            res = WithSpan::new(Self::Filter(Filter { name, arguments }), start);
+            res = WithSpan::new(
+                Self::Filter(Filter {
+                    name,
+                    arguments,
+                    generics,
+                }),
+                start,
+            );
         }
         Ok(res)
     }
@@ -503,7 +514,7 @@ impl<'a> Expr<'a> {
             | Self::FilterSource
             | Self::RustMacro(_, _)
             | Self::As(_, _)
-            | Self::Call(_, _)
+            | Self::Call { .. }
             | Self::Range(_, _, _)
             | Self::Try(_)
             | Self::NamedArgument(_, _)
@@ -548,12 +559,22 @@ fn token_bitand<'a>(i: &mut &'a str) -> ParseResult<'a> {
 pub struct Filter<'a> {
     pub name: &'a str,
     pub arguments: Vec<WithSpan<'a, Expr<'a>>>,
+    pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attr<'a> {
+    pub name: &'a str,
+    pub generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
 }
 
 enum Suffix<'a> {
-    Attr(&'a str),
+    Attr(Attr<'a>),
     Index(WithSpan<'a, Expr<'a>>),
-    Call(Vec<WithSpan<'a, Expr<'a>>>),
+    Call {
+        args: Vec<WithSpan<'a, Expr<'a>>>,
+        generics: Vec<WithSpan<'a, TyGenerics<'a>>>,
+    },
     // The value is the arguments of the macro call.
     MacroCall(&'a str),
     Try,
@@ -564,7 +585,7 @@ impl<'a> Suffix<'a> {
         let mut level_guard = level.guard();
         let mut expr = Expr::single(i, level)?;
         let mut right = opt(alt((
-            Self::attr,
+            |i: &mut _| Self::attr(i, level),
             |i: &mut _| Self::index(i, level),
             |i: &mut _| Self::call(i, level),
             Self::r#try,
@@ -585,8 +606,15 @@ impl<'a> Suffix<'a> {
                 Self::Index(index) => {
                     expr = WithSpan::new(Expr::Index(expr.into(), index.into()), before_suffix);
                 }
-                Self::Call(args) => {
-                    expr = WithSpan::new(Expr::Call(expr.into(), args), before_suffix)
+                Self::Call { args, generics } => {
+                    expr = WithSpan::new(
+                        Expr::Call {
+                            path: expr.into(),
+                            args,
+                            generics,
+                        },
+                        before_suffix,
+                    )
                 }
                 Self::Try => expr = WithSpan::new(Expr::Try(expr.into()), before_suffix),
                 Self::MacroCall(args) => match expr.inner {
@@ -666,10 +694,21 @@ impl<'a> Suffix<'a> {
         .parse_next(i)
     }
 
-    fn attr(i: &mut &'a str) -> ParseResult<'a, Self> {
-        preceded(ws(('.', not('.'))), cut_err(alt((digit1, identifier))))
-            .map(Self::Attr)
-            .parse_next(i)
+    fn attr(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
+        preceded(
+            ws(('.', not('.'))),
+            cut_err((
+                alt((digit1, identifier)),
+                opt(|i: &mut _| call_generics(i, level)),
+            )),
+        )
+        .map(|(name, generics)| {
+            Self::Attr(Attr {
+                name,
+                generics: generics.unwrap_or_default(),
+            })
+        })
+        .parse_next(i)
     }
 
     fn index(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
@@ -685,12 +724,60 @@ impl<'a> Suffix<'a> {
     }
 
     fn call(i: &mut &'a str, level: Level<'_>) -> ParseResult<'a, Self> {
-        (move |i: &mut _| Expr::arguments(i, level, false))
-            .map(Self::Call)
+        (opt(|i: &mut _| call_generics(i, level)), |i: &mut _| {
+            Expr::arguments(i, level, false)
+        })
+            .map(|(generics, args)| Self::Call {
+                args,
+                generics: generics.unwrap_or_default(),
+            })
             .parse_next(i)
     }
 
     fn r#try(i: &mut &'a str) -> ParseResult<'a, Self> {
         preceded(skip_ws0, '?').map(|_| Self::Try).parse_next(i)
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TyGenerics<'a> {
+    pub refs: usize,
+    pub path: Vec<&'a str>,
+    pub args: Vec<WithSpan<'a, TyGenerics<'a>>>,
+}
+
+impl<'i> TyGenerics<'i> {
+    fn parse(i: &mut &'i str, level: Level<'_>) -> ParseResult<'i, WithSpan<'i, Self>> {
+        let start = *i;
+        (
+            repeat(0.., ws('&')),
+            separated(1.., ws(identifier), "::"),
+            opt(|i: &mut _| Self::args(i, level)).map(|generics| generics.unwrap_or_default()),
+        )
+            .map(|(refs, path, args)| WithSpan::new(TyGenerics { refs, path, args }, start))
+            .parse_next(i)
+    }
+
+    fn args(
+        i: &mut &'i str,
+        level: Level<'_>,
+    ) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
+        ws('<').parse_next(i)?;
+        let _level_guard = level.nest(i)?;
+        cut_err(terminated(
+            terminated(
+                separated(0.., |i: &mut _| TyGenerics::parse(i, level), ws(',')),
+                ws(opt(',')),
+            ),
+            '>',
+        ))
+        .parse_next(i)
+    }
+}
+
+pub(crate) fn call_generics<'i>(
+    i: &mut &'i str,
+    level: Level<'_>,
+) -> ParseResult<'i, Vec<WithSpan<'i, TyGenerics<'i>>>> {
+    preceded(ws("::"), cut_err(|i: &mut _| TyGenerics::args(i, level))).parse_next(i)
 }

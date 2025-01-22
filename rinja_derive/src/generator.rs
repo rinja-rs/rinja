@@ -409,7 +409,7 @@ fn is_copyable_within_op(expr: &Expr<'_>, within_op: bool) -> bool {
         // The result of a call likely doesn't need to be borrowed,
         // as in that case the call is more likely to return a
         // reference in the first place then.
-        Expr::Call(..) | Expr::Path(..) | Expr::Filter(..) | Expr::RustMacro(..) => true,
+        Expr::Call { .. } | Expr::Path(..) | Expr::Filter(..) | Expr::RustMacro(..) => true,
         // If the `expr` is within a `Unary` or `BinOp` then
         // an assumption can be made that the operand is copy.
         // If not, then the value is moved and adding `.clone()`

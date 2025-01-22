@@ -199,7 +199,7 @@ impl<'a> Generator<'a, '_> {
             | Expr::Index(_, _)
             | Expr::Filter(_)
             | Expr::Range(_, _, _)
-            | Expr::Call(_, _)
+            | Expr::Call { .. }
             | Expr::RustMacro(_, _)
             | Expr::Try(_)
             | Expr::Tuple(_)
@@ -525,7 +525,7 @@ impl<'a> Generator<'a, '_> {
                 // If `iter` is a call then we assume it's something that returns
                 // an iterator. If not then the user can explicitly add the needed
                 // call without issues.
-                Expr::Call(..) | Expr::Index(..) => {
+                Expr::Call { .. } | Expr::Index(..) => {
                     buf.write(format_args!("let _iter = ({expr_code}).into_iter();"));
                 }
                 // If accessing `self` then it most likely needs to be
@@ -802,6 +802,7 @@ impl<'a> Generator<'a, '_> {
             &mut filter_buf,
             filter.filters.name,
             &filter.filters.arguments,
+            &filter.filters.generics,
             filter.span(),
         )?;
         let filter_buf = match display_wrap {
@@ -1492,7 +1493,7 @@ fn is_cacheable(expr: &WithSpan<'_, Expr<'_>>) -> bool {
         // Doesn't make sense in this context.
         Expr::LetCond(_) => false,
         // We have too little information to tell if the expression is pure:
-        Expr::Call(_, _) => false,
+        Expr::Call { .. } => false,
         Expr::RustMacro(_, _) => false,
         // Should never be encountered:
         Expr::FilterSource => unreachable!("FilterSource in expression?"),

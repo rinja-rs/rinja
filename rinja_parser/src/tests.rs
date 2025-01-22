@@ -49,7 +49,8 @@ fn test_parse_filter() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "e",
-                arguments: vec![WithSpan::no_span(Expr::Var("strvar"))]
+                arguments: vec![WithSpan::no_span(Expr::Var("strvar"))],
+                generics: vec![],
             })),
         )],
     );
@@ -59,7 +60,8 @@ fn test_parse_filter() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
-                arguments: vec![WithSpan::no_span(int_lit("2"))]
+                arguments: vec![WithSpan::no_span(int_lit("2"))],
+                generics: vec![],
             })),
         )],
     );
@@ -72,7 +74,8 @@ fn test_parse_filter() {
                 arguments: vec![WithSpan::no_span(Expr::Unary(
                     "-",
                     WithSpan::no_span(int_lit("2")).into()
-                ))]
+                ))],
+                generics: vec![],
             })),
         )],
     );
@@ -92,6 +95,7 @@ fn test_parse_filter() {
                     ))
                     .into()
                 ))],
+                generics: vec![],
             })),
         )],
     );
@@ -164,10 +168,11 @@ fn test_parse_path() {
         Ast::from_str("{{ Some(123) }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec!["Some"]))),
-                vec![WithSpan::no_span(int_lit("123"))]
-            )),
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec!["Some"]))),
+                args: vec![WithSpan::no_span(int_lit("123"))],
+                generics: vec![],
+            }),
         )],
     );
 
@@ -175,20 +180,22 @@ fn test_parse_path() {
         Ast::from_str("{{ Ok(123) }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec!["Ok"]))),
-                vec![WithSpan::no_span(int_lit("123"))]
-            )),
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec!["Ok"]))),
+                args: vec![WithSpan::no_span(int_lit("123"))],
+                generics: vec![],
+            }),
         )],
     );
     assert_eq!(
         Ast::from_str("{{ Err(123) }}", None, &s).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec!["Err"]))),
-                vec![WithSpan::no_span(int_lit("123"))]
-            )),
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec!["Err"]))),
+                args: vec![WithSpan::no_span(int_lit("123"))],
+                generics: vec![],
+            }),
         )],
     );
 }
@@ -201,16 +208,17 @@ fn test_parse_var_call() {
             .nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Var("function"))),
-                vec![
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Var("function"))),
+                args: vec![
                     WithSpan::no_span(Expr::StrLit(StrLit {
                         content: "123",
                         prefix: None,
                     })),
                     WithSpan::no_span(int_lit("3"))
-                ]
-            )),
+                ],
+                generics: vec![],
+            }),
         )],
     );
 }
@@ -232,10 +240,11 @@ fn test_parse_path_call() {
             .nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec!["Option", "Some"]))),
-                vec![WithSpan::no_span(int_lit("123"))],
-            ))
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec!["Option", "Some"]))),
+                args: vec![WithSpan::no_span(int_lit("123"))],
+                generics: vec![],
+            })
         )],
     );
 
@@ -245,16 +254,17 @@ fn test_parse_path_call() {
             .nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec!["self", "function"]))),
-                vec![
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec!["self", "function"]))),
+                args: vec![
                     WithSpan::no_span(Expr::StrLit(StrLit {
                         content: "123",
                         prefix: None,
                     })),
                     WithSpan::no_span(int_lit("3"))
                 ],
-            ))
+                generics: vec![],
+            })
         )],
     );
 }
@@ -268,12 +278,13 @@ fn test_parse_root_path() {
             .nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec![
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec![
                     "std", "string", "String", "new"
                 ]))),
-                vec![]
-            )),
+                args: vec![],
+                generics: vec![],
+            }),
         )],
     );
     assert_eq!(
@@ -282,12 +293,13 @@ fn test_parse_root_path() {
             .nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Path(vec![
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Path(vec![
                     "", "std", "string", "String", "new"
                 ]))),
-                vec![]
-            )),
+                args: vec![],
+                generics: vec![],
+            }),
         )],
     );
 }
@@ -603,13 +615,14 @@ fn test_odd_calls() {
         Ast::from_str("{{ a[b](c) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Index(
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Index(
                     Box::new(WithSpan::no_span(Expr::Var("a"))),
                     Box::new(WithSpan::no_span(Expr::Var("b")))
                 ))),
-                vec![WithSpan::no_span(Expr::Var("c"))],
-            ))
+                args: vec![WithSpan::no_span(Expr::Var("c"))],
+                generics: vec![],
+            })
         )],
     );
     assert_eq!(
@@ -618,16 +631,17 @@ fn test_odd_calls() {
             .nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
                     Expr::BinOp(
                         "+",
                         Box::new(WithSpan::no_span(Expr::Var("a"))),
                         Box::new(WithSpan::no_span(Expr::Var("b")))
                     )
                 ))))),
-                vec![WithSpan::no_span(Expr::Var("c"))],
-            ))
+                args: vec![WithSpan::no_span(Expr::Var("c"))],
+                generics: vec![],
+            })
         )],
     );
     assert_eq!(
@@ -639,10 +653,11 @@ fn test_odd_calls() {
             WithSpan::no_span(Expr::BinOp(
                 "+",
                 Box::new(WithSpan::no_span(Expr::Var("a"))),
-                Box::new(WithSpan::no_span(Expr::Call(
-                    Box::new(WithSpan::no_span(Expr::Var("b"))),
-                    vec![WithSpan::no_span(Expr::Var("c"))]
-                ))),
+                Box::new(WithSpan::no_span(Expr::Call {
+                    path: Box::new(WithSpan::no_span(Expr::Var("b"))),
+                    args: vec![WithSpan::no_span(Expr::Var("c"))],
+                    generics: vec![],
+                })),
             )),
         )],
     );
@@ -650,12 +665,13 @@ fn test_odd_calls() {
         Ast::from_str("{{ (-a)(b) }}", None, &syntax).unwrap().nodes,
         vec![Node::Expr(
             Ws(None, None),
-            WithSpan::no_span(Expr::Call(
-                Box::new(WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
+            WithSpan::no_span(Expr::Call {
+                path: Box::new(WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
                     Expr::Unary("-", Box::new(WithSpan::no_span(Expr::Var("a"))))
                 ))))),
-                vec![WithSpan::no_span(Expr::Var("b"))],
-            ))
+                args: vec![WithSpan::no_span(Expr::Var("b"))],
+                generics: vec![],
+            })
         )],
     );
     assert_eq!(
@@ -664,10 +680,11 @@ fn test_odd_calls() {
             Ws(None, None),
             WithSpan::no_span(Expr::Unary(
                 "-",
-                Box::new(WithSpan::no_span(Expr::Call(
-                    Box::new(WithSpan::no_span(Expr::Var("a"))),
-                    vec![WithSpan::no_span(Expr::Var("b"))]
-                )))
+                Box::new(WithSpan::no_span(Expr::Call {
+                    path: Box::new(WithSpan::no_span(Expr::Var("a"))),
+                    args: vec![WithSpan::no_span(Expr::Var("b"))],
+                    generics: vec![],
+                }))
             ))
         )],
     );
@@ -677,10 +694,12 @@ fn test_odd_calls() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "c",
-                arguments: vec![WithSpan::no_span(Expr::Call(
-                    Box::new(WithSpan::no_span(Expr::Var("a"))),
-                    vec![WithSpan::no_span(Expr::Var("b"))]
-                ))]
+                arguments: vec![WithSpan::no_span(Expr::Call {
+                    path: Box::new(WithSpan::no_span(Expr::Var("a"))),
+                    args: vec![WithSpan::no_span(Expr::Var("b"))],
+                    generics: vec![],
+                })],
+                generics: vec![],
             }))
         )]
     );
@@ -690,10 +709,12 @@ fn test_odd_calls() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "c",
-                arguments: vec![WithSpan::no_span(Expr::Call(
-                    Box::new(WithSpan::no_span(Expr::Var("a"))),
-                    vec![WithSpan::no_span(Expr::Var("b"))]
-                ))]
+                arguments: vec![WithSpan::no_span(Expr::Call {
+                    path: Box::new(WithSpan::no_span(Expr::Var("a"))),
+                    args: vec![WithSpan::no_span(Expr::Var("b"))],
+                    generics: vec![],
+                })],
+                generics: vec![],
             })),
         )]
     );
@@ -843,7 +864,8 @@ fn test_parse_tuple() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "abs",
-                arguments: vec![WithSpan::no_span(Expr::Tuple(vec![]))]
+                arguments: vec![WithSpan::no_span(Expr::Tuple(vec![]))],
+                generics: vec![],
             })),
         )],
     );
@@ -855,7 +877,8 @@ fn test_parse_tuple() {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Group(Box::new(WithSpan::no_span(
                     int_lit("1")
-                ))))]
+                ))))],
+                generics: vec![],
             })),
         )],
     );
@@ -869,7 +892,8 @@ fn test_parse_tuple() {
                 name: "abs",
                 arguments: vec![WithSpan::no_span(Expr::Tuple(vec![WithSpan::no_span(
                     int_lit("1")
-                )]))]
+                )]))],
+                generics: vec![],
             })),
         )],
     );
@@ -884,7 +908,8 @@ fn test_parse_tuple() {
                 arguments: vec![WithSpan::no_span(Expr::Tuple(vec![
                     WithSpan::no_span(int_lit("1")),
                     WithSpan::no_span(int_lit("2"))
-                ]))]
+                ]))],
+                generics: vec![],
             })),
         )],
     );
@@ -977,7 +1002,8 @@ fn test_parse_array() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "foo",
-                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))]
+                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))],
+                generics: vec![],
             }))
         )],
     );
@@ -987,7 +1013,8 @@ fn test_parse_array() {
             Ws(None, None),
             WithSpan::no_span(Expr::Filter(Filter {
                 name: "foo",
-                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))]
+                arguments: vec![WithSpan::no_span(Expr::Array(vec![]))],
+                generics: vec![],
             }))
         )],
     );
@@ -1152,4 +1179,112 @@ fn fuzzed_excessive_filter_block() {
         err.to_string().lines().next(),
         Some("your template code is too deeply nested, or the last expression is too complex"),
     );
+}
+
+#[test]
+fn test_generics_parsing() {
+    // Method call.
+    Ast::from_str("{{ a.b::<&str, H<B<C>>>() }}", None, &Syntax::default()).unwrap();
+    Ast::from_str(
+        "{{ a.b::<&str, H<B<C> , &u32>>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+
+    // Call.
+    Ast::from_str(
+        "{{ a::<&str, H<B<C> , &u32>>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+
+    // Filter.
+    Ast::from_str("{{ 12 | a::<&str> }}", None, &Syntax::default()).unwrap();
+    Ast::from_str("{{ 12 | a::<&str, u32>('a') }}", None, &Syntax::default()).unwrap();
+
+    // Unclosed `<`.
+    assert!(
+        Ast::from_str(
+            "{{ a.b::<&str, H<B<C> , &u32>() }}",
+            None,
+            &Syntax::default()
+        )
+        .is_err()
+    );
+
+    // With path and spaces
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b ::<&&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b:: <&&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::< &&core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<& &core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&& core::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core ::primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core:: primitive::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive ::str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive:: str>() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive::str >() }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
+    Ast::from_str(
+        "{{ a.b::<&&core::primitive::str> () }}",
+        None,
+        &Syntax::default(),
+    )
+    .unwrap();
 }
