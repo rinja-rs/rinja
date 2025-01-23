@@ -264,6 +264,7 @@ impl<'a> Generator<'a, '_> {
             "safe" => Self::_visit_safe_filter,
             "urlencode" => Self::_visit_urlencode_filter,
             "urlencode_strict" => Self::_visit_urlencode_strict_filter,
+            "value" => return self._visit_value(ctx, buf, args, generics, node, "`value` filter"),
             name if BUILTIN_FILTERS.contains(&name) => {
                 return self._visit_builtin_filter(ctx, buf, name, args, generics, node);
             }
@@ -676,6 +677,37 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Unwrapped)
     }
 
+    fn _visit_value(
+        &mut self,
+        ctx: &Context<'_>,
+        buf: &mut Buffer,
+        args: &[WithSpan<'_, Expr<'a>>],
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
+        node: Span<'_>,
+        kind: &str,
+    ) -> Result<DisplayWrap, CompileError> {
+        let [key] = args else {
+            return Err(ctx.generate_error(
+                format_args!("{kind} only takes one argument, found {}", args.len()),
+                node,
+            ));
+        };
+        let [gen] = generics else {
+            return Err(ctx.generate_error(
+                format_args!("{kind} expects one generic, found {}", generics.len()),
+                node,
+            ));
+        };
+        buf.write("rinja::helpers::get_value");
+        buf.write("::<");
+        self.visit_ty_generic(buf, gen);
+        buf.write('>');
+        buf.write("(&__rinja_values, &(");
+        self._visit_arg(ctx, buf, key)?;
+        buf.write("))");
+        Ok(DisplayWrap::Unwrapped)
+    }
+
     fn _visit_args(
         &mut self,
         ctx: &Context<'_>,
@@ -892,6 +924,17 @@ impl<'a> Generator<'a, '_> {
                         ));
                     }
                 }
+            }
+            // We special-case "rinja::get_value".
+            Expr::Path(path) if path == &["rinja", "get_value"] => {
+                self._visit_value(
+                    ctx,
+                    buf,
+                    args,
+                    generics,
+                    left.span(),
+                    "`get_value` function",
+                )?;
             }
             sub_left => {
                 match sub_left {

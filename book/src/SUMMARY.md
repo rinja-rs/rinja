@@ -2,6 +2,7 @@
 
 - [Introduction](./introduction.md)
 - [Creating templates](./creating_templates.md)
+- [Runtime values](./runtime.md)
 - [Debugging](./debugging.md)
 - [Configuration](./configuration.md)
 - [Template syntax](./template_syntax.md)

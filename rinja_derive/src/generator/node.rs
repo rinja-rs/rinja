@@ -1168,7 +1168,8 @@ impl<'a> Generator<'a, '_> {
                         idx
                     };
                     lines.write(format_args!(
-                        "(&&rinja::filters::Writable(expr{idx})).rinja_write(__rinja_writer)?;",
+                        "(&&&rinja::filters::Writable(expr{idx})).\
+                             rinja_write(__rinja_writer, __rinja_values)?;",
                     ));
                 }
             }

@@ -27,7 +27,11 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
             extern crate rinja as rinja;
 
             impl rinja::Template for Foo {
-                fn render_into<RinjaW>(&self, __rinja_writer: &mut RinjaW) -> rinja::Result<()>
+                fn render_into_with_values<RinjaW>(
+                    &self,
+                    __rinja_writer: &mut RinjaW,
+                    __rinja_values: &dyn rinja::Values,
+                ) -> rinja::Result<()>
                 where
                     RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
                 {
@@ -153,7 +157,7 @@ fn check_if_let() {
         &((&&rinja::filters::AutoEscaper::new(&(query), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }",
@@ -170,7 +174,7 @@ fn check_if_let() {
         &((&&rinja::filters::AutoEscaper::new(&(s), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }",
@@ -187,7 +191,7 @@ fn check_if_let() {
         &((&&rinja::filters::AutoEscaper::new(&(s), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }",
@@ -211,9 +215,9 @@ fn check_if_let_chain() {
             .rinja_auto_escape()?),
     ) {
         (expr0, expr2) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             __rinja_writer.write_str(" ")?;
-            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }"#,
@@ -236,9 +240,9 @@ fn check_if_let_chain() {
             .rinja_auto_escape()?),
     ) {
         (expr0, expr2) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             __rinja_writer.write_str(" ")?;
-            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }"#,
@@ -265,9 +269,9 @@ fn check_if_let_chain() {
             .rinja_auto_escape()?),
     ) {
         (expr0, expr2) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             __rinja_writer.write_str(" ")?;
-            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }"#,
@@ -292,9 +296,9 @@ fn check_if_let_chain() {
             .rinja_auto_escape()?),
     ) {
         (expr0, expr2) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             __rinja_writer.write_str(" ")?;
-            (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }"#,
@@ -429,7 +433,7 @@ __rinja_writer.write_str("12")?;
         &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }
@@ -443,7 +447,7 @@ __rinja_writer.write_str("12")?;
     &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+        (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
     }
 }
 ",
@@ -474,7 +478,7 @@ if rinja::helpers::as_bool(&(self.y == 12)) {
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 } else {
@@ -496,7 +500,7 @@ match (
         .rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+        (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
     }
 }
 ",
@@ -616,7 +620,7 @@ fn check_bool_conditions() {
     &((&&rinja::filters::AutoEscaper::new(&(self.x), rinja::filters::Text)).rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+        (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
     }
 }
 ",
@@ -634,7 +638,7 @@ fn check_bool_conditions() {
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }
@@ -658,7 +662,7 @@ fn check_bool_conditions() {
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }
@@ -678,7 +682,7 @@ fn check_bool_conditions() {
         .rinja_auto_escape()?),
 ) {
     (expr0,) => {
-        (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+        (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
     }
 }
 ",
@@ -699,7 +703,7 @@ if rinja::helpers::as_bool(&(self.y == 3))
             .rinja_auto_escape()?),
     ) {
         (expr0,) => {
-            (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+            (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
         }
     }
 }
@@ -899,9 +903,9 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0, expr3) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
                 __rinja_writer.write_str(" dog")?;
-                (&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }"#,
         &[("dogs", "i8")],
@@ -923,9 +927,9 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0, expr3) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
                 __rinja_writer.write_str(" dog")?;
-                (&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }"#,
         &[("dogs", "i8")],
@@ -947,9 +951,9 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0, expr2) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
                 __rinja_writer.write_str(" ")?;
-                (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }"#,
         &[("dogs", "i8")],
@@ -975,7 +979,7 @@ fn test_pluralize() {
             )?),
         ) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         ",
@@ -991,7 +995,7 @@ fn test_pluralize() {
                 .rinja_auto_escape()?),
         ) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         ",
@@ -1006,7 +1010,7 @@ fn test_pluralize() {
                 .rinja_auto_escape()?),
         ) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         ",
@@ -1019,7 +1023,7 @@ fn test_pluralize() {
         r#"
         match (&(rinja::filters::Safe("pl")),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         "#,
@@ -1031,7 +1035,7 @@ fn test_pluralize() {
         r#"
         match (&(rinja::filters::Safe("sg")),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         "#,
@@ -1044,7 +1048,7 @@ fn test_pluralize() {
         r#"
         match (&(rinja::filters::Safe("s")),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         "#,
@@ -1056,7 +1060,7 @@ fn test_pluralize() {
         r"
         match (&(rinja::helpers::Empty),) {
             (expr0,) => {
-                (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
             }
         }
         ",
@@ -1078,9 +1082,9 @@ fn test_concat() {
                     .rinja_auto_escape()?),
             ) {
                 (expr1, expr3) => {
-                    (&&rinja::filters::Writable(expr1)).rinja_write(__rinja_writer)?;
+                    (&&&rinja::filters::Writable(expr1)).rinja_write(__rinja_writer, __rinja_values)?;
                     __rinja_writer.write_str("|")?;
-                    (&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer)?;
+                    (&&&rinja::filters::Writable(expr3)).rinja_write(__rinja_writer, __rinja_values)?;
                 }
             }
             __rinja_writer.write_str(">")?;
@@ -1105,7 +1109,7 @@ fn test_concat() {
                     .rinja_auto_escape()?),
             ) {
                 (expr0,) => {
-                    (&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer)?;
+                    (&&&rinja::filters::Writable(expr0)).rinja_write(__rinja_writer, __rinja_values)?;
                 }
             }
         "#,

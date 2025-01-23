@@ -124,12 +124,16 @@ impl<'a, 'h> Generator<'a, 'h> {
     ) -> Result<usize, CompileError> {
         write_header(self.input.ast, buf, target);
         buf.write(
-            "fn render_into<RinjaW>(&self, __rinja_writer: &mut RinjaW) -> rinja::Result<()>\
+            "fn render_into_with_values<RinjaW>(\
+                &self,\
+                __rinja_writer: &mut RinjaW,\
+                __rinja_values: &dyn rinja::Values\
+            ) -> rinja::Result<()>\
             where \
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
                 use rinja::filters::{AutoEscape as _, WriteWritable as _};\
-                use rinja::helpers::ResultConverter as _;
+                use rinja::helpers::ResultConverter as _;\
                 use rinja::helpers::core::fmt::Write as _;",
         );
 

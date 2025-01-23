@@ -19,6 +19,10 @@ pub type Result<I, E = Error> = core::result::Result<I, E>;
 pub enum Error {
     /// Generic, unspecified formatting error
     Fmt,
+    /// Key not present in [`Values`][crate::Values]
+    ValueMissing,
+    /// Incompatible value type for key in [`Values`][crate::Values]
+    ValueType,
     /// An error raised by using `?` in a template
     #[cfg(feature = "alloc")]
     Custom(Box<dyn StdError + Send + Sync>),
@@ -41,6 +45,8 @@ impl Error {
     pub fn into_box(self) -> Box<dyn StdError + Send + Sync> {
         match self {
             Error::Fmt => fmt::Error.into(),
+            Error::ValueMissing => Box::new(Error::ValueMissing),
+            Error::ValueType => Box::new(Error::ValueType),
             Error::Custom(err) => err,
             #[cfg(feature = "serde_json")]
             Error::Json(err) => err.into(),
@@ -66,6 +72,8 @@ impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Error::Fmt => Some(&fmt::Error),
+            Error::ValueMissing => None,
+            Error::ValueType => None,
             #[cfg(feature = "alloc")]
             Error::Custom(err) => Some(err.as_ref()),
             #[cfg(feature = "serde_json")]
@@ -78,6 +86,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Fmt => fmt::Error.fmt(f),
+            Error::ValueMissing => f.write_str("key missing in values"),
+            Error::ValueType => f.write_str("value has wrong type"),
             #[cfg(feature = "alloc")]
             Error::Custom(err) => err.fmt(f),
             #[cfg(feature = "serde_json")]
