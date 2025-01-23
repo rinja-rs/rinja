@@ -4,6 +4,8 @@ use core::ops::Deref;
 use core::pin::Pin;
 use core::str;
 
+use crate::Values;
+
 /// Marks a string (or other `Display` type) as safe
 ///
 /// Use this if you want to allow markup in an expression, or if you know
@@ -489,7 +491,11 @@ pub struct Writable<'a, S: ?Sized>(pub &'a S);
 /// Used internally by rinja to select the appropriate [`write!()`] mechanism
 pub trait WriteWritable {
     /// Used internally by rinja to select the appropriate [`write!()`] mechanism
-    fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()>;
+    fn rinja_write<W: fmt::Write + ?Sized>(
+        &self,
+        dest: &mut W,
+        values: &dyn Values,
+    ) -> crate::Result<()>;
 }
 
 /// Used internally by rinja to speed up writing some types.
@@ -604,16 +610,35 @@ const _: () = {
         }
     }
 
-    impl<S: FastWritable + ?Sized> WriteWritable for &Writable<'_, S> {
+    impl<S: crate::Template + ?Sized> WriteWritable for &Writable<'_, S> {
         #[inline]
-        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+        fn rinja_write<W: fmt::Write + ?Sized>(
+            &self,
+            dest: &mut W,
+            values: &dyn Values,
+        ) -> crate::Result<()> {
+            self.0.render_into_with_values(dest, values)
+        }
+    }
+
+    impl<S: FastWritable + ?Sized> WriteWritable for &&Writable<'_, S> {
+        #[inline]
+        fn rinja_write<W: fmt::Write + ?Sized>(
+            &self,
+            dest: &mut W,
+            _: &dyn Values,
+        ) -> crate::Result<()> {
             self.0.write_into(dest)
         }
     }
 
-    impl<S: fmt::Display + ?Sized> WriteWritable for &&Writable<'_, S> {
+    impl<S: fmt::Display + ?Sized> WriteWritable for &&&Writable<'_, S> {
         #[inline]
-        fn rinja_write<W: fmt::Write + ?Sized>(&self, dest: &mut W) -> crate::Result<()> {
+        fn rinja_write<W: fmt::Write + ?Sized>(
+            &self,
+            dest: &mut W,
+            _: &dyn Values,
+        ) -> crate::Result<()> {
             Ok(write!(dest, "{}", self.0)?)
         }
     }

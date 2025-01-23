@@ -14,6 +14,7 @@ use core::pin::Pin;
 
 pub use crate::error::{ErrorMarker, ResultConverter};
 use crate::filters::FastWritable;
+pub use crate::values::get_value;
 
 pub struct TemplateLoop<I>
 where
