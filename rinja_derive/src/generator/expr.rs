@@ -1,19 +1,15 @@
 use std::borrow::Cow;
-use std::fmt;
 
 use parser::node::CondTest;
-use parser::{
-    Attr, CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target,
-    TyGenerics, WithSpan,
-};
+use parser::{Attr, CharLit, CharPrefix, Expr, Filter, Span, StrLit, Target, TyGenerics, WithSpan};
 
 use super::{
-    DisplayWrap, FILTER_SOURCE, Generator, LocalMeta, TargetIsize, TargetUsize, Writable,
-    compile_time_escape, is_copyable, normalize_identifier,
+    DisplayWrap, FILTER_SOURCE, Generator, LocalMeta, Writable, compile_time_escape, is_copyable,
+    normalize_identifier,
 };
+use crate::CompileError;
 use crate::heritage::Context;
 use crate::integration::Buffer;
-use crate::{BUILTIN_FILTERS, BUILTIN_FILTERS_NEED_ALLOC, CompileError, MsgValidEscapers};
 
 impl<'a> Generator<'a, '_> {
     pub(crate) fn visit_expr_root(
@@ -240,377 +236,7 @@ impl<'a> Generator<'a, '_> {
         DisplayWrap::Unwrapped
     }
 
-    pub(crate) fn visit_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        let filter = match name {
-            "deref" => Self::_visit_deref_filter,
-            "escape" | "e" => Self::_visit_escape_filter,
-            "filesizeformat" => Self::_visit_humansize,
-            "fmt" => Self::_visit_fmt_filter,
-            "format" => Self::_visit_format_filter,
-            "join" => Self::_visit_join_filter,
-            "json" | "tojson" => Self::_visit_json_filter,
-            "linebreaks" | "linebreaksbr" | "paragraphbreaks" => Self::_visit_linebreaks_filters,
-            "pluralize" => Self::_visit_pluralize_filter,
-            "ref" => Self::_visit_ref_filter,
-            "safe" => Self::_visit_safe_filter,
-            "urlencode" | "urlencode_strict" => Self::_visit_urlencode_filter,
-            name if BUILTIN_FILTERS.contains(&name) => Self::_visit_builtin_filter,
-            "value" => {
-                return self._visit_value(ctx, buf, args, generics, node, "`value` filter");
-            }
-            _ => {
-                return self._visit_custom_filter(ctx, buf, name, args, generics);
-            }
-        };
-
-        ensure_filter_has_no_generics(ctx, name, generics, node)?;
-        filter(self, ctx, buf, name, args, node)
-    }
-
-    fn _visit_custom_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        generics: &[WithSpan<'_, TyGenerics<'_>>],
-    ) -> Result<DisplayWrap, CompileError> {
-        buf.write(format_args!("filters::{name}"));
-        self.visit_call_generics(buf, generics);
-        buf.write('(');
-        self._visit_args(ctx, buf, args)?;
-        buf.write(")?");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_builtin_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        if BUILTIN_FILTERS_NEED_ALLOC.contains(&name) {
-            ensure_filter_has_feature_alloc(ctx, name, node)?;
-        }
-        buf.write(format_args!("rinja::filters::{name}("));
-        self._visit_args(ctx, buf, args)?;
-        buf.write(")?");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_urlencode_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        if cfg!(not(feature = "urlencode")) {
-            return Err(ctx.generate_error(
-                format_args!("the `{name}` filter requires the `urlencode` feature to be enabled"),
-                node,
-            ));
-        }
-
-        let arg = get_filter_argument(ctx, name, args, node)?;
-        // Both filters return HTML-safe strings.
-        buf.write(format_args!(
-            "rinja::filters::HtmlSafeOutput(rinja::filters::{name}(",
-        ));
-        self._visit_arg(ctx, buf, arg)?;
-        buf.write(")?)");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_humansize(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        let arg = get_filter_argument(ctx, name, args, node)?;
-        // All filters return numbers, and any default formatted number is HTML safe.
-        buf.write(format_args!(
-            "rinja::filters::HtmlSafeOutput(rinja::filters::filesizeformat(\
-                 rinja::helpers::get_primitive_value(&("
-        ));
-        self._visit_arg(ctx, buf, arg)?;
-        buf.write(")) as rinja::helpers::core::primitive::f32)?)");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_pluralize_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        const SINGULAR: &WithSpan<'static, Expr<'static>> =
-            &WithSpan::new_without_span(Expr::StrLit(StrLit {
-                prefix: None,
-                content: "",
-            }));
-        const PLURAL: &WithSpan<'static, Expr<'static>> =
-            &WithSpan::new_without_span(Expr::StrLit(StrLit {
-                prefix: None,
-                content: "s",
-            }));
-
-        let (count, sg, pl) = match args {
-            [count] => (count, SINGULAR, PLURAL),
-            [count, sg] => (count, sg, PLURAL),
-            [count, sg, pl] => (count, sg, pl),
-            _ => return Err(unexpected_filter_arguments(ctx, name, args, node, 2)),
-        };
-        if let Some(is_singular) = expr_is_int_lit_plus_minus_one(count) {
-            let value = if is_singular { sg } else { pl };
-            self._visit_auto_escaped_arg(ctx, buf, value)?;
-        } else {
-            buf.write("rinja::filters::pluralize(");
-            self._visit_arg(ctx, buf, count)?;
-            for value in [sg, pl] {
-                buf.write(',');
-                self._visit_auto_escaped_arg(ctx, buf, value)?;
-            }
-            buf.write(")?");
-        }
-        Ok(DisplayWrap::Wrapped)
-    }
-
-    fn _visit_linebreaks_filters(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
-        let arg = get_filter_argument(ctx, name, args, node)?;
-        buf.write(format_args!(
-            "rinja::filters::{name}(&(&&rinja::filters::AutoEscaper::new(&(",
-        ));
-        self._visit_arg(ctx, buf, arg)?;
-        // The input is always HTML escaped, regardless of the selected escaper:
-        buf.write("), rinja::filters::Html)).rinja_auto_escape()?)?");
-        // The output is marked as HTML safe, not safe in all contexts:
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_ref_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        let arg = get_filter_argument(ctx, name, args, node)?;
-        buf.write('&');
-        self.visit_expr(ctx, buf, arg)?;
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_deref_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        let arg = get_filter_argument(ctx, name, args, node)?;
-        buf.write('*');
-        self.visit_expr(ctx, buf, arg)?;
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_json_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        if cfg!(not(feature = "serde_json")) {
-            return Err(ctx.generate_error(
-                "the `json` filter requires the `serde_json` feature to be enabled",
-                node,
-            ));
-        }
-
-        let filter = match args.len() {
-            1 => "json",
-            2 => "json_pretty",
-            _ => return Err(unexpected_filter_arguments(ctx, name, args, node, 1)),
-        };
-        buf.write(format_args!("rinja::filters::{filter}("));
-        self._visit_args(ctx, buf, args)?;
-        buf.write(")?");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_safe_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        let arg = get_filter_argument(ctx, name, args, node)?;
-        buf.write("rinja::filters::safe(");
-        self._visit_arg(ctx, buf, arg)?;
-        buf.write(format_args!(", {})?", self.input.escaper));
-        Ok(DisplayWrap::Wrapped)
-    }
-
-    fn _visit_escape_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        let (arg, escaper) = match args {
-            [arg] => (arg, self.input.escaper),
-            [arg, escaper] => {
-                let Expr::StrLit(StrLit {
-                    ref prefix,
-                    content,
-                }) = **escaper
-                else {
-                    return Err(ctx.generate_error(
-                        format_args!("expected string literal for `{name}` filter"),
-                        node,
-                    ));
-                };
-                if let Some(prefix) = prefix {
-                    let kind = match prefix {
-                        StrPrefix::Binary => "slice",
-                        StrPrefix::CLike => "CStr",
-                    };
-                    return Err(ctx.generate_error(
-                        format_args!("expected string literal for `{name}` filter, got a {kind}"),
-                        args[1].span(),
-                    ));
-                }
-                let escaper = self
-                    .input
-                    .config
-                    .escapers
-                    .iter()
-                    .find_map(|(extensions, path)| {
-                        extensions
-                            .contains(&Cow::Borrowed(content))
-                            .then_some(path.as_ref())
-                    })
-                    .ok_or_else(|| {
-                        ctx.generate_error(
-                            format_args!(
-                                "invalid escaper '{content}' for `{name}` filter. {}",
-                                MsgValidEscapers(&self.input.config.escapers),
-                            ),
-                            node,
-                        )
-                    })?;
-                (arg, escaper)
-            }
-            args => return Err(unexpected_filter_arguments(ctx, name, args, node, 1)),
-        };
-        buf.write("rinja::filters::escape(");
-        self._visit_arg(ctx, buf, arg)?;
-        buf.write(format_args!(", {escaper})?"));
-        Ok(DisplayWrap::Wrapped)
-    }
-
-    fn _visit_format_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
-        if let [fmt, args @ ..] = args {
-            if let Expr::StrLit(fmt) = &**fmt {
-                buf.write("rinja::helpers::alloc::format!(");
-                self.visit_str_lit(buf, fmt);
-                if !args.is_empty() {
-                    buf.write(',');
-                    self._visit_args(ctx, buf, args)?;
-                }
-                buf.write(')');
-                return Ok(DisplayWrap::Unwrapped);
-            }
-        }
-        Err(ctx.generate_error(r#"use filter format like `"a={} b={}"|format(a, b)`"#, node))
-    }
-
-    fn _visit_fmt_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        ensure_filter_has_feature_alloc(ctx, name, node)?;
-        if let [arg, fmt] = args {
-            if let Expr::StrLit(fmt) = &**fmt {
-                buf.write("rinja::helpers::alloc::format!(");
-                self.visit_str_lit(buf, fmt);
-                buf.write(',');
-                self._visit_arg(ctx, buf, arg)?;
-                buf.write(')');
-                return Ok(DisplayWrap::Unwrapped);
-            }
-        }
-        Err(ctx.generate_error(r#"use filter fmt like `value|fmt("{:?}")`"#, node))
-    }
-
-    // Force type coercion on first argument to `join` filter (see #39).
-    fn _visit_join_filter(
-        &mut self,
-        ctx: &Context<'_>,
-        buf: &mut Buffer,
-        _name: &str,
-        args: &[WithSpan<'_, Expr<'a>>],
-        _node: Span<'_>,
-    ) -> Result<DisplayWrap, CompileError> {
-        buf.write("rinja::filters::join((&");
-        for (i, arg) in args.iter().enumerate() {
-            if i > 0 {
-                buf.write(", &");
-            }
-            self.visit_expr(ctx, buf, arg)?;
-            if i == 0 {
-                buf.write(").into_iter()");
-            }
-        }
-        buf.write(")?");
-        Ok(DisplayWrap::Unwrapped)
-    }
-
-    fn _visit_value(
+    pub(super) fn _visit_value(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -641,7 +267,7 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn _visit_args(
+    pub(super) fn _visit_args(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -656,7 +282,7 @@ impl<'a> Generator<'a, '_> {
         Ok(())
     }
 
-    fn _visit_arg(
+    pub(super) fn _visit_arg(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -698,7 +324,7 @@ impl<'a> Generator<'a, '_> {
         Ok(())
     }
 
-    fn _visit_auto_escaped_arg(
+    pub(crate) fn _visit_auto_escaped_arg(
         &mut self,
         ctx: &Context<'_>,
         buf: &mut Buffer,
@@ -755,7 +381,11 @@ impl<'a> Generator<'a, '_> {
         Ok(DisplayWrap::Unwrapped)
     }
 
-    fn visit_call_generics(&mut self, buf: &mut Buffer, generics: &[WithSpan<'_, TyGenerics<'_>>]) {
+    pub(super) fn visit_call_generics(
+        &mut self,
+        buf: &mut Buffer,
+        generics: &[WithSpan<'_, TyGenerics<'_>>],
+    ) {
         if generics.is_empty() {
             return;
         }
@@ -1025,7 +655,7 @@ impl<'a> Generator<'a, '_> {
         DisplayWrap::Unwrapped
     }
 
-    fn visit_str_lit(&mut self, buf: &mut Buffer, s: &StrLit<'_>) -> DisplayWrap {
+    pub(super) fn visit_str_lit(&mut self, buf: &mut Buffer, s: &StrLit<'_>) -> DisplayWrap {
         if let Some(prefix) = s.prefix {
             buf.write(prefix.to_char());
         }
@@ -1147,146 +777,5 @@ impl<'a> Generator<'a, '_> {
                 buf.write(s);
             }
         }
-    }
-}
-
-#[inline]
-fn ensure_filter_has_no_generics(
-    ctx: &Context<'_>,
-    name: &str,
-    generics: &[WithSpan<'_, TyGenerics<'_>>],
-    node: Span<'_>,
-) -> Result<(), CompileError> {
-    match generics {
-        [] => Ok(()),
-        _ => Err(unexpected_filter_generics(ctx, name, node)),
-    }
-}
-
-#[cold]
-fn unexpected_filter_generics(ctx: &Context<'_>, name: &str, node: Span<'_>) -> CompileError {
-    ctx.generate_error(format_args!("unexpected generics on filter `{name}`"), node)
-}
-
-#[inline]
-fn get_filter_argument<'a, 'b>(
-    ctx: &Context<'_>,
-    name: &str,
-    args: &'b [WithSpan<'b, Expr<'a>>],
-    node: Span<'_>,
-) -> Result<&'b WithSpan<'b, Expr<'a>>, CompileError> {
-    match args {
-        [arg] => Ok(arg),
-        _ => Err(unexpected_filter_arguments(ctx, name, args, node, 0)),
-    }
-}
-
-#[cold]
-fn unexpected_filter_arguments(
-    ctx: &Context<'_>,
-    name: &str,
-    args: &[WithSpan<'_, Expr<'_>>],
-    node: Span<'_>,
-    at_most: usize,
-) -> CompileError {
-    #[derive(Debug, Clone, Copy)]
-    struct Error<'a> {
-        name: &'a str,
-        count: usize,
-        at_most: usize,
-    }
-
-    impl fmt::Display for Error<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "filter `{}` expects ", self.name)?;
-            match self.at_most {
-                0 => f.write_str("no arguments"),
-                1 => f.write_str("at most one optional argument"),
-                n => write!(f, "at most {n} optional arguments"),
-            }?;
-            write!(f, ", got {}", self.count - 1)
-        }
-    }
-
-    ctx.generate_error(
-        Error {
-            name,
-            count: args.len(),
-            at_most,
-        },
-        node,
-    )
-}
-
-fn ensure_filter_has_feature_alloc(
-    ctx: &Context<'_>,
-    name: &str,
-    node: Span<'_>,
-) -> Result<(), CompileError> {
-    if !cfg!(feature = "alloc") {
-        return Err(ctx.generate_error(
-            format_args!("the `{name}` filter requires the `alloc` feature to be enabled"),
-            node,
-        ));
-    }
-    Ok(())
-}
-
-fn expr_is_int_lit_plus_minus_one(expr: &WithSpan<'_, Expr<'_>>) -> Option<bool> {
-    fn is_signed_singular<T: Eq + Default, E>(
-        from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
-        value: &str,
-        plus_one: T,
-        minus_one: T,
-    ) -> Option<bool> {
-        Some([plus_one, minus_one].contains(&from_str_radix(value, 10).ok()?))
-    }
-
-    fn is_unsigned_singular<T: Eq + Default, E>(
-        from_str_radix: impl Fn(&str, u32) -> Result<T, E>,
-        value: &str,
-        plus_one: T,
-    ) -> Option<bool> {
-        Some(from_str_radix(value, 10).ok()? == plus_one)
-    }
-
-    macro_rules! impl_match {
-        (
-            $kind:ident $value:ident;
-            $($svar:ident => $sty:ident),*;
-            $($uvar:ident => $uty:ident),*;
-        ) => {
-            match $kind {
-                $(
-                    Some(IntKind::$svar) => is_signed_singular($sty::from_str_radix, $value, 1, -1),
-                )*
-                $(
-                    Some(IntKind::$uvar) => is_unsigned_singular($uty::from_str_radix, $value, 1),
-                )*
-                None => match $value.starts_with('-') {
-                    true => is_signed_singular(i128::from_str_radix, $value, 1, -1),
-                    false => is_unsigned_singular(u128::from_str_radix, $value, 1),
-                },
-            }
-        };
-    }
-
-    let Expr::NumLit(_, Num::Int(value, kind)) = **expr else {
-        return None;
-    };
-    impl_match! {
-        kind value;
-        I8 => i8,
-        I16 => i16,
-        I32 => i32,
-        I64 => i64,
-        I128 => i128,
-        Isize => TargetIsize;
-        U8 => u8,
-        U16 => u16,
-        U32 => u32,
-        U64 => u64,
-        U128 => u128,
-        Usize => TargetUsize;
     }
 }
