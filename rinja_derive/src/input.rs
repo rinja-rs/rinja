@@ -865,7 +865,7 @@ const _: () = {
 };
 
 #[cfg(feature = "code-in-doc")]
-const JINJA_EXTENSIONS: &[&str] = &["j2", "jinja", "jinja2", "rinja"];
+const JINJA_EXTENSIONS: &[&str] = &["askama", "j2", "jinja", "jinja2", "rinja"];
 
 #[test]
 fn get_source() {

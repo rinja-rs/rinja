@@ -369,7 +369,7 @@ static DEFAULT_SYNTAX_NAME: &str = "default";
 static DEFAULT_ESCAPERS: &[(&[&str], &str)] = &[
     (
         &[
-            "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml",
+            "askama", "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml",
         ],
         "Html",
     ),
@@ -649,7 +649,7 @@ mod tests {
             (str_set(&["js"]), "::my_filters::Js".into()),
             (
                 str_set(&[
-                    "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml"
+                    "askama", "html", "htm", "j2", "jinja", "jinja2", "rinja", "svg", "xml"
                 ]),
                 "rinja::filters::Html".into()
             ),
