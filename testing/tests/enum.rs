@@ -4,6 +4,99 @@ use std::fmt::{Debug, Display};
 use rinja::Template;
 
 #[test]
+fn test_book_example() {
+    #[derive(Template, Debug)]
+    #[template(
+        source = "
+            {%- match self -%}
+                {%- when Self::Square(side) -%}      {{side}}^2
+                {%- when Self::Rectangle { a, b} -%} {{a}} * {{b}}
+                {%- when Self::Circle { radius } -%} pi * {{radius}}^2
+            {%- endmatch -%}
+        ",
+        ext = "txt"
+    )]
+    enum AreaWithMatch {
+        #[template(source = "{{self.0}}^2", ext = "txt")]
+        Square(f32),
+        #[template(source = "{{a}} * {{b}}", ext = "txt")]
+        Rectangle { a: f32, b: f32 },
+        #[template(source = "pi * {{radius}}^2", ext = "txt")]
+        Circle { radius: f32 },
+    }
+
+    assert_eq!(AreaWithMatch::Square(2.0).render().unwrap(), "2^2");
+    assert_eq!(
+        AreaWithMatch::Rectangle { a: 1.0, b: 2.0 }
+            .render()
+            .unwrap(),
+        "1 * 2",
+    );
+    assert_eq!(
+        AreaWithMatch::Circle { radius: 3.0 }.render().unwrap(),
+        "pi * 3^2"
+    );
+
+    #[derive(Template, Debug)]
+    enum AreaPerVariant {
+        #[template(source = "{{self.0}}^2", ext = "txt")]
+        Square(f32),
+        #[template(source = "{{a}} * {{b}}", ext = "txt")]
+        Rectangle { a: f32, b: f32 },
+        #[template(source = "pi * {{radius}}^2", ext = "txt")]
+        Circle { radius: f32 },
+    }
+
+    assert_eq!(AreaPerVariant::Square(2.0).render().unwrap(), "2^2");
+    assert_eq!(
+        AreaPerVariant::Rectangle { a: 1.0, b: 2.0 }
+            .render()
+            .unwrap(),
+        "1 * 2",
+    );
+    assert_eq!(
+        AreaPerVariant::Circle { radius: 3.0 }.render().unwrap(),
+        "pi * 3^2"
+    );
+
+    #[derive(Template, Debug)]
+    #[template(
+        source = "
+            {%- block square -%}
+                {{self.0}}^2
+            {%- endblock -%}
+            {%- block rectangle -%}
+                {{a}} * {{b}}
+            {%- endblock -%}
+            {%- block circle -%}
+                pi * {{radius}}^2
+            {%- endblock -%}
+        ",
+        ext = "txt"
+    )]
+    enum AreaWithBlocks {
+        #[template(block = "square")]
+        Square(f32),
+        #[template(block = "rectangle")]
+        Rectangle { a: f32, b: f32 },
+        #[template(block = "circle")]
+        Circle { radius: f32 },
+    }
+
+    assert_eq!(AreaWithBlocks::Square(2.0).render().unwrap(), "2^2");
+    assert_eq!(
+        AreaWithBlocks::Rectangle { a: 1.0, b: 2.0 }
+            .render()
+            .unwrap(),
+        "1 * 2",
+    );
+    assert_eq!(
+        AreaWithBlocks::Circle { radius: 3.0 }.render().unwrap(),
+        "pi * 3^2"
+    );
+}
+
+#[test]
 fn test_simple_enum() {
     #[derive(Template, Debug)]
     #[template(
