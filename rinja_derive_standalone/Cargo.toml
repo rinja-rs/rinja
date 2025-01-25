@@ -20,6 +20,11 @@ name = "derive-template"
 harness = false
 required-features = ["__standalone"]
 
+[[bench]]
+name = "filters"
+harness = false
+required-features = ["__standalone"]
+
 [dependencies]
 parser = { package = "rinja_parser", version = "=0.3.5", path = "../rinja_parser" }
 
