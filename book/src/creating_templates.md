@@ -118,6 +118,85 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
+## Templating `enum`s
+
+You can add derive `Template`s for `struct`s and `enum`s.
+If you add `#[template()]` only to the item itself, both item kinds work exactly the same.
+But with `enum`s you also have the option to add a specialized implementation to one, some,
+or all variants:
+
+```rust
+#[derive(Debug, Template)]
+#[template(path = "area.txt")]
+enum Area {
+    Square(f32),
+    Rectangle { a: f32, b: f32 },
+    Circle { radius: f32 },
+}
+```
+
+```jinja2
+{%- match self -%}
+    {%- when Self::Square(side) -%}
+        {{side}}^2
+    {%- when Self::Rectangle { a, b} -%}
+        {{a}} * {{b}}
+    {%- when Self::Circle { radius } -%}
+        pi * {{radius}}^2
+{%- endmatch -%}
+```
+
+will give you the same results as:
+
+```rust
+#[derive(Template, Debug)]
+#[template(ext = "txt")]
+enum AreaPerVariant {
+    #[template(source = "{{self.0}}^2")]
+    Square(f32),
+    #[template(source = "{{a}} * {{b}}")]
+    Rectangle { a: f32, b: f32 },
+    #[template(source = "pi * {{radius}}^2")]
+    Circle { radius: f32 },
+}
+```
+
+As you can see with the `ext` attribute, `enum` variants inherit most settings of the `enum`:
+`config`, `escape`, `ext`, `syntax`, and `whitespace`.
+Not inherited are: `block`, and `print`.
+
+If there is no `#[template]` annotation for an `enum` variant,
+then the `enum` needs a default implementation, which will be used if `self` is this variant.
+A good compromise between annotating only the template, or all its variants,
+might be using the `block` argument on the members:
+
+```rust
+#[derive(Template, Debug)]
+#[template(path = "area.txt")]
+enum AreaWithBlocks {
+    #[template(block = "square")]
+    Square(f32),
+    #[template(block = "rectangle")]
+    Rectangle { a: f32, b: f32 },
+    #[template(block = "circle")]
+    Circle { radius: f32 },
+}
+```
+
+```jinja2
+{%- block square -%}
+    {{self.0}}^2
+{%- endblock -%}
+
+{%- block rectangle -%}
+    {{a}} * {{b}}
+{%- endblock -%}
+
+{%- block circle -%}
+    pi * {{radius}}^2
+{%- endblock -%}
+```
+
 ## Documentation as template code
 [#documentation-as-template-code]: #documentation-as-template-code
 

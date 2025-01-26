@@ -172,7 +172,8 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-      - run: cd ${{ matrix.package }} && cargo nextest run --no-tests=warn
+      - run: cd ${{ matrix.package }} && cargo build --all-targets
+      - run: cd ${{ matrix.package }} && cargo nextest run --all-targets --no-fail-fast --no-tests=warn
       - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
 
   MSRV:
