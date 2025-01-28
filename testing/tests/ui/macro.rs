@@ -39,5 +39,27 @@ struct NoClosingParen3;
 #[template(source = "{% macro thrice(a, b, c = %}{% endmacro %}", ext = "html")]
 struct NoClosingParen4;
 
+#[derive(rinja::Template)]
+#[template(
+    source = r#"
+        {% macro example(name, value, current, label="", id="") %}
+        {% endmacro %}
+        {% call example(name="name", value="") %}
+    "#,
+    ext = "txt"
+)]
+struct WrongNumberOfParams;
+
+#[derive(rinja::Template)]
+#[template(
+    source = r#"
+        {% macro example(name, value, arg=12) %}
+        {% endmacro %}
+        {% call example(0, name="name", value="") %}
+    "#,
+    ext = "txt"
+)]
+struct DuplicatedArg;
+
 fn main() {
 }

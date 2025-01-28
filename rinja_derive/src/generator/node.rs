@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::collections::hash_map::{Entry, HashMap};
 use std::fmt::Write;
 use std::mem;
@@ -1421,33 +1422,73 @@ fn macro_call_ensure_arg_count(
     def: &Macro<'_>,
     ctx: &Context<'_>,
 ) -> Result<(), CompileError> {
-    if call.args.len() == def.args.len() {
-        // exactly enough arguments were provided
-        return Ok(());
+    if call.args.len() > def.args.len() {
+        return Err(ctx.generate_error(
+            format_args!(
+                "macro `{}` expected {} argument{}, found {}",
+                def.name,
+                def.args.len(),
+                if def.args.len() > 1 { "s" } else { "" },
+                call.args.len(),
+            ),
+            call.span(),
+        ));
+    }
+    // First we list of arguments position then we remove them one by one.
+    let mut args = (0..def.args.len()).collect::<HashSet<_>>();
+    for (pos, arg) in call.args.iter().enumerate() {
+        let pos = match **arg {
+            Expr::NamedArgument(name, ..) => {
+                def.args.iter().position(|(arg_name, _)| *arg_name == name)
+            }
+            _ => Some(pos),
+        };
+        if let Some(pos) = pos {
+            if !args.remove(&pos) {
+                // This argument was already passed, so error.
+                return Err(ctx.generate_error(
+                    format_args!(
+                        "argument `{}` is passed more than once when calling macro `{}`",
+                        def.args[pos].0, def.name,
+                    ),
+                    call.span(),
+                ));
+            }
+        }
     }
 
-    let nb_default_args = def
-        .args
-        .iter()
-        .rev()
-        .take_while(|(_, default_value)| default_value.is_some())
-        .count();
-    if call.args.len() < def.args.len() && call.args.len() >= def.args.len() - nb_default_args {
-        // all missing arguments have a default value, and there weren't too many args
-        return Ok(());
-    }
-
-    // either too many or not enough arguments were provided
-    let (expected_args, extra) = match nb_default_args {
-        0 => (def.args.len(), ""),
-        _ => (nb_default_args, "at least "),
+    // Now we need to filter out arguments with default value.
+    let args = args
+        .into_iter()
+        .filter(|pos| def.args[*pos].1.is_none())
+        .collect::<Vec<_>>();
+    let (extra, error) = match args.len() {
+        0 => return Ok(()),
+        1 => ("", format!("`{}`", def.args[0].0)),
+        2 => ("s", format!("`{}` and `{}`", def.args[0].0, def.args[1].0)),
+        _ => {
+            let mut error_s =
+                args.iter()
+                    .take(args.len() - 2)
+                    .fold(String::new(), |mut acc, arg| {
+                        if !acc.is_empty() {
+                            acc.push_str(", ");
+                        }
+                        acc.push_str(&format!("`{}`", def.args[*arg].0));
+                        acc
+                    });
+            error_s.push_str(&format!(
+                " and `{}`",
+                def.args[*args.last().expect("no last args")].0
+            ));
+            ("s", error_s)
+        }
     };
+
     Err(ctx.generate_error(
         format_args!(
-            "macro {:?} expected {extra}{expected_args} argument{}, found {}",
-            def.name,
-            if expected_args != 1 { "s" } else { "" },
-            call.args.len(),
+            "missing argument{extra} when calling macro `{}`: {error}",
+            def.name
         ),
         call.span(),
     ))

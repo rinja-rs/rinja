@@ -1,4 +1,4 @@
-error: macro "thrice" expected at least 1 argument, found 0
+error: missing argument when calling macro `thrice`: `param1`
  --> InvalidDefault1.html:4:2
        "- call thrice() -%}"
  --> tests/ui/macro_default_value.rs:4:21
@@ -10,7 +10,7 @@ error: macro "thrice" expected at least 1 argument, found 0
 7 | | {%- call thrice() -%}", ext = "html")]
   | |______________________^
 
-error: macro "thrice" expected at least 1 argument, found 3
+error: macro `thrice` expected 2 arguments, found 3
  --> InvalidDefault2.html:4:2
        "- call thrice(1, 2, 3) -%}"
   --> tests/ui/macro_default_value.rs:11:21

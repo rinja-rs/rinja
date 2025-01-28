@@ -1,4 +1,4 @@
-error: no argument named `param3` in macro "thrice"
+error: missing argument when calling macro `thrice`: `param1`
  --> InvalidNamedArg.html:5:2
        "- call thrice(param1=2, param3=3) -%}"
  --> tests/ui/macro_named_argument.rs:4:21
@@ -49,7 +49,7 @@ error: named arguments must always be passed last
 33 | | {%- call thrice(param1=2, 3) -%}", ext = "html")]
    | |_________________________________^
 
-error: `param1` is passed more than once
+error: argument `param1` is passed more than once when calling macro `thrice`
  --> InvalidNamedArg5.html:4:2
        "- call thrice(3, param1=2) -%}"
   --> tests/ui/macro_named_argument.rs:38:21
@@ -60,3 +60,25 @@ error: `param1` is passed more than once
 40 | | {%- endmacro -%}
 41 | | {%- call thrice(3, param1=2) -%}", ext = "html")]
    | |_________________________________^
+
+error: missing arguments when calling macro `thrice`: `param1` and `param2`
+ --> MissingArgs.html:3:2
+       "- call thrice() -%}"
+  --> tests/ui/macro_named_argument.rs:45:21
+   |
+45 |   #[template(source = "{%- macro thrice(param1, param2) -%}
+   |  _____________________^
+46 | | {%- endmacro -%}
+47 | | {%- call thrice() -%}", ext = "html")]
+   | |______________________^
+
+error: missing argument when calling macro `thrice`: `param1`
+ --> MissingArgs2.html:3:2
+       "- call thrice() -%}"
+  --> tests/ui/macro_named_argument.rs:51:21
+   |
+51 |   #[template(source = "{%- macro thrice(param1, param2=1) -%}
+   |  _____________________^
+52 | | {%- endmacro -%}
+53 | | {%- call thrice() -%}", ext = "html")]
+   | |______________________^
