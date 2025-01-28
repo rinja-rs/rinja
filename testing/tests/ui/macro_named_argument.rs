@@ -41,5 +41,17 @@ struct InvalidNamedArg4;
 {%- call thrice(3, param1=2) -%}", ext = "html")]
 struct InvalidNamedArg5;
 
+#[derive(Template)]
+#[template(source = "{%- macro thrice(param1, param2) -%}
+{%- endmacro -%}
+{%- call thrice() -%}", ext = "html")]
+struct MissingArgs;
+
+#[derive(Template)]
+#[template(source = "{%- macro thrice(param1, param2=1) -%}
+{%- endmacro -%}
+{%- call thrice() -%}", ext = "html")]
+struct MissingArgs2;
+
 fn main() {
 }
