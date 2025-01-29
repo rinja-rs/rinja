@@ -113,6 +113,7 @@ jobs:
         with:
           tool: cargo-sort
       - run: |
+          cargo sort --check --check-format --grouped
           set -eu
           for PKG in \
             examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/salvo-app examples/warp-app fuzzing \

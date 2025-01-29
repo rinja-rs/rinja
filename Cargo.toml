@@ -1,3 +1,10 @@
 [workspace]
-members = ["rinja", "rinja_derive", "rinja_parser", "testing", "testing-alloc", "testing-no-std"]
+members = [
+    "rinja",
+    "rinja_derive",
+    "rinja_parser",
+    "testing",
+    "testing-alloc",
+    "testing-no-std"
+]
 resolver = "2"

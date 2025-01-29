@@ -6,10 +6,13 @@ edition = "2021"
 rust-version = "1.81"
 publish = false
 
-[features]
-default = ["code-in-doc", "serde_json"]
-code-in-doc = ["rinja/code-in-doc"]
-serde_json = ["dep:serde_json", "rinja/serde_json"]
+[[bench]]
+name = "all"
+harness = false
+
+[[bench]]
+name = "normalize_identifier"
+harness = false
 
 [dependencies]
 rinja = { path = "../rinja", version = "0.3.5" }
@@ -27,13 +30,10 @@ criterion = "0.5"
 phf = { version = "0.11", features = ["macros" ] }
 trybuild = "1.0.100"
 
-[[bench]]
-name = "all"
-harness = false
-
-[[bench]]
-name = "normalize_identifier"
-harness = false
+[features]
+default = ["code-in-doc", "serde_json"]
+code-in-doc = ["rinja/code-in-doc"]
+serde_json = ["dep:serde_json", "rinja/serde_json"]
 
 [lints.rust]
 # Set in `build.rs` if we are compiling in stable rust, used by `ui.rs`
