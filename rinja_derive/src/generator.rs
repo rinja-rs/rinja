@@ -136,9 +136,11 @@ impl<'a, 'h> Generator<'a, 'h> {
             where \
                 RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized\
             {\
-                use rinja::filters::{AutoEscape as _, WriteWritable as _};\
-                use rinja::helpers::ResultConverter as _;\
-                use rinja::helpers::core::fmt::Write as _;",
+                #[allow(unused_imports)]\
+                use rinja::{\
+                    filters::{AutoEscape as _, WriteWritable as _},\
+                    helpers::{ResultConverter as _, core::fmt::Write as _},\
+                };",
         );
 
         // Make sure the compiler understands that the generated code depends on the template files.
