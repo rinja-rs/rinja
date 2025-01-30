@@ -13,7 +13,7 @@ use std::{fmt, str};
 use winnow::Parser;
 use winnow::ascii::take_escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
-use winnow::error::{ErrorKind, FromExternalError};
+use winnow::error::FromExternalError;
 use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till, take_while};
 
@@ -311,25 +311,28 @@ impl<'a> ErrorContext<'a> {
 }
 
 impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
-    fn from_error_kind(input: &&'a str, _code: ErrorKind) -> Self {
+    #[allow(deprecated)]
+    fn from_error_kind(input: &&'a str, _code: winnow::error::ErrorKind) -> Self {
         Self {
             span: (*input).into(),
             message: None,
         }
     }
 
+    #[allow(deprecated)]
     fn append(
         self,
         _: &&'a str,
         _: &<&str as winnow::stream::Stream>::Checkpoint,
-        _: ErrorKind,
+        _: winnow::error::ErrorKind,
     ) -> Self {
         self
     }
 }
 
 impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a> {
-    fn from_external_error(input: &&'a str, _kind: ErrorKind, e: E) -> Self {
+    #[allow(deprecated)]
+    fn from_external_error(input: &&'a str, _kind: winnow::error::ErrorKind, e: E) -> Self {
         Self {
             span: (*input).into(),
             message: Some(Cow::Owned(e.to_string())),
