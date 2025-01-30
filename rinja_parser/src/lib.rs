@@ -311,28 +311,23 @@ impl<'a> ErrorContext<'a> {
 }
 
 impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
-    #[allow(deprecated)]
-    fn from_error_kind(input: &&'a str, _code: winnow::error::ErrorKind) -> Self {
+    type Inner = Self;
+
+    fn from_input(input: &&'a str) -> Self {
         Self {
             span: (*input).into(),
             message: None,
         }
     }
 
-    #[allow(deprecated)]
-    fn append(
-        self,
-        _: &&'a str,
-        _: &<&str as winnow::stream::Stream>::Checkpoint,
-        _: winnow::error::ErrorKind,
-    ) -> Self {
-        self
+    #[inline(always)]
+    fn into_inner(self) -> Result<Self::Inner, Self> {
+        Ok(self)
     }
 }
 
 impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a> {
-    #[allow(deprecated)]
-    fn from_external_error(input: &&'a str, _kind: winnow::error::ErrorKind, e: E) -> Self {
+    fn from_external_error(input: &&'a str, e: E) -> Self {
         Self {
             span: (*input).into(),
             message: Some(Cow::Owned(e.to_string())),
@@ -447,7 +442,8 @@ fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
     let int_with_base = (opt('-'), |i: &mut _| {
         let (base, kind) = preceded('0', alt(('b'.value(2), 'o'.value(8), 'x'.value(16))))
             .with_taken()
-            .parse_next(i)?;
+            .parse_next(i)
+            .map_err(|e: ParseErr<'_>| e)?;
         match opt(separated_digits(base, false)).parse_next(i)? {
             Some(_) => Ok(()),
             None => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -462,7 +458,9 @@ fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
     let float = |i: &mut &'a str| -> ParseResult<'a, ()> {
         let has_dot = opt(('.', separated_digits(10, true))).parse_next(i)?;
         let has_exp = opt(|i: &mut _| {
-            let (kind, op) = (one_of(['e', 'E']), opt(one_of(['+', '-']))).parse_next(i)?;
+            let (kind, op) = (one_of(['e', 'E']), opt(one_of(['+', '-'])))
+                .parse_next(i)
+                .map_err(|e: ParseErr<'_>| e)?;
             match opt(separated_digits(10, op.is_none())).parse_next(i)? {
                 Some(_) => Ok(()),
                 None => Err(winnow::error::ErrMode::Cut(ErrorContext::new(
@@ -559,7 +557,8 @@ fn str_lit_without_prefix<'a>(i: &mut &'a str) -> ParseResult<'a> {
         opt(take_escaped(take_till(1.., ['\\', '"']), '\\', any)),
         '"',
     )
-    .parse_next(i)?;
+    .parse_next(i)
+    .map_err(|e: ParseErr<'_>| e)?;
     Ok(s.unwrap_or_default())
 }
 
@@ -596,7 +595,8 @@ fn char_lit<'a>(i: &mut &'a str) -> ParseResult<'a, CharLit<'a>> {
             '\'',
         ),
     )
-        .parse_next(i)?;
+        .parse_next(i)
+        .map_err(|e: ParseErr<'_>| e)?;
 
     let Some(s) = s else {
         i.reset(&start);
@@ -754,7 +754,8 @@ impl State<'_, '_> {
             peek(delimited('%', alt(('-', '~', '+')).map(Some), '}')),
             fail, // rollback on partial matches in the previous line
         ))
-        .parse_next(i)?;
+        .parse_next(i)
+        .map_err(|e: ParseErr<'_>| e)?;
         if let Some(control) = control {
             let message = format!(
                 "unclosed block, you likely meant to apply whitespace control: \"{}{}\"",

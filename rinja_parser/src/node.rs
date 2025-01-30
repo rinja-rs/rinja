@@ -11,8 +11,8 @@ use winnow::{ModalParser, Parser};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
-    ErrorContext, Expr, Filter, ParseResult, Span, State, Target, WithSpan, filter, identifier,
-    is_rust_keyword, keyword, skip_till, skip_ws0, str_lit_without_prefix, ws,
+    ErrorContext, Expr, Filter, ParseErr, ParseResult, Span, State, Target, WithSpan, filter,
+    identifier, is_rust_keyword, keyword, skip_till, skip_ws0, str_lit_without_prefix, ws,
 };
 
 #[derive(Debug, PartialEq)]
@@ -56,7 +56,7 @@ impl<'a> Node<'a> {
             }
         };
         opt(|i: &mut _| unexpected_tag(i, s)).parse_next(i)?;
-        let is_eof = opt(eof).parse_next(i)?;
+        let is_eof = opt(eof).parse_next(i).map_err(|e: ParseErr<'_>| e)?;
         if is_eof.is_none() {
             return Err(winnow::error::ErrMode::Cut(ErrorContext::new(
                 "cannot parse entire template\n\
@@ -1076,7 +1076,7 @@ pub struct Lit<'a> {
 impl<'a> Lit<'a> {
     fn parse(i: &mut &'a str, s: &State<'_, '_>) -> ParseResult<'a, WithSpan<'a, Self>> {
         let start = *i;
-        not(eof).parse_next(i)?;
+        not(eof).parse_next(i).map_err(|e: ParseErr<'_>| e)?;
 
         let candidate_finder = Splitter3::new(
             s.syntax.block_start,
@@ -1096,7 +1096,7 @@ impl<'a> Lit<'a> {
                 return fail.parse_next(i);
             }
             Some(content) => content,
-            None => rest.parse_next(i)?, // there is no {block,comment,expr}_start: take everything
+            None => rest.parse_next(i).map_err(|e: ParseErr<'_>| e)?, /* there is no {block,comment,expr}_start: take everything */
         };
         Ok(WithSpan::new(Self::split_ws_parts(content), start))
     }
