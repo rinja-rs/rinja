@@ -10,12 +10,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, str};
 
-use winnow::Parser;
 use winnow::ascii::take_escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
 use winnow::error::FromExternalError;
 use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till, take_while};
+use winnow::{ModalParser, Parser};
 
 pub mod expr;
 pub use expr::{Attr, Expr, Filter, TyGenerics};
@@ -364,8 +364,8 @@ fn skip_ws1<'a>(i: &mut &'a str) -> ParseResult<'a, ()> {
 }
 
 fn ws<'a, O>(
-    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
-) -> impl Parser<&'a str, O, ErrorContext<'a>> {
+    inner: impl ModalParser<&'a str, O, ErrorContext<'a>>,
+) -> impl ModalParser<&'a str, O, ErrorContext<'a>> {
     delimited(skip_ws0, inner, skip_ws0)
 }
 
@@ -373,8 +373,8 @@ fn ws<'a, O>(
 /// Returns tuple that would be returned when parsing `end`.
 fn skip_till<'a, 'b, O>(
     candidate_finder: impl crate::memchr_splitter::Splitter,
-    end: impl Parser<&'a str, O, ErrorContext<'a>>,
-) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
+    end: impl ModalParser<&'a str, O, ErrorContext<'a>>,
+) -> impl ModalParser<&'a str, (&'a str, O), ErrorContext<'a>> {
     let mut next = alt((end.map(Some), any.map(|_| None)));
     move |i: &mut &'a str| loop {
         *i = match candidate_finder.split(i) {
@@ -395,7 +395,7 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
+fn keyword(k: &str) -> impl ModalParser<&str, &str, ErrorContext<'_>> {
     identifier.verify(move |v: &str| v == k)
 }
 
@@ -511,7 +511,7 @@ fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
 fn separated_digits<'a>(
     radix: u32,
     start: bool,
-) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
+) -> impl ModalParser<&'a str, &'a str, ErrorContext<'a>> {
     (
         move |i: &mut &'a _| match start {
             true => Ok(()),

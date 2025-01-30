@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::str::{self, FromStr};
 
-use winnow::Parser;
 use winnow::combinator::{
     alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, separated,
     terminated,
 };
 use winnow::stream::Stream as _;
 use winnow::token::{any, literal, rest};
+use winnow::{ModalParser, Parser};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -218,8 +218,8 @@ impl<'a> Node<'a> {
 
 fn cut_node<'a, O>(
     kind: Option<&'static str>,
-    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
-) -> impl Parser<&'a str, O, ErrorContext<'a>> {
+    inner: impl ModalParser<&'a str, O, ErrorContext<'a>>,
+) -> impl ModalParser<&'a str, O, ErrorContext<'a>> {
     let mut inner = cut_err(inner);
     move |i: &mut &'a str| {
         let start = *i;
@@ -1414,7 +1414,7 @@ pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
 fn end_node<'a, 'g: 'a>(
     node: &'g str,
     expected: &'g str,
-) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
+) -> impl ModalParser<&'a str, &'a str, ErrorContext<'a>> + 'g {
     move |i: &mut &'a str| {
         let start = i.checkpoint();
         let actual = ws(identifier).parse_next(i)?;
