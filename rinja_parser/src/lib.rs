@@ -308,6 +308,14 @@ impl<'a> ErrorContext<'a> {
             message: Some(message.into()),
         }
     }
+
+    fn backtrack(self) -> winnow::error::ErrMode<Self> {
+        winnow::error::ErrMode::Backtrack(self)
+    }
+
+    fn cut(self) -> winnow::error::ErrMode<Self> {
+        winnow::error::ErrMode::Cut(self)
+    }
 }
 
 impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
@@ -332,12 +340,6 @@ impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a
             span: (*input).into(),
             message: Some(Cow::Owned(e.to_string())),
         }
-    }
-}
-
-impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
-    fn from(cx: ErrorContext<'a>) -> Self {
-        Self::Cut(cx)
     }
 }
 
@@ -762,7 +764,7 @@ impl State<'_, '_> {
                 control.escape_default(),
                 self.syntax.block_end.escape_default(),
             );
-            Err(ParseErr::backtrack(ErrorContext::new(message, *i).into()))
+            Err(ErrorContext::new(message, *i).backtrack())
         } else {
             Ok(())
         }

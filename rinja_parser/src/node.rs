@@ -120,7 +120,7 @@ impl<'a> Node<'a> {
         .parse_next(i)?;
         match closed {
             true => Ok(node),
-            false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).into()),
+            false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).cut()),
         }
     }
 
@@ -188,7 +188,7 @@ impl<'a> Node<'a> {
         .parse_next(i)?;
         match closed {
             true => Ok(Self::Expr(Ws(pws, nws), expr)),
-            false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).into()),
+            false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).cut()),
         }
     }
 
@@ -1352,7 +1352,7 @@ impl<'a> Comment<'a> {
                 let tag = opt(skip_till(splitter, |i: &mut _| tag(i, s))).parse_next(i)?;
                 let Some((inclusive, tag)) = tag else {
                     return Err(
-                        ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),
+                        ErrorContext::unclosed("comment", s.syntax.comment_end, start).cut(),
                     );
                 };
                 match tag {
