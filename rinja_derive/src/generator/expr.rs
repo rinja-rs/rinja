@@ -191,7 +191,7 @@ impl<'a> Generator<'a, '_> {
             [] => unreachable!(),
             [expr] => self.visit_expr(ctx, buf, expr),
             exprs => {
-                let (l, r) = exprs.split_at((exprs.len() + 1) / 2);
+                let (l, r) = exprs.split_at(exprs.len().div_ceil(2));
                 buf.write("rinja::helpers::Concat(&(");
                 self.visit_concat(ctx, buf, l)?;
                 buf.write("), &(");
