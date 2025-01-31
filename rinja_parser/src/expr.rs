@@ -424,13 +424,13 @@ impl<'a> Expr<'a> {
         let start = *i;
         let expr = preceded(ws('('), opt(|i: &mut _| Self::parse(i, level, true))).parse_next(i)?;
         let Some(expr) = expr else {
-            let _ = ')'.parse_next(i).map_err(|e: ParseErr<'_>| e)?;
+            let _ = ')'.parse_next(i)?;
             return Ok(WithSpan::new(Self::Tuple(vec![]), start));
         };
 
         let comma = ws(opt(peek(','))).parse_next(i)?;
         if comma.is_none() {
-            let _ = ')'.parse_next(i).map_err(|e: ParseErr<'_>| e)?;
+            let _ = ')'.parse_next(i)?;
             return Ok(WithSpan::new(Self::Group(Box::new(expr)), start));
         }
 
