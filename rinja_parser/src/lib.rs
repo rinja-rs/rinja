@@ -183,7 +183,7 @@ impl<'a> Span<'a> {
 impl<'a> From<&'a str> for Span<'a> {
     #[inline]
     fn from(value: &'a str) -> Self {
-        Self(value[..0].as_bytes().try_into().unwrap())
+        Self(value.as_bytes()[..0].try_into().unwrap())
     }
 }
 
