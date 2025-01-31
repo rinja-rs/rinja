@@ -6,7 +6,7 @@ use winnow::ascii::digit1;
 use winnow::combinator::{
     alt, cut_err, fail, not, opt, peek, preceded, repeat, separated, terminated,
 };
-use winnow::error::{ErrorKind, ParserError as _};
+use winnow::error::ParserError as _;
 use winnow::stream::Stream as _;
 
 use crate::node::CondTest;
@@ -625,11 +625,7 @@ impl<'a> Suffix<'a> {
                         expr = WithSpan::new(Expr::RustMacro(vec![name], args), before_suffix)
                     }
                     _ => {
-                        return Err(winnow::error::ErrMode::from_error_kind(
-                            &before_suffix,
-                            ErrorKind::Tag,
-                        )
-                        .cut());
+                        return Err(winnow::error::ErrMode::from_input(&before_suffix).cut());
                     }
                 },
             }

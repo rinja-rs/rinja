@@ -1,6 +1,6 @@
-use winnow::Parser;
 use winnow::combinator::{alt, opt, peek, preceded, separated};
 use winnow::token::one_of;
+use winnow::{ModalParser, Parser};
 
 use crate::{
     CharLit, ErrorContext, Num, ParseErr, ParseResult, PathOrIdentifier, State, StrLit, WithSpan,
@@ -217,7 +217,7 @@ fn verify_name<'a>(
 fn collect_targets<'a, T>(
     i: &mut &'a str,
     delim: char,
-    one: impl Parser<&'a str, T, ErrorContext<'a>>,
+    one: impl ModalParser<&'a str, T, ErrorContext<'a>>,
 ) -> ParseResult<'a, (bool, Vec<T>)> {
     let opt_comma = ws(opt(',')).map(|o| o.is_some());
     let mut opt_end = ws(opt(one_of(delim))).map(|o| o.is_some());

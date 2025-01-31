@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::str::{self, FromStr};
 
-use winnow::Parser;
 use winnow::combinator::{
     alt, cut_err, delimited, empty, eof, fail, not, opt, peek, preceded, repeat, separated,
     terminated,
 };
 use winnow::stream::Stream as _;
 use winnow::token::{any, literal, rest};
+use winnow::{ModalParser, Parser};
 
 use crate::memchr_splitter::{Splitter1, Splitter2, Splitter3};
 use crate::{
@@ -120,7 +120,7 @@ impl<'a> Node<'a> {
         .parse_next(i)?;
         match closed {
             true => Ok(node),
-            false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).into()),
+            false => Err(ErrorContext::unclosed("block", s.syntax.block_end, start).cut()),
         }
     }
 
@@ -188,7 +188,7 @@ impl<'a> Node<'a> {
         .parse_next(i)?;
         match closed {
             true => Ok(Self::Expr(Ws(pws, nws), expr)),
-            false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).into()),
+            false => Err(ErrorContext::unclosed("expression", s.syntax.expr_end, start).cut()),
         }
     }
 
@@ -218,8 +218,8 @@ impl<'a> Node<'a> {
 
 fn cut_node<'a, O>(
     kind: Option<&'static str>,
-    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
-) -> impl Parser<&'a str, O, ErrorContext<'a>> {
+    inner: impl ModalParser<&'a str, O, ErrorContext<'a>>,
+) -> impl ModalParser<&'a str, O, ErrorContext<'a>> {
     let mut inner = cut_err(inner);
     move |i: &mut &'a str| {
         let start = *i;
@@ -1096,7 +1096,7 @@ impl<'a> Lit<'a> {
                 return fail.parse_next(i);
             }
             Some(content) => content,
-            None => rest.parse_next(i)?, // there is no {block,comment,expr}_start: take everything
+            None => rest.parse_next(i)?, /* there is no {block,comment,expr}_start: take everything */
         };
         Ok(WithSpan::new(Self::split_ws_parts(content), start))
     }
@@ -1352,7 +1352,7 @@ impl<'a> Comment<'a> {
                 let tag = opt(skip_till(splitter, |i: &mut _| tag(i, s))).parse_next(i)?;
                 let Some((inclusive, tag)) = tag else {
                     return Err(
-                        ErrorContext::unclosed("comment", s.syntax.comment_end, start).into(),
+                        ErrorContext::unclosed("comment", s.syntax.comment_end, start).cut(),
                     );
                 };
                 match tag {
@@ -1414,7 +1414,7 @@ pub struct Ws(pub Option<Whitespace>, pub Option<Whitespace>);
 fn end_node<'a, 'g: 'a>(
     node: &'g str,
     expected: &'g str,
-) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> + 'g {
+) -> impl ModalParser<&'a str, &'a str, ErrorContext<'a>> + 'g {
     move |i: &mut &'a str| {
         let start = i.checkpoint();
         let actual = ws(identifier).parse_next(i)?;

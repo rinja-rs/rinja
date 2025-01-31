@@ -10,12 +10,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, str};
 
-use winnow::Parser;
 use winnow::ascii::take_escaped;
 use winnow::combinator::{alt, cut_err, delimited, fail, not, opt, peek, preceded, repeat};
-use winnow::error::{ErrorKind, FromExternalError};
+use winnow::error::FromExternalError;
 use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till, take_while};
+use winnow::{ModalParser, Parser};
 
 pub mod expr;
 pub use expr::{Attr, Expr, Filter, TyGenerics};
@@ -308,38 +308,38 @@ impl<'a> ErrorContext<'a> {
             message: Some(message.into()),
         }
     }
+
+    fn backtrack(self) -> winnow::error::ErrMode<Self> {
+        winnow::error::ErrMode::Backtrack(self)
+    }
+
+    fn cut(self) -> winnow::error::ErrMode<Self> {
+        winnow::error::ErrMode::Cut(self)
+    }
 }
 
 impl<'a> winnow::error::ParserError<&'a str> for ErrorContext<'a> {
-    fn from_error_kind(input: &&'a str, _code: ErrorKind) -> Self {
+    type Inner = Self;
+
+    fn from_input(input: &&'a str) -> Self {
         Self {
             span: (*input).into(),
             message: None,
         }
     }
 
-    fn append(
-        self,
-        _: &&'a str,
-        _: &<&str as winnow::stream::Stream>::Checkpoint,
-        _: ErrorKind,
-    ) -> Self {
-        self
+    #[inline(always)]
+    fn into_inner(self) -> Result<Self::Inner, Self> {
+        Ok(self)
     }
 }
 
 impl<'a, E: std::fmt::Display> FromExternalError<&'a str, E> for ErrorContext<'a> {
-    fn from_external_error(input: &&'a str, _kind: ErrorKind, e: E) -> Self {
+    fn from_external_error(input: &&'a str, e: E) -> Self {
         Self {
             span: (*input).into(),
             message: Some(Cow::Owned(e.to_string())),
         }
-    }
-}
-
-impl<'a> From<ErrorContext<'a>> for winnow::error::ErrMode<ErrorContext<'a>> {
-    fn from(cx: ErrorContext<'a>) -> Self {
-        Self::Cut(cx)
     }
 }
 
@@ -361,8 +361,8 @@ fn skip_ws1<'a>(i: &mut &'a str) -> ParseResult<'a, ()> {
 }
 
 fn ws<'a, O>(
-    inner: impl Parser<&'a str, O, ErrorContext<'a>>,
-) -> impl Parser<&'a str, O, ErrorContext<'a>> {
+    inner: impl ModalParser<&'a str, O, ErrorContext<'a>>,
+) -> impl ModalParser<&'a str, O, ErrorContext<'a>> {
     delimited(skip_ws0, inner, skip_ws0)
 }
 
@@ -370,8 +370,8 @@ fn ws<'a, O>(
 /// Returns tuple that would be returned when parsing `end`.
 fn skip_till<'a, 'b, O>(
     candidate_finder: impl crate::memchr_splitter::Splitter,
-    end: impl Parser<&'a str, O, ErrorContext<'a>>,
-) -> impl Parser<&'a str, (&'a str, O), ErrorContext<'a>> {
+    end: impl ModalParser<&'a str, O, ErrorContext<'a>>,
+) -> impl ModalParser<&'a str, (&'a str, O), ErrorContext<'a>> {
     let mut next = alt((end.map(Some), any.map(|_| None)));
     move |i: &mut &'a str| loop {
         *i = match candidate_finder.split(i) {
@@ -392,7 +392,7 @@ fn skip_till<'a, 'b, O>(
     }
 }
 
-fn keyword(k: &str) -> impl Parser<&str, &str, ErrorContext<'_>> {
+fn keyword(k: &str) -> impl ModalParser<&str, &str, ErrorContext<'_>> {
     identifier.verify(move |v: &str| v == k)
 }
 
@@ -508,7 +508,7 @@ fn num_lit<'a>(i: &mut &'a str) -> ParseResult<'a, Num<'a>> {
 fn separated_digits<'a>(
     radix: u32,
     start: bool,
-) -> impl Parser<&'a str, &'a str, ErrorContext<'a>> {
+) -> impl ModalParser<&'a str, &'a str, ErrorContext<'a>> {
     (
         move |i: &mut &'a _| match start {
             true => Ok(()),
@@ -758,7 +758,7 @@ impl State<'_, '_> {
                 control.escape_default(),
                 self.syntax.block_end.escape_default(),
             );
-            Err(ParseErr::backtrack(ErrorContext::new(message, *i).into()))
+            Err(ErrorContext::new(message, *i).backtrack())
         } else {
             Ok(())
         }
