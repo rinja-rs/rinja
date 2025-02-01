@@ -155,7 +155,7 @@ fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream 
 fn build_skeleton(buf: &mut Buffer, ast: &syn::DeriveInput) -> Result<usize, CompileError> {
     let template_args = TemplateArgs::fallback();
     let config = Config::new("", None, None, None)?;
-    let input = TemplateInput::new(ast, config, &template_args)?;
+    let input = TemplateInput::new(ast, None, config, &template_args)?;
     let mut contexts = HashMap::default();
     let parsed = parser::Parsed::default();
     contexts.insert(&input.path, Context::empty(&parsed));
@@ -177,7 +177,7 @@ pub(crate) fn build_template(
     let mut result = match AnyTemplateArgs::new(ast)? {
         AnyTemplateArgs::Struct(item) => {
             err_span = item.source.1.or(item.template_span);
-            build_template_item(buf, ast, &item, TmplKind::Struct)
+            build_template_item(buf, ast, None, &item, TmplKind::Struct)
         }
         AnyTemplateArgs::Enum {
             enum_args,
@@ -203,6 +203,7 @@ pub(crate) fn build_template(
 fn build_template_item(
     buf: &mut Buffer,
     ast: &syn::DeriveInput,
+    enum_ast: Option<&syn::DeriveInput>,
     template_args: &TemplateArgs,
     tmpl_kind: TmplKind,
 ) -> Result<usize, CompileError> {
@@ -214,7 +215,7 @@ fn build_template_item(
         template_args.whitespace,
         template_args.config_span,
     )?;
-    let input = TemplateInput::new(ast, config, template_args)?;
+    let input = TemplateInput::new(ast, enum_ast, config, template_args)?;
 
     let mut templates = HashMap::default();
     input.find_used_templates(&mut templates)?;

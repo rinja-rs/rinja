@@ -19,6 +19,7 @@ use crate::{CompileError, FileInfo, MsgValidEscapers, OnceMap};
 
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
+    pub(crate) enum_ast: Option<&'a syn::DeriveInput>,
     pub(crate) config: &'a Config,
     pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
@@ -36,6 +37,7 @@ impl TemplateInput<'_> {
     /// `template()` attribute list fields.
     pub(crate) fn new<'n>(
         ast: &'n syn::DeriveInput,
+        enum_ast: Option<&'n syn::DeriveInput>,
         config: &'n Config,
         args: &'n TemplateArgs,
     ) -> Result<TemplateInput<'n>, CompileError> {
@@ -126,6 +128,7 @@ impl TemplateInput<'_> {
 
         Ok(TemplateInput {
             ast,
+            enum_ast,
             config,
             syntax,
             source,

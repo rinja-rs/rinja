@@ -210,6 +210,12 @@ impl BufferFmt for Arguments<'_> {
     }
 }
 
+impl BufferFmt for TokenStream {
+    fn append_to(&self, buf: &mut String) {
+        write!(buf, "{self}").unwrap();
+    }
+}
+
 /// Similar to `write!(dest, "{src:?}")`, but only escapes the strictly needed characters,
 /// and without the surrounding `"…"` quotation marks.
 fn string_escape(dest: &mut String, src: &str) {
@@ -271,7 +277,7 @@ pub(crate) fn build_template_enum(
         };
 
         let var_ast = type_for_enum_variant(enum_ast, &generics, var);
-        buf.write(quote!(#var_ast).to_string());
+        buf.write(quote!(#var_ast));
 
         // not inherited: template, meta_docs, block, print
         if let Some(enum_args) = &mut enum_args {
@@ -285,6 +291,7 @@ pub(crate) fn build_template_enum(
         let size_hint = biggest_size_hint.max(build_template_item(
             buf,
             &var_ast,
+            Some(enum_ast),
             &TemplateArgs::from_partial(&var_ast, Some(var_args))?,
             TmplKind::Variant,
         )?);
@@ -302,6 +309,7 @@ pub(crate) fn build_template_enum(
         let size_hint = build_template_item(
             buf,
             enum_ast,
+            None,
             &TemplateArgs::from_partial(enum_ast, enum_args)?,
             TmplKind::Variant,
         )?;
