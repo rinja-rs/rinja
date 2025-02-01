@@ -5,6 +5,7 @@ use parser::{
     Attr, CharLit, CharPrefix, Expr, Filter, IntKind, Num, Span, StrLit, StrPrefix, Target,
     TyGenerics, WithSpan,
 };
+use quote::quote;
 
 use super::{
     DisplayWrap, FILTER_SOURCE, Generator, LocalMeta, TargetIsize, TargetUsize, Writable,
@@ -1057,9 +1058,17 @@ impl<'a> Generator<'a, '_> {
     }
 
     fn visit_path(&mut self, buf: &mut Buffer, path: &[&str]) -> DisplayWrap {
-        for (i, part) in path.iter().enumerate() {
+        for (i, part) in path.iter().copied().enumerate() {
             if i > 0 {
                 buf.write("::");
+            } else if let Some(enum_ast) = self.input.enum_ast {
+                if part == "Self" {
+                    let this = &enum_ast.ident;
+                    let (_, generics, _) = enum_ast.generics.split_for_impl();
+                    let generics = generics.as_turbofish();
+                    buf.write(quote!(#this #generics));
+                    continue;
+                }
             }
             buf.write(part);
         }

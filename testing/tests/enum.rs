@@ -196,6 +196,45 @@ fn test_enum_blocks() {
     );
 }
 
+#[test]
+fn associated_constants() {
+    #[derive(Template, Debug)]
+    #[template(
+        ext = "txt",
+        source = "\
+            {% block a -%} {{ Self::CONST_A }} {{ self.0 }} {%- endblock %}
+            {% block b -%} {{ Self::CONST_B }} {{ self.0 }} {%- endblock %}
+            {% block c -%} {{ Self::func_c(self.0) }} {{ self.0 }} {%- endblock %}
+        "
+    )]
+    enum BlockEnum<'a, T: Display> {
+        #[template(block = "a")]
+        A(&'a str),
+        #[template(block = "b")]
+        B(T),
+        #[template(block = "c")]
+        C(&'a T),
+    }
+
+    impl<'a, T: Display> BlockEnum<'a, T> {
+        const CONST_A: &'static str = "<A>";
+        const CONST_B: &'static str = "<B>";
+
+        fn func_c(_: &'a T) -> &'static str {
+            "<C>"
+        }
+    }
+
+    let tmpl: BlockEnum<'_, X> = BlockEnum::A("hello");
+    assert_eq!(tmpl.render().unwrap(), "<A> hello");
+
+    let tmpl: BlockEnum<'_, X> = BlockEnum::B(X);
+    assert_eq!(tmpl.render().unwrap(), "<B> X");
+
+    let tmpl: BlockEnum<'_, X> = BlockEnum::C(&X);
+    assert_eq!(tmpl.render().unwrap(), "<C> X");
+}
+
 #[derive(Debug)]
 struct X;
 
