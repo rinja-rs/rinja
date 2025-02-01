@@ -68,7 +68,7 @@ error: expected `)` to close macro argument list
 39 | #[template(source = "{% macro thrice(a, b, c = %}{% endmacro %}", ext = "html")]
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: missing argument when calling macro `example`: `name`
+error: missing argument when calling macro `example`: `current`
  --> WrongNumberOfParams.txt:4:10
        " call example(name=\"name\", value=\"\") %}\n    "
   --> tests/ui/macro.rs:44:14
@@ -81,7 +81,7 @@ error: missing argument when calling macro `example`: `name`
 48 | |     "#,
    | |______^
 
-error: argument `name` is passed more than once when calling macro `example`
+error: argument `name` was passed more than once when calling macro `example`
  --> DuplicatedArg.txt:4:10
        " call example(0, name=\"name\", value=\"\") %}\n    "
   --> tests/ui/macro.rs:55:14
