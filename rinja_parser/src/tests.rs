@@ -1288,3 +1288,14 @@ fn test_generics_parsing() {
     )
     .unwrap();
 }
+
+#[test]
+fn fuzzed_deeply_tested_if_let() {
+    let src = include_str!("../tests/fuzzed-deeply-tested-if-let.txt");
+    let syntax = Syntax::default();
+    let err = Ast::from_str(src, None, &syntax).unwrap_err();
+    assert_eq!(
+        err.to_string().lines().next(),
+        Some("your template code is too deeply nested, or the last expression is too complex"),
+    );
+}
