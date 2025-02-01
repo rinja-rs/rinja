@@ -1,7 +1,6 @@
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::collections::hash_map::{Entry, HashMap};
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use std::mem;
 
 use parser::node::{
@@ -1434,8 +1433,9 @@ fn macro_call_ensure_arg_count(
             call.span(),
         ));
     }
-    // First we list of arguments position then we remove them one by one.
-    let mut args = (0..def.args.len()).collect::<HashSet<_>>();
+
+    // First we list of arguments position, then we remove every argument with a value.
+    let mut args: Vec<_> = def.args.iter().map(|&(name, _)| Some(name)).collect();
     for (pos, arg) in call.args.iter().enumerate() {
         let pos = match **arg {
             Expr::NamedArgument(name, ..) => {
@@ -1444,11 +1444,11 @@ fn macro_call_ensure_arg_count(
             _ => Some(pos),
         };
         if let Some(pos) = pos {
-            if !args.remove(&pos) {
+            if mem::take(&mut args[pos]).is_none() {
                 // This argument was already passed, so error.
                 return Err(ctx.generate_error(
                     format_args!(
-                        "argument `{}` is passed more than once when calling macro `{}`",
+                        "argument `{}` was passed more than once when calling macro `{}`",
                         def.args[pos].0, def.name,
                     ),
                     call.span(),
@@ -1457,41 +1457,55 @@ fn macro_call_ensure_arg_count(
         }
     }
 
-    // Now we need to filter out arguments with default value.
-    let args = args
-        .into_iter()
-        .filter(|pos| def.args[*pos].1.is_none())
-        .collect::<Vec<_>>();
-    let (extra, error) = match args.len() {
-        0 => return Ok(()),
-        1 => ("", format!("`{}`", def.args[0].0)),
-        2 => ("s", format!("`{}` and `{}`", def.args[0].0, def.args[1].0)),
-        _ => {
-            let mut error_s =
-                args.iter()
-                    .take(args.len() - 2)
-                    .fold(String::new(), |mut acc, arg| {
-                        if !acc.is_empty() {
-                            acc.push_str(", ");
-                        }
-                        acc.push_str(&format!("`{}`", def.args[*arg].0));
-                        acc
-                    });
-            error_s.push_str(&format!(
-                " and `{}`",
-                def.args[*args.last().expect("no last args")].0
-            ));
-            ("s", error_s)
+    // Now we can check off arguments with a default value, too.
+    for (pos, (_, dflt)) in def.args.iter().enumerate() {
+        if dflt.is_some() {
+            args[pos] = None;
         }
-    };
+    }
 
-    Err(ctx.generate_error(
-        format_args!(
-            "missing argument{extra} when calling macro `{}`: {error}",
-            def.name
-        ),
-        call.span(),
-    ))
+    // Now that we have a needed information, we can print an error message (if needed).
+    struct FmtMissing<'a, I> {
+        count: usize,
+        missing: I,
+        name: &'a str,
+    }
+
+    impl<'a, I: Iterator<Item = &'a str> + Clone> fmt::Display for FmtMissing<'a, I> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            if self.count == 1 {
+                let a = self.missing.clone().next().unwrap();
+                write!(
+                    f,
+                    "missing argument when calling macro `{}`: `{a}`",
+                    self.name
+                )
+            } else {
+                write!(f, "missing arguments when calling macro `{}`: ", self.name)?;
+                for (idx, a) in self.missing.clone().enumerate() {
+                    if idx == self.count - 1 {
+                        write!(f, " and ")?;
+                    } else if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "`{a}`")?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    let missing = args.iter().filter_map(Option::as_deref);
+    let fmt_missing = FmtMissing {
+        count: missing.clone().count(),
+        missing,
+        name: def.name,
+    };
+    if fmt_missing.count == 0 {
+        Ok(())
+    } else {
+        Err(ctx.generate_error(fmt_missing, call.span()))
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
