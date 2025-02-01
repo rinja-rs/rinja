@@ -482,22 +482,3 @@ macro_rules! fmt_right {
 }
 
 pub(crate) use {fmt_left, fmt_right};
-
-// This is used by the code generator to decide whether a named filter is part of
-// Rinja or should refer to a local `filters` module.
-const BUILTIN_FILTERS: &[&str] = &[
-    "capitalize",
-    "center",
-    "indent",
-    "lower",
-    "lowercase",
-    "title",
-    "trim",
-    "truncate",
-    "upper",
-    "uppercase",
-    "wordcount",
-];
-
-// Built-in filters that need the `alloc` feature.
-const BUILTIN_FILTERS_NEED_ALLOC: &[&str] = &["center", "truncate"];

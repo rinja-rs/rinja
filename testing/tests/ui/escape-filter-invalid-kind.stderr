@@ -1,4 +1,4 @@
-error: invalid escaper `b"none"`. Expected a string, found a slice
+error: expected string literal for `escape` filter, got a slice
  --> BadEscapeKind.txt:1:14
        "b\"none\") }}"
  --> tests/ui/escape-filter-invalid-kind.rs:5:14
@@ -6,7 +6,7 @@ error: invalid escaper `b"none"`. Expected a string, found a slice
 5 |     source = r#"{{ "a"|escape(b"none") }}"#,
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: invalid escaper `b"none"`. Expected a string, found a CStr
+error: expected string literal for `escape` filter, got a CStr
  --> BadEscapeKind2.txt:1:14
        "c\"none\") }}"
   --> tests/ui/escape-filter-invalid-kind.rs:12:14
