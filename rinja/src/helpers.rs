@@ -12,6 +12,17 @@ use core::iter::{Enumerate, Peekable};
 use core::ops::Deref;
 use core::pin::Pin;
 
+#[cfg(feature = "dynamic")]
+pub use {
+    crate::dynamic::{
+        Outcome,
+        child::{DYNAMIC_TEMPLATES, DynamicTemplate, use_dynamic_render_result},
+        parent::maybe_render_dynamic_into,
+    },
+    linkme,
+    serde_json::{from_str as from_json, to_string as to_json},
+};
+
 pub use crate::error::{ErrorMarker, ResultConverter};
 use crate::filters::FastWritable;
 pub use crate::values::get_value;

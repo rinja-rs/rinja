@@ -25,6 +25,87 @@ impl<'a> Generator<'a, '_> {
         ctx: &Context<'a>,
         buf: &mut Buffer,
     ) -> Result<usize, CompileError> {
+        #[cfg(feature = "dynamic")]
+        use std::fmt::{self, Write};
+
+        #[cfg(feature = "dynamic")]
+        #[derive(Debug, Clone, Copy, Default)]
+        struct LifetimesTimesN(usize, &'static str);
+
+        #[cfg(feature = "dynamic")]
+        impl fmt::Display for LifetimesTimesN {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                if self.0 > 0 {
+                    f.write_char('<')?;
+                    for i in 0..self.0 {
+                        if i > 0 {
+                            f.write_char(',')?;
+                        }
+                        f.write_str(self.1)?;
+                    }
+                    f.write_char('>')?;
+                }
+                Ok(())
+            }
+        }
+
+        #[cfg(feature = "dynamic")]
+        let lt = if self.input.dynamic {
+            let item = match &self.input.ast.data {
+                syn::Data::Struct(_) => "struct",
+                syn::Data::Enum(_) => "enum",
+                syn::Data::Union(_) => "union",
+            };
+
+            let (lt, typ, cnst) = self.input.ast.generics.params.iter().fold(
+                (0, 0, 0),
+                |(lt, typ, cnst), p| match p {
+                    syn::GenericParam::Lifetime(_) => (lt + 1, typ, cnst),
+                    syn::GenericParam::Type(_) => (lt, typ + 1, cnst),
+                    syn::GenericParam::Const(_) => (lt, typ, cnst + 1),
+                },
+            );
+            if typ > 0 || cnst > 0 {
+                return Err(CompileError::new(
+                    format_args!(
+                        "`dynamic` templates are not implemented for `{item}`s with generics"
+                    ),
+                    None,
+                ));
+            }
+
+            buf.write(format_args!(
+                "\
+                rinja::register_dynamic_template! {{\
+                    name: {ident}{lt_static},\
+                    type: {ident}{lt_any},\
+                }}",
+                ident = &self.input.ast.ident,
+                lt_static = LifetimesTimesN(lt, "'static"),
+                lt_any = LifetimesTimesN(lt, "'_"),
+            ));
+            lt
+        } else {
+            0
+        };
+
+        #[cfg(feature = "dynamic")]
+        if self.input.dynamic {
+            buf.write(format_args!(
+                "\
+                if rinja::helpers::maybe_render_dynamic_into(\
+                    &rinja::helpers::core::any::type_name::<{ident}{lt_static}>,\
+                    &|| rinja::helpers::to_json(self),\
+                    __rinja_writer,\
+                    __rinja_values\
+                )?.is_break() {{\
+                    return rinja::Result::Ok(());\
+                }}",
+                ident = &self.input.ast.ident,
+                lt_static = LifetimesTimesN(lt, "'static"),
+            ));
+        }
+
         buf.set_discard(self.buf_writable.discard);
         let size_hint = if let Some(heritage) = self.heritage {
             self.handle(heritage.root, heritage.root.nodes, buf, AstLevel::Top)

@@ -1,13 +1,16 @@
+use std::borrow::Cow;
+
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::get;
 use axum::{Router, serve};
 use rinja::Template;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
 use tracing::{Level, info};
 
+#[rinja::main]
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt()
@@ -52,7 +55,7 @@ enum Error {
 ///  * `PartialEq` so that we can use the type in comparisons with `==` or `!=`.
 ///  * `serde::Deserialize` so that axum can parse the type in incoming URLs.
 ///  * `strum::Display` so that rinja can write the value in templates.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Deserialize, strum::Display)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Deserialize, Serialize, strum::Display)]
 #[allow(non_camel_case_types)]
 enum Lang {
     #[default]
@@ -130,8 +133,8 @@ async fn index_handler(
     // In `IndexHandlerQuery` we annotated the field with `#[serde(default)]`, so if the value is
     // absent, an empty string is selected by default, which is visible to the user an empty
     // `<input type="text" />` element.
-    #[derive(Debug, Template)]
-    #[template(path = "index.html")]
+    #[derive(Debug, Template, Serialize, Deserialize)]
+    #[template(path = "index.html", dynamic = true)]
     struct Tmpl {
         lang: Lang,
         name: String,
@@ -158,16 +161,17 @@ async fn greeting_handler(
     Path((lang,)): Path<(Lang,)>,
     Query(query): Query<GreetingHandlerQuery>,
 ) -> Result<impl IntoResponse, AppError> {
-    #[derive(Debug, Template)]
-    #[template(path = "greet.html")]
-    struct Tmpl {
+    #[derive(Debug, Template, Serialize, Deserialize)]
+    #[template(path = "greet.html", dynamic = true, print = "code")]
+    struct Tmpl<'a> {
         lang: Lang,
-        name: String,
+        #[serde(borrow)]
+        name: Cow<'a, str>,
     }
 
     let template = Tmpl {
         lang,
-        name: query.name,
+        name: query.name.into(),
     };
     Ok(Html(template.render()?))
 }

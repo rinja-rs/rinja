@@ -41,6 +41,7 @@ syn = { version = "2.0.3", features = ["full"] }
 alloc = []
 code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:serde", "dep:basic-toml", "parser/config"]
+dynamic = ["syn/full"]
 urlencode = []
 serde_json = []
 std = ["alloc"]

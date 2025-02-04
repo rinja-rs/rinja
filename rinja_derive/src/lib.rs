@@ -142,6 +142,40 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
     }
 }
 
+#[allow(clippy::useless_conversion)] // To be compatible with both `TokenStream`s
+#[cfg_attr(not(feature = "__standalone"), proc_macro_attribute)]
+#[must_use]
+pub fn main(_attr: TokenStream12, item: TokenStream12) -> TokenStream12 {
+    main_impl(item.into()).into()
+}
+
+#[cfg(not(feature = "dynamic"))]
+fn main_impl(item: TokenStream) -> TokenStream {
+    item
+}
+
+#[cfg(feature = "dynamic")]
+fn main_impl(item: TokenStream) -> TokenStream {
+    let func: syn::ItemFn = match syn::parse2(item) {
+        Ok(func) => func,
+        Err(err) => {
+            return compile_error(std::iter::once(err.to_string()), Span::call_site());
+        }
+    };
+    let output = &func.sig.output;
+    syn::parse_quote_spanned! {
+        func.sig.ident.span() =>
+        fn main() #output {
+            {
+                extern crate rinja as rinja;
+                rinja::run_dynamic_main();
+                return main();
+            }
+            #func
+        }
+    }
+}
+
 fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream {
     quote_spanned! {
         span =>

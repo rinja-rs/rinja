@@ -27,6 +27,8 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) block: Option<&'a str>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
+    #[cfg(feature = "dynamic")]
+    pub(crate) dynamic: bool,
     pub(crate) path: Arc<Path>,
     pub(crate) fields: Vec<String>,
 }
@@ -49,6 +51,8 @@ impl TemplateInput<'_> {
             ext,
             ext_span,
             syntax,
+            #[cfg(feature = "dynamic")]
+            dynamic,
             ..
         } = args;
 
@@ -138,6 +142,8 @@ impl TemplateInput<'_> {
             escaper,
             path,
             fields,
+            #[cfg(feature = "dynamic")]
+            dynamic: dynamic.unwrap_or_default(),
         })
     }
 
@@ -341,6 +347,8 @@ pub(crate) struct TemplateArgs {
     ext_span: Option<Span>,
     syntax: Option<String>,
     config: Option<String>,
+    #[cfg(feature = "dynamic")]
+    dynamic: Option<bool>,
     pub(crate) whitespace: Option<Whitespace>,
     pub(crate) template_span: Option<Span>,
     pub(crate) config_span: Option<Span>,
@@ -389,6 +397,8 @@ impl TemplateArgs {
             ext_span: args.ext.as_ref().map(|value| value.span()),
             syntax: args.syntax.map(|value| value.value()),
             config: args.config.as_ref().map(|value| value.value()),
+            #[cfg(feature = "dynamic")]
+            dynamic: args.dynamic.map(|value| value.value()),
             whitespace: args.whitespace,
             template_span: Some(args.template.span()),
             config_span: args.config.as_ref().map(|value| value.span()),
@@ -405,6 +415,8 @@ impl TemplateArgs {
             ext_span: None,
             syntax: None,
             config: None,
+            #[cfg(feature = "dynamic")]
+            dynamic: None,
             whitespace: None,
             template_span: None,
             config_span: None,
@@ -676,6 +688,7 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) syntax: Option<LitStr>,
     pub(crate) config: Option<LitStr>,
     pub(crate) whitespace: Option<Whitespace>,
+    pub(crate) dynamic: Option<LitBool>,
 }
 
 #[derive(Clone)]
@@ -735,6 +748,7 @@ const _: () = {
             syntax: None,
             config: None,
             whitespace: None,
+            dynamic: None,
         };
         let mut has_data = false;
 
@@ -820,6 +834,8 @@ const _: () = {
                     set_strlit_pair(ident, value, &mut this.config)?;
                 } else if ident == "whitespace" {
                     set_parseable_string(ident, value, &mut this.whitespace)?;
+                } else if ident == "dynamic" {
+                    set_boollit_pair(ident, value, &mut this.dynamic)?;
                 } else {
                     return Err(CompileError::no_file_info(
                         format!("unsupported template attribute `{ident}` found"),
@@ -851,6 +867,16 @@ const _: () = {
     ) -> Result<(), CompileError> {
         ensure_only_once(name, dest)?;
         *dest = Some(get_strlit(name, value)?);
+        Ok(())
+    }
+
+    fn set_boollit_pair(
+        name: &Ident,
+        value: ExprLit,
+        dest: &mut Option<LitBool>,
+    ) -> Result<(), CompileError> {
+        ensure_only_once(name, dest)?;
+        *dest = Some(get_boollit(name, value)?);
         Ok(())
     }
 

@@ -9,7 +9,7 @@ publish = false
 # and axum as your web-framework.
 [dependencies]
 axum = "0.8.1"
-rinja = { version = "0.3.5", path = "../../rinja" }
+rinja = { version = "0.3.5", path = "../../rinja", features = ["dynamic"] }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 
 # serde and strum are used to parse (deserialize) and generate (serialize) information

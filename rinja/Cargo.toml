@@ -28,6 +28,12 @@ rinja_derive = { version = "=0.3.5", path = "../rinja_derive" }
 
 itoa = "1.0.11"
 
+# needed by feature "dynamic"
+linkme = { version = "0.3.31", optional = true }
+notify = { version = "8.0.0", optional = true }
+parking_lot = { version = "0.12.3", optional = true, features = ["arc_lock", "send_guard"] }
+tokio = { version = "1.43.0", optional = true, features = ["macros", "io-util", "net", "process", "rt", "sync", "time"] }
+
 # needed by feature "serde_json"
 serde = { version = "1.0", optional = true, default-features = false }
 serde_json = { version = "1.0", optional = true, default-features = false, features = [] }
@@ -43,7 +49,7 @@ criterion = "0.5"
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["config", "std", "urlencode"]
+default = ["config", "std", "urlencode", "dynamic"]
 full = ["default", "code-in-doc", "serde_json"]
 
 alloc = [
@@ -54,6 +60,16 @@ alloc = [
 ]
 code-in-doc = ["rinja_derive/code-in-doc"]
 config = ["rinja_derive/config"]
+dynamic = [
+    "std",
+    "rinja_derive/dynamic",
+    "serde/derive",
+    "dep:linkme",
+    "dep:notify",
+    "dep:parking_lot",
+    "dep:serde_json",
+    "dep:tokio",
+]
 serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
 std = [
     "alloc",

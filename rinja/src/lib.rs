@@ -65,6 +65,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "dynamic")]
+mod dynamic;
 mod error;
 pub mod filters;
 #[doc(hidden)]
@@ -78,7 +80,7 @@ use core::fmt;
 #[cfg(feature = "std")]
 use std::io;
 
-pub use rinja_derive::Template;
+pub use rinja_derive::{Template, main};
 
 #[doc(hidden)]
 pub use crate as shared;
@@ -369,6 +371,19 @@ macro_rules! impl_for_ref {
 }
 
 pub(crate) use impl_for_ref;
+
+/// Used by [`#[rinja::main]`][crate::main] to run a subprocess for dynamic rendering.
+///
+/// If manually invoked in `fn main()`, you need to place the call at the very top of the function.
+/// Only initializations for e.g. `log` or `tracing` can come before.
+pub fn run_dynamic_main() {
+    #[cfg(feature = "dynamic")]
+    if dynamic::init_am_dynamic_child() {
+        dynamic::child::run_dynamic_main();
+    } else {
+        dynamic::parent::run_dynamic_main();
+    }
+}
 
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
