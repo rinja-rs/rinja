@@ -27,10 +27,6 @@ pub(crate) fn template_to_string(
     heritage: Option<&Heritage<'_, '_>>,
     tmpl_kind: TmplKind,
 ) -> Result<usize, CompileError> {
-    if tmpl_kind == TmplKind::Struct {
-        buf.write("const _: () = { extern crate rinja as rinja;");
-    }
-
     let generator = Generator::new(
         input,
         contexts,
@@ -49,7 +45,6 @@ pub(crate) fn template_to_string(
 
     if tmpl_kind == TmplKind::Struct {
         impl_everything(input.ast, buf);
-        buf.write("};");
     }
     Ok(size_hint)
 }

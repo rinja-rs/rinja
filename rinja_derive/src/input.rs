@@ -12,7 +12,7 @@ use proc_macro2::Span;
 use rustc_hash::FxBuildHasher;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Expr, ExprLit, Ident, Lit, LitBool, LitStr, Meta, Token};
+use syn::{Attribute, Expr, ExprLit, ExprPath, Ident, Lit, LitBool, LitStr, Meta, Token};
 
 use crate::config::{Config, SyntaxAndCache};
 use crate::{CompileError, FileInfo, MsgValidEscapers, OnceMap};
@@ -329,9 +329,21 @@ impl AnyTemplateArgs {
             has_default_impl: needs_default_impl > 0,
         })
     }
+
+    pub(crate) fn take_crate_name(&mut self) -> Option<ExprPath> {
+        match self {
+            AnyTemplateArgs::Struct(template_args) => template_args.crate_name.take(),
+            AnyTemplateArgs::Enum { enum_args, .. } => {
+                if let Some(PartialTemplateArgs { crate_name, .. }) = enum_args {
+                    crate_name.take()
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
-#[derive(Debug)]
 pub(crate) struct TemplateArgs {
     pub(crate) source: (Source, Option<Span>),
     block: Option<String>,
@@ -341,6 +353,7 @@ pub(crate) struct TemplateArgs {
     ext_span: Option<Span>,
     syntax: Option<String>,
     config: Option<String>,
+    crate_name: Option<ExprPath>,
     pub(crate) whitespace: Option<Whitespace>,
     pub(crate) template_span: Option<Span>,
     pub(crate) config_span: Option<Span>,
@@ -389,6 +402,7 @@ impl TemplateArgs {
             ext_span: args.ext.as_ref().map(|value| value.span()),
             syntax: args.syntax.map(|value| value.value()),
             config: args.config.as_ref().map(|value| value.value()),
+            crate_name: args.crate_name,
             whitespace: args.whitespace,
             template_span: Some(args.template.span()),
             config_span: args.config.as_ref().map(|value| value.span()),
@@ -405,6 +419,7 @@ impl TemplateArgs {
             ext_span: None,
             syntax: None,
             config: None,
+            crate_name: None,
             whitespace: None,
             template_span: None,
             config_span: None,
@@ -676,6 +691,7 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) syntax: Option<LitStr>,
     pub(crate) config: Option<LitStr>,
     pub(crate) whitespace: Option<Whitespace>,
+    pub(crate) crate_name: Option<ExprPath>,
 }
 
 #[derive(Clone)]
@@ -735,6 +751,7 @@ const _: () = {
             syntax: None,
             config: None,
             whitespace: None,
+            crate_name: None,
         };
         let mut has_data = false;
 
@@ -775,6 +792,12 @@ const _: () = {
                     Some(ident) => ident,
                     None => unreachable!("not possible in syn::Meta::NameValue(…)"),
                 };
+
+                if ident == "rinja" {
+                    ensure_only_once(ident, &mut this.crate_name)?;
+                    this.crate_name = Some(get_exprpath(ident, pair.value)?);
+                    continue;
+                }
 
                 let value = get_lit(ident, pair.value)?;
 
@@ -915,6 +938,21 @@ const _: () = {
                 format!("template attribute `{name}` expects a boolean value"),
                 Some(value.lit.span()),
             ))
+        }
+    }
+
+    fn get_exprpath(name: &Ident, mut expr: Expr) -> Result<ExprPath, CompileError> {
+        loop {
+            match expr {
+                Expr::Path(path) => return Ok(path),
+                Expr::Group(group) => expr = *group.expr,
+                v => {
+                    return Err(CompileError::no_file_info(
+                        format!("template attribute `{name}` expects a path or identifier"),
+                        Some(v.span()),
+                    ));
+                }
+            }
         }
     }
 

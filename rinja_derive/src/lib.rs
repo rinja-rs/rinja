@@ -28,8 +28,8 @@ use parser::{Parsed, strip_common};
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
 use proc_macro2::TokenStream as TokenStream12;
-use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
+use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
+use quote::{quote, quote_spanned};
 use rustc_hash::FxBuildHasher;
 
 /// The `Template` derive macro and its `template()` attribute.
@@ -113,6 +113,37 @@ use rustc_hash::FxBuildHasher;
 ///
 /// Set the syntax name for a parser defined in the configuration file.
 /// The default syntax, `"default"`,  is the one provided by Rinja.
+///
+/// ### rinja
+///
+/// E.g. `rinja = rinja`
+///
+/// If you are using rinja in a subproject, a library or a [macro][book-macro], it might be
+/// necessary to specify the [path][book-tree] where to find the module `rinja`:
+///
+/// [book-macro]: https://doc.rust-lang.org/book/ch19-06-macros.html
+/// [book-tree]: https://doc.rust-lang.org/book/ch07-03-paths-for-referring-to-an-item-in-the-module-tree.html
+///
+/// ```rust,ignore
+/// #[doc(hidden)]
+/// use rinja as __rinja;
+///
+/// #[macro_export]
+/// macro_rules! new_greeter {
+///     ($name:ident) => {
+///         #[derive(Debug, $crate::rinja::Template)]
+///         #[template(
+///             ext = "txt",
+///             source = "Hello, world!",
+///             rinja = $crate::__rinja
+///         )]
+///         struct $name;
+///     }
+/// }
+///
+/// new_greeter!(HelloWorld);
+/// assert_eq!(HelloWorld.to_string(), Ok("Hello, world."));
+/// ```
 #[allow(clippy::useless_conversion)] // To be compatible with both `TokenStream`s
 #[cfg_attr(
     not(feature = "__standalone"),
@@ -124,32 +155,57 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
         Ok(ast) => ast,
         Err(err) => {
             let msgs = err.into_iter().map(|err| err.to_string());
-            return compile_error(msgs, Span::call_site()).into();
+            let ts = quote! {
+                span =>
+                const _: () = {
+                    extern crate core;
+                    #(core::compile_error!(#msgs);)*
+                };
+            };
+            return ts.into();
         }
     };
 
     let mut buf = Buffer::new();
-    if let Err(CompileError { msg, span }) = build_template(&mut buf, &ast) {
-        let mut ts = compile_error(std::iter::once(msg), span.unwrap_or(ast.ident.span()));
+    let mut args = AnyTemplateArgs::new(&ast);
+    let crate_name = args
+        .as_mut()
+        .map(|a| a.take_crate_name())
+        .unwrap_or_default();
+
+    let result = args.and_then(|args| build_template(&mut buf, &ast, args));
+    let ts = if let Err(CompileError { msg, span }) = result {
+        let mut ts = quote_spanned! {
+            span.unwrap_or(ast.ident.span()) =>
+            rinja::helpers::core::compile_error!(#msg);
+        };
         buf.clear();
         if build_skeleton(&mut buf, &ast).is_ok() {
             let source: TokenStream = buf.into_string().parse().unwrap();
             ts.extend(source);
         }
-        ts.into()
+        ts
     } else {
         buf.into_string().parse().unwrap()
-    }
-}
+    };
 
-fn compile_error(msgs: impl Iterator<Item = String>, span: Span) -> TokenStream {
-    quote_spanned! {
-        span =>
-        const _: () = {
-            extern crate rinja as rinja;
-            #(rinja::helpers::core::compile_error!(#msgs);)*
-        };
-    }
+    let ts = TokenTree::Group(Group::new(Delimiter::None, ts));
+    let ts = if let Some(crate_name) = crate_name {
+        quote! {
+            const _: () = {
+                use #crate_name as rinja;
+                #ts
+            };
+        }
+    } else {
+        quote! {
+            const _: () = {
+                extern crate rinja;
+                #ts
+            };
+        }
+    };
+    ts.into()
 }
 
 fn build_skeleton(buf: &mut Buffer, ast: &syn::DeriveInput) -> Result<usize, CompileError> {
@@ -172,9 +228,10 @@ fn build_skeleton(buf: &mut Buffer, ast: &syn::DeriveInput) -> Result<usize, Com
 pub(crate) fn build_template(
     buf: &mut Buffer,
     ast: &syn::DeriveInput,
+    args: AnyTemplateArgs,
 ) -> Result<usize, CompileError> {
     let err_span;
-    let mut result = match AnyTemplateArgs::new(ast)? {
+    let mut result = match args {
         AnyTemplateArgs::Struct(item) => {
             err_span = item.source.1.or(item.template_span);
             build_template_item(buf, ast, None, &item, TmplKind::Struct)
