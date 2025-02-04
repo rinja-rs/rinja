@@ -28,7 +28,7 @@ jobs:
           for PKG in \
             examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/salvo-app examples/warp-app fuzzing \
             rinja rinja_derive rinja_derive_standalone rinja_parser \
-            testing testing-alloc testing-no-std
+            testing testing-alloc testing-no-std testing-renamed
           do
             cd "$PKG"
             echo "Testing: $PKG"
@@ -118,7 +118,7 @@ jobs:
           for PKG in \
             examples/actix-web-app examples/axum-app examples/poem-app examples/rocket-app examples/salvo-app examples/warp-app fuzzing \
             rinja rinja_derive rinja_derive_standalone rinja_parser \
-            testing testing-alloc testing-no-std
+            testing testing-alloc testing-no-std testing-renamed
           do
             cd "$PKG"
             cargo sort --check --check-format --grouped
@@ -161,7 +161,7 @@ jobs:
         package: [
           examples/actix-web-app, examples/axum-app, examples/poem-app, examples/rocket-app, examples/salvo-app, examples/warp-app, fuzzing,
           rinja, rinja_derive, rinja_derive_standalone, rinja_parser,
-          testing, testing-alloc, testing-no-std,
+          testing, testing-alloc, testing-no-std, testing-renamed,
         ]
     runs-on: ubuntu-latest
     steps:

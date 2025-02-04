@@ -250,7 +250,6 @@ pub(crate) fn build_template_enum(
         unreachable!();
     };
 
-    buf.write("const _: () = { extern crate rinja as rinja;");
     impl_everything(enum_ast, buf);
 
     let enum_id = &enum_ast.ident;
@@ -368,8 +367,7 @@ pub(crate) fn build_template_enum(
     buf.write(format_args!(
         "\
         const SIZE_HINT: rinja::helpers::core::primitive::usize = {biggest_size_hint}usize;\
-        }}\
-        }};",
+        }}",
     ));
     Ok(biggest_size_hint)
 }

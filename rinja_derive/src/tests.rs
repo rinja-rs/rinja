@@ -7,11 +7,14 @@ use console::style;
 use prettyplease::unparse;
 use similar::{Algorithm, ChangeTag, TextDiffConfig};
 
+use crate::AnyTemplateArgs;
 use crate::integration::Buffer;
 
+#[track_caller]
 fn build_template(ast: &syn::DeriveInput) -> Result<String, crate::CompileError> {
     let mut buf = Buffer::new();
-    crate::build_template(&mut buf, ast)?;
+    let args = AnyTemplateArgs::new(ast)?;
+    crate::build_template(&mut buf, ast, args)?;
     Ok(buf.into_string())
 }
 
@@ -23,49 +26,45 @@ fn compare(jinja: &str, expected: &str, fields: &[(&str, &str)], size_hint: usiz
 
     let expected: proc_macro2::TokenStream = expected.parse().unwrap();
     let expected: syn::File = syn::parse_quote! {
-        const _: () = {
-            extern crate rinja as rinja;
-
-            impl rinja::Template for Foo {
-                fn render_into_with_values<RinjaW>(
-                    &self,
-                    __rinja_writer: &mut RinjaW,
-                    __rinja_values: &dyn rinja::Values,
-                ) -> rinja::Result<()>
-                where
-                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
-                {
-                    #[allow(unused_imports)]
-                    use rinja::{
-                        filters::{AutoEscape as _, WriteWritable as _},
-                        helpers::{ResultConverter as _, core::fmt::Write as _},
-                    };
-                    #expected
-                    rinja::Result::Ok(())
-                }
-                const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
+        impl rinja::Template for Foo {
+            fn render_into_with_values<RinjaW>(
+                &self,
+                __rinja_writer: &mut RinjaW,
+                __rinja_values: &dyn rinja::Values,
+            ) -> rinja::Result<()>
+            where
+                RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
+            {
+                #[allow(unused_imports)]
+                use rinja::{
+                    filters::{AutoEscape as _, WriteWritable as _},
+                    helpers::{ResultConverter as _, core::fmt::Write as _},
+                };
+                #expected
+                rinja::Result::Ok(())
             }
+            const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
+        }
 
-            /// Implement the [`format!()`][rinja::helpers::std::format] trait for [`Foo`]
-            ///
-            /// Please be aware of the rendering performance notice in the [`Template`][rinja::Template] trait.
-            impl rinja::helpers::core::fmt::Display for Foo {
-                #[inline]
-                fn fmt(&self, f: &mut rinja::helpers::core::fmt::Formatter<'_>) -> rinja::helpers::core::fmt::Result {
-                    rinja::Template::render_into(self, f).map_err(|_| rinja::helpers::core::fmt::Error)
-                }
+        /// Implement the [`format!()`][rinja::helpers::std::format] trait for [`Foo`]
+        ///
+        /// Please be aware of the rendering performance notice in the [`Template`][rinja::Template] trait.
+        impl rinja::helpers::core::fmt::Display for Foo {
+            #[inline]
+            fn fmt(&self, f: &mut rinja::helpers::core::fmt::Formatter<'_>) -> rinja::helpers::core::fmt::Result {
+                rinja::Template::render_into(self, f).map_err(|_| rinja::helpers::core::fmt::Error)
             }
+        }
 
-            impl rinja::filters::FastWritable for Foo {
-                #[inline]
-                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::Result<()>
-                where
-                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
-                {
-                    rinja::Template::render_into(self, dest)
-                }
+        impl rinja::filters::FastWritable for Foo {
+            #[inline]
+            fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::Result<()>
+            where
+                RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized,
+            {
+                rinja::Template::render_into(self, dest)
             }
-        };
+        }
     };
 
     let expected = unparse(&expected);

@@ -30,7 +30,7 @@ code generation process takes some options that can be specified through
 the `template()` attribute. The following sub-attributes are currently
 recognized:
 
-* `path` (as `path = "foo.html"`): sets the path to the template file. The
+* `path` (e.g. `path = "foo.html"`): sets the path to the template file. The
   path is interpreted as relative to the configured template directories
   (by default, this is a `templates` directory next to your `Cargo.toml`).
   The file name extension is used to infer an escape mode (see below). In
@@ -43,7 +43,7 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `source` (as `source = "{{ foo }}"`): directly sets the template source.
+* `source` (e.g. `source = "{{ foo }}"`): directly sets the template source.
   This can be useful for test cases or short templates. The generated path
   is undefined, which generally makes it impossible to refer to this
   template from other templates. If `source` is specified, `ext` must also
@@ -56,10 +56,10 @@ recognized:
   }
   ```
 
-* `in_doc` (as `in_doc = true`):
+* `in_doc` (e.g. `in_doc = true`):
   please see the section ["documentation as template code"](#documentation-as-template-code).
 
-* `ext` (as `ext = "txt"`): lets you specify the content type as a file
+* `ext` (e.g. `ext = "txt"`): lets you specify the content type as a file
   extension. This is used to infer an escape mode (see below), and some
   web framework integrations use it to determine the content type.
   Cannot be used together with `path`.
@@ -71,7 +71,7 @@ recognized:
   }
   ```
 
-* `print` (as `print = "code"`): enable debugging by printing nothing
+* `print` (e.g. `print = "code"`): enable debugging by printing nothing
   (`none`), the parsed syntax tree (`ast`), the generated code (`code`)
   or `all` for both. The requested data will be printed to stdout at
   compile time.
@@ -81,7 +81,7 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `block` (as `block = "block_name"`): renders the block by itself.
+* `block` (e.g. `block = "block_name"`): renders the block by itself.
   Expressions outside of the block are not required by the struct, and
   inheritance is also supported. This can be useful when you need to
   decompose your template for partial rendering, without needing to
@@ -92,7 +92,7 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `escape` (as `escape = "none"`): override the template's extension used for
+* `escape` (e.g. `escape = "none"`): override the template's extension used for
   the purpose of determining the escaper for this template. See the section
   on configuring custom escapers for more information.
   ```rust
@@ -101,7 +101,7 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `syntax` (as `syntax = "foo"`): set the syntax name for a parser defined
+* `syntax` (e.g. `syntax = "foo"`): set the syntax name for a parser defined
   in the configuration file. The default syntax , "default", is the one
   provided by Rinja.
   ```rust
@@ -110,7 +110,7 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `config` (as `config = "config_file_path"`): set the path for the config file
+* `config` (e.g. `config = "config_file_path"`): set the path for the config file
   to be used. The path is interpreted as relative to your crate root.
   ```rust
   #[derive(Template)]
@@ -118,6 +118,33 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
+* `rinja` (e.g. `rinja = rinja`):
+  If you are using rinja in a subproject, a library or a [macro][book-macro], it might be
+  necessary to specify the [path][book-tree] where to find the module `rinja`:
+
+  [book-macro]: https://doc.rust-lang.org/book/ch19-06-macros.html
+  [book-tree]: https://doc.rust-lang.org/book/ch07-03-paths-for-referring-to-an-item-in-the-module-tree.html
+
+  ```rust,ignore
+  #[doc(hidden)]
+  use rinja as __rinja;
+
+  #[macro_export]
+  macro_rules! new_greeter {
+      ($name:ident) => {
+          #[derive(Debug, $crate::rinja::Template)]
+          #[template(
+              ext = "txt",
+              source = "Hello, world!",
+              rinja = $crate::__rinja
+          )]
+          struct $name;
+      }
+  }
+
+  new_greeter!(HelloWorld);
+  assert_eq!(HelloWorld.to_string(), Ok("Hello, world."));
+  ```
 ## Templating `enum`s
 
 You can add derive `Template`s for `struct`s and `enum`s.
@@ -200,8 +227,8 @@ enum AreaWithBlocks {
 ## Documentation as template code
 [#documentation-as-template-code]: #documentation-as-template-code
 
-As an alternative to supplying the code template code in an external file (as `path` argument),
-or as a string (as `source` argument), you can also enable the `"code-in-doc"` feature.
+As an alternative to supplying the code template code in an external file (e.g. `path` argument),
+or as a string (e.g. `source` argument), you can also enable the `"code-in-doc"` feature.
 With this feature, you can specify the template code directly in the documentation
 of the template item.
 

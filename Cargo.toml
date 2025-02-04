@@ -5,6 +5,7 @@ members = [
     "rinja_parser",
     "testing",
     "testing-alloc",
-    "testing-no-std"
+    "testing-no-std",
+    "testing-renamed"
 ]
 resolver = "2"
