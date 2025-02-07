@@ -289,11 +289,11 @@ impl AnyTemplateArgs {
             return Ok(Self::Struct(TemplateArgs::new(ast)?));
         };
 
-        let enum_args = PartialTemplateArgs::new(ast, &ast.attrs)?;
+        let enum_args = PartialTemplateArgs::new(ast, &ast.attrs, false)?;
         let vars_args = enum_data
             .variants
             .iter()
-            .map(|variant| PartialTemplateArgs::new(ast, &variant.attrs))
+            .map(|variant| PartialTemplateArgs::new(ast, &variant.attrs, true))
             .collect::<Result<Vec<_>, _>>()?;
         if vars_args.is_empty() {
             return Ok(Self::Struct(TemplateArgs::from_partial(ast, enum_args)?));
@@ -361,7 +361,7 @@ pub(crate) struct TemplateArgs {
 
 impl TemplateArgs {
     pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
-        Self::from_partial(ast, PartialTemplateArgs::new(ast, &ast.attrs)?)
+        Self::from_partial(ast, PartialTemplateArgs::new(ast, &ast.attrs, false)?)
     }
 
     pub(crate) fn from_partial(
@@ -719,8 +719,9 @@ const _: () = {
         pub(crate) fn new(
             ast: &syn::DeriveInput,
             attrs: &[Attribute],
+            is_enum_variant: bool,
         ) -> Result<Option<Self>, CompileError> {
-            new(ast, attrs)
+            new(ast, attrs, is_enum_variant)
         }
     }
 
@@ -728,6 +729,7 @@ const _: () = {
     fn new(
         ast: &syn::DeriveInput,
         attrs: &[Attribute],
+        is_enum_variant: bool,
     ) -> Result<Option<PartialTemplateArgs>, CompileError> {
         // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
         if let syn::Data::Union(data) = &ast.data {
@@ -794,6 +796,13 @@ const _: () = {
                 };
 
                 if ident == "rinja" {
+                    if is_enum_variant {
+                        return Err(CompileError::no_file_info(
+                            "template attribute `rinja` can only be used on the `enum`, \
+                            not its variants",
+                            Some(ident.span()),
+                        ));
+                    }
                     ensure_only_once(ident, &mut this.crate_name)?;
                     this.crate_name = Some(get_exprpath(ident, pair.value)?);
                     continue;
@@ -845,7 +854,7 @@ const _: () = {
                     set_parseable_string(ident, value, &mut this.whitespace)?;
                 } else {
                     return Err(CompileError::no_file_info(
-                        format!("unsupported template attribute `{ident}` found"),
+                        format_args!("unsupported template attribute `{ident}` found"),
                         Some(ident.span()),
                     ));
                 }
