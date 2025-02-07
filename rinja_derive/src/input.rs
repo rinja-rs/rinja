@@ -76,7 +76,7 @@ impl TemplateInput<'_> {
             || Ok(config.syntaxes.get(config.default_syntax).unwrap()),
             |s| {
                 config.syntaxes.get(s).ok_or_else(|| {
-                    CompileError::no_file_info(format!("syntax `{s}` is undefined"), None)
+                    CompileError::no_file_info(format_args!("syntax `{s}` is undefined"), None)
                 })
             },
         )?;
@@ -98,7 +98,7 @@ impl TemplateInput<'_> {
             })
             .ok_or_else(|| {
                 CompileError::no_file_info(
-                    format!(
+                    format_args!(
                         "no escaper defined for extension '{escaping}'. You can define an escaper \
                         in the config file (named `rinja.toml` by default). {}",
                         MsgValidEscapers(&config.escapers),
@@ -509,7 +509,7 @@ fn no_rinja_code_block(span: Span, ast: &syn::DeriveInput) -> CompileError {
         syn::Data::Union(_) => "union",
     };
     CompileError::no_file_info(
-        format!(
+        format_args!(
             "when using `in_doc` with the value `true`, the {kind}'s documentation needs a \
              `rinja` code block"
         ),
@@ -641,7 +641,7 @@ impl FromStr for Print {
 
 fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
     Err(CompileError::no_file_info(
-        format!(
+        format_args!(
             "cyclic dependency in graph {:#?}",
             dependency_graph
                 .iter()
@@ -776,7 +776,7 @@ const _: () = {
                 .parse_args_with(<Punctuated<Meta, Token![,]>>::parse_terminated)
                 .map_err(|e| {
                     CompileError::no_file_info(
-                        format!("unable to parse template arguments: {e}"),
+                        format_args!("unable to parse template arguments: {e}"),
                         Some(attr.path().span()),
                     )
                 })?;
@@ -907,7 +907,7 @@ const _: () = {
             Ok(())
         } else {
             Err(CompileError::no_file_info(
-                format!("template attribute `{name}` already set"),
+                format_args!("template attribute `{name}` already set"),
                 Some(name.span()),
             ))
         }
@@ -920,7 +920,7 @@ const _: () = {
                 Expr::Group(group) => expr = *group.expr,
                 v => {
                     return Err(CompileError::no_file_info(
-                        format!("template attribute `{name}` expects a literal"),
+                        format_args!("template attribute `{name}` expects a literal"),
                         Some(v.span()),
                     ));
                 }
@@ -933,7 +933,7 @@ const _: () = {
             Ok(s)
         } else {
             Err(CompileError::no_file_info(
-                format!("template attribute `{name}` expects a string literal"),
+                format_args!("template attribute `{name}` expects a string literal"),
                 Some(value.lit.span()),
             ))
         }
@@ -944,7 +944,7 @@ const _: () = {
             Ok(s)
         } else {
             Err(CompileError::no_file_info(
-                format!("template attribute `{name}` expects a boolean value"),
+                format_args!("template attribute `{name}` expects a boolean value"),
                 Some(value.lit.span()),
             ))
         }
@@ -957,7 +957,7 @@ const _: () = {
                 Expr::Group(group) => expr = *group.expr,
                 v => {
                     return Err(CompileError::no_file_info(
-                        format!("template attribute `{name}` expects a path or identifier"),
+                        format_args!("template attribute `{name}` expects a path or identifier"),
                         Some(v.span()),
                     ));
                 }
