@@ -21,3 +21,9 @@ error: template attribute `rinja` can only be used on the `enum`, not its varian
    |
 27 |     #[template(ext = "txt", source = "🫠", rinja = rinja)]
    |                                            ^^^^^
+
+error: cannot find block `c`
+  --> tests/ui/enum.rs:48:24
+   |
+48 |     #[template(block = "c")]
+   |                        ^^^

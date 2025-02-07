@@ -24,7 +24,7 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
     pub(crate) source_span: Option<Span>,
-    pub(crate) block: Option<&'a str>,
+    pub(crate) block: Option<(&'a str, Span)>,
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
     pub(crate) path: Arc<Path>,
@@ -133,7 +133,7 @@ impl TemplateInput<'_> {
             syntax,
             source,
             source_span: *source_span,
-            block: block.as_deref(),
+            block: block.as_ref().map(|(block, span)| (block.as_str(), *span)),
             print: *print,
             escaper,
             path,
@@ -346,7 +346,7 @@ impl AnyTemplateArgs {
 
 pub(crate) struct TemplateArgs {
     pub(crate) source: (Source, Option<Span>),
-    block: Option<String>,
+    block: Option<(String, Span)>,
     print: Print,
     escaping: Option<String>,
     ext: Option<String>,
@@ -395,7 +395,7 @@ impl TemplateArgs {
                     ));
                 }
             },
-            block: args.block.map(|value| value.value()),
+            block: args.block.map(|value| (value.value(), value.span())),
             print: args.print.unwrap_or_default(),
             escaping: args.escape.map(|value| value.value()),
             ext: args.ext.as_ref().map(|value| value.value()),

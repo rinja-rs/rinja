@@ -30,4 +30,25 @@ enum CratePathOnAll {
     Variant2,
 }
 
+#[derive(Template)]
+#[template(
+    ext = "txt",
+    source = "
+        {%- block a -%} a {%- endblock -%}
+        {%- block b -%} b {%- endblock -%}
+        {#- no block c -#}
+        {%- block d -%} d {%- endblock -%}
+    ",
+)]
+enum MissingBlockName {
+    #[template(block = "a")]
+    A,
+    #[template(block = "b")]
+    B,
+    #[template(block = "c")]
+    C,
+    #[template(block = "d")]
+    D,
+}
+
 fn main() {}
