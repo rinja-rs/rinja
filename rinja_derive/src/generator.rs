@@ -176,8 +176,8 @@ impl<'a, 'h> Generator<'a, 'h> {
         buf.write('}');
 
         #[cfg(feature = "blocks")]
-        for (block, span) in self.input.blocks {
-            self.impl_block(buf, block, span)?;
+        for block in self.input.blocks {
+            self.impl_block(buf, block)?;
         }
 
         Ok(size_hint)
@@ -187,8 +187,7 @@ impl<'a, 'h> Generator<'a, 'h> {
     fn impl_block(
         &self,
         buf: &mut Buffer,
-        block: &str,
-        span: &proc_macro2::Span,
+        block: &crate::input::Block,
     ) -> Result<(), CompileError> {
         // RATIONALE: `*self` must be the input type, implementation details should not leak:
         // - impl Self { fn as_block(self) } ->
@@ -199,7 +198,7 @@ impl<'a, 'h> Generator<'a, 'h> {
         use quote::quote_spanned;
         use syn::{GenericParam, Ident, Lifetime, LifetimeParam, Token};
 
-        let span = *span;
+        let span = block.span;
         buf.write(
             "\
             #[allow(missing_docs, non_camel_case_types, non_snake_case, unreachable_pub)]\
@@ -208,11 +207,14 @@ impl<'a, 'h> Generator<'a, 'h> {
 
         let ident = &self.input.ast.ident;
 
-        let doc = format!("A sub-template that renders only the block `{block}` of [`{ident}`].");
-        let method_name = format!("as_{block}");
-        let trait_name = format!("__Rinja__{ident}__as__{block}");
-        let wrapper_name = format!("__Rinja__{ident}__as__{block}__Wrapper");
-        let self_lt_name = format!("'__Rinja__{ident}__as__{block}__self");
+        let doc = format!(
+            "A sub-template that renders only the block `{}` of [`{ident}`].",
+            block.name
+        );
+        let method_name = format!("as_{}", block.name);
+        let trait_name = format!("__Rinja__{ident}__as__{}", block.name);
+        let wrapper_name = format!("__Rinja__{ident}__as__{}__Wrapper", block.name);
+        let self_lt_name = format!("'__Rinja__{ident}__as__{}__self", block.name);
 
         let method_id = Ident::new(&method_name, span);
         let trait_id = Ident::new(&trait_name, span);
@@ -235,7 +237,7 @@ impl<'a, 'h> Generator<'a, 'h> {
             wrapper_generics.split_for_impl();
 
         let input = TemplateInput {
-            block: Some((block, span)),
+            block: Some((&block.name, span)),
             #[cfg(feature = "blocks")]
             blocks: &[],
             ..self.input.clone()
