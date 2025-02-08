@@ -100,6 +100,56 @@ use rustc_hash::FxBuildHasher;
 /// the generated code (`code`) or `all` for both.
 /// The requested data will be printed to stdout at compile time.
 ///
+/// ### block
+///
+/// E.g. `block = "block_name"`
+///
+/// Renders the block by itself.
+/// Expressions outside of the block are not required by the struct, and
+/// inheritance is also supported. This can be useful when you need to
+/// decompose your template for partial rendering, without needing to
+/// extract the partial into a separate template or macro.
+///
+/// ```rust,ignore
+/// #[derive(Template)]
+/// #[template(path = "hello.html", block = "hello")]
+/// struct HelloTemplate<'a> { ... }
+/// ```
+///
+/// ### blocks
+///
+/// E.g. `blocks = ["title", "content"]`
+///
+/// Automatically generates (a number of) sub-templates that act as if they had a
+/// `block = "..."` attribute. You can access the sub-templates with the method
+/// <code>my_template.as_<em>block_name</em>()</code>, where *`block_name`* is the
+/// name of the block:
+///
+/// ```rust,ignore
+/// #[derive(Template)]
+/// #[template(
+///     ext = "txt",
+///     source = "
+///         {% block title %} ... {% endblock %}
+///         {% block content %} ... {% endblock %}
+///     ",
+///     blocks = ["title", "content"]
+/// )]
+/// struct News<'a> {
+///     title: &'a str,
+///     message: &'a str,
+/// }
+///
+/// let news = News {
+///     title: "Announcing Rust 1.84.1",
+///     message: "The Rust team has published a new point release of Rust, 1.84.1.",
+/// };
+/// assert_eq!(
+///     news.as_title().render().unwrap(),
+///     "<h1>Announcing Rust 1.84.1</h1>"
+/// );
+/// ```
+///
 /// ### escape
 ///
 /// E.g. `escape = "none"`
