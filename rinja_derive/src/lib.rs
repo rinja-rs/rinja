@@ -156,7 +156,6 @@ pub fn derive_template(input: TokenStream12) -> TokenStream12 {
         Err(err) => {
             let msgs = err.into_iter().map(|err| err.to_string());
             let ts = quote! {
-                span =>
                 const _: () = {
                     extern crate core;
                     #(core::compile_error!(#msgs);)*
