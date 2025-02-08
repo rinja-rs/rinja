@@ -17,6 +17,7 @@ use syn::{Attribute, Expr, ExprLit, ExprPath, Ident, Lit, LitBool, LitStr, Meta,
 use crate::config::{Config, SyntaxAndCache};
 use crate::{CompileError, FileInfo, MsgValidEscapers, OnceMap};
 
+#[derive(Clone)]
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
     pub(crate) enum_ast: Option<&'a syn::DeriveInput>,
@@ -25,10 +26,12 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) source: &'a Source,
     pub(crate) source_span: Option<Span>,
     pub(crate) block: Option<(&'a str, Span)>,
+    #[cfg(feature = "blocks")]
+    pub(crate) blocks: &'a [(String, Span)],
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
     pub(crate) path: Arc<Path>,
-    pub(crate) fields: Vec<String>,
+    pub(crate) fields: Arc<[String]>,
 }
 
 impl TemplateInput<'_> {
@@ -44,6 +47,8 @@ impl TemplateInput<'_> {
         let TemplateArgs {
             source: (source, source_span),
             block,
+            #[cfg(feature = "blocks")]
+            blocks,
             print,
             escaping,
             ext,
@@ -134,10 +139,12 @@ impl TemplateInput<'_> {
             source,
             source_span: *source_span,
             block: block.as_ref().map(|(block, span)| (block.as_str(), *span)),
+            #[cfg(feature = "blocks")]
+            blocks: blocks.as_slice(),
             print: *print,
             escaper,
             path,
-            fields,
+            fields: fields.into(),
         })
     }
 
@@ -347,6 +354,8 @@ impl AnyTemplateArgs {
 pub(crate) struct TemplateArgs {
     pub(crate) source: (Source, Option<Span>),
     block: Option<(String, Span)>,
+    #[cfg(feature = "blocks")]
+    blocks: Vec<(String, Span)>,
     print: Print,
     escaping: Option<String>,
     ext: Option<String>,
@@ -396,6 +405,13 @@ impl TemplateArgs {
                 }
             },
             block: args.block.map(|value| (value.value(), value.span())),
+            #[cfg(feature = "blocks")]
+            blocks: args
+                .blocks
+                .unwrap_or_default()
+                .into_iter()
+                .map(|value| (value.value(), value.span()))
+                .collect(),
             print: args.print.unwrap_or_default(),
             escaping: args.escape.map(|value| value.value()),
             ext: args.ext.as_ref().map(|value| value.value()),
@@ -413,6 +429,8 @@ impl TemplateArgs {
         Self {
             source: (Source::Source("".into()), None),
             block: None,
+            #[cfg(feature = "blocks")]
+            blocks: vec![],
             print: Print::default(),
             escaping: None,
             ext: Some("txt".to_string()),
@@ -692,6 +710,8 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) config: Option<LitStr>,
     pub(crate) whitespace: Option<Whitespace>,
     pub(crate) crate_name: Option<ExprPath>,
+    #[cfg(feature = "blocks")]
+    pub(crate) blocks: Option<Vec<LitStr>>,
 }
 
 #[derive(Clone)]
@@ -754,6 +774,8 @@ const _: () = {
             config: None,
             whitespace: None,
             crate_name: None,
+            #[cfg(feature = "blocks")]
+            blocks: None,
         };
         let mut has_data = false;
 
@@ -806,6 +828,31 @@ const _: () = {
                     ensure_only_once(ident, &mut this.crate_name)?;
                     this.crate_name = Some(get_exprpath(ident, pair.value)?);
                     continue;
+                } else if ident == "blocks" {
+                    if !cfg!(feature = "blocks") {
+                        return Err(CompileError::no_file_info(
+                            "enable feature `blocks` to use `blocks` argument",
+                            Some(ident.span()),
+                        ));
+                    } else if is_enum_variant {
+                        return Err(CompileError::no_file_info(
+                            "template attribute `blocks` can only be used on the `enum`, \
+                            not its variants",
+                            Some(ident.span()),
+                        ));
+                    }
+                    #[cfg(feature = "blocks")]
+                    {
+                        ensure_only_once(ident, &mut this.blocks)?;
+                        this.blocks = Some(
+                            get_exprarray(ident, pair.value)?
+                                .elems
+                                .into_iter()
+                                .map(|value| get_strlit(ident, get_lit(ident, value)?))
+                                .collect::<Result<_, _>>()?,
+                        );
+                        continue;
+                    }
                 }
 
                 let value = get_lit(ident, pair.value)?;
@@ -958,6 +1005,22 @@ const _: () = {
                 v => {
                     return Err(CompileError::no_file_info(
                         format_args!("template attribute `{name}` expects a path or identifier"),
+                        Some(v.span()),
+                    ));
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "blocks")]
+    fn get_exprarray(name: &Ident, mut expr: Expr) -> Result<syn::ExprArray, CompileError> {
+        loop {
+            match expr {
+                Expr::Array(array) => return Ok(array),
+                Expr::Group(group) => expr = *group.expr,
+                v => {
+                    return Err(CompileError::no_file_info(
+                        format_args!("template attribute `{name}` expects an array"),
                         Some(v.span()),
                     ));
                 }

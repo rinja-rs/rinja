@@ -262,7 +262,7 @@ fn build_template_item(
     ast: &syn::DeriveInput,
     enum_ast: Option<&syn::DeriveInput>,
     template_args: &TemplateArgs,
-    tmpl_kind: TmplKind,
+    tmpl_kind: TmplKind<'_>,
 ) -> Result<usize, CompileError> {
     let config_path = template_args.config_path();
     let s = read_config_file(config_path, template_args.config_span)?;
