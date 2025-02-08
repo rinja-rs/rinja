@@ -238,7 +238,6 @@ impl<'a, 'h> Generator<'a, 'h> {
 
         let input = TemplateInput {
             block: Some((&block.name, span)),
-            #[cfg(feature = "blocks")]
             blocks: &[],
             ..self.input.clone()
         };
