@@ -25,7 +25,7 @@ pub(crate) fn template_to_string(
     input: &TemplateInput<'_>,
     contexts: &HashMap<&Arc<Path>, Context<'_>, FxBuildHasher>,
     heritage: Option<&Heritage<'_, '_>>,
-    tmpl_kind: TmplKind,
+    tmpl_kind: TmplKind<'_>,
 ) -> Result<usize, CompileError> {
     let generator = Generator::new(
         input,
@@ -50,11 +50,14 @@ pub(crate) fn template_to_string(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TmplKind {
+pub(crate) enum TmplKind<'a> {
     /// [`rinja::Template`]
     Struct,
     /// [`rinja::helpers::EnumVariantTemplate`]
     Variant,
+    /// Used in `blocks` implementation
+    #[allow(unused)]
+    Block(&'a str),
 }
 
 struct Generator<'a, 'h> {
@@ -113,13 +116,14 @@ impl<'a, 'h> Generator<'a, 'h> {
     fn impl_template(
         mut self,
         buf: &mut Buffer,
-        tmpl_kind: TmplKind,
+        tmpl_kind: TmplKind<'a>,
     ) -> Result<usize, CompileError> {
         let ctx = &self.contexts[&self.input.path];
 
         let target = match tmpl_kind {
             TmplKind::Struct => "rinja::Template",
             TmplKind::Variant => "rinja::helpers::EnumVariantTemplate",
+            TmplKind::Block(trait_name) => trait_name,
         };
         write_header(self.input.ast, buf, target);
         buf.write(
@@ -170,7 +174,156 @@ impl<'a, 'h> Generator<'a, 'h> {
         }
 
         buf.write('}');
+
+        #[cfg(feature = "blocks")]
+        for (block, span) in self.input.blocks {
+            self.impl_block(buf, block, span)?;
+        }
+
         Ok(size_hint)
+    }
+
+    #[cfg(feature = "blocks")]
+    fn impl_block(
+        &self,
+        buf: &mut Buffer,
+        block: &str,
+        span: &proc_macro2::Span,
+    ) -> Result<(), CompileError> {
+        // RATIONALE: `*self` must be the input type, implementation details should not leak:
+        // - impl Self { fn as_block(self) } ->
+        // - struct __Rinja__Self__as__block__Wrapper { this: self } ->
+        // - impl Template for __Rinja__Self__as__block__Wrapper { fn render_into_with_values() } ->
+        // - impl __Rinja__Self__as__block for Self { render_into_with_values() }
+
+        use quote::quote_spanned;
+        use syn::{GenericParam, Ident, Lifetime, LifetimeParam, Token};
+
+        let span = *span;
+        buf.write(
+            "\
+            #[allow(missing_docs, non_camel_case_types, non_snake_case, unreachable_pub)]\
+            const _: () = {",
+        );
+
+        let ident = &self.input.ast.ident;
+
+        let doc = format!("A sub-template that renders only the block `{block}` of [`{ident}`].");
+        let method_name = format!("as_{block}");
+        let trait_name = format!("__Rinja__{ident}__as__{block}");
+        let wrapper_name = format!("__Rinja__{ident}__as__{block}__Wrapper");
+        let self_lt_name = format!("'__Rinja__{ident}__as__{block}__self");
+
+        let method_id = Ident::new(&method_name, span);
+        let trait_id = Ident::new(&trait_name, span);
+        let wrapper_id = Ident::new(&wrapper_name, span);
+        let self_lt = Lifetime::new(&self_lt_name, span);
+
+        // generics of the input with an additional lifetime to capture `self`
+        let mut wrapper_generics = self.input.ast.generics.clone();
+        if wrapper_generics.lt_token.is_none() {
+            wrapper_generics.lt_token = Some(Token![<](span));
+            wrapper_generics.gt_token = Some(Token![>](span));
+        }
+        wrapper_generics.params.insert(
+            0,
+            GenericParam::Lifetime(LifetimeParam::new(self_lt.clone())),
+        );
+
+        let (impl_generics, ty_generics, where_clause) = self.input.ast.generics.split_for_impl();
+        let (wrapper_impl_generics, wrapper_ty_generics, wrapper_where_clause) =
+            wrapper_generics.split_for_impl();
+
+        let input = TemplateInput {
+            block: Some((block, span)),
+            #[cfg(feature = "blocks")]
+            blocks: &[],
+            ..self.input.clone()
+        };
+        let size_hint = template_to_string(
+            buf,
+            &input,
+            self.contexts,
+            self.heritage,
+            TmplKind::Block(&trait_name),
+        )?;
+
+        buf.write(quote_spanned! {
+            span =>
+            pub trait #trait_id {
+                fn render_into_with_values<RinjaW>(
+                    &self,
+                    writer: &mut RinjaW,
+                    values: &dyn rinja::Values,
+                ) -> rinja::Result<()>
+                where
+                    RinjaW:
+                        rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized;
+            }
+
+            impl #impl_generics #ident #ty_generics #where_clause {
+                #[inline]
+                #[doc = #doc]
+                pub fn #method_id(&self) -> impl rinja::Template + '_ {
+                    #wrapper_id {
+                        this: self,
+                    }
+                }
+            }
+
+            #[rinja::helpers::core::prelude::rust_2021::derive(
+                rinja::helpers::core::prelude::rust_2021::Clone,
+                rinja::helpers::core::prelude::rust_2021::Copy
+            )]
+            pub struct #wrapper_id #wrapper_generics #wrapper_where_clause {
+                this: &#self_lt #ident #ty_generics,
+            }
+
+            impl #wrapper_impl_generics rinja::Template
+            for #wrapper_id #wrapper_ty_generics #wrapper_where_clause {
+                #[inline]
+                fn render_into_with_values<RinjaW>(
+                    &self,
+                    writer: &mut RinjaW,
+                    values: &dyn rinja::Values
+                ) -> rinja::Result<()>
+                where
+                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized
+                {
+                    <_ as #trait_id>::render_into_with_values(self.this, writer, values)
+                }
+
+                const SIZE_HINT: rinja::helpers::core::primitive::usize = #size_hint;
+            }
+
+            // cannot use `crate::integrations::impl_fast_writable()` w/o cloning the struct
+            impl #wrapper_impl_generics rinja::filters::FastWritable
+            for #wrapper_id #wrapper_ty_generics #wrapper_where_clause {
+                #[inline]
+                fn write_into<RinjaW>(&self, dest: &mut RinjaW) -> rinja::Result<()>
+                where
+                    RinjaW: rinja::helpers::core::fmt::Write + ?rinja::helpers::core::marker::Sized
+                {
+                    <_ as rinja::Template>::render_into(self, dest)
+                }
+            }
+
+            // cannot use `crate::integrations::impl_display()` w/o cloning the struct
+            impl #wrapper_impl_generics rinja::helpers::core::fmt::Display
+            for #wrapper_id #wrapper_ty_generics #wrapper_where_clause {
+                #[inline]
+                fn fmt(
+                    &self,
+                    f: &mut rinja::helpers::core::fmt::Formatter<'_>
+                ) -> rinja::helpers::core::fmt::Result {
+                    <_ as rinja::Template>::render_into(self, f)
+                        .map_err(|_| rinja::helpers::core::fmt::Error)
+                }
+            }
+        });
+
+        buf.write("};");
+        Ok(())
     }
 
     fn is_var_defined(&self, var_name: &str) -> bool {

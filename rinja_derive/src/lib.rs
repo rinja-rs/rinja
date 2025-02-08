@@ -262,7 +262,7 @@ fn build_template_item(
     ast: &syn::DeriveInput,
     enum_ast: Option<&syn::DeriveInput>,
     template_args: &TemplateArgs,
-    tmpl_kind: TmplKind,
+    tmpl_kind: TmplKind<'_>,
 ) -> Result<usize, CompileError> {
     let config_path = template_args.config_path();
     let s = read_config_file(config_path, template_args.config_span)?;
@@ -286,11 +286,11 @@ fn build_template_item(
     let heritage = if !ctx.blocks.is_empty() || ctx.extends.is_some() {
         let heritage = Heritage::new(ctx, &contexts);
 
-        if let Some(block_name) = input.block {
+        if let Some((block_name, block_span)) = input.block {
             if !heritage.blocks.contains_key(&block_name) {
                 return Err(CompileError::no_file_info(
-                    format!("cannot find block {block_name}"),
-                    None,
+                    format_args!("cannot find block `{block_name}`"),
+                    Some(block_span),
                 ));
             }
         }

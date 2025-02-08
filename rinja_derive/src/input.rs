@@ -17,6 +17,7 @@ use syn::{Attribute, Expr, ExprLit, ExprPath, Ident, Lit, LitBool, LitStr, Meta,
 use crate::config::{Config, SyntaxAndCache};
 use crate::{CompileError, FileInfo, MsgValidEscapers, OnceMap};
 
+#[derive(Clone)]
 pub(crate) struct TemplateInput<'a> {
     pub(crate) ast: &'a syn::DeriveInput,
     pub(crate) enum_ast: Option<&'a syn::DeriveInput>,
@@ -24,11 +25,13 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) syntax: &'a SyntaxAndCache<'a>,
     pub(crate) source: &'a Source,
     pub(crate) source_span: Option<Span>,
-    pub(crate) block: Option<&'a str>,
+    pub(crate) block: Option<(&'a str, Span)>,
+    #[cfg(feature = "blocks")]
+    pub(crate) blocks: &'a [(String, Span)],
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
     pub(crate) path: Arc<Path>,
-    pub(crate) fields: Vec<String>,
+    pub(crate) fields: Arc<[String]>,
 }
 
 impl TemplateInput<'_> {
@@ -44,6 +47,8 @@ impl TemplateInput<'_> {
         let TemplateArgs {
             source: (source, source_span),
             block,
+            #[cfg(feature = "blocks")]
+            blocks,
             print,
             escaping,
             ext,
@@ -76,7 +81,7 @@ impl TemplateInput<'_> {
             || Ok(config.syntaxes.get(config.default_syntax).unwrap()),
             |s| {
                 config.syntaxes.get(s).ok_or_else(|| {
-                    CompileError::no_file_info(format!("syntax `{s}` is undefined"), None)
+                    CompileError::no_file_info(format_args!("syntax `{s}` is undefined"), None)
                 })
             },
         )?;
@@ -98,7 +103,7 @@ impl TemplateInput<'_> {
             })
             .ok_or_else(|| {
                 CompileError::no_file_info(
-                    format!(
+                    format_args!(
                         "no escaper defined for extension '{escaping}'. You can define an escaper \
                         in the config file (named `rinja.toml` by default). {}",
                         MsgValidEscapers(&config.escapers),
@@ -133,11 +138,13 @@ impl TemplateInput<'_> {
             syntax,
             source,
             source_span: *source_span,
-            block: block.as_deref(),
+            block: block.as_ref().map(|(block, span)| (block.as_str(), *span)),
+            #[cfg(feature = "blocks")]
+            blocks: blocks.as_slice(),
             print: *print,
             escaper,
             path,
-            fields,
+            fields: fields.into(),
         })
     }
 
@@ -289,11 +296,11 @@ impl AnyTemplateArgs {
             return Ok(Self::Struct(TemplateArgs::new(ast)?));
         };
 
-        let enum_args = PartialTemplateArgs::new(ast, &ast.attrs)?;
+        let enum_args = PartialTemplateArgs::new(ast, &ast.attrs, false)?;
         let vars_args = enum_data
             .variants
             .iter()
-            .map(|variant| PartialTemplateArgs::new(ast, &variant.attrs))
+            .map(|variant| PartialTemplateArgs::new(ast, &variant.attrs, true))
             .collect::<Result<Vec<_>, _>>()?;
         if vars_args.is_empty() {
             return Ok(Self::Struct(TemplateArgs::from_partial(ast, enum_args)?));
@@ -346,7 +353,9 @@ impl AnyTemplateArgs {
 
 pub(crate) struct TemplateArgs {
     pub(crate) source: (Source, Option<Span>),
-    block: Option<String>,
+    block: Option<(String, Span)>,
+    #[cfg(feature = "blocks")]
+    blocks: Vec<(String, Span)>,
     print: Print,
     escaping: Option<String>,
     ext: Option<String>,
@@ -361,7 +370,7 @@ pub(crate) struct TemplateArgs {
 
 impl TemplateArgs {
     pub(crate) fn new(ast: &syn::DeriveInput) -> Result<Self, CompileError> {
-        Self::from_partial(ast, PartialTemplateArgs::new(ast, &ast.attrs)?)
+        Self::from_partial(ast, PartialTemplateArgs::new(ast, &ast.attrs, false)?)
     }
 
     pub(crate) fn from_partial(
@@ -395,7 +404,14 @@ impl TemplateArgs {
                     ));
                 }
             },
-            block: args.block.map(|value| value.value()),
+            block: args.block.map(|value| (value.value(), value.span())),
+            #[cfg(feature = "blocks")]
+            blocks: args
+                .blocks
+                .unwrap_or_default()
+                .into_iter()
+                .map(|value| (value.value(), value.span()))
+                .collect(),
             print: args.print.unwrap_or_default(),
             escaping: args.escape.map(|value| value.value()),
             ext: args.ext.as_ref().map(|value| value.value()),
@@ -413,6 +429,8 @@ impl TemplateArgs {
         Self {
             source: (Source::Source("".into()), None),
             block: None,
+            #[cfg(feature = "blocks")]
+            blocks: vec![],
             print: Print::default(),
             escaping: None,
             ext: Some("txt".to_string()),
@@ -509,7 +527,7 @@ fn no_rinja_code_block(span: Span, ast: &syn::DeriveInput) -> CompileError {
         syn::Data::Union(_) => "union",
     };
     CompileError::no_file_info(
-        format!(
+        format_args!(
             "when using `in_doc` with the value `true`, the {kind}'s documentation needs a \
              `rinja` code block"
         ),
@@ -641,7 +659,7 @@ impl FromStr for Print {
 
 fn cyclic_graph_error(dependency_graph: &[(Arc<Path>, Arc<Path>)]) -> Result<(), CompileError> {
     Err(CompileError::no_file_info(
-        format!(
+        format_args!(
             "cyclic dependency in graph {:#?}",
             dependency_graph
                 .iter()
@@ -692,6 +710,8 @@ pub(crate) struct PartialTemplateArgs {
     pub(crate) config: Option<LitStr>,
     pub(crate) whitespace: Option<Whitespace>,
     pub(crate) crate_name: Option<ExprPath>,
+    #[cfg(feature = "blocks")]
+    pub(crate) blocks: Option<Vec<LitStr>>,
 }
 
 #[derive(Clone)]
@@ -719,8 +739,9 @@ const _: () = {
         pub(crate) fn new(
             ast: &syn::DeriveInput,
             attrs: &[Attribute],
+            is_enum_variant: bool,
         ) -> Result<Option<Self>, CompileError> {
-            new(ast, attrs)
+            new(ast, attrs, is_enum_variant)
         }
     }
 
@@ -728,6 +749,7 @@ const _: () = {
     fn new(
         ast: &syn::DeriveInput,
         attrs: &[Attribute],
+        is_enum_variant: bool,
     ) -> Result<Option<PartialTemplateArgs>, CompileError> {
         // FIXME: implement once <https://github.com/rust-lang/rfcs/pull/3715> is stable
         if let syn::Data::Union(data) = &ast.data {
@@ -752,6 +774,8 @@ const _: () = {
             config: None,
             whitespace: None,
             crate_name: None,
+            #[cfg(feature = "blocks")]
+            blocks: None,
         };
         let mut has_data = false;
 
@@ -774,7 +798,7 @@ const _: () = {
                 .parse_args_with(<Punctuated<Meta, Token![,]>>::parse_terminated)
                 .map_err(|e| {
                     CompileError::no_file_info(
-                        format!("unable to parse template arguments: {e}"),
+                        format_args!("unable to parse template arguments: {e}"),
                         Some(attr.path().span()),
                     )
                 })?;
@@ -794,9 +818,41 @@ const _: () = {
                 };
 
                 if ident == "rinja" {
+                    if is_enum_variant {
+                        return Err(CompileError::no_file_info(
+                            "template attribute `rinja` can only be used on the `enum`, \
+                            not its variants",
+                            Some(ident.span()),
+                        ));
+                    }
                     ensure_only_once(ident, &mut this.crate_name)?;
                     this.crate_name = Some(get_exprpath(ident, pair.value)?);
                     continue;
+                } else if ident == "blocks" {
+                    if !cfg!(feature = "blocks") {
+                        return Err(CompileError::no_file_info(
+                            "enable feature `blocks` to use `blocks` argument",
+                            Some(ident.span()),
+                        ));
+                    } else if is_enum_variant {
+                        return Err(CompileError::no_file_info(
+                            "template attribute `blocks` can only be used on the `enum`, \
+                            not its variants",
+                            Some(ident.span()),
+                        ));
+                    }
+                    #[cfg(feature = "blocks")]
+                    {
+                        ensure_only_once(ident, &mut this.blocks)?;
+                        this.blocks = Some(
+                            get_exprarray(ident, pair.value)?
+                                .elems
+                                .into_iter()
+                                .map(|value| get_strlit(ident, get_lit(ident, value)?))
+                                .collect::<Result<_, _>>()?,
+                        );
+                        continue;
+                    }
                 }
 
                 let value = get_lit(ident, pair.value)?;
@@ -845,7 +901,7 @@ const _: () = {
                     set_parseable_string(ident, value, &mut this.whitespace)?;
                 } else {
                     return Err(CompileError::no_file_info(
-                        format!("unsupported template attribute `{ident}` found"),
+                        format_args!("unsupported template attribute `{ident}` found"),
                         Some(ident.span()),
                     ));
                 }
@@ -898,7 +954,7 @@ const _: () = {
             Ok(())
         } else {
             Err(CompileError::no_file_info(
-                format!("template attribute `{name}` already set"),
+                format_args!("template attribute `{name}` already set"),
                 Some(name.span()),
             ))
         }
@@ -911,7 +967,7 @@ const _: () = {
                 Expr::Group(group) => expr = *group.expr,
                 v => {
                     return Err(CompileError::no_file_info(
-                        format!("template attribute `{name}` expects a literal"),
+                        format_args!("template attribute `{name}` expects a literal"),
                         Some(v.span()),
                     ));
                 }
@@ -924,7 +980,7 @@ const _: () = {
             Ok(s)
         } else {
             Err(CompileError::no_file_info(
-                format!("template attribute `{name}` expects a string literal"),
+                format_args!("template attribute `{name}` expects a string literal"),
                 Some(value.lit.span()),
             ))
         }
@@ -935,7 +991,7 @@ const _: () = {
             Ok(s)
         } else {
             Err(CompileError::no_file_info(
-                format!("template attribute `{name}` expects a boolean value"),
+                format_args!("template attribute `{name}` expects a boolean value"),
                 Some(value.lit.span()),
             ))
         }
@@ -948,7 +1004,23 @@ const _: () = {
                 Expr::Group(group) => expr = *group.expr,
                 v => {
                     return Err(CompileError::no_file_info(
-                        format!("template attribute `{name}` expects a path or identifier"),
+                        format_args!("template attribute `{name}` expects a path or identifier"),
+                        Some(v.span()),
+                    ));
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "blocks")]
+    fn get_exprarray(name: &Ident, mut expr: Expr) -> Result<syn::ExprArray, CompileError> {
+        loop {
+            match expr {
+                Expr::Array(array) => return Ok(array),
+                Expr::Group(group) => expr = *group.expr,
+                v => {
+                    return Err(CompileError::no_file_info(
+                        format_args!("template attribute `{name}` expects an array"),
                         Some(v.span()),
                     ));
                 }
