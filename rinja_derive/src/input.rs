@@ -27,7 +27,7 @@ pub(crate) struct TemplateInput<'a> {
     pub(crate) source_span: Option<Span>,
     pub(crate) block: Option<(&'a str, Span)>,
     #[cfg(feature = "blocks")]
-    pub(crate) blocks: &'a [(String, Span)],
+    pub(crate) blocks: &'a [Block],
     pub(crate) print: Print,
     pub(crate) escaper: &'a str,
     pub(crate) path: Arc<Path>,
@@ -351,11 +351,17 @@ impl AnyTemplateArgs {
     }
 }
 
+#[cfg(feature = "blocks")]
+pub(crate) struct Block {
+    pub(crate) name: String,
+    pub(crate) span: Span,
+}
+
 pub(crate) struct TemplateArgs {
     pub(crate) source: (Source, Option<Span>),
     block: Option<(String, Span)>,
     #[cfg(feature = "blocks")]
-    blocks: Vec<(String, Span)>,
+    blocks: Vec<Block>,
     print: Print,
     escaping: Option<String>,
     ext: Option<String>,
@@ -410,7 +416,10 @@ impl TemplateArgs {
                 .blocks
                 .unwrap_or_default()
                 .into_iter()
-                .map(|value| (value.value(), value.span()))
+                .map(|value| Block {
+                    name: value.value(),
+                    span: value.span(),
+                })
                 .collect(),
             print: args.print.unwrap_or_default(),
             escaping: args.escape.map(|value| value.value()),
