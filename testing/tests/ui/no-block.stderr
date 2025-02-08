@@ -1,0 +1,29 @@
+error: cannot find block `a`
+ --> tests/ui/no-block.rs:7:13
+  |
+7 |     block = "a"
+  |             ^^^
+
+error: cannot find block `a`
+  --> tests/ui/no-block.rs:12:43
+   |
+12 | #[template(path = "no-block.txt", block = "a")]
+   |                                           ^^^
+
+error: cannot find block `a`
+  --> tests/ui/no-block.rs:16:56
+   |
+16 | #[template(path = "no-block-with-include.txt", block = "a")]
+   |                                                        ^^^
+
+error: cannot find block `a`
+  --> tests/ui/no-block.rs:20:64
+   |
+20 | #[template(path = "no-block-with-include-times-2.txt", block = "a")]
+   |                                                                ^^^
+
+error: cannot find block `a`
+  --> tests/ui/no-block.rs:24:62
+   |
+24 | #[template(path = "no-block-with-base-template.txt", block = "a")]
+   |                                                              ^^^
