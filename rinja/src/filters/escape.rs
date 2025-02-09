@@ -138,13 +138,13 @@ pub struct Html;
 
 impl Escaper for Html {
     #[inline]
-    fn write_escaped_str<W: Write>(&self, fmt: W, string: &str) -> fmt::Result {
-        crate::html::write_escaped_str(fmt, string)
+    fn write_escaped_str<W: Write>(&self, dest: W, string: &str) -> fmt::Result {
+        crate::html::write_escaped_str(dest, string)
     }
 
     #[inline]
-    fn write_escaped_char<W: Write>(&self, fmt: W, c: char) -> fmt::Result {
-        crate::html::write_escaped_char(fmt, c)
+    fn write_escaped_char<W: Write>(&self, dest: W, c: char) -> fmt::Result {
+        crate::html::write_escaped_char(dest, c)
     }
 }
 
@@ -154,13 +154,13 @@ pub struct Text;
 
 impl Escaper for Text {
     #[inline]
-    fn write_escaped_str<W: Write>(&self, mut fmt: W, string: &str) -> fmt::Result {
-        fmt.write_str(string)
+    fn write_escaped_str<W: Write>(&self, mut dest: W, string: &str) -> fmt::Result {
+        dest.write_str(string)
     }
 
     #[inline]
-    fn write_escaped_char<W: Write>(&self, mut fmt: W, c: char) -> fmt::Result {
-        fmt.write_char(c)
+    fn write_escaped_char<W: Write>(&self, mut dest: W, c: char) -> fmt::Result {
+        dest.write_char(c)
     }
 }
 
@@ -169,13 +169,13 @@ impl Escaper for Text {
 /// E.g. in an [`Html`] context, any and all generated text can be used in HTML/XML text nodes and
 /// attributes, without for for maliciously injected data.
 pub trait Escaper: Copy {
-    /// Escaped the input string `string` into `fmt`
-    fn write_escaped_str<W: Write>(&self, fmt: W, string: &str) -> fmt::Result;
+    /// Escaped the input string `string` into `dest`
+    fn write_escaped_str<W: Write>(&self, dest: W, string: &str) -> fmt::Result;
 
-    /// Escaped the input char `c` into `fmt`
+    /// Escaped the input char `c` into `dest`
     #[inline]
-    fn write_escaped_char<W: Write>(&self, fmt: W, c: char) -> fmt::Result {
-        self.write_escaped_str(fmt, c.encode_utf8(&mut [0; 4]))
+    fn write_escaped_char<W: Write>(&self, dest: W, c: char) -> fmt::Result {
+        self.write_escaped_str(dest, c.encode_utf8(&mut [0; 4]))
     }
 }
 
