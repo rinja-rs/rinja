@@ -92,6 +92,36 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
+* `blocks` (e.g. `blocks = ["title", "content"]`):
+  automatically generates (a number of) sub-templates that act as if they had a
+  `block = "..."` attribute. You can access the sub-templates with the method
+  <code>my_template.as_<em>block_name</em>()</code>, where *`block_name`* is the
+  name of the block:
+  ```rust,ignore
+  #[derive(Template)]
+  #[template(
+      ext = "txt",
+      source = "
+          {% block title %} ... {% endblock %}
+          {% block content %} ... {% endblock %}
+      ",
+      blocks = ["title", "content"]
+  )]
+  struct News<'a> {
+      title: &'a str,
+      message: &'a str,
+  }
+
+  let news = News {
+      title: "Announcing Rust 1.84.1",
+      message: "The Rust team has published a new point release of Rust, 1.84.1.",
+  };
+  assert_eq!(
+      news.as_title().render().unwrap(),
+      "<h1>Announcing Rust 1.84.1</h1>"
+  );
+  ```
+
 * `escape` (e.g. `escape = "none"`): override the template's extension used for
   the purpose of determining the escaper for this template. See the section
   on configuring custom escapers for more information.
