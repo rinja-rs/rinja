@@ -35,7 +35,7 @@ Without `default-features = false`, i.e with default features enabled,
 the following features are automatically selected for you:
 
 ```toml
-default = ["config", "std", "urlencode"]
+default = ["config", "derive", "std", "urlencode"]
 ```
 
 This should encompass most features an average user of rinja might need.
@@ -43,6 +43,24 @@ This should encompass most features an average user of rinja might need.
 *If you are writing a **library** that depends on rinja,
 and if you want it to be usable in by other users and in **other projects**,
 then you should probably **opt-out of features you do not need**.*
+
+### `"derive"`
+
+<blockquote class="right" style="padding:0.5ex 1ex; margin:0 0 1ex 1ex; font-size:80%">
+enabled by <code>"default"</code>
+</blockquote>
+
+This feature enables `#[derive(Template)]`. Without it the trait `rinja::Template` will still be
+available, but if you want to derive a template, you have to manually depend on `rinja_derive`.
+`rinja_derive` should be used with the same features as `rinja`.
+
+Not using this feature might be useful e.g. if you are writing a library with manual filters
+for rinja, without any templates. It might also very slightly speed-up the compilation,
+because more dependencies can be compiled in parallel, because `rinja` won't transitively depend
+on e.g. `syn` or `proc-macro2`. On the author's PC the compilation of a trivial hello-world example
+was about 0.2s faster without the feature when compiled in release mode.
+
+*If you are writing a library that uses rinja, consider **not using** this default-feature.*
 
 ### `"config"`
 

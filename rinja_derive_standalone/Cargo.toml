@@ -47,11 +47,14 @@ syn = { version = "2.0.3", features = ["full"] }
 default = ["__standalone"]
 __standalone = []
 
+alloc = []
 blocks = ["syn/full"]
 code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:basic-toml", "dep:serde", "dep:serde_derive", "parser/config"]
-urlencode = []
+derive = []
 serde_json = []
+std = ["alloc"]
+urlencode = []
 
 [lints.rust]
 # Used in `rinja_derive` which uses the same source folder, but is a proc-macro.
