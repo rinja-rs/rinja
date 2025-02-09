@@ -66,7 +66,7 @@ where
 {
     #[inline]
     fn get_value<'a>(&'a self, key: &str) -> Option<&'a dyn Any> {
-        self.as_slice().get_value(key)
+        find_value_linear(self.iter(), key)
     }
 }
 
@@ -76,13 +76,58 @@ where
     V: Value,
 {
     fn get_value<'a>(&'a self, key: &str) -> Option<&'a dyn Any> {
-        for (k, v) in self {
-            if k.borrow() == key {
-                return v.ref_any();
-            }
-        }
-        None
+        find_value_linear(self.iter(), key)
     }
+}
+
+#[cfg(feature = "alloc")]
+impl<K, V> Values for alloc::vec::Vec<(K, V)>
+where
+    K: Borrow<str>,
+    V: Value,
+{
+    #[inline]
+    fn get_value<'a>(&'a self, key: &str) -> Option<&'a dyn Any> {
+        find_value_linear(self.iter(), key)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<K, V> Values for alloc::collections::VecDeque<(K, V)>
+where
+    K: Borrow<str>,
+    V: Value,
+{
+    #[inline]
+    fn get_value<'a>(&'a self, key: &str) -> Option<&'a dyn Any> {
+        find_value_linear(self.iter(), key)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<K, V> Values for alloc::collections::LinkedList<(K, V)>
+where
+    K: Borrow<str>,
+    V: Value,
+{
+    #[inline]
+    fn get_value<'a>(&'a self, key: &str) -> Option<&'a dyn Any> {
+        find_value_linear(self.iter(), key)
+    }
+}
+
+fn find_value_linear<'a, K, V, I>(it: I, key: &str) -> Option<&'a dyn Any>
+where
+    K: Borrow<str> + 'a,
+    V: Value + 'a,
+    I: Iterator<Item = &'a (K, V)>,
+{
+    for (k, v) in it {
+        if k.borrow() == key {
+            return v.ref_any();
+        }
+    }
+    None
 }
 
 #[cfg(feature = "alloc")]
@@ -148,6 +193,22 @@ mod tests {
 
     use super::*;
 
+    #[track_caller]
+    fn assert_a_10_c_blam(values: &dyn Values) {
+        assert_matches!(get_value::<u32>(values, "a"), Ok(10u32));
+        assert_matches!(get_value::<&str>(values, "c"), Ok(&"blam"));
+        assert_matches!(get_value::<u8>(values, "a"), Err(Error::ValueType));
+        assert_matches!(get_value::<u8>(values, "d"), Err(Error::ValueMissing));
+    }
+
+    #[track_caller]
+    fn assert_a_12_c_blam(values: &dyn Values) {
+        assert_matches!(get_value::<u32>(values, "a"), Ok(12u32));
+        assert_matches!(get_value::<&str>(values, "c"), Ok(&"blam"));
+        assert_matches!(get_value::<u8>(values, "a"), Err(Error::ValueType));
+        assert_matches!(get_value::<u8>(values, "d"), Err(Error::ValueMissing));
+    }
+
     #[cfg(feature = "std")]
     #[test]
     fn values_on_hashmap() {
@@ -156,12 +217,9 @@ mod tests {
         use std::collections::HashMap;
 
         let mut values: HashMap<String, Box<dyn Any>> = HashMap::new();
-        values.insert("a".into(), Box::new(10u32));
+        values.insert("a".into(), Box::new(12u32));
         values.insert("c".into(), Box::new("blam"));
-        assert_matches!(get_value::<u32>(&values, "a"), Ok(&10u32));
-        assert_matches!(get_value::<&str>(&values, "c"), Ok(&"blam"));
-        assert_matches!(get_value::<u8>(&values, "a"), Err(Error::ValueType));
-        assert_matches!(get_value::<u8>(&values, "d"), Err(Error::ValueMissing));
+        assert_a_12_c_blam(&values);
 
         let mut values: HashMap<&str, Box<dyn Any>> = HashMap::new();
         values.insert("a", Box::new(10u32));
@@ -176,13 +234,9 @@ mod tests {
         use alloc::string::String;
 
         let mut values: BTreeMap<String, Box<dyn Any>> = BTreeMap::new();
-        values.insert("a".into(), Box::new(10u32));
+        values.insert("a".into(), Box::new(12u32));
         values.insert("c".into(), Box::new("blam"));
-
-        assert_matches!(get_value::<u32>(&values, "a"), Ok(&10u32));
-        assert_matches!(get_value::<&str>(&values, "c"), Ok(&"blam"));
-        assert_matches!(get_value::<u8>(&values, "a"), Err(Error::ValueType));
-        assert_matches!(get_value::<u8>(&values, "d"), Err(Error::ValueMissing));
+        assert_a_12_c_blam(&values);
 
         let mut values: BTreeMap<&str, Box<dyn Any>> = BTreeMap::new();
         values.insert("a", Box::new(10u32));
@@ -191,10 +245,38 @@ mod tests {
 
     #[test]
     fn values_on_slice() {
-        let values: &[(&str, &dyn Any)] = &[("a", &12u32), ("c", &"blam")];
-        assert_matches!(get_value::<u32>(&values, "a"), Ok(12u32));
-        assert_matches!(get_value::<&str>(&values, "c"), Ok(&"blam"));
-        assert_matches!(get_value::<u8>(&values, "a"), Err(Error::ValueType));
-        assert_matches!(get_value::<u8>(&values, "d"), Err(Error::ValueMissing));
+        let slice: &[(&str, &dyn Any)] = &[("a", &12u32), ("c", &"blam")];
+        assert_a_12_c_blam(&slice);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn values_vec() {
+        let vec: alloc::vec::Vec<(&str, &dyn Any)> = alloc::vec![("a", &12u32), ("c", &"blam")];
+        assert_a_12_c_blam(&vec);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn values_deque() {
+        let mut deque = alloc::collections::VecDeque::<(&str, &dyn Any)>::new();
+        deque.push_back(("a", &12u32));
+        deque.push_back(("c", &"blam"));
+        assert_a_12_c_blam(&deque);
+        deque.pop_front();
+        deque.push_back(("a", &10u32));
+        assert_a_10_c_blam(&deque);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn values_list() {
+        let mut list = alloc::collections::LinkedList::<(&str, &dyn Any)>::new();
+        list.push_back(("a", &12u32));
+        list.push_back(("c", &"blam"));
+        assert_a_12_c_blam(&list);
+        list.pop_front();
+        list.push_back(("a", &10u32));
+        assert_a_10_c_blam(&list);
     }
 }
