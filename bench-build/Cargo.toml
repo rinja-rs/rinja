@@ -1,0 +1,18 @@
+[package]
+name = "bench-build"
+version = "0.3.5"
+authors = ["rinja-rs developers"]
+edition = "2021"
+rust-version = "1.81"
+publish = false
+
+[dependencies]
+rinja = { path = "../rinja", version = "0.3.5", default-features = false, features = ["std"] }
+rinja_derive = { path = "../rinja_derive", version = "0.3.5", features = ["std"] }
+
+[features]
+default = []
+derive = ["rinja/derive"]
+
+[workspace]
+members = ["."]

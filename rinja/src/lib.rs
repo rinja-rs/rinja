@@ -34,8 +34,8 @@
 //! }
 //!
 //! assert_eq!(
-//!     Footer { year: 2024, enterprise: "<em>Rinja</em> developers" }.to_string(),
-//!     "<p>© 2024 &#60;EM&#62;RINJA&#60;/EM&#62; DEVELOPERS</p>",
+//!     Footer { year: 2025, enterprise: "<em>Rinja</em> developers" }.to_string(),
+//!     "<p>© 2025 &#60;EM&#62;RINJA&#60;/EM&#62; DEVELOPERS</p>",
 //! );
 //! // In here you see can Rinja's auto-escaping. You, the developer,
 //! // can easily disable the auto-escaping with the `|safe` filter,
@@ -78,6 +78,7 @@ use core::fmt;
 #[cfg(feature = "std")]
 use std::io;
 
+#[cfg(feature = "derive")]
 pub use rinja_derive::Template;
 
 #[doc(hidden)]

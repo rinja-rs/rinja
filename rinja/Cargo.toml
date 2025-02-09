@@ -24,9 +24,10 @@ name = "escape"
 harness = false
 
 [dependencies]
-rinja_derive = { version = "=0.3.5", path = "../rinja_derive" }
-
 itoa = "1.0.11"
+
+# needed by feature "derive"
+rinja_derive = { version = "=0.3.5", path = "../rinja_derive", default-features = false, optional = true }
 
 # needed by feature "serde_json"
 serde = { version = "1.0", optional = true, default-features = false }
@@ -43,24 +44,25 @@ criterion = "0.5"
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["config", "std", "urlencode"]
-full = ["default", "blocks", "code-in-doc", "serde_json"]
+default = ["config", "derive", "std", "urlencode", "rinja_derive?/default"]
+full = ["default", "blocks", "code-in-doc", "serde_json", "rinja_derive?/full"]
 
 alloc = [
-    "rinja_derive/alloc",
+    "rinja_derive?/alloc",
     "serde?/alloc",
     "serde_json?/alloc",
-    "percent-encoding?/alloc"
+    "percent-encoding?/alloc",
 ]
-blocks = ["rinja_derive/blocks"]
-code-in-doc = ["rinja_derive/code-in-doc"]
-config = ["rinja_derive/config"]
-serde_json = ["rinja_derive/serde_json", "dep:serde", "dep:serde_json"]
+blocks = ["rinja_derive?/blocks"]
+code-in-doc = ["rinja_derive?/code-in-doc"]
+config = ["rinja_derive?/config"]
+derive = ["rinja_derive"]
+serde_json = ["rinja_derive?/serde_json", "dep:serde", "dep:serde_json"]
 std = [
     "alloc",
-    "rinja_derive/std",
+    "rinja_derive?/std",
     "serde?/std",
     "serde_json?/std",
-    "percent-encoding?/std"
+    "percent-encoding?/std",
 ]
-urlencode = ["rinja_derive/urlencode", "dep:percent-encoding"]
+urlencode = ["rinja_derive?/urlencode", "dep:percent-encoding"]

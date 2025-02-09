@@ -38,14 +38,19 @@ prettyplease = "0.2.20"
 similar = "2.6.0"
 syn = { version = "2.0.3", features = ["full"] }
 
+# must be the same feature list as for rinja
 [features]
+default = ["config", "derive", "std", "urlencode"]
+full = ["default", "blocks", "code-in-doc", "serde_json"]
+
 alloc = []
 blocks = ["syn/full"]
 code-in-doc = ["dep:pulldown-cmark"]
 config = ["dep:basic-toml", "dep:serde", "dep:serde_derive", "parser/config"]
-urlencode = []
+derive = []
 serde_json = []
 std = ["alloc"]
+urlencode = []
 
 [lints.rust]
 # Used in `rinja_derive_standalone` which uses the same source folder, but is not a proc-macro.
