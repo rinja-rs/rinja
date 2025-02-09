@@ -1,6 +1,6 @@
 [package]
 name = "rinja"
-version = "0.3.5"
+version = "0.3.6"
 description = "Type-safe, compiled Jinja-like templates for Rust"
 documentation = "https://docs.rs/rinja"
 keywords = ["markup", "template", "jinja2", "html"]
@@ -8,8 +8,6 @@ categories = ["template-engine"]
 homepage = "https://rinja.readthedocs.io/"
 repository = "https://github.com/rinja-rs/rinja"
 license = "MIT OR Apache-2.0"
-workspace = ".."
-readme = "../README.md"
 edition = "2021"
 rust-version = "1.71"
 
@@ -37,7 +35,7 @@ with-rocket = ["rinja_derive/with-rocket"]
 with-warp = ["rinja_derive/with-warp"]
 
 [dependencies]
-rinja_derive = { version = "=0.3.5", path = "../rinja_derive" }
+rinja_derive = { version = "=0.3.6", path = "../rinja_derive" }
 
 humansize = { version = "2", optional = true }
 num-traits = { version = "0.2.6", optional = true }

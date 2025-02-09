@@ -3,7 +3,7 @@ members = ["."]
 
 [package]
 name = "rinja_axum"
-version = "0.3.5"
+version = "0.3.6"
 edition = "2021"
 rust-version = "1.71"
 description = "Axum integration for Rinja templates"
@@ -29,7 +29,7 @@ serde_json = ["rinja/serde_json"]
 urlencode = ["rinja/urlencode"]
 
 [dependencies]
-rinja = { version = "0.3.5", path = "../rinja", default-features = false, features = ["with-axum"] }
+rinja = { version = "0.3.6", path = "../rinja", default-features = false, features = ["with-axum"] }
 
 axum-core = "0.4"
 http = "1.0"

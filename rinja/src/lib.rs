@@ -1,63 +1,8 @@
-//! [![Crates.io](https://img.shields.io/crates/v/rinja?logo=rust&style=flat-square&logoColor=white "Crates.io")](https://crates.io/crates/rinja)
-//! [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/rinja-rs/rinja/rust.yml?branch=master&logo=github&style=flat-square&logoColor=white "GitHub Workflow Status")](https://github.com/rinja-rs/rinja/actions/workflows/rust.yml)
-//! [![Book](https://img.shields.io/readthedocs/rinja?label=book&logo=readthedocs&style=flat-square&logoColor=white "Book")](https://rinja.readthedocs.io/)
-//! [![docs.rs](https://img.shields.io/docsrs/rinja?logo=docsdotrs&style=flat-square&logoColor=white "docs.rs")](https://docs.rs/rinja/)
-//!
-//! Rinja implements a type-safe compiler for Jinja-like templates.
-//! It lets you write templates in a Jinja-like syntax,
-//! which are linked to a `struct` defining the template context.
-//! This is done using a custom derive implementation (implemented
-//! in [`rinja_derive`](https://crates.io/crates/rinja_derive)).
-//!
-//! For feature highlights and a quick start, please review the
-//! [README](https://github.com/rinja-rs/rinja/blob/master/README.md).
-//!
-//! You can find the documentation about our syntax, features, configuration in our book:
-//! [rinja.readthedocs.io](https://rinja.readthedocs.io/).
-//!
-//! # Creating Rinja templates
-//!
-//! The main feature of Rinja is the [`Template`] derive macro
-//! which reads your template code, so your `struct` can implement
-//! the [`Template`] trait and [`Display`][std::fmt::Display], type-safe and fast:
-//!
-//! ```rust
-//! # use rinja::Template;
-//! #[derive(Template)]
-//! #[template(
-//!     ext = "html",
-//!     source = "<p>© {{ year }} {{ enterprise|upper }}</p>"
-//! )]
-//! struct Footer<'a> {
-//!     year: u16,
-//!     enterprise: &'a str,
-//! }
-//!
-//! assert_eq!(
-//!     Footer { year: 2024, enterprise: "<em>Rinja</em> developers" }.to_string(),
-//!     "<p>© 2024 &#60;EM&#62;RINJA&#60;/EM&#62; DEVELOPERS</p>",
-//! );
-//! // In here you see can Rinja's auto-escaping. You, the developer,
-//! // can easily disable the auto-escaping with the `|safe` filter,
-//! // but a malicious user cannot insert e.g. HTML scripts this way.
-//! ```
-//!
-//! A Rinja template is a `struct` definition which provides the template
-//! context combined with a UTF-8 encoded text file (or inline source).
-//! Rinja can be used to generate any kind of text-based format.
-//! The template file's extension may be used to provide content type hints.
-//!
-//! A template consists of **text contents**, which are passed through as-is,
-//! **expressions**, which get replaced with content while being rendered, and
-//! **tags**, which control the template's logic.
-//! The template syntax is very similar to [Jinja](http://jinja.pocoo.org/),
-//! as well as Jinja-derivatives like [Twig](http://twig.sensiolabs.org/) or
-//! [Tera](https://github.com/Keats/tera).
-
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
 #![deny(missing_docs)]
+#![doc = include_str!("../README.md")]
 
 mod error;
 pub mod filters;
