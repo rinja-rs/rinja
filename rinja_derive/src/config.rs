@@ -10,7 +10,7 @@ use parser::node::Whitespace;
 use parser::{ParseError, Parsed, Syntax, SyntaxBuilder};
 use proc_macro2::Span;
 #[cfg(feature = "config")]
-use serde::Deserialize;
+use serde_derive::Deserialize;
 
 use crate::{CompileError, FileInfo, OnceMap};
 
@@ -314,7 +314,7 @@ impl RawConfig<'_> {
     }
 }
 
-#[cfg_attr(feature = "config", derive(serde::Deserialize))]
+#[cfg_attr(feature = "config", derive(Deserialize))]
 struct General<'a> {
     #[cfg_attr(feature = "config", serde(borrow))]
     dirs: Option<Vec<&'a str>>,

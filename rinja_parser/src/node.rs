@@ -447,7 +447,7 @@ impl<'a> CondTest<'a> {
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash)]
-#[cfg_attr(feature = "config", derive(serde::Deserialize))]
+#[cfg_attr(feature = "config", derive(serde_derive::Deserialize))]
 #[cfg_attr(feature = "config", serde(field_identifier, rename_all = "lowercase"))]
 pub enum Whitespace {
     #[default]

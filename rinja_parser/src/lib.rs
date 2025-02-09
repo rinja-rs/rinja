@@ -855,7 +855,7 @@ fn fmt_syntax(name: &str, inner: &InnerSyntax<'_>, f: &mut fmt::Formatter<'_>) -
 }
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq)]
-#[cfg_attr(feature = "config", derive(serde::Deserialize))]
+#[cfg_attr(feature = "config", derive(serde_derive::Deserialize))]
 pub struct SyntaxBuilder<'a> {
     pub name: &'a str,
     pub block_start: Option<&'a str>,
