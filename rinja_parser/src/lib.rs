@@ -1417,10 +1417,13 @@ mod test {
         // Check with `b` prefix.
         assert_eq!(
             char_lit.parse_peek("b'a'").unwrap(),
-            ("", crate::CharLit {
-                prefix: Some(crate::CharPrefix::Binary),
-                content: "a"
-            })
+            (
+                "",
+                crate::CharLit {
+                    prefix: Some(crate::CharPrefix::Binary),
+                    content: "a"
+                }
+            )
         );
 
         // Should fail.
@@ -1438,17 +1441,23 @@ mod test {
     fn test_str_lit() {
         assert_eq!(
             str_lit.parse_peek(r#"b"hello""#).unwrap(),
-            ("", StrLit {
-                prefix: Some(StrPrefix::Binary),
-                content: "hello"
-            })
+            (
+                "",
+                StrLit {
+                    prefix: Some(StrPrefix::Binary),
+                    content: "hello"
+                }
+            )
         );
         assert_eq!(
             str_lit.parse_peek(r#"c"hello""#).unwrap(),
-            ("", StrLit {
-                prefix: Some(StrPrefix::CLike),
-                content: "hello"
-            })
+            (
+                "",
+                StrLit {
+                    prefix: Some(StrPrefix::CLike),
+                    content: "hello"
+                }
+            )
         );
         assert!(str_lit.parse_peek(r#"d"hello""#).is_err());
     }
