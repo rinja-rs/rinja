@@ -284,21 +284,23 @@ fn build_template_item(
 
     let ctx = &contexts[&input.path];
     let heritage = if !ctx.blocks.is_empty() || ctx.extends.is_some() {
-        let heritage = Heritage::new(ctx, &contexts);
-
-        if let Some((block_name, block_span)) = input.block {
-            if !heritage.blocks.contains_key(&block_name) {
-                return Err(CompileError::no_file_info(
-                    format_args!("cannot find block `{block_name}`"),
-                    Some(block_span),
-                ));
-            }
-        }
-
-        Some(heritage)
+        Some(Heritage::new(ctx, &contexts))
     } else {
         None
     };
+
+    if let Some((block_name, block_span)) = input.block {
+        let has_block = match &heritage {
+            Some(heritage) => heritage.blocks.contains_key(block_name),
+            None => ctx.blocks.contains_key(block_name),
+        };
+        if !has_block {
+            return Err(CompileError::no_file_info(
+                format_args!("cannot find block `{block_name}`"),
+                Some(block_span),
+            ));
+        }
+    }
 
     if input.print == Print::Ast || input.print == Print::All {
         eprintln!("{:?}", templates[&input.path].nodes());
