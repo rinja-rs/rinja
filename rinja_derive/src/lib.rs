@@ -441,10 +441,14 @@ impl fmt::Display for FileInfo<'_> {
                 source_after = error_info.source_after,
             )
         } else {
-            write!(f, "\n --> {}", match std::env::current_dir() {
-                Ok(cwd) => fmt_left!(move "{}", strip_common(&cwd, self.path)),
-                Err(_) => fmt_right!("{}", self.path.display()),
-            })
+            write!(
+                f,
+                "\n --> {}",
+                match std::env::current_dir() {
+                    Ok(cwd) => fmt_left!(move "{}", strip_common(&cwd, self.path)),
+                    Err(_) => fmt_right!("{}", self.path.display()),
+                }
+            )
         }
     }
 }
