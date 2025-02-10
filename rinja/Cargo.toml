@@ -57,7 +57,7 @@ blocks = ["rinja_derive?/blocks"]
 code-in-doc = ["rinja_derive?/code-in-doc"]
 config = ["rinja_derive?/config"]
 derive = ["rinja_derive"]
-serde_json = ["rinja_derive?/serde_json", "dep:serde", "dep:serde_json"]
+serde_json = ["std", "rinja_derive?/serde_json", "dep:serde", "dep:serde_json"]
 std = [
     "alloc",
     "rinja_derive?/std",

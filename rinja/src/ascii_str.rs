@@ -114,6 +114,19 @@ impl AsciiChar {
             Self::new(ALPHABET[d as usize % ALPHABET.len()]),
         ]
     }
+
+    #[inline]
+    pub const fn two_hex_digits(d: u32) -> [Self; 2] {
+        const ALPHABET: &[u8; 16] = b"0123456789abcdef";
+
+        if d >= ALPHABET.len().pow(2) as u32 {
+            panic!();
+        }
+        [
+            Self::new(ALPHABET[d as usize / ALPHABET.len()]),
+            Self::new(ALPHABET[d as usize % ALPHABET.len()]),
+        ]
+    }
 }
 
 mod _ascii_char {
