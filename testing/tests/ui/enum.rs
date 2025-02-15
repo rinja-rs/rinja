@@ -1,32 +1,32 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 enum CratePathOnVariant {
-    #[template(ext = "txt", source = "🫨", rinja = rinja)]
+    #[template(ext = "txt", source = "🫨", askama = askama)]
     Variant,
 }
 
 #[derive(Template)]
 enum CratePathOnVariants {
-    #[template(ext = "txt", source = "🫏", rinja = rinja)]
+    #[template(ext = "txt", source = "🫏", askama = askama)]
     Variant1,
-    #[template(ext = "txt", source = "🪿", rinja = rinja)]
+    #[template(ext = "txt", source = "🪿", askama = askama)]
     Variant2,
 }
 
 #[derive(Template)]
-#[template(ext = "txt", source = "🪼", rinja = rinja)]
+#[template(ext = "txt", source = "🪼", askama = askama)]
 enum CratePathOnBoth {
-    #[template(ext = "txt", source = "🪻", rinja = rinja)]
+    #[template(ext = "txt", source = "🪻", askama = askama)]
     Variant,
 }
 
 #[derive(Template)]
-#[template(ext = "txt", source = "🫛", rinja = rinja)]
+#[template(ext = "txt", source = "🫛", askama = askama)]
 enum CratePathOnAll {
-    #[template(ext = "txt", source = "🫠", rinja = rinja)]
+    #[template(ext = "txt", source = "🫠", askama = askama)]
     Variant1,
-    #[template(ext = "txt", source = "🧌", rinja = rinja)]
+    #[template(ext = "txt", source = "🧌", askama = askama)]
     Variant2,
 }
 

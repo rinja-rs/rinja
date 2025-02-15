@@ -4,7 +4,7 @@ use actix_web::web::Html;
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError, get, middleware, web,
 };
-use rinja::Template;
+use askama::Template;
 use serde::Deserialize;
 
 #[tokio::main]
@@ -47,7 +47,7 @@ enum AppError {
     /// not found
     NotFound,
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
     /// could not generate URL
     Url(#[from] UrlGenerationError),
 }
@@ -65,7 +65,7 @@ impl Responder for AppError {
     type Body = String;
 
     fn respond_to(self, req: &HttpRequest) -> HttpResponse<Self::Body> {
-        // The error handler uses a rinja template to display its content.
+        // The error handler uses a askama template to display its content.
         // The member `lang` is used by "_layout.html" which "error.html" extends. Even though it
         // is always the fallback language English in here, "_layout.html" expects to be able to
         // access this field, so you have to provide it.
@@ -92,7 +92,7 @@ impl Responder for AppError {
 
 /// Thanks to this type, your user can select the display language of your page.
 ///
-/// The same type is used by actix-web as part of the URL, and in rinja to select what content to
+/// The same type is used by actix-web as part of the URL, and in askama to select what content to
 /// show, and also as an HTML attribute in `<html lang=`. To make it possible to use the same type
 /// for three different use cases, we use a few derive macros:
 ///
@@ -102,7 +102,7 @@ impl Responder for AppError {
 ///  * `PartialEq` so that we can use the type in comparisons with `==` or `!=`.
 ///  * `serde::Deserialize` so that actix-web can parse the type in incoming URLs.
 ///  * `strum::AsRefStr` so that actix-web the use the type to construct URL for printing.
-///  * `strum::Display` so that rinja can write the value in templates.
+///  * `strum::Display` so that askama can write the value in templates.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Deserialize, strum::AsRefStr, strum::Display)]
 #[allow(non_camel_case_types)]
 enum Lang {

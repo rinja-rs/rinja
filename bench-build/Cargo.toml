@@ -1,18 +1,18 @@
 [package]
 name = "bench-build"
 version = "0.3.5"
-authors = ["rinja-rs developers"]
+authors = ["askama-rs developers"]
 edition = "2021"
 rust-version = "1.81"
 publish = false
 
 [dependencies]
-rinja = { path = "../rinja", version = "0.3.5", default-features = false, features = ["std"] }
-rinja_derive = { path = "../rinja_derive", version = "0.3.5", features = ["std"] }
+askama = { path = "../askama", version = "0.3.5", default-features = false, features = ["std"] }
+askama_derive = { path = "../askama_derive", version = "0.3.5", features = ["std"] }
 
 [features]
 default = []
-derive = ["rinja/derive"]
+derive = ["askama/derive"]
 
 [workspace]
 members = ["."]

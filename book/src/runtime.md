@@ -1,7 +1,7 @@
 # Runtime values
 
 It is possible to define variables at runtime and to use them in the templates using the `values`
-filter or the `rinja::get_value` function and to call the `_with_values` variants of the `render`
+filter or the `askama::get_value` function and to call the `_with_values` variants of the `render`
 methods. It expects an extra argument implementing the `Values` trait. This trait is implemented on
 a few types provided by the `std`, like `HashMap`:
 
@@ -23,13 +23,13 @@ template_struct.render_with_values(&values).unwrap();
 ```
 
 There are two ways to get the values from the template, either by using the `value` filter
-or by calling directly the `rinja::get_value` function:
+or by calling directly the `askama::get_value` function:
 
 ```jinja
 {% if let Ok(name) = "name"|value::<&str> %}
   name is {{ name }}
 {% endif %}
-{% if let Ok(age) = rinja::get_value::<u32>("age") %}
+{% if let Ok(age) = askama::get_value::<u32>("age") %}
   age is {{ age }}
 {% endif %}
 ```

@@ -148,25 +148,25 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `rinja` (e.g. `rinja = rinja`):
-  If you are using rinja in a subproject, a library or a [macro][book-macro], it might be
-  necessary to specify the [path][book-tree] where to find the module `rinja`:
+* `askama` (e.g. `askama = askama`):
+  If you are using askama in a subproject, a library or a [macro][book-macro], it might be
+  necessary to specify the [path][book-tree] where to find the module `askama`:
 
   [book-macro]: https://doc.rust-lang.org/book/ch19-06-macros.html
   [book-tree]: https://doc.rust-lang.org/book/ch07-03-paths-for-referring-to-an-item-in-the-module-tree.html
 
   ```rust,ignore
   #[doc(hidden)]
-  use rinja as __rinja;
+  use askama as __askama;
 
   #[macro_export]
   macro_rules! new_greeter {
       ($name:ident) => {
-          #[derive(Debug, $crate::rinja::Template)]
+          #[derive(Debug, $crate::askama::Template)]
           #[template(
               ext = "txt",
               source = "Hello, world!",
-              rinja = $crate::__rinja
+              askama = $crate::__askama
           )]
           struct $name;
       }
@@ -263,12 +263,12 @@ With this feature, you can specify the template code directly in the documentati
 of the template item.
 
 Instead of `path = "…"` or `source = "…"`, specify `in_doc = true` in the `#[template]` attribute,
-and in the item's documentation, add a code block with the `rinja` attribute:
+and in the item's documentation, add a code block with the `askama` attribute:
 
 ```rust
 /// Here you can put our usual comments.
 ///
-/// ```rinja
+/// ```askama
 /// <div>{{ lines|linebreaksbr }}</div>
 /// ```
 ///
@@ -292,5 +292,5 @@ struct Example<'a> {
 If you want to supply the template code in the comments,
 then you have to specify the `ext` argument, too, e.g. `#[template(ext = "html")]`.
 
-Instead of `rinja`, you can also write `jinja` or `jinja2`,
+Instead of `askama`, you can also write `jinja` or `jinja2`,
 e.g. to get it to work better in conjunction with syntax highlighters.

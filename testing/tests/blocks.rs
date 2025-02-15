@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_blocks() {

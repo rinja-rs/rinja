@@ -1,16 +1,16 @@
 #![cfg(feature = "code-in-doc")]
 
 // Regarding `#[rustfmt::skip]`: `cargo fmt` strips extraneous newlines in code block,
-// but we want to test if `rinja_derive` works with extraneous newlines.
+// but we want to test if `askama_derive` works with extraneous newlines.
 
-use rinja::Template;
+use askama::Template;
 
 #[rustfmt::skip]
 #[test]
 fn test_code_in_comment_only() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// Hello world!
     /// ```
     struct Tmpl;
@@ -23,7 +23,7 @@ fn test_code_in_comment_only() {
 fn test_code_in_comment_with_line_break() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// Hello
     /// world!
     /// ```
@@ -32,7 +32,7 @@ fn test_code_in_comment_with_line_break() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// Hello
     ///
     /// world!
@@ -42,7 +42,7 @@ fn test_code_in_comment_with_line_break() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// 
     /// Hello
     ///
@@ -53,7 +53,7 @@ fn test_code_in_comment_with_line_break() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// Hello
     ///
     /// world!
@@ -64,7 +64,7 @@ fn test_code_in_comment_with_line_break() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// 
     ///
     /// Hello
@@ -81,7 +81,7 @@ fn test_code_in_comment_with_line_break() {
 #[rustfmt::skip]
 #[test]
 fn test_code_in_comment_with_derive_in_between() {
-    /// ```rinja
+    /// ```askama
     /// Hello
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
@@ -92,7 +92,7 @@ fn test_code_in_comment_with_derive_in_between() {
 
     /// This template greets the whole world
     ///
-    /// ```rinja
+    /// ```askama
     /// Hello
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
@@ -110,11 +110,11 @@ fn test_code_in_comment_split_up() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
     /// Text1
-    /// ```rinja
+    /// ```askama
     /// Hello
     /// ```
     /// Text2
-    /// ```rinja
+    /// ```askama
     /// world!
     /// ```
     /// Text3
@@ -125,13 +125,13 @@ fn test_code_in_comment_split_up() {
     #[template(ext = "txt", in_doc = true)]
     /// Text1
     ///
-    /// ```rinja
+    /// ```askama
     /// Hello
     /// ```
     ///
     /// Text2
     ///
-    /// ```rinja
+    /// ```askama
     /// world!
     /// ```
     ///
@@ -145,13 +145,13 @@ fn test_code_in_comment_split_up() {
 fn test_code_in_comment_doc() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    #[doc = "```rinja\nHello world!\n```"]
+    #[doc = "```askama\nHello world!\n```"]
     struct Tmpl1;
     assert_eq!(Tmpl1.to_string(), "Hello world!");
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    #[doc = "```rinja"]
+    #[doc = "```askama"]
     #[doc = "Hello world!"]
     #[doc = "```"]
     struct Tmpl2;
@@ -159,14 +159,14 @@ fn test_code_in_comment_doc() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    #[doc = "```rinja\nHello world!"]
+    #[doc = "```askama\nHello world!"]
     #[doc = "```"]
     struct Tmpl3;
     assert_eq!(Tmpl3.to_string(), "Hello world!");
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    #[doc = "```rinja"]
+    #[doc = "```askama"]
     #[doc = "Hello world!\n```"]
     struct Tmpl4;
     assert_eq!(Tmpl4.to_string(), "Hello world!");
@@ -178,7 +178,7 @@ fn test_code_in_comment_multiline() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
     /**
-    ```rinja
+    ```askama
     Hello world!
     ```
     */
@@ -188,7 +188,7 @@ fn test_code_in_comment_multiline() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
     /**
-    ```rinja
+    ```askama
     Hello
     world!
     ```
@@ -199,7 +199,7 @@ fn test_code_in_comment_multiline() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
     /**
-    ```rinja
+    ```askama
 
     Hello
     world!
@@ -211,7 +211,7 @@ fn test_code_in_comment_multiline() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
     /**
-    ```rinja
+    ```askama
     Hello
     world!
 
@@ -223,7 +223,7 @@ fn test_code_in_comment_multiline() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
     /**
-    ```rinja
+    ```askama
 
     Hello
 
@@ -240,7 +240,7 @@ fn test_code_in_comment_multiline() {
 fn test_code_in_comment_backticks() {
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ````rinja
+    /// ````askama
     /// Hello
     /// ````
     struct Tmpl1;
@@ -248,7 +248,7 @@ fn test_code_in_comment_backticks() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// `````rinja
+    /// `````askama
     /// Hello
     /// `````
     struct Tmpl2;
@@ -256,7 +256,7 @@ fn test_code_in_comment_backticks() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ``````````````````````````````````````````````````````````````````````````````````````rinja
+    /// ``````````````````````````````````````````````````````````````````````````````````````askama
     /// Hello
     /// ``````````````````````````````````````````````````````````````````````````````````````
     struct Tmpl3;
@@ -264,7 +264,7 @@ fn test_code_in_comment_backticks() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// ```rinja
+    /// ```askama
     /// `````
     /// Hello
     /// `````
@@ -274,7 +274,7 @@ fn test_code_in_comment_backticks() {
 
     #[derive(Template)]
     #[template(ext = "txt", in_doc = true)]
-    /// `````rinja
+    /// `````askama
     /// ```
     /// Hello
     /// ```

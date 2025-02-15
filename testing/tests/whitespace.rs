@@ -1,10 +1,10 @@
 #![cfg(feature = "serde_json")]
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_extra_whitespace() {
-    #[derive(rinja::Template, Default)]
+    #[derive(askama::Template, Default)]
     #[template(path = "allow-whitespaces.html")]
     struct AllowWhitespaces {
         tuple: (u64, u64, u64, u64),

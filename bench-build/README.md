@@ -1,4 +1,4 @@
-Run the script `./run.sh` in this directory to compare the compile compile of `rinja`
+Run the script `./run.sh` in this directory to compare the compile compile of `askama`
 
 * uses feature `derive` vs
 * it does not use that feature.
@@ -35,20 +35,20 @@ Summary
 
 This shows that – while it is less convenient – for small projects it might be better
 to use the following setup.
-This might be especially true if you are using `rinja` in a library.
+This might be especially true if you are using `askama` in a library.
 Without the feature, `cargo` will be able to compile more dependencies in parallel.
 
 ```toml
 # Cargo.toml
 [dependencies]
-rinja = { version = "0.3.5", default-features = false, features = ["std"] }
-rinja_derive = { version = "0.3.5", features = ["std"] }
+askama = { version = "0.3.5", default-features = false, features = ["std"] }
+askama_derive = { version = "0.3.5", features = ["std"] }
 ```
 
 ```rust
 // lib.rs
-use rinja::Template as _;
-use rinja_derive::Template;
+use askama::Template as _;
+use askama_derive::Template;
 ```
 
 The script uses [hyperfine](https://crates.io/crates/hyperfine).

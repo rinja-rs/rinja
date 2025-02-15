@@ -3,45 +3,45 @@ error: node `end` was not expected in the current context
        " end %}"
  --> tests/ui/unexpected-tag.rs:5:1
   |
-5 | /// ```rinja
-  | ^^^^^^^^^^^^
+5 | /// ```askama
+  | ^^^^^^^^^^^^^
 
 error: node `elif` was not expected in the current context: `for` block
  --> <source attribute>:3:2
        " elif %}\n    what?\n{% endfor %}"
   --> tests/ui/unexpected-tag.rs:12:1
    |
-12 | /// ```rinja
-   | ^^^^^^^^^^^^
+12 | /// ```askama
+   | ^^^^^^^^^^^^^
 
 error: node `else` was not expected in the current context: `block` block
  --> <source attribute>:3:2
        " else %}\n    else\n{% endblock meta %}"
   --> tests/ui/unexpected-tag.rs:23:1
    |
-23 | /// ```rinja
-   | ^^^^^^^^^^^^
+23 | /// ```askama
+   | ^^^^^^^^^^^^^
 
 error: node `when` was not expected in the current context
  --> <source attribute>:1:2
        " when condition %}\n    true\n{% endwhen %}"
   --> tests/ui/unexpected-tag.rs:34:1
    |
-34 | /// ```rinja
-   | ^^^^^^^^^^^^
+34 | /// ```askama
+   | ^^^^^^^^^^^^^
 
 error: unexpected closing tag `endlet`
  --> <source attribute>:1:20
        " endlet %}"
   --> tests/ui/unexpected-tag.rs:43:1
    |
-43 | /// ```rinja
-   | ^^^^^^^^^^^^
+43 | /// ```askama
+   | ^^^^^^^^^^^^^
 
 error: unknown node `syntax`
  --> <source attribute>:1:2
        " syntax error %}"
   --> tests/ui/unexpected-tag.rs:50:1
    |
-50 | /// ```rinja
-   | ^^^^^^^^^^^^
+50 | /// ```askama
+   | ^^^^^^^^^^^^^

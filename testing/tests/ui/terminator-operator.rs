@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = "<<a>> and <<b>>", config = "issue-128.toml", syntax = "mwe", ext="")]

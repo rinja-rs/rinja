@@ -4,7 +4,7 @@ use core::fmt;
 use core::str::Utf8Error;
 
 use assert_matches::assert_matches;
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn hello_world() {
@@ -43,7 +43,7 @@ fn hello_world() {
     };
     let mut cursor = Cursor::new(&mut buffer);
     let err = match tmpl.render_into(&mut cursor) {
-        Err(rinja::Error::Custom(err)) => err,
+        Err(askama::Error::Custom(err)) => err,
         err => panic!("Expected `Err(Custom(_))`, got {err:#?}"),
     };
     assert!(err.is::<CustomError>());

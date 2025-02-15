@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-print(r'''use rinja::Template;
+print(r'''use askama::Template;
 
 #[derive(Template)]
 #[template(

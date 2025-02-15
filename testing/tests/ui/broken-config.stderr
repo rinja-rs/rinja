@@ -1,10 +1,10 @@
-error: `$WORKSPACE/target/tests/trybuild/rinja_testing/no-such-config.toml` does not exist
+error: `$WORKSPACE/target/tests/trybuild/askama_testing/no-such-config.toml` does not exist
  --> tests/ui/broken-config.rs:4:47
   |
 4 | #[template(source = "", ext = "txt", config = "no-such-config.toml")]
   |                                               ^^^^^^^^^^^^^^^^^^^^^
 
-error: unable to read $WORKSPACE/target/tests/trybuild/rinja_testing/folder-config.toml: Is a directory (os error 21)
+error: unable to read $WORKSPACE/target/tests/trybuild/askama_testing/folder-config.toml: Is a directory (os error 21)
  --> tests/ui/broken-config.rs:8:47
   |
 8 | #[template(source = "", ext = "txt", config = "folder-config.toml")]
