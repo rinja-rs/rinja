@@ -1,4 +1,4 @@
-error: the binary AND operator is called `bitand` in rinja
+error: the binary AND operator is called `bitand` in askama
  --> <source attribute>:1:6
        " b }}"
  --> tests/ui/iso646.rs:4:34
@@ -6,7 +6,7 @@ error: the binary AND operator is called `bitand` in rinja
 4 | #[template(ext = "txt", source = "{{ a & b }}")]
   |                                  ^^^^^^^^^^^^^
 
-error: the binary XOR operator is called `xor` in rinja
+error: the binary XOR operator is called `xor` in askama
  --> <source attribute>:1:6
        " b }}"
   --> tests/ui/iso646.rs:25:34

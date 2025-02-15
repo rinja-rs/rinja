@@ -1,15 +1,15 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(in_doc = true, ext = "html")]
-/// ```rinja
+/// ```askama
 /// {% end %}
 /// ```
 struct UnexpectedEnd;
 
 #[derive(Template)]
 #[template(in_doc = true, ext = "html")]
-/// ```rinja
+/// ```askama
 /// {% for i in 0..10 %}
 ///     i = {{i}}
 /// {% elif %}
@@ -20,7 +20,7 @@ struct UnexpectedElif;
 
 #[derive(Template)]
 #[template(in_doc = true, ext = "html")]
-/// ```rinja
+/// ```askama
 /// {% block meta %}
 ///     then
 /// {% else %}
@@ -31,7 +31,7 @@ struct UnexpectedElse;
 
 #[derive(Template)]
 #[template(in_doc = true, ext = "html")]
-/// ```rinja
+/// ```askama
 /// {% when condition %}
 ///     true
 /// {% endwhen %}
@@ -40,14 +40,14 @@ struct UnexpectedWhen;
 
 #[derive(Template)]
 #[template(in_doc = true, ext = "html")]
-/// ```rinja
+/// ```askama
 /// {% let var %}value{% endlet %}
 /// ```
 struct UnexpectedEndLet;
 
 #[derive(Template)]
 #[template(in_doc = true, ext = "html")]
-/// ```rinja
+/// ```askama
 /// {% syntax error %}
 /// ```
 struct Unexpected;

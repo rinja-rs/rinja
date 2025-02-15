@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use arbitrary::{Arbitrary, Unstructured};
-use rinja_parser::{Ast, InnerSyntax, Syntax, SyntaxBuilder};
+use askama_parser::{Ast, InnerSyntax, Syntax, SyntaxBuilder};
 
 #[derive(Debug, Default)]
 pub struct Scenario<'a> {
@@ -11,7 +11,7 @@ pub struct Scenario<'a> {
 }
 
 impl<'a> super::Scenario<'a> for Scenario<'a> {
-    type RunError = rinja_parser::ParseError;
+    type RunError = askama_parser::ParseError;
 
     fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
         let mut data = Unstructured::new(data);
@@ -74,7 +74,7 @@ SyntaxBuilder {{
         write!(
             f,
             "\
-use rinja_parser::{{Ast, ParseError}};
+use askama_parser::{{Ast, ParseError}};
 
 #[test]
 fn test() -> Result<(), ParseError> {{

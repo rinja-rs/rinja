@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_match_option() {
@@ -270,7 +270,7 @@ fn test_match_with_patterns() {
 fn test_end_when() {
     #[derive(Template)]
     #[template(in_doc = true, ext = "html")]
-    /// ```rinja
+    /// ```askama
     /// {% match result %}
     ///     {% when Some(Ok(s)) -%}
     ///         good: {{s}}

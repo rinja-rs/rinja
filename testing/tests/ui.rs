@@ -17,7 +17,7 @@ fn ui() {
         Err(_) => panic!("you need to run tests with `cargo`"),
     };
 
-    let target_crate_root = manifest_dir.join("../target/tests/trybuild/rinja_testing");
+    let target_crate_root = manifest_dir.join("../target/tests/trybuild/askama_testing");
     if !target_crate_root.exists() {
         if let Err(err) = std::fs::create_dir_all(&target_crate_root) {
             panic!(

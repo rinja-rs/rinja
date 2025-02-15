@@ -1,10 +1,10 @@
+use askama::Template;
 use poem::error::{NotFoundError, ResponseError};
 use poem::http::StatusCode;
 use poem::listener::TcpListener;
 use poem::middleware::Tracing;
 use poem::web::{Html, Path, Query, Redirect};
 use poem::{EndpointExt, IntoResponse, Response, Route, Server, get, handler};
-use rinja::Template;
 use serde::Deserialize;
 use tracing::Level;
 
@@ -29,7 +29,7 @@ async fn main() -> Result<(), std::io::Error> {
 
 /// Thanks to this type, your user can select the display language of your page.
 ///
-/// The same type is used by poem as part of the URL, and in rinja to select what content to show,
+/// The same type is used by poem as part of the URL, and in askama to select what content to show,
 /// and also as an HTML attribute in `<html lang=`. To make it possible to use the same type for
 /// three different use cases, we use a few derive macros:
 ///
@@ -38,7 +38,7 @@ async fn main() -> Result<(), std::io::Error> {
 ///  * `Clone` + `Copy` so that we can pass the language by value.
 ///  * `PartialEq` so that we can use the type in comparisons with `==` or `!=`.
 ///  * `serde::Deserialize` so that poem can parse the type in incoming URLs.
-///  * `strum::Display` so that rinja can write the value in templates.
+///  * `strum::Display` so that askama can write the value in templates.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Deserialize, strum::Display)]
 #[allow(non_camel_case_types)]
 enum Lang {
@@ -56,7 +56,7 @@ enum AppError {
     /// not found
     NotFound,
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl ResponseError for AppError {
@@ -71,7 +71,7 @@ impl ResponseError for AppError {
 /// This is your error handler
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // It uses a rinja template to display its content.
+        // It uses an askama template to display its content.
         // The member `lang` is used by "_layout.html" which "error.html" extends. Even though it
         // is always the fallback language English in here, "_layout.html" expects to be able to
         // access this field, so you have to provide it.

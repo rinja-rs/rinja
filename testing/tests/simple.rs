@@ -6,8 +6,8 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use rinja::Template;
-use rinja::filters::HtmlSafe;
+use askama::Template;
+use askama::filters::HtmlSafe;
 
 #[test]
 fn test_variables() {
@@ -71,7 +71,7 @@ fn test_variables_no_escape() {
 }
 
 mod test_constants {
-    use rinja::Template;
+    use askama::Template;
 
     const FOO: &str = "FOO";
     const FOO_BAR: &str = "FOO BAR";
@@ -337,7 +337,7 @@ fn test_func_ref_call() {
 }
 
 mod test_path_func_call {
-    use rinja::Template;
+    use askama::Template;
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn world2(s: &str, v: u8) -> String {
@@ -472,20 +472,20 @@ fn test_raw_ws() {
 }
 
 mod without_import_on_derive {
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(source = "foo", ext = "txt")]
     struct WithoutImport;
 
     #[test]
     fn test_without_import() {
-        use rinja::Template;
+        use askama::Template;
         assert_eq!(WithoutImport.render().unwrap(), "foo");
     }
 }
 
 #[test]
 fn test_define_string_var() {
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(source = "{% let s = String::new() %}{{ s }}", ext = "txt")]
     struct DefineStringVar;
 
@@ -495,7 +495,7 @@ fn test_define_string_var() {
 
 #[test]
 fn test_simple_float() {
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(source = "{% let x = 4.5 %}{{ x }}", ext = "html")]
     struct SimpleFloat;
 
@@ -505,7 +505,7 @@ fn test_simple_float() {
 
 #[test]
 fn test_num_literals() {
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(path = "num-literals.html")]
     struct NumLiterals;
 
@@ -522,11 +522,11 @@ fn test_num_literals() {
 /// variable names (`foo`). Previously, this test would fail because any
 /// name containing uppercase characters would be considered a path.
 ///
-/// <https://github.com/rinja-rs/rinja/issues/924>
+/// <https://github.com/askama-rs/askama/issues/924>
 #[test]
 fn test_mixed_case() {
     #[allow(non_snake_case)]
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(source = "{{ xY }}", ext = "txt")]
     struct MixedCase {
         xY: &'static str,
@@ -540,7 +540,7 @@ fn test_mixed_case() {
 #[allow(clippy::needless_borrows_for_generic_args)]
 fn test_referenced() {
     #[allow(non_snake_case)]
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(source = "Hello, {{ user }}!", ext = "txt")]
     struct Referenced {
         user: &'static str,
@@ -558,7 +558,7 @@ fn test_referenced() {
 
 #[test]
 fn test_i16_to_u8() {
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(
         source = "{{ input as u8 }} {{ &input as u8 }} {{ &&input as u8 }}",
         ext = "txt"

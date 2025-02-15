@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(path = "fuzzed-recursion-mul-deref.txt")]

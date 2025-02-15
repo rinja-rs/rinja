@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 struct X {
     a: u32,

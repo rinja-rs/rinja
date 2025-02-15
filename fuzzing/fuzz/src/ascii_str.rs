@@ -1,1 +1,1 @@
-../../../rinja/src/ascii_str.rs
+../../../askama/src/ascii_str.rs

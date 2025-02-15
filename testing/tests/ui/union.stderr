@@ -1,4 +1,4 @@
-error: rinja templates are not supported for `union` types, only `struct` and `enum`
+error: askama templates are not supported for `union` types, only `struct` and `enum`
  --> tests/ui/union.rs:5:1
   |
 5 | union Tmpl {

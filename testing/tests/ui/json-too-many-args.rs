@@ -1,6 +1,6 @@
 #![cfg(feature = "serde_json")]
 
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(ext = "txt", source = "{{ 1|json(2, 3) }}")]

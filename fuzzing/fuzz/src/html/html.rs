@@ -1,1 +1,1 @@
-../../../../rinja/src/html.rs
+../../../../askama/src/html.rs

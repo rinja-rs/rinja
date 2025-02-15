@@ -1,8 +1,8 @@
 use std::hint::black_box;
 use std::iter::repeat;
 
+use askama::Template;
 use criterion::{Criterion, criterion_group, criterion_main};
-use rinja::Template;
 
 criterion_main!(benches);
 criterion_group!(benches, functions);

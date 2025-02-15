@@ -1,8 +1,8 @@
 # Creating Templates
 
-An Rinja template is a `struct` definition which provides the template
+An Askama template is a `struct` definition which provides the template
 context combined with a UTF-8 encoded text file (or inline source, see
-below). Rinja can be used to generate any kind of text-based format.
+below). Askama can be used to generate any kind of text-based format.
 The template file's extension may be used to provide content type hints.
 
 A template consists of **text contents**, which are passed through as-is,
@@ -24,7 +24,7 @@ struct HelloTemplate<'a> { // the name of the struct can be anything
 
 ## The `template()` attribute
 
-Rinja works by generating one or more trait implementations for any
+Askama works by generating one or more trait implementations for any
 `struct` type decorated with the `#[derive(Template)]` attribute. The
 code generation process takes some options that can be specified through
 the `template()` attribute. The following sub-attributes are currently
@@ -133,7 +133,7 @@ recognized:
 
 * `syntax` (e.g. `syntax = "foo"`): set the syntax name for a parser defined
   in the configuration file. The default syntax , "default", is the one
-  provided by Rinja.
+  provided by Askama.
   ```rust
   #[derive(Template)]
   #[template(path = "hello.html", syntax = "foo")]
@@ -148,25 +148,25 @@ recognized:
   struct HelloTemplate<'a> { ... }
   ```
 
-* `rinja` (e.g. `rinja = rinja`):
-  If you are using rinja in a subproject, a library or a [macro][book-macro], it might be
-  necessary to specify the [path][book-tree] where to find the module `rinja`:
+* `askama` (e.g. `askama = askama`):
+  If you are using askama in a subproject, a library or a [macro][book-macro], it might be
+  necessary to specify the [path][book-tree] where to find the module `askama`:
 
   [book-macro]: https://doc.rust-lang.org/book/ch19-06-macros.html
   [book-tree]: https://doc.rust-lang.org/book/ch07-03-paths-for-referring-to-an-item-in-the-module-tree.html
 
   ```rust,ignore
   #[doc(hidden)]
-  use rinja as __rinja;
+  use askama as __askama;
 
   #[macro_export]
   macro_rules! new_greeter {
       ($name:ident) => {
-          #[derive(Debug, $crate::rinja::Template)]
+          #[derive(Debug, $crate::askama::Template)]
           #[template(
               ext = "txt",
               source = "Hello, world!",
-              rinja = $crate::__rinja
+              askama = $crate::__askama
           )]
           struct $name;
       }
@@ -263,12 +263,12 @@ With this feature, you can specify the template code directly in the documentati
 of the template item.
 
 Instead of `path = "…"` or `source = "…"`, specify `in_doc = true` in the `#[template]` attribute,
-and in the item's documentation, add a code block with the `rinja` attribute:
+and in the item's documentation, add a code block with the `askama` attribute:
 
 ```rust
 /// Here you can put our usual comments.
 ///
-/// ```rinja
+/// ```askama
 /// <div>{{ lines|linebreaksbr }}</div>
 /// ```
 ///
@@ -292,5 +292,5 @@ struct Example<'a> {
 If you want to supply the template code in the comments,
 then you have to specify the `ext` argument, too, e.g. `#[template(ext = "html")]`.
 
-Instead of `rinja`, you can also write `jinja` or `jinja2`,
+Instead of `askama`, you can also write `jinja` or `jinja2`,
 e.g. to get it to work better in conjunction with syntax highlighters.

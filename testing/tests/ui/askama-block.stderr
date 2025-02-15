@@ -1,0 +1,49 @@
+error: unknown node `fail`
+ --> <source attribute>:2:6
+       " fail %}\n{% endif %}"
+ --> tests/ui/askama-block.rs:5:1
+  |
+5 | /// Some documentation
+  | ^^^^^^^^^^^^^^^^^^^^^^
+
+error: when using `in_doc` with the value `true`, the struct's documentation needs a `askama` code block
+  --> tests/ui/askama-block.rs:15:34
+   |
+15 | #[template(ext = "txt", in_doc = true)]
+   |                                  ^^^^
+
+error: specify one template argument `path`, `source` or `in_doc`
+  --> tests/ui/askama-block.rs:24:3
+   |
+24 | #[template(ext = "txt")]
+   |   ^^^^^^^^
+
+error: unsupported attribute argument
+  --> tests/ui/askama-block.rs:33:25
+   |
+33 | #[template(ext = "txt", in_doc)]
+   |                         ^^^^^^
+
+error: specify one template argument `path`, `source` or `in_doc`
+  --> tests/ui/askama-block.rs:42:3
+   |
+42 | #[template(ext = "txt", in_doc = false)]
+   |   ^^^^^^^^
+
+error: template attribute `in_doc` expects a boolean value
+  --> tests/ui/askama-block.rs:51:34
+   |
+51 | #[template(ext = "txt", in_doc = "yes")]
+   |                                  ^^^^^
+
+error: when using `in_doc` with the value `true`, the enum's documentation needs a `askama` code block
+  --> tests/ui/askama-block.rs:60:34
+   |
+60 | #[template(ext = "txt", in_doc = true)]
+   |                                  ^^^^
+
+error: askama templates are not supported for `union` types, only `struct` and `enum`
+  --> tests/ui/askama-block.rs:68:1
+   |
+68 | union NoDocForUnion {
+   | ^^^^^

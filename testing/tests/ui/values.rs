@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(
@@ -17,28 +17,28 @@ struct B;
 #[derive(Template)]
 #[template(
     ext = "html",
-    source = r#"{% if let Ok(x) = rinja::get_value("a") %}{% endif %}"#,
+    source = r#"{% if let Ok(x) = askama::get_value("a") %}{% endif %}"#,
 )]
 struct C;
 
 #[derive(Template)]
 #[template(
     ext = "html",
-    source = r#"{% if let Ok(x) = rinja::get_value::<u8, u8>("a") %}{% endif %}"#,
+    source = r#"{% if let Ok(x) = askama::get_value::<u8, u8>("a") %}{% endif %}"#,
 )]
 struct D;
 
 #[derive(Template)]
 #[template(
     ext = "html",
-    source = r#"{% if let Ok(x) = rinja::get_value::<u8>() %}{% endif %}"#,
+    source = r#"{% if let Ok(x) = askama::get_value::<u8>() %}{% endif %}"#,
 )]
 struct E;
 
 #[derive(Template)]
 #[template(
     ext = "html",
-    source = r#"{% if let Ok(x) = rinja::get_value::<u8>("a", "b") %}{% endif %}"#,
+    source = r#"{% if let Ok(x) = askama::get_value::<u8>("a", "b") %}{% endif %}"#,
 )]
 struct F;
 
