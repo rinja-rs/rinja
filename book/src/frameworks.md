@@ -1,6 +1,6 @@
 # Working with web-frameworks
 
-Rinja's [`Template::render()`] returns <code>Result&lt;String, [rinja::Error]&gt;</code>.
+Askama's [`Template::render()`] returns <code>Result&lt;String, [askama::Error]&gt;</code>.
 To make this result work in your preferred web-framework, you'll need to handle both cases:
 converting the `String` to a web-response with the correct `Content-Type`,
 and the `Error` case to a proper error message.
@@ -18,8 +18,8 @@ Maybe you'll add multiple languages and you want to localize error messages?
 
 The crates [`thiserror`] and [`displaydoc`] can be useful to implement this error type.
 
-[`Template::render()`]: <https://docs.rs/rinja/0.3.5/rinja/trait.Template.html#method.render>
-[rinja::Error]: <https://docs.rs/rinja/0.3.5/rinja/enum.Error.html>
+[`Template::render()`]: <https://docs.rs/askama/0.3.5/askama/trait.Template.html#method.render>
+[askama::Error]: <https://docs.rs/askama/0.3.5/askama/enum.Error.html>
 [`thiserror`]: <https://crates.io/crates/thiserror>
 [`displaydoc`]: <https://crates.io/crates/displaydoc>
 
@@ -28,7 +28,7 @@ The crates [`thiserror`] and [`displaydoc`] can be useful to implement this erro
 [![our actix-web example web-app](
     https://img.shields.io/badge/actix--web-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
 )](
-    https://github.com/rinja-rs/rinja/tree/master/examples/actix-web-app "our actix-web example web-app"
+    https://github.com/askama-rs/askama/tree/master/examples/actix-web-app "our actix-web example web-app"
 )
 [![crates.io: actix-web](
     https://img.shields.io/crates/v/actix-web?label=actix-web&style=flat-square&logo=rust&logoColor=white&color=informational
@@ -57,12 +57,12 @@ use actix_web::{HttpResponse, Responder};
 use actix_web::error::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::web::Html;
-use rinja::Template;
+use askama::Template;
 
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 enum AppError {
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl ResponseError for AppError {
@@ -96,7 +96,7 @@ impl Responder for AppError {
 [![our axum example web-app](
     https://img.shields.io/badge/axum-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
 )](
-    https://github.com/rinja-rs/rinja/tree/master/examples/axum-app "our axum example web-app"
+    https://github.com/askama-rs/askama/tree/master/examples/axum-app "our axum example web-app"
 )
 [![crates.io: axum](
     https://img.shields.io/crates/v/axum?label=axum&style=flat-square&logo=rust&logoColor=white&color=informational
@@ -120,12 +120,12 @@ To implement your own error type, you can use this boilerplate code:
 
 ```rust
 use axum::response::IntoResponse;
-use rinja::Template;
+use askama::Template;
 
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 enum AppError {
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl IntoResponse for AppError {
@@ -152,7 +152,7 @@ impl IntoResponse for AppError {
 [![our poem example web-app](
     https://img.shields.io/badge/poem-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
 )](
-    https://github.com/rinja-rs/rinja/tree/master/examples/poem-app "our poem example web-app"
+    https://github.com/askama-rs/askama/tree/master/examples/poem-app "our poem example web-app"
 )
 [![crates.io: poem](
     https://img.shields.io/crates/v/poem?label=poem&style=flat-square&logo=rust&logoColor=white&color=informational
@@ -181,12 +181,12 @@ use poem::error::ResponseError;
 use poem::http::StatusCode;
 use poem::web::Html;
 use poem::{IntoResponse, Response};
-use rinja::Template;
+use askama::Template;
 
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 enum AppError {
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl ResponseError for AppError {
@@ -218,7 +218,7 @@ impl IntoResponse for AppError {
 [![our rocket example web-app](
     https://img.shields.io/badge/rocket-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
 )](
-    https://github.com/rinja-rs/rinja/tree/master/examples/rocket-app "our rocket example web-app"
+    https://github.com/askama-rs/askama/tree/master/examples/rocket-app "our rocket example web-app"
 )
 [![crates.io: rocket](
     https://img.shields.io/crates/v/rocket?label=rocket&style=flat-square&logo=rust&logoColor=white&color=informational
@@ -244,7 +244,7 @@ fn handler<'r>() -> Result<impl Responder<'r, 'static>, AppError> {
 To implement your own error type, you can use this boilerplate code:
 
 ```rust
-use rinja::Template;
+use askama::Template;
 use rocket::http::Status;
 use rocket::response::content::RawHtml;
 use rocket::response::Responder;
@@ -253,7 +253,7 @@ use rocket::{Request, Response};
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 enum AppError {
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl<'r> Responder<'r, 'static> for AppError {
@@ -283,7 +283,7 @@ impl<'r> Responder<'r, 'static> for AppError {
 [![our salvo example web-app](
     https://img.shields.io/badge/salvo-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
 )](
-    https://github.com/rinja-rs/rinja/tree/master/examples/salvo-app "our salvo example web-app"
+    https://github.com/askama-rs/askama/tree/master/examples/salvo-app "our salvo example web-app"
 )
 [![crates.io: salvo](
     https://img.shields.io/crates/v/salvo?label=salvo&style=flat-square&logo=rust&logoColor=white&color=informational
@@ -308,7 +308,7 @@ async fn handler() -> Result<impl Scribe, AppError> {
 To implement your own error type, you can use this boilerplate code:
 
 ```rust
-use rinja::Template;
+use askama::Template;
 use salvo::http::StatusCode;
 use salvo::writing::Text;
 use salvo::{Response, Scribe};
@@ -316,7 +316,7 @@ use salvo::{Response, Scribe};
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 enum AppError {
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl Scribe for AppError {
@@ -343,7 +343,7 @@ impl Scribe for AppError {
 [![our warp example web-app](
     https://img.shields.io/badge/warp-example-informational?style=flat-square&logo=git&logoColor=white&color=%23228b22
 )](
-    https://github.com/rinja-rs/rinja/tree/master/examples/warp-app "our warp example web-app"
+    https://github.com/askama-rs/askama/tree/master/examples/warp-app "our warp example web-app"
 )
 [![crates.io: warp](
     https://img.shields.io/crates/v/warp?label=warp&style=flat-square&logo=rust&logoColor=white&color=informational
@@ -372,7 +372,7 @@ use warp::reply::{Reply, Response, html};
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 enum AppError {
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 impl Reply for AppError {

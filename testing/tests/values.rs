@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::collections::HashMap;
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_values() {
@@ -76,7 +76,7 @@ fn test_values3() {
 fn test_value_function_getter() {
     #[derive(Template)]
     #[template(
-        source = r#"{% if let Ok(bla) = rinja::get_value::<u32>("a") %}{{bla}}{% endif %}"#,
+        source = r#"{% if let Ok(bla) = askama::get_value::<u32>("a") %}{{bla}}{% endif %}"#,
         ext = "txt"
     )]
     struct V;

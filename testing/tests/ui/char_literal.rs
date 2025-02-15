@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(path = "char-literals/char-literal-1.txt")]

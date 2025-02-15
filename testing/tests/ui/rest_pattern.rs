@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 // Checking that we can't use `..` more than once.
 #[derive(Template)]

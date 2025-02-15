@@ -1,6 +1,6 @@
 # Opt-in features
 
-Some features in rinja are opt-in to reduce the amount of dependencies,
+Some features in askama are opt-in to reduce the amount of dependencies,
 and to keep the compilation time low.
 
 To opt-in to a feature, you can use `features = […]`.
@@ -9,7 +9,7 @@ you have to opt-in to the feature [`"serde_json"`](#serde_json):
 
 ```toml
 [dependencies]
-rinja = { version = "0.3.5", features = ["serde_json"] }
+askama = { version = "0.3.5", features = ["serde_json"] }
 ```
 
 Please read the [Cargo manual](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features)
@@ -18,7 +18,7 @@ for more information.
 ## Default features
 
 Any [semver-compatible](https://doc.rust-lang.org/cargo/reference/semver.html) upgrade
-(e.g. `rinja = "0.3.4"` to `rinja = "0.3.5"`) will keep the same list of default features.
+(e.g. `askama = "0.3.4"` to `askama = "0.3.5"`) will keep the same list of default features.
 We will treat upgrades to a newer dependency version as a semver breaking change.
 
 ### `"default"`
@@ -28,7 +28,7 @@ You can opt-out of using the feature flags by using
 
 ```toml
 [dependencies]
-rinja = { version = "0.3.5", default-features = false }
+askama = { version = "0.3.5", default-features = false }
 ```
 
 Without `default-features = false`, i.e with default features enabled,
@@ -38,9 +38,9 @@ the following features are automatically selected for you:
 default = ["config", "derive", "std", "urlencode"]
 ```
 
-This should encompass most features an average user of rinja might need.
+This should encompass most features an average user of askama might need.
 
-*If you are writing a **library** that depends on rinja,
+*If you are writing a **library** that depends on askama,
 and if you want it to be usable in by other users and in **other projects**,
 then you should probably **opt-out of features you do not need**.*
 
@@ -50,17 +50,17 @@ then you should probably **opt-out of features you do not need**.*
 enabled by <code>"default"</code>
 </blockquote>
 
-This feature enables `#[derive(Template)]`. Without it the trait `rinja::Template` will still be
-available, but if you want to derive a template, you have to manually depend on `rinja_derive`.
-`rinja_derive` should be used with the same features as `rinja`.
+This feature enables `#[derive(Template)]`. Without it the trait `askama::Template` will still be
+available, but if you want to derive a template, you have to manually depend on `askama_derive`.
+`askama_derive` should be used with the same features as `askama`.
 
 Not using this feature might be useful e.g. if you are writing a library with manual filters
-for rinja, without any templates. It might also very slightly speed-up the compilation,
-because more dependencies can be compiled in parallel, because `rinja` won't transitively depend
+for askama, without any templates. It might also very slightly speed-up the compilation,
+because more dependencies can be compiled in parallel, because `askama` won't transitively depend
 on e.g. `syn` or `proc-macro2`. On the author's PC the compilation of a trivial hello-world example
 was about 0.2s faster without the feature when compiled in release mode.
 
-*If you are writing a library that uses rinja, consider **not using** this default-feature.*
+*If you are writing a library that uses askama, consider **not using** this default-feature.*
 
 ### `"config"`
 
@@ -150,8 +150,8 @@ Please find more information in [The Embedded Rust Book](https://docs.rust-embed
 enabled by <code>"default"</code>
 </blockquote>
 
-Without the default feature `"alloc"` rinja can be used in a `#![no_std]` environment.
-The method `Template::render()` will be absent, because rinja won't have access to a default allocator.
+Without the default feature `"alloc"` askama can be used in a `#![no_std]` environment.
+The method `Template::render()` will be absent, because askama won't have access to a default allocator.
 
 Many filters need intermediate allocations, and won't be usable without this feature.
 
@@ -165,7 +165,7 @@ You can still render templates using e.g.
 enabled by <code>"default"</code>
 </blockquote>
 
-Without the feature `"std"` rinja can be used in a `#![no_std]` environment.
-The method `Template::write_into()` will be absent, because rinja won't have access to standard IO operations.
+Without the feature `"std"` askama can be used in a `#![no_std]` environment.
+The method `Template::write_into()` will be absent, because askama won't have access to standard IO operations.
 
 Enabling `"std"` enables `"alloc"`, too.

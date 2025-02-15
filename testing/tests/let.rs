@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 // This test ensures that rust macro calls in `let`/`set` statements are not prepended with `&`.
 #[test]

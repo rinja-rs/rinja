@@ -1,7 +1,7 @@
 [project]
 name = "jinja2-assumptions"
 version = "0.1.0"
-description = "This folder contains tests to ensure that rinja work the same a Jinja2."
+description = "This folder contains tests to ensure that askama work the same a Jinja2."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

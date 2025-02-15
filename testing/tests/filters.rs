@@ -2,7 +2,7 @@
 #[macro_use]
 extern crate serde_json;
 
-use rinja::Template;
+use askama::Template;
 #[cfg(feature = "serde_json")]
 use serde_json::Value;
 
@@ -99,11 +99,11 @@ fn filter_fmt() {
 }
 
 mod filters {
-    pub fn myfilter(s: &str) -> ::rinja::Result<String> {
+    pub fn myfilter(s: &str) -> ::askama::Result<String> {
         Ok(s.replace("oo", "aa"))
     }
     // for test_nested_filter_ref
-    pub fn mytrim(s: &dyn (::std::fmt::Display)) -> ::rinja::Result<String> {
+    pub fn mytrim(s: &dyn (::std::fmt::Display)) -> ::askama::Result<String> {
         Ok(s.to_string().trim().to_owned())
     }
 }
@@ -356,7 +356,7 @@ fn test_json_script() {
 
 #[test]
 fn test_let_borrow() {
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(
         source = r#"{% let word = s|ref %}{{ word }}
 {%- let hello = String::from("hello") %}
@@ -422,7 +422,7 @@ fn test_linebreaks() {
     );
 }
 
-// Regression tests for <https://github.com/rinja-rs/rinja/issues/215>.
+// Regression tests for <https://github.com/askama-rs/askama/issues/215>.
 #[test]
 fn test_filesizeformat() {
     #[derive(Template)]

@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[allow(non_camel_case_types)]
 #[derive(Template)]

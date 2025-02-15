@@ -1,7 +1,7 @@
 # Configuration
 
-At compile time, Rinja will read optional configuration values from
-`rinja.toml` in the crate root (the directory where `Cargo.toml` can
+At compile time, Askama will read optional configuration values from
+`askama.toml` in the crate root (the directory where `Cargo.toml` can
 be found). Currently, this covers the directories to search for templates,
 custom syntax configuration and escaper configuration.
 
@@ -132,7 +132,7 @@ this means you can also define other escapers that match different extensions
 to the same escaper.
 
 You can then use templates with this extension or use the
-[`escape`](https://docs.rs/rinja/latest/rinja/filters/fn.escape.html) filter with
+[`escape`](https://docs.rs/askama/latest/askama/filters/fn.escape.html) filter with
 the name of your extension in your template:
 
 ```jinja
@@ -143,12 +143,12 @@ As an example, we want `.js` files to be treated like "txt" files. To do so:
 
 ```toml
 [[escaper]]
-path = "rinja::filters::Text"
+path = "askama::filters::Text"
 extensions = ["js"]
 ```
 
-[`Text`](https://docs.rs/rinja/latest/rinja/filters/struct.Text.html) implements the
+[`Text`](https://docs.rs/askama/latest/askama/filters/struct.Text.html) implements the
 [`Escaper`] trait so since we don't need want any escaping on our `.js` files, we use
 it.
 
-[`Escaper`]: https://docs.rs/rinja/latest/rinja/filters/trait.Escaper.html
+[`Escaper`]: https://docs.rs/askama/latest/askama/filters/trait.Escaper.html

@@ -1,26 +1,26 @@
-error: template attribute `rinja` can only be used on the `enum`, not its variants
+error: template attribute `askama` can only be used on the `enum`, not its variants
  --> tests/ui/enum.rs:5:43
   |
-5 |     #[template(ext = "txt", source = "🫨", rinja = rinja)]
-  |                                            ^^^^^
+5 |     #[template(ext = "txt", source = "🫨", askama = askama)]
+  |                                            ^^^^^^
 
-error: template attribute `rinja` can only be used on the `enum`, not its variants
+error: template attribute `askama` can only be used on the `enum`, not its variants
   --> tests/ui/enum.rs:11:43
    |
-11 |     #[template(ext = "txt", source = "🫏", rinja = rinja)]
-   |                                            ^^^^^
+11 |     #[template(ext = "txt", source = "🫏", askama = askama)]
+   |                                            ^^^^^^
 
-error: template attribute `rinja` can only be used on the `enum`, not its variants
+error: template attribute `askama` can only be used on the `enum`, not its variants
   --> tests/ui/enum.rs:20:43
    |
-20 |     #[template(ext = "txt", source = "🪻", rinja = rinja)]
-   |                                            ^^^^^
+20 |     #[template(ext = "txt", source = "🪻", askama = askama)]
+   |                                            ^^^^^^
 
-error: template attribute `rinja` can only be used on the `enum`, not its variants
+error: template attribute `askama` can only be used on the `enum`, not its variants
   --> tests/ui/enum.rs:27:43
    |
-27 |     #[template(ext = "txt", source = "🫠", rinja = rinja)]
-   |                                            ^^^^^
+27 |     #[template(ext = "txt", source = "🫠", askama = askama)]
+   |                                            ^^^^^^
 
 error: cannot find block `c`
   --> tests/ui/enum.rs:48:24

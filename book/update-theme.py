@@ -16,7 +16,7 @@ INDEX_HBS_PROTO = "GET"
 INDEX_HBS_PATH = "/repos/rust-lang/mdBook/contents/src/theme/index.hbs?ref=v0.4.40"
 INDEX_HBS_DATA = None
 INDEX_HBS_HEADERS = {
-    "user-agent": "Update index.hbs for +https://github.com/rinja-rs/rinja",
+    "user-agent": "Update index.hbs for +https://github.com/askama-rs/askama",
 }
 
 SIDEBAR_STYLE = 'style="display:flex; flex-direction:column"'

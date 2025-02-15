@@ -1,21 +1,21 @@
 # Upgrading to new versions
 
 This file **only lists breaking changes** you need to be aware of when you upgrade to a new askama
-version. Please see [our release notes](<https://github.com/rinja-rs/rinja/releases>) to get a
+version. Please see [our release notes](<https://github.com/askama-rs/askama/releases>) to get a
 list of all changes and improvements that might be useful to you.
 
 Also have a look at our blog posts that highlight some of the best features of our releases, and
 give you more in-dept explanations:
 
-* [docs.rs switching jinja template framework from tera to rinja](
-  <https://blog.guillaume-gomez.fr/articles/2024-07-31+docs.rs+switching+jinja+template+framework+from+tera+to+rinja>)
+* [docs.rs switching jinja template framework from tera to askama](
+  <https://blog.guillaume-gomez.fr/articles/2024-07-31+docs.rs+switching+jinja+template+framework+from+tera+to+askama>)
 
 ## From askama v0.12 to askama v0.13
 
 * The <abbr title="minimum supported rust version">MSRV</abbr> of this release is 1.81.
 
 * The integration crates were removed.
-  Instead of depending on e.g. `askama_axum` / `rinja_axum`, please use `template.render()` to
+  Instead of depending on e.g. `askama_axum` / `askama_axum`, please use `template.render()` to
   render to a `Result<String, askama::Error>`.
 
   Use e.g. `.map_err(|err| err.into_io_error())?` if your web-framework expects `std::io::Error`s,
@@ -25,7 +25,7 @@ give you more in-dept explanations:
 
 * The fields `Template::EXTENSION` and `Template::MIME_TYPE` were removed.
 
-* You may not give variables a name starting with `__rinja`,
+* You may not give variables a name starting with `__askama`,
   or the name of a [rust keyword](https://doc.rust-lang.org/reference/keywords.html).
 
 * `#[derive(Template)]` cannot be used with `union`s.
@@ -65,7 +65,7 @@ give you more in-dept explanations:
   ```
 
 * The integration crates were removed.
-  Instead of depending on e.g. `askama_axum` / `rinja_axum`, please use `template.render()` to
+  Instead of depending on e.g. `rinja_axum` / `askama_axum`, please use `template.render()` to
   render to a `Result<String, askama::Error>`.
 
   Use e.g. `.map_err(|err| err.into_io_error())?` if your web-framework expects `std::io::Error`s,

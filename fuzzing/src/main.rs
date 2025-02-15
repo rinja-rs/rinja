@@ -62,7 +62,7 @@ enum Error {
         * <target>   {DisplayTargets}\n\
         * <src>      failed scenario (supply '-' to from from STDIN)\n\
         * <dest>     write a #[test] to this file (optional; supply '-' to write to STDOUT)",
-        .0.as_deref().unwrap_or(Path::new("rinja_fuzzing")).display(),
+        .0.as_deref().unwrap_or(Path::new("askama_fuzzing")).display(),
     )]
     Usage(Option<PathBuf>),
     #[error("unknown fuzzing target {:?}\nImplemented targets: {DisplayTargets}", .0)]

@@ -3,8 +3,8 @@
 use core::fmt;
 use core::str::Utf8Error;
 
+use askama::Template;
 use assert_matches::assert_matches;
-use rinja::Template;
 
 #[test]
 fn hello_world() {
@@ -42,7 +42,7 @@ fn hello_world() {
         user: Err(fmt::Error),
     };
     let mut cursor = Cursor::new(&mut buffer);
-    assert_matches!(tmpl.render_into(&mut cursor), Err(rinja::Error::Fmt));
+    assert_matches!(tmpl.render_into(&mut cursor), Err(askama::Error::Fmt));
 }
 
 struct Cursor<'a> {

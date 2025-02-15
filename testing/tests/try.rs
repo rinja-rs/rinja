@@ -1,7 +1,7 @@
 use std::{fmt, io};
 
+use askama::Template;
 use assert_matches::assert_matches;
-use rinja::Template;
 
 #[test]
 fn test_int_parser() {
@@ -18,7 +18,7 @@ fn test_int_parser() {
     }
 
     let template = IntParserTemplate { s: "💯" };
-    assert_matches!(template.render(), Err(rinja::Error::Custom(_)));
+    assert_matches!(template.render(), Err(askama::Error::Custom(_)));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
         "invalid digit found in string"
@@ -47,7 +47,7 @@ fn fail_fmt() {
     }
 
     let template = FailFmt { inner: None };
-    assert_matches!(template.render(), Err(rinja::Error::Fmt));
+    assert_matches!(template.render(), Err(askama::Error::Fmt));
     assert_eq!(
         format!("{}", &template.render().unwrap_err()),
         format!("{}", std::fmt::Error)
@@ -78,7 +78,7 @@ fn fail_str() {
     }
 
     let template = FailStr { value: false };
-    assert_matches!(template.render(), Err(rinja::Error::Custom(_)));
+    assert_matches!(template.render(), Err(askama::Error::Custom(_)));
     assert_eq!(format!("{}", &template.render().unwrap_err()), "FAIL");
 
     let template = FailStr { value: true };
@@ -108,12 +108,12 @@ fn error_conversion_from_fmt() {
     );
     assert_matches!(
         ResultTemplate { succeed: false }.render().as_deref(),
-        Err(rinja::Error::Fmt)
+        Err(askama::Error::Fmt)
     );
 }
 
 #[test]
-fn error_conversion_from_rinja_custom() {
+fn error_conversion_from_askama_custom() {
     #[derive(Template)]
     #[template(source = "{{ value()? }}", ext = "txt")]
     struct ResultTemplate {
@@ -121,10 +121,10 @@ fn error_conversion_from_rinja_custom() {
     }
 
     impl ResultTemplate {
-        fn value(&self) -> Result<&'static str, rinja::Error> {
+        fn value(&self) -> Result<&'static str, askama::Error> {
             match self.succeed {
                 true => Ok("hello"),
-                false => Err(rinja::Error::custom(CustomError)),
+                false => Err(askama::Error::custom(CustomError)),
             }
         }
     }
@@ -146,7 +146,7 @@ fn error_conversion_from_rinja_custom() {
     );
 
     let err = match (ResultTemplate { succeed: false }.render().unwrap_err()) {
-        rinja::Error::Custom(err) => err,
+        askama::Error::Custom(err) => err,
         err => panic!("Expected Error::Custom(_), got {err:#?}"),
     };
     assert!(err.is::<CustomError>());
@@ -186,7 +186,7 @@ fn error_conversion_from_custom() {
     );
 
     let err = match (ResultTemplate { succeed: false }.render().unwrap_err()) {
-        rinja::Error::Custom(err) => err,
+        askama::Error::Custom(err) => err,
         err => panic!("Expected Error::Custom(_), got {err:#?}"),
     };
     assert!(err.is::<CustomError>());
@@ -226,7 +226,7 @@ fn error_conversion_from_wrapped_in_io() {
     );
 
     let err = match (ResultTemplate { succeed: false }.render().unwrap_err()) {
-        rinja::Error::Custom(err) => err,
+        askama::Error::Custom(err) => err,
         err => panic!("Expected Error::Custom(_), got {err:#?}"),
     };
     assert!(err.is::<CustomError>());

@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 // This test ensures that `include` are correctly working inside filter blocks and that external
 // variables are used correctly.

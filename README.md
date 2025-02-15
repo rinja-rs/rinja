@@ -1,25 +1,25 @@
-# rinja
+# askama
 
-[![Crates.io](https://img.shields.io/crates/v/rinja?logo=rust&style=flat-square&logoColor=white "Crates.io")](https://crates.io/crates/rinja)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/rinja-rs/rinja/rust.yml?branch=master&logo=github&style=flat-square&logoColor=white "GitHub Workflow Status")](https://github.com/rinja-rs/rinja/actions/workflows/rust.yml)
-[![Book](https://img.shields.io/readthedocs/rinja?label=book&logo=readthedocs&style=flat-square&logoColor=white "Book")](https://rinja.readthedocs.io/)
-[![docs.rs](https://img.shields.io/docsrs/rinja?logo=docsdotrs&style=flat-square&logoColor=white "docs.rs")](https://docs.rs/rinja/)
+[![Crates.io](https://img.shields.io/crates/v/askama?logo=rust&style=flat-square&logoColor=white "Crates.io")](https://crates.io/crates/askama)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/askama-rs/askama/rust.yml?branch=master&logo=github&style=flat-square&logoColor=white "GitHub Workflow Status")](https://github.com/askama-rs/askama/actions/workflows/rust.yml)
+[![Book](https://img.shields.io/readthedocs/askama?label=book&logo=readthedocs&style=flat-square&logoColor=white "Book")](https://askama.readthedocs.io/)
+[![docs.rs](https://img.shields.io/docsrs/askama?logo=docsdotrs&style=flat-square&logoColor=white "docs.rs")](https://docs.rs/askama/)
 
-**Rinja** implements a template rendering engine based on [Jinja](https://jinja.palletsprojects.com/),
+**Askama** implements a template rendering engine based on [Jinja](https://jinja.palletsprojects.com/),
 and generates type-safe Rust code from your templates at compile time
 based on a user-defined `struct` to hold the template's context.
-See below for an example. It is a fork of [Askama](https://crates.io/crates/askama), please have a look at our
-[blog post](https://blog.guillaume-gomez.fr/articles/2024-07-31+docs.rs+switching+jinja+template+framework+from+tera+to+rinja)
-highlighting differences between the two crates.
+
+At some point, **Askama** got forked into **Rinja** (explained [here](https://blog.guillaume-gomez.fr/articles/2024-07-31+docs.rs+switching+jinja+template+framework+from+tera+to+rinja))
+before getting merged back into **Askama**.
 
 All feedback welcome! Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
 
 You can find the documentation about our syntax, features, configuration in our book:
-[rinja.readthedocs.io](https://rinja.readthedocs.io/).
+[askama.readthedocs.io](https://askama.readthedocs.io/).
 
-Have a look at our [*Rinja Playground*](https://rinja-rs.github.io/play-rinja/),
-if you want to try out rinja's code generation online.
+Have a look at our [*Askama Playground*](https://askama-rs.github.io/play-askama/),
+if you want to try out askama's code generation online.
 
 ### Feature highlights
 
@@ -41,16 +41,16 @@ if you want to try out rinja's code generation online.
 * Opt-out HTML escaping
 * Syntax customization
 
-[issues]: https://github.com/rinja-rs/rinja/issues
+[issues]: https://github.com/askama-rs/askama/issues
 
 
 How to get started
 ------------------
 
-First, add the rinja dependency to your crate's `Cargo.toml`:
+First, add the askama dependency to your crate's `Cargo.toml`:
 
 ```sh
-cargo add rinja
+cargo add askama
 ```
 
 Now create a directory called `templates` in your crate root.
@@ -63,7 +63,7 @@ Hello, {{ name }}!
 In any Rust file inside your crate, add the following:
 
 ```rust
-use rinja::Template; // bring trait in scope
+use askama::Template; // bring trait in scope
 
 #[derive(Template)] // this will generate the code...
 #[template(path = "hello.html")] // using the template in this path, relative

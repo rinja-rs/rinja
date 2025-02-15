@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = "{% for _ in 1..=10 %}{% end %}", ext = "txt")]

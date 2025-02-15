@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = "{% filter lower|indent(2) - %}

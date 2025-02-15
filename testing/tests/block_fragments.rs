@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 /// Tests a simple base-inherited template with block fragment rendering.
 #[test]
@@ -147,7 +147,7 @@ fn test_fragment_include() {
 }
 
 // This test ensures that parent variables are inherited in the block.
-// This is a regression test for <https://github.com/rinja-rs/rinja/issues/246>.
+// This is a regression test for <https://github.com/askama-rs/askama/issues/246>.
 #[test]
 fn test_variable_inheritance_in_block() {
     #[derive(Template)]

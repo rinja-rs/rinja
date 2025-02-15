@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 macro_rules! test_size {
     ($source:literal, $expected:expr) => {{

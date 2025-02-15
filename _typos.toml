@@ -8,10 +8,10 @@ extend-exclude = [
     "fuzzing/fuzz/artifacts/",
     "fuzzing/fuzz/corpus/",
     "target/",
-    "rinja_parser/tests/*.txt",
+    "askama_parser/tests/*.txt",
     "testing/templates/fuzzed-*",
     # filler texts
-    "rinja/benches/strings.inc",
+    "askama/benches/strings.inc",
     # too many false positives
     "testing/tests/gen_ws_tests.py",
 ]

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(path = "base.html")]
@@ -52,7 +52,7 @@ fn test_empty_child() {
 }
 
 pub mod parent {
-    use rinja::Template;
+    use askama::Template;
 
     #[derive(Template)]
     #[template(path = "base.html")]
@@ -62,7 +62,7 @@ pub mod parent {
 }
 
 pub mod child {
-    use rinja::Template;
+    use askama::Template;
 
     use super::parent::*;
 

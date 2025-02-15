@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "rinja",
-    "rinja_derive",
-    "rinja_parser",
+    "askama",
+    "askama_derive",
+    "askama_parser",
     "testing",
     "testing-alloc",
     "testing-no-std",

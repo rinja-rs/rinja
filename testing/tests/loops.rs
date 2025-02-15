@@ -3,7 +3,7 @@
 use std::fmt;
 use std::ops::Range;
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_for() {
@@ -391,7 +391,7 @@ fn test_for_cycle() {
 }
 
 mod test_for_cycle {
-    use rinja::Template;
+    use askama::Template;
 
     #[derive(Template)]
     #[template(
@@ -440,7 +440,7 @@ fn test_for_in_if() {
     assert_eq!(t.render().unwrap(), ":(");
 }
 
-// This is a regression test for <https://github.com/rinja-rs/rinja/issues/150>.
+// This is a regression test for <https://github.com/askama-rs/askama/issues/150>.
 // The loop didn't drop its locals context, creating a bug where a field could
 // not be retrieved although it existed.
 #[test]

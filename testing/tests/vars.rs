@@ -1,6 +1,6 @@
 #![allow(clippy::useless_let_if_seq)]
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_let() {
