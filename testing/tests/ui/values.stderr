@@ -16,32 +16,32 @@ error: `value` filter expects one generic, found 2
 
 error: `get_value` function expects one generic, found 0
  --> C.html:1:18
-       "rinja::get_value(\"a\") %}{% endif %}"
+       "askama::get_value(\"a\") %}{% endif %}"
   --> tests/ui/values.rs:20:14
    |
-20 |     source = r#"{% if let Ok(x) = rinja::get_value("a") %}{% endif %}"#,
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 |     source = r#"{% if let Ok(x) = askama::get_value("a") %}{% endif %}"#,
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `get_value` function expects one generic, found 2
  --> D.html:1:18
-       "rinja::get_value::<u8, u8>(\"a\") %}{% endif %}"
+       "askama::get_value::<u8, u8>(\"a\") %}{% endif %}"
   --> tests/ui/values.rs:27:14
    |
-27 |     source = r#"{% if let Ok(x) = rinja::get_value::<u8, u8>("a") %}{% endif %}"#,
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 |     source = r#"{% if let Ok(x) = askama::get_value::<u8, u8>("a") %}{% endif %}"#,
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `get_value` function only takes one argument, found 0
  --> E.html:1:18
-       "rinja::get_value::<u8>() %}{% endif %}"
+       "askama::get_value::<u8>() %}{% endif %}"
   --> tests/ui/values.rs:34:14
    |
-34 |     source = r#"{% if let Ok(x) = rinja::get_value::<u8>() %}{% endif %}"#,
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+34 |     source = r#"{% if let Ok(x) = askama::get_value::<u8>() %}{% endif %}"#,
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `get_value` function only takes one argument, found 2
  --> F.html:1:18
-       "rinja::get_value::<u8>(\"a\", \"b\") %}{% endif %}"
+       "askama::get_value::<u8>(\"a\", \"b\") %}{% endif %}"
   --> tests/ui/values.rs:41:14
    |
-41 |     source = r#"{% if let Ok(x) = rinja::get_value::<u8>("a", "b") %}{% endif %}"#,
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+41 |     source = r#"{% if let Ok(x) = askama::get_value::<u8>("a", "b") %}{% endif %}"#,
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

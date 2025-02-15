@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use rinja::Template as _;
-use rinja_derive::Template;
+use askama::Template as _;
+use askama_derive::Template;
 
 fn main() {
     let mut args = std::env::args().fuse().skip(1);

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use arbitrary::{Arbitrary, Unstructured};
-use rinja::filters;
+use askama::filters;
 
 #[derive(Arbitrary, Debug, Clone, Copy)]
 pub enum Scenario<'a> {
@@ -9,7 +9,7 @@ pub enum Scenario<'a> {
 }
 
 impl<'a> super::Scenario<'a> for Scenario<'a> {
-    type RunError = rinja::Error;
+    type RunError = askama::Error;
 
     fn new(data: &'a [u8]) -> Result<Self, arbitrary::Error> {
         Self::arbitrary_take_rest(Unstructured::new(data))
@@ -22,7 +22,7 @@ impl<'a> super::Scenario<'a> for Scenario<'a> {
     }
 }
 
-fn run_text(filter: Text<'_>) -> Result<(), rinja::Error> {
+fn run_text(filter: Text<'_>) -> Result<(), askama::Error> {
     let Text { input, filter } = filter;
     let _ = match filter {
         TextFilter::Capitalize => filters::capitalize(input)?.to_string(),
@@ -71,7 +71,7 @@ impl fmt::Display for Scenario<'_> {
         write!(
             f,
             "\
-use rinja::filters;
+use askama::filters;
 
 #[test]
 fn test() {{

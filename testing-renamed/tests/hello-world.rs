@@ -22,7 +22,7 @@ fn hello_world() {
     #[template(
         ext = "html",
         source = "Hello {%- if let Some(user) = user? -%} , {{ user }} {%- endif -%}!",
-        rinja = some::deeply::nested::path::with::some_name
+        askama = some::deeply::nested::path::with::some_name
     )]
     struct Hello<'a> {
         user: Result<Option<&'a str>, fmt::Error>,

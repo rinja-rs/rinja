@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_one_func() {
@@ -84,13 +84,13 @@ fn test_one_func_binop() {
 }
 
 mod test_double_attr_arg {
-    use rinja::Template;
+    use askama::Template;
 
     fn double_attr_arg_helper(x: u32) -> u32 {
         x * x + x
     }
 
-    #[derive(rinja::Template)]
+    #[derive(askama::Template)]
     #[template(
         source = "{{ self::double_attr_arg_helper(self.x.0 + 2) }}",
         ext = "txt"
@@ -151,7 +151,7 @@ fn test_closure_field() {
 }
 
 mod test_not_method {
-    use rinja::Template;
+    use askama::Template;
 
     fn single() -> &'static str {
         "a"
@@ -180,7 +180,7 @@ mod test_not_method {
 }
 
 mod test_deref_method_arg {
-    use rinja::Template;
+    use askama::Template;
 
     #[derive(Template)]
     #[template(

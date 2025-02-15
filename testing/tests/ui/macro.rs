@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = "{%- macro thrice(param) -%}
@@ -39,7 +39,7 @@ struct NoClosingParen3;
 #[template(source = "{% macro thrice(a, b, c = %}{% endmacro %}", ext = "html")]
 struct NoClosingParen4;
 
-#[derive(rinja::Template)]
+#[derive(askama::Template)]
 #[template(
     source = r#"
         {% macro example(name, value, current, label="", id="") %}
@@ -50,7 +50,7 @@ struct NoClosingParen4;
 )]
 struct WrongNumberOfParams;
 
-#[derive(rinja::Template)]
+#[derive(askama::Template)]
 #[template(
     source = r#"
         {% macro example(name, value, arg=12) %}

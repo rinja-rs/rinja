@@ -1,7 +1,7 @@
 use std::any::type_name_of_val;
 use std::fmt::{Debug, Display};
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_book_example() {

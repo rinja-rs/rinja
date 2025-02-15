@@ -162,7 +162,7 @@ Whitespace controls can also be defined by a
 These definitions follow the global-to-local preference:
 1. Inline (`-`, `+`, `~`)
 2. Derive (`#[template(whitespace = "suppress")]`)
-3. Configuration (in `rinja.toml`, `whitespace = "preserve"`)
+3. Configuration (in `askama.toml`, `whitespace = "preserve"`)
 
 Two inline whitespace controls may point to the same whitespace span.
 In this case, they are resolved by the following preference.
@@ -296,7 +296,7 @@ struct MyTemplate {
 
 ## Calling functions
 
-If you only provide a function name, rinja will assume it's a method. If
+If you only provide a function name, askama will assume it's a method. If
 you want to call a method, you will need to use a path instead:
 
 ```jinja
@@ -534,7 +534,7 @@ const x = {{ x is defined }};
 </script>
 ```
 
-Due to proc-macro limitations, rinja can only see the fields of your current type and the variables
+Due to proc-macro limitations, askama can only see the fields of your current type and the variables
 declared in the templates. Because of this, you can not check if a field or a function is defined:
 
 ```jinja
@@ -733,7 +733,7 @@ restrictions:
 
 - You can only use [primitive types](https://doc.rust-lang.org/std/primitive/index.html)
   like `i32` or `f64` both as source variable type and as target type.
-- If the source is a reference to a primitive type, e.g. `&&&bool`, then rinja automatically
+- If the source is a reference to a primitive type, e.g. `&&&bool`, then askama automatically
   dereferences the value until it gets the underlying `bool`.
 
 ### String concatenation
@@ -748,7 +748,7 @@ This makes it possible to inject modular template sections into other templates 
 testing and reuse.
 
 ```rust
-use rinja::Template;
+use askama::Template;
 #[derive(Template)]
 #[template(source = "Section 1: {{ s1 }}", ext = "txt")]
 struct RenderInPlace<'a> {
@@ -769,10 +769,10 @@ assert_eq!(t.render().unwrap(), "Section 1: A=a\nB=b")
 Note that if your inner template like `SectionOne` renders HTML content, then you may want to
 disable escaping when injecting it into an outer template, e.g. `{{ s1|safe }}`.
 Otherwise it will render the HTML content literally, because
-rinja [escapes HTML variables](#html-escaping) by default.
+askama [escapes HTML variables](#html-escaping) by default.
 
 See the example
-[render in place](https://github.com/rinja-rs/rinja/blob/master/testing/tests/render_in_place.rs)
+[render in place](https://github.com/askama-rs/askama/blob/master/testing/tests/render_in_place.rs)
 using a vector of templates in a for block.
 
 ## Comments
@@ -799,7 +799,7 @@ use a plain loop. If that is not doable, call `.render()`
 directly by using an expression as shown below.
 
 ```rust
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = r#"

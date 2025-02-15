@@ -1,12 +1,12 @@
 [package]
-name = "rinja_testing-no-std"
+name = "askama_testing-no-std"
 version = "0.3.5"
-authors = ["rinja-rs developers"]
+authors = ["askama-rs developers"]
 edition = "2021"
 rust-version = "1.81"
 publish = false
 
 [dev-dependencies]
-rinja = { path = "../rinja", version = "0.3.5", default-features = false, features = ["derive"] }
+askama = { path = "../askama", version = "0.3.5", default-features = false, features = ["derive"] }
 
 assert_matches = "1.5.0"

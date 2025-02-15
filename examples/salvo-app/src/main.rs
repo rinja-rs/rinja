@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr};
 
-use rinja::Template;
+use askama::Template;
 use salvo::catcher::Catcher;
 use salvo::conn::TcpListener;
 use salvo::http::StatusCode;
@@ -47,7 +47,7 @@ enum Error {
 
 /// Thanks to this type, your user can select the display language of your page.
 ///
-/// The same type is used by salvo as part of the URL, and in rinja to select what content to show,
+/// The same type is used by salvo as part of the URL, and in askama to select what content to show,
 /// and also as an HTML attribute in `<html lang=`. To make it possible to use the same type for
 /// three different use cases, we use a few derive macros:
 ///
@@ -56,7 +56,7 @@ enum Error {
 ///  * `Clone` + `Copy` so that we can pass the language by value.
 ///  * `PartialEq` so that we can use the type in comparisons with `==` or `!=`.
 ///  * `serde::Deserialize` so that salvo can parse the type in incoming URLs.
-///  * `strum::Display` so that rinja can write the value in templates.
+///  * `strum::Display` so that askama can write the value in templates.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Deserialize, strum::Display)]
 #[allow(non_camel_case_types)]
 enum Lang {
@@ -76,13 +76,13 @@ enum AppError {
     /// could not extract information from request
     Extract(#[from] salvo::http::ParseError),
     /// could not render template
-    Render(#[from] rinja::Error),
+    Render(#[from] askama::Error),
 }
 
 /// This is your error handler
 impl Scribe for AppError {
     fn render(self, res: &mut Response) {
-        // It uses a rinja template to display its content.
+        // It uses a askama template to display its content.
         // The member `lang` is used by "_layout.html" which "error.html" extends. Even though it
         // is always the fallback language English in here, "_layout.html" expects to be able to
         // access this field, so you have to provide it.

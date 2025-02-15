@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 macro_rules! hello {
     () => {
@@ -51,7 +51,7 @@ macro_rules! call_a_or_b_on_tail {
 }
 
 mod macro_with_args {
-    use rinja::Template;
+    use askama::Template;
 
     fn year(y: u16, _: &str, _: u8) -> u16 {
         y
