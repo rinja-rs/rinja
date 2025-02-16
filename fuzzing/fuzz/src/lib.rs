@@ -3,6 +3,7 @@
 #![deny(unreachable_pub)]
 
 pub mod all;
+mod ascii_str;
 pub mod filters;
 pub mod html;
 pub mod parser;

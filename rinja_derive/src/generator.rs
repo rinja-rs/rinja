@@ -14,6 +14,7 @@ use parser::{
 };
 use rustc_hash::FxBuildHasher;
 
+use crate::ascii_str::{AsciiChar, AsciiStr};
 use crate::heritage::{Context, Heritage};
 use crate::html::write_escaped_str;
 use crate::input::{Source, TemplateInput};
@@ -648,18 +649,14 @@ fn normalize_identifier(ident: &str) -> &str {
     }
     let kws = RUST_KEYWORDS[ident.len()];
 
-    let mut padded_ident = [b'_'; MAX_RUST_KEYWORD_LEN];
+    let mut padded_ident = [0; MAX_RUST_KEYWORD_LEN];
     padded_ident[..ident.len()].copy_from_slice(ident.as_bytes());
 
     // Since the individual buckets are quite short, a linear search is faster than a binary search.
-    let replacement = match kws
-        .iter()
-        .find(|probe| padded_ident == <[u8; MAX_RUST_KEYWORD_LEN]>::try_from(&probe[2..]).unwrap())
-    {
-        Some(replacement) => replacement,
-        None => return ident,
-    };
-
-    // SAFETY: We know that the input byte slice is pure-ASCII.
-    unsafe { std::str::from_utf8_unchecked(&replacement[..ident.len() + 2]) }
+    for probe in kws {
+        if padded_ident == *AsciiChar::slice_as_bytes(probe[2..].try_into().unwrap()) {
+            return AsciiStr::from_slice(&probe[..ident.len() + 2]);
+        }
+    }
+    ident
 }

@@ -1,9 +1,9 @@
 use core::convert::Infallible;
 use core::fmt;
 use core::mem::MaybeUninit;
-use core::str::from_utf8_unchecked;
 
 use super::FastWritable;
+use crate::ascii_str::{AsciiChar, AsciiStr};
 
 /// Returns adequate string representation (in KB, ..) of number of bytes
 ///
@@ -58,26 +58,27 @@ impl FastWritable for FilesizeFormatFilter {
 }
 
 /// Formats `buffer` to contain the decimal point, decimal places and unit
-fn format_frac(buffer: &mut MaybeUninit<[u8; 8]>, prefix: u8, scaled: u32) -> &str {
-    // LLVM generates better byte code for register sized buffers, so we add some NULs
-    let buffer = buffer.write(*b"..0 kB\0\0");
+fn format_frac(buffer: &mut MaybeUninit<[AsciiChar; 8]>, prefix: AsciiChar, scaled: u32) -> &str {
+    // LLVM generates better byte code for register sized buffers
+    let buffer = buffer.write(AsciiStr::new_sized("..0 kB"));
     buffer[4] = prefix;
 
     let frac = scaled % 100;
     let buffer = if frac == 0 {
         &buffer[3..6]
-    } else if frac % 10 == 0 {
-        // the decimal separator '.' is already contained in buffer[1]
-        buffer[2] = b'0' + (frac / 10) as u8;
-        &buffer[1..6]
     } else {
-        // the decimal separator '.' is already contained in buffer[0]
-        buffer[1] = b'0' + (frac / 10) as u8;
-        buffer[2] = b'0' + (frac % 10) as u8;
-        &buffer[0..6]
+        let digits = AsciiChar::two_digits(frac);
+        if digits[1] == AsciiChar::new(b'0') {
+            // the decimal separator '.' is already contained in buffer[1]
+            buffer[2] = digits[0];
+            &buffer[1..6]
+        } else {
+            // the decimal separator '.' is already contained in buffer[0]
+            [buffer[1], buffer[2]] = digits;
+            &buffer[0..6]
+        }
     };
-    // SAFETY: we know that the buffer contains only ASCII data
-    unsafe { from_utf8_unchecked(buffer) }
+    AsciiStr::from_slice(buffer).as_str()
 }
 
 #[cold]
@@ -87,17 +88,17 @@ fn too_big<W: fmt::Write + ?Sized>(value: f32, dest: &mut W) -> crate::Result<()
 }
 
 /// `((si_prefix, factor), limit)`, the factor is offset by 10**2 to account for 2 decimal places
-const SI_PREFIXES: &[((u8, f32), f32)] = &[
-    ((b'k', 1e-1), 1e6),
-    ((b'M', 1e-4), 1e9),
-    ((b'G', 1e-7), 1e12),
-    ((b'T', 1e-10), 1e15),
-    ((b'P', 1e-13), 1e18),
-    ((b'E', 1e-16), 1e21),
-    ((b'Z', 1e-19), 1e24),
-    ((b'Y', 1e-22), 1e27),
-    ((b'R', 1e-25), 1e30),
-    ((b'Q', 1e-28), 1e33),
+const SI_PREFIXES: &[((AsciiChar, f32), f32)] = &[
+    ((AsciiChar::new(b'k'), 1e-1), 1e6),
+    ((AsciiChar::new(b'M'), 1e-4), 1e9),
+    ((AsciiChar::new(b'G'), 1e-7), 1e12),
+    ((AsciiChar::new(b'T'), 1e-10), 1e15),
+    ((AsciiChar::new(b'P'), 1e-13), 1e18),
+    ((AsciiChar::new(b'E'), 1e-16), 1e21),
+    ((AsciiChar::new(b'Z'), 1e-19), 1e24),
+    ((AsciiChar::new(b'Y'), 1e-22), 1e27),
+    ((AsciiChar::new(b'R'), 1e-25), 1e30),
+    ((AsciiChar::new(b'Q'), 1e-28), 1e33),
 ];
 
 #[test]

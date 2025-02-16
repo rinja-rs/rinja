@@ -18,12 +18,7 @@ use std::hash::{BuildHasher, Hash};
 use std::path::Path;
 use std::sync::Mutex;
 
-use config::{Config, read_config_file};
-use generator::{TmplKind, template_to_string};
-use heritage::{Context, Heritage};
-use input::{AnyTemplateArgs, Print, TemplateArgs, TemplateInput};
-use integration::{Buffer, build_template_enum};
-use parser::{Parsed, strip_common};
+use parser::{Parsed, ascii_str, strip_common};
 #[cfg(not(feature = "__standalone"))]
 use proc_macro::TokenStream as TokenStream12;
 #[cfg(feature = "__standalone")]
@@ -31,6 +26,12 @@ use proc_macro2::TokenStream as TokenStream12;
 use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned};
 use rustc_hash::FxBuildHasher;
+
+use crate::config::{Config, read_config_file};
+use crate::generator::{TmplKind, template_to_string};
+use crate::heritage::{Context, Heritage};
+use crate::input::{AnyTemplateArgs, Print, TemplateArgs, TemplateInput};
+use crate::integration::{Buffer, build_template_enum};
 
 /// The `Template` derive macro and its `template()` attribute.
 ///
