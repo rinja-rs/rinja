@@ -65,6 +65,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod ascii_str;
 mod error;
 pub mod filters;
 #[doc(hidden)]

@@ -17,9 +17,13 @@ extend-exclude = [
 ]
 
 [default.extend-words]
+# It's actually called that in the ASCII standard
+Enquiry = "Enquiry"
+
 # French words
 exemple = "exemple"
 existant = "existant"
+
 # used in tests
 Ba = "Ba"
 fo = "fo"

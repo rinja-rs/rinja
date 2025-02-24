@@ -2,6 +2,14 @@
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
 
+pub mod ascii_str;
+pub mod expr;
+mod memchr_splitter;
+pub mod node;
+mod target;
+#[cfg(test)]
+mod tests;
+
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::env::current_dir;
@@ -17,16 +25,10 @@ use winnow::stream::{AsChar, Stream as _};
 use winnow::token::{any, one_of, take_till, take_while};
 use winnow::{ModalParser, Parser};
 
-pub mod expr;
-pub use expr::{Attr, Expr, Filter, TyGenerics};
-mod memchr_splitter;
-pub mod node;
-pub use node::Node;
-
-mod target;
-pub use target::Target;
-#[cfg(test)]
-mod tests;
+use crate::ascii_str::{AsciiChar, AsciiStr};
+pub use crate::expr::{Attr, Expr, Filter, TyGenerics};
+pub use crate::node::Node;
+pub use crate::target::Target;
 
 mod _parsed {
     use std::path::Path;
@@ -1167,105 +1169,133 @@ const PRIMITIVE_TYPES: &[&str] = &{
     list
 };
 
-#[doc(hidden)]
 pub const MAX_RUST_KEYWORD_LEN: usize = 8;
-const MAX_RUST_RAW_KEYWORD_LEN: usize = MAX_RUST_KEYWORD_LEN + 2;
-#[doc(hidden)]
-pub const RUST_KEYWORDS: &[&[[u8; MAX_RUST_RAW_KEYWORD_LEN]]] = {
-    // FIXME: Replace `u8` with `[core:ascii::Char; MAX_REPL_LEN]` once
-    //        <https://github.com/rust-lang/rust/issues/110998> is stable.
+pub const MAX_RUST_RAW_KEYWORD_LEN: usize = MAX_RUST_KEYWORD_LEN + 2;
 
-    const KW2: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[
-        *b"r#as______",
-        *b"r#do______",
-        *b"r#fn______",
-        *b"r#if______",
-        *b"r#in______",
+pub const RUST_KEYWORDS: &[&[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]]; MAX_RUST_KEYWORD_LEN + 1] = &{
+    const NO_KWS: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[];
+    const KW2: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#as"),
+        AsciiStr::new_sized("r#do"),
+        AsciiStr::new_sized("r#fn"),
+        AsciiStr::new_sized("r#if"),
+        AsciiStr::new_sized("r#in"),
     ];
-    const KW3: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[
-        *b"r#box_____",
-        *b"r#dyn_____",
-        *b"r#for_____",
-        *b"r#gen_____",
-        *b"r#let_____",
-        *b"r#mod_____",
-        *b"r#mut_____",
-        *b"r#pub_____",
-        *b"r#ref_____",
-        *b"r#try_____",
-        *b"r#use_____",
+    const KW3: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#box"),
+        AsciiStr::new_sized("r#dyn"),
+        AsciiStr::new_sized("r#for"),
+        AsciiStr::new_sized("r#gen"),
+        AsciiStr::new_sized("r#let"),
+        AsciiStr::new_sized("r#mod"),
+        AsciiStr::new_sized("r#mut"),
+        AsciiStr::new_sized("r#pub"),
+        AsciiStr::new_sized("r#ref"),
+        AsciiStr::new_sized("r#try"),
+        AsciiStr::new_sized("r#use"),
     ];
-    const KW4: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[
-        *b"r#else____",
-        *b"r#enum____",
-        *b"r#impl____",
-        *b"r#move____",
-        *b"r#priv____",
-        *b"r#true____",
-        *b"r#type____",
+    const KW4: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#else"),
+        AsciiStr::new_sized("r#enum"),
+        AsciiStr::new_sized("r#impl"),
+        AsciiStr::new_sized("r#move"),
+        AsciiStr::new_sized("r#priv"),
+        AsciiStr::new_sized("r#true"),
+        AsciiStr::new_sized("r#type"),
     ];
-    const KW5: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[
-        *b"r#async___",
-        *b"r#await___",
-        *b"r#break___",
-        *b"r#const___",
-        *b"r#crate___",
-        *b"r#false___",
-        *b"r#final___",
-        *b"r#macro___",
-        *b"r#match___",
-        *b"r#trait___",
-        *b"r#where___",
-        *b"r#while___",
-        *b"r#yield___",
+    const KW5: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#async"),
+        AsciiStr::new_sized("r#await"),
+        AsciiStr::new_sized("r#break"),
+        AsciiStr::new_sized("r#const"),
+        AsciiStr::new_sized("r#crate"),
+        AsciiStr::new_sized("r#false"),
+        AsciiStr::new_sized("r#final"),
+        AsciiStr::new_sized("r#macro"),
+        AsciiStr::new_sized("r#match"),
+        AsciiStr::new_sized("r#trait"),
+        AsciiStr::new_sized("r#where"),
+        AsciiStr::new_sized("r#while"),
+        AsciiStr::new_sized("r#yield"),
     ];
-    const KW6: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[
-        *b"r#become__",
-        *b"r#extern__",
-        *b"r#return__",
-        *b"r#static__",
-        *b"r#struct__",
-        *b"r#typeof__",
-        *b"r#unsafe__",
+    const KW6: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#become"),
+        AsciiStr::new_sized("r#extern"),
+        AsciiStr::new_sized("r#return"),
+        AsciiStr::new_sized("r#static"),
+        AsciiStr::new_sized("r#struct"),
+        AsciiStr::new_sized("r#typeof"),
+        AsciiStr::new_sized("r#unsafe"),
     ];
-    const KW7: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[*b"r#unsized_", *b"r#virtual_"];
-    const KW8: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] =
-        &[*b"r#abstract", *b"r#continue", *b"r#override"];
+    const KW7: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#unsized"),
+        AsciiStr::new_sized("r#virtual"),
+    ];
+    const KW8: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &[
+        AsciiStr::new_sized("r#abstract"),
+        AsciiStr::new_sized("r#continue"),
+        AsciiStr::new_sized("r#override"),
+    ];
 
-    &[&[], &[], KW2, KW3, KW4, KW5, KW6, KW7, KW8]
+    [NO_KWS, NO_KWS, KW2, KW3, KW4, KW5, KW6, KW7, KW8]
 };
 
 // These ones are only used in the parser, hence why they're private.
-const KWS_EXTRA: &[&[[u8; MAX_RUST_RAW_KEYWORD_LEN]]] = {
-    const KW4: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] =
-        &[*b"r#loop____", *b"r#self____", *b"r#Self____"];
-    const KW5: &[[u8; MAX_RUST_RAW_KEYWORD_LEN]] = &[*b"r#super___", *b"r#union___"];
+const KWS_PARSER: &[&[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]]; MAX_RUST_KEYWORD_LEN + 1] = &{
+    const KW4: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &{
+        let mut result = [AsciiStr::new_sized("r#"); RUST_KEYWORDS[4].len() + 3];
+        let mut i = 0;
+        while i < RUST_KEYWORDS[4].len() {
+            result[i] = RUST_KEYWORDS[4][i];
+            i += 1;
+        }
+        result[result.len() - 3] = AsciiStr::new_sized("r#loop");
+        result[result.len() - 2] = AsciiStr::new_sized("r#self");
+        result[result.len() - 1] = AsciiStr::new_sized("r#Self");
+        result
+    };
+    const KW5: &[[AsciiChar; MAX_RUST_RAW_KEYWORD_LEN]] = &{
+        let mut result = [AsciiStr::new_sized("r#"); RUST_KEYWORDS[5].len() + 2];
+        let mut i = 0;
+        while i < RUST_KEYWORDS[5].len() {
+            result[i] = RUST_KEYWORDS[5][i];
+            i += 1;
+        }
+        result[result.len() - 2] = AsciiStr::new_sized("r#super");
+        result[result.len() - 1] = AsciiStr::new_sized("r#union");
+        result
+    };
 
-    &[&[], &[], &[], &[], KW4, KW5, &[], &[], &[]]
+    [
+        RUST_KEYWORDS[0],
+        RUST_KEYWORDS[1],
+        RUST_KEYWORDS[2],
+        RUST_KEYWORDS[3],
+        KW4,
+        KW5,
+        RUST_KEYWORDS[6],
+        RUST_KEYWORDS[7],
+        RUST_KEYWORDS[8],
+    ]
 };
 
 fn is_rust_keyword(ident: &str) -> bool {
-    fn is_rust_keyword_inner(
-        kws: &[&[[u8; MAX_RUST_RAW_KEYWORD_LEN]]],
-        padded_ident: &[u8; MAX_RUST_KEYWORD_LEN],
-        ident_len: usize,
-    ) -> bool {
-        // Since the individual buckets are quite short, a linear search is faster than a binary search.
-        kws[ident_len]
-            .iter()
-            .any(|&probe| padded_ident == &probe[2..])
-    }
-
     let ident_len = ident.len();
     if ident_len > MAX_RUST_KEYWORD_LEN {
         return false;
     }
+    let kws = KWS_PARSER[ident.len()];
 
-    let mut padded_ident = [b'_'; MAX_RUST_KEYWORD_LEN];
-    padded_ident[..ident.len()].copy_from_slice(ident.as_bytes());
+    let mut padded_ident = [0; MAX_RUST_KEYWORD_LEN];
+    padded_ident[..ident_len].copy_from_slice(ident.as_bytes());
 
-    is_rust_keyword_inner(RUST_KEYWORDS, &padded_ident, ident_len)
-        || is_rust_keyword_inner(KWS_EXTRA, &padded_ident, ident_len)
+    // Since the individual buckets are quite short, a linear search is faster than a binary search.
+    for probe in kws {
+        if padded_ident == *AsciiChar::slice_as_bytes(probe[2..].try_into().unwrap()) {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(not(windows))]
@@ -1274,15 +1304,6 @@ mod test {
     use std::path::Path;
 
     use super::*;
-
-    #[track_caller]
-    fn ensure_utf8_inner(entry: &[&[[u8; MAX_RUST_RAW_KEYWORD_LEN]]]) {
-        for kws in entry {
-            for kw in *kws {
-                assert!(std::str::from_utf8(kw).is_ok(), "not UTF-8: {kw:?}");
-            }
-        }
-    }
 
     #[test]
     fn test_strip_common() {
@@ -1468,14 +1489,6 @@ mod test {
             std::mem::size_of::<Span<'static>>(),
             std::mem::size_of::<*const ()>()
         );
-    }
-
-    // Ensure that all raw keyword strings are UTF-8, because we use `from_utf8_unchecked()`.
-    #[test]
-    fn ensure_utf8() {
-        assert_eq!(RUST_KEYWORDS.len(), KWS_EXTRA.len());
-        ensure_utf8_inner(RUST_KEYWORDS);
-        ensure_utf8_inner(KWS_EXTRA);
     }
 
     #[test]
