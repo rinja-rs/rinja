@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_let_destruct_tuple() {

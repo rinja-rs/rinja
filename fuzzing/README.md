@@ -1,4 +1,4 @@
-# Rinja Fuzzing
+# Askama Fuzzing
 
 First install `cargo-fuzz` and rust-nightly (once):
 

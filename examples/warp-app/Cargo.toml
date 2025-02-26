@@ -5,11 +5,11 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 publish = false
 
-# This is an example application that uses both rinja as template engine,
+# This is an example application that uses both askama as template engine,
 # and actix-web as your web-framework.
 [dependencies]
+askama = { version = "0.3.5", path = "../../askama" }
 http = "0.2.12"
-rinja = { version = "0.3.5", path = "../../rinja" }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 warp = "0.3.7"
 
@@ -26,6 +26,6 @@ pretty-error-debug = "0.3.1"
 thiserror = "2.0.11"
 
 # In a real application you would not need this section. It is only used in here, so that this
-# example can have a more lenient MSRV (minimum supported rust version) than rinja as a whole.
+# example can have a more lenient MSRV (minimum supported rust version) than askama as a whole.
 [workspace]
 members = ["."]

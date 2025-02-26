@@ -1,6 +1,6 @@
 #![no_implicit_prelude]
 
-use ::rinja::Template;
+use ::askama::Template;
 
 #[derive(Template)]
 #[template(path = "hello.html")]

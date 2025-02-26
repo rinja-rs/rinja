@@ -27,24 +27,24 @@ The parse tree looks like this for the example template:
 The generated code looks like this:
 
 ```rust
-impl<'a> rinja::Template for HelloWorld<'a> {
-    fn render_into<RinjaW>(&self, __rinja_writer: &mut RinjaW) -> rinja::Result<()>
+impl<'a> askama::Template for HelloWorld<'a> {
+    fn render_into<AskamaW>(&self, __askama_writer: &mut AskamaW) -> askama::Result<()>
     where
-        RinjaW: core::fmt::Write + ?Sized,
+        AskamaW: core::fmt::Write + ?Sized,
     {
-        __rinja_writer.write_str("Hello, ")?;
+        __askama_writer.write_str("Hello, ")?;
         match (
-            &((&&rinja::filters::AutoEscaper::new(
+            &((&&askama::filters::AutoEscaper::new(
                 &(self.name),
-                rinja::filters::Html,
+                askama::filters::Html,
             ))
-                .rinja_auto_escape()?),
+                .askama_auto_escape()?),
         ) {
             (expr2,) => {
-                (&&rinja::filters::Writable(expr2)).rinja_write(__rinja_writer)?;
+                (&&askama::filters::Writable(expr2)).askama_write(__askama_writer)?;
             }
         }
-        __rinja_writer.write_str("!")?;
+        __askama_writer.write_str("!")?;
         Ok(())
     }
     const SIZE_HINT: usize = 11usize;

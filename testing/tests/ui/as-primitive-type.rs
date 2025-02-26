@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = r#"{{ 1234 as 4567 }}"#, ext = "html")]

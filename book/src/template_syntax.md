@@ -53,7 +53,7 @@ Assignments use the `let` tag:
 {{ val }}
 ```
 
-Like Rust, Rinja also supports shadowing variables.
+Like Rust, Askama also supports shadowing variables.
 
 ```jinja
 {% let foo = "bar" %}
@@ -111,7 +111,7 @@ called on what `lower` returned.
 
 ## Whitespace control
 
-Rinja considers all tabs, spaces, newlines and carriage returns to be
+Askama considers all tabs, spaces, newlines and carriage returns to be
 whitespace. By default, it preserves all whitespace in template code,
 except that a single trailing newline character is suppressed.
 However, whitespace before and after expression and block delimiters
@@ -162,7 +162,7 @@ Whitespace controls can also be defined by a
 These definitions follow the global-to-local preference:
 1. Inline (`-`, `+`, `~`)
 2. Derive (`#[template(whitespace = "suppress")]`)
-3. Configuration (in `rinja.toml`, `whitespace = "preserve"`)
+3. Configuration (in `askama.toml`, `whitespace = "preserve"`)
 
 Two inline whitespace controls may point to the same whitespace span.
 In this case, they are resolved by the following preference.
@@ -296,7 +296,7 @@ struct MyTemplate {
 
 ## Calling functions
 
-If you only provide a function name, rinja will assume it's a method. If
+If you only provide a function name, askama will assume it's a method. If
 you want to call a method, you will need to use a path instead:
 
 ```jinja
@@ -402,7 +402,7 @@ struct BlockFragment {
 
 ## HTML escaping
 
-Rinja by default escapes variables if it thinks it is rendering HTML
+Askama by default escapes variables if it thinks it is rendering HTML
 content. It infers the escaping context from the extension of template
 filenames, escaping by default if the extension is one of `html`, `htm`,
 or `xml`. When specifying a template as `source` in an attribute, the
@@ -410,7 +410,7 @@ or `xml`. When specifying a template as `source` in an attribute, the
 you can specify an escape mode explicitly for your template by setting
 the `escape` attribute parameter value (to `none` or `html`).
 
-Rinja escapes `<`, `>`, `&`, `"`, and `'`, according to the
+Askama escapes `<`, `>`, `&`, `"`, and `'`, according to the
 [OWASP escaping recommendations][owasp]. Use the `safe` filter to
 prevent escaping for a single expression, or the `escape` (or `e`)
 filter to escape a single expression in an unescaped context.
@@ -534,7 +534,7 @@ const x = {{ x is defined }};
 </script>
 ```
 
-Due to proc-macro limitations, rinja can only see the fields of your current type and the variables
+Due to proc-macro limitations, askama can only see the fields of your current type and the variables
 declared in the templates. Because of this, you can not check if a field or a function is defined:
 
 ```jinja
@@ -677,14 +677,14 @@ in which they're used, including local variables like those from loops:
 ```
 
 The path to include must be a string literal, so that it is known at
-compile time. Rinja will try to find the specified template relative
+compile time. Askama will try to find the specified template relative
 to the including template's path before falling back to the absolute
 template path. Use `include` within the branches of an `if`/`else`
 block to use includes more dynamically.
 
 ## Expressions
 
-Rinja supports string literals (`"foo"`) and integer literals (`1`).
+Askama supports string literals (`"foo"`) and integer literals (`1`).
 It supports almost all binary operators that Rust supports,
 including arithmetic, comparison and logic operators.
 The parser applies the same [operator precedence] as the Rust compiler.
@@ -714,7 +714,7 @@ will in turn evaluate the expression and yield `self` again.
 
 ### Expressions containing bit-operators
 
-In Rinja, the binary AND, OR, and XOR operators (called `&`, `|`, `^` in Rust, resp.),
+In Askama, the binary AND, OR, and XOR operators (called `&`, `|`, `^` in Rust, resp.),
 are renamed to `bitand`, `bitor`, `xor` to avoid confusion with filter expressions.
 They still have the same operator precedende as in Rust.
 E.g. to test if the least significant bit is set in an integer field:
@@ -733,7 +733,7 @@ restrictions:
 
 - You can only use [primitive types](https://doc.rust-lang.org/std/primitive/index.html)
   like `i32` or `f64` both as source variable type and as target type.
-- If the source is a reference to a primitive type, e.g. `&&&bool`, then rinja automatically
+- If the source is a reference to a primitive type, e.g. `&&&bool`, then askama automatically
   dereferences the value until it gets the underlying `bool`.
 
 ### String concatenation
@@ -748,7 +748,7 @@ This makes it possible to inject modular template sections into other templates 
 testing and reuse.
 
 ```rust
-use rinja::Template;
+use askama::Template;
 #[derive(Template)]
 #[template(source = "Section 1: {{ s1 }}", ext = "txt")]
 struct RenderInPlace<'a> {
@@ -769,21 +769,21 @@ assert_eq!(t.render().unwrap(), "Section 1: A=a\nB=b")
 Note that if your inner template like `SectionOne` renders HTML content, then you may want to
 disable escaping when injecting it into an outer template, e.g. `{{ s1|safe }}`.
 Otherwise it will render the HTML content literally, because
-rinja [escapes HTML variables](#html-escaping) by default.
+askama [escapes HTML variables](#html-escaping) by default.
 
 See the example
-[render in place](https://github.com/rinja-rs/rinja/blob/master/testing/tests/render_in_place.rs)
+[render in place](https://github.com/askama-rs/askama/blob/master/testing/tests/render_in_place.rs)
 using a vector of templates in a for block.
 
 ## Comments
 
-Rinja supports block comments delimited by `{#` and `#}`.
+Askama supports block comments delimited by `{#` and `#}`.
 
 ```jinja
 {# A Comment #}
 ```
 
-Like Rust, Rinja also supports nested block comments.
+Like Rust, Askama also supports nested block comments.
 
 ```jinja
 {#
@@ -799,7 +799,7 @@ use a plain loop. If that is not doable, call `.render()`
 directly by using an expression as shown below.
 
 ```rust
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(source = r#"
@@ -917,7 +917,7 @@ It is possible to call rust macros directly in your templates:
 ```
 
 One important thing to note is that contrary to the rest of the expressions,
-Rinja cannot know if a token given to a macro is a variable or something
+Askama cannot know if a token given to a macro is a variable or something
 else, so it will always default to generate it "as is". So if you have:
 
 ```rust

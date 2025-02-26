@@ -1,4 +1,4 @@
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_include() {
@@ -74,7 +74,7 @@ fn test_include_macro() {
 // 4. Back to `block_in_include_extended.html`: it uses the block `block_in_base`. However, this
 //    block was already called, so this second call is ignored.
 //
-// Related issue is <https://github.com/rinja-rs/rinja/issues/272>.
+// Related issue is <https://github.com/askama-rs/askama/issues/272>.
 #[test]
 fn block_in_include() {
     #[derive(Template)]

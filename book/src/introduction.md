@@ -1,6 +1,6 @@
-# Rinja
+# Askama
 
-Rinja implements a template rendering engine based on [Jinja](https://jinja.palletsprojects.com/).
+Askama implements a template rendering engine based on [Jinja](https://jinja.palletsprojects.com/).
 It generates Rust code from your templates at compile time
 based on a user-defined `struct` to hold the template's context.
 See below for an example.
@@ -8,8 +8,8 @@ See below for an example.
 All feedback welcome! Feel free to file bugs, requests for documentation and
 any other feedback to the [issue tracker][issues].
 
-Have a look at our [*Rinja Playground*](https://rinja-rs.github.io/play-rinja/),
-if you want to try out rinja's code generation online.
+Have a look at our [*Askama Playground*](https://askama-rs.github.io/play-askama/),
+if you want to try out askama's code generation online.
 
 ## Feature highlights
 
@@ -31,7 +31,7 @@ if you want to try out rinja's code generation online.
 * Opt-out HTML escaping
 * Syntax customization
 
-[issues]: https://github.com/rinja-rs/rinja/issues
+[issues]: https://github.com/askama-rs/askama/issues
 
 ## Getting Started
 
@@ -39,7 +39,7 @@ First, add the following to your crate's `Cargo.toml`:
 
 ```toml
 # in [dependencies] section
-rinja = "0.3.5"
+askama = "0.3.5"
 ```
 
 Now create a directory called `templates` in your crate root.
@@ -52,7 +52,7 @@ Hello, {{ name }}!
 In any Rust file inside your crate, add the following:
 
 ```rust
-use rinja::Template; // bring trait in scope
+use askama::Template; // bring trait in scope
 
 #[derive(Template)] // this will generate the code...
 #[template(path = "hello.html")] // using the template in this path, relative

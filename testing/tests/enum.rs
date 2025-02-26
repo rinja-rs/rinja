@@ -1,7 +1,7 @@
 use std::any::type_name_of_val;
 use std::fmt::{Debug, Display};
 
-use rinja::Template;
+use askama::Template;
 
 #[test]
 fn test_book_example() {
@@ -119,7 +119,7 @@ fn test_simple_enum() {
         },
         // uses default source with `SimpleEnum` as `Self`
         F,
-        // uses default source with a synthetic type `__Rinja__SimpleEnum__G` as `Self`
+        // uses default source with a synthetic type `__Askama__SimpleEnum__G` as `Self`
         #[template()]
         G,
     }
@@ -151,8 +151,8 @@ fn test_simple_enum() {
     let tmpl: SimpleEnum<'_, X> = SimpleEnum::G;
     assert_eq!(
         tmpl.render().unwrap(),
-        "&enum::test_simple_enum::_::__Rinja__SimpleEnum__G<enum::X> | \
-        __Rinja__SimpleEnum__G(\
+        "&enum::test_simple_enum::_::__Askama__SimpleEnum__G<enum::X> | \
+        __Askama__SimpleEnum__G(\
             PhantomData<&enum::test_simple_enum::SimpleEnum<enum::X>>\
         )",
     );
@@ -192,7 +192,7 @@ fn test_enum_blocks() {
 
     assert_eq!(
         BlockEnum::<'_, X>::D.render().unwrap(),
-        "<d = &enum::test_enum_blocks::_::__Rinja__BlockEnum__D<enum::X>>"
+        "<d = &enum::test_enum_blocks::_::__Askama__BlockEnum__D<enum::X>>"
     );
 }
 

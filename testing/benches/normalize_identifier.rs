@@ -652,7 +652,7 @@ struct Words(&'static str);
 
 impl Default for Words {
     fn default() -> Self {
-        Self(include_str!("../../rinja_derive/src/generator.rs"))
+        Self(include_str!("../../askama_derive/src/generator.rs"))
     }
 }
 

@@ -2,7 +2,7 @@
 
 ## Rendering Performance
 
-When rendering a rinja template, you should prefer the methods
+When rendering an askama template, you should prefer the methods
 
 * [`.render()`] (to render the content into a new string),
 * [`.render_into()`] (to render the content into an [`fmt::Write`] object, e.g. [`String`]) or
@@ -10,13 +10,13 @@ When rendering a rinja template, you should prefer the methods
 
 over [`.to_string()`] or [`format!()`].
 While `.to_string()` and `format!()` give you the same result, they generally perform much worse
-than rinja's own methods, because [`fmt::Write`] uses [dynamic methods calls] instead of
+than askama's own methods, because [`fmt::Write`] uses [dynamic methods calls] instead of
 monomorphised code. On average, expect `.to_string()` to be 100% to 200% slower than `.render()`.
 
 [dynamic methods calls]: <https://doc.rust-lang.org/stable/std/keyword.dyn.html>
-[`.render()`]: <https://docs.rs/rinja/latest/rinja/trait.Template.html#method.render>
-[`.render_into()`]: <https://docs.rs/rinja/latest/rinja/trait.Template.html#tymethod.render_into>
-[`.write_into()`]: <https://docs.rs/rinja/latest/rinja/trait.Template.html#method.write_into>
+[`.render()`]: <https://docs.rs/askama/latest/askama/trait.Template.html#method.render>
+[`.render_into()`]: <https://docs.rs/askama/latest/askama/trait.Template.html#tymethod.render_into>
+[`.write_into()`]: <https://docs.rs/askama/latest/askama/trait.Template.html#method.write_into>
 [`fmt::Write`]: <https://doc.rust-lang.org/stable/std/fmt/trait.Write.html>
 [`String`]: <https://doc.rust-lang.org/stable/std/string/struct.String.html>
 [`io::Write`]: <https://doc.rust-lang.org/stable/std/io/trait.Write.html>
@@ -27,12 +27,12 @@ monomorphised code. On average, expect `.to_string()` to be 100% to 200% slower 
 ## Slow Debug Recompilations
 
 If you experience slow compile times when iterating with lots of templates,
-you can compile Rinja's derive macros with a higher optimization level.
+you can compile Askama's derive macros with a higher optimization level.
 This can speed up recompilation times dramatically.
 
 Add the following to `Cargo.toml` or `.cargo/config.toml`:
 ```rust
-[profile.dev.package.rinja_derive]
+[profile.dev.package.askama_derive]
 opt-level = 3
 ```
 
