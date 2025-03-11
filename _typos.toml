@@ -10,6 +10,9 @@ extend-exclude = [
     "target/",
     "askama_parser/tests/*.txt",
     "testing/templates/fuzzed-*",
+    # we copied the files verbatim including any typos :)
+    "askama_parser/benches",
+    "askama_derive_standalone/benches",
     # filler texts
     "askama/benches/strings.inc",
     # too many false positives
