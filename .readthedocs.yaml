@@ -6,6 +6,7 @@ build:
   os: ubuntu-lts-latest
   tools:
     python: "3.12"
+    rust: "latest"
   commands:
     # Generate "book/theme/index.hbs" as "skeleton" of the generated pages.
     - book/update-theme.py
@@ -18,3 +19,8 @@ build:
     - cat book/ethicalads-theme.css >> $READTHEDOCS_OUTPUT/html/css/general.css
     # We are done!
     - cp book/404.html $READTHEDOCS_OUTPUT/html
+
+    # Build and copy the API docs
+    - cargo install cargo-docs-rs
+    - RUSTC_BOOTSTRAP=1 cargo docs-rs -p askama
+    - cp -a -r -t $READTHEDOCS_OUTPUT/html/ target/x86_64-unknown-linux-gnu/doc/

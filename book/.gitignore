@@ -1,2 +1,3 @@
-book
-.sass-cache
+/book
+/.sass-cache
+/src/doc
