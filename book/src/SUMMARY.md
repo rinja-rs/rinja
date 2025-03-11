@@ -11,3 +11,4 @@
 - [Web-frameworks](./frameworks.md)
 - [Performance](./performance.md)
 - [Upgrading](./upgrading.md)
+- [API documentation](./doc/askama/index.html)
