@@ -9,7 +9,7 @@ A template consists of **text contents**, which are passed through as-is,
 **expressions**, which get replaced with content while being rendered, and
 **tags**, which control the template's logic.
 The [template syntax](template_syntax.md) is very similar to [Jinja](http://jinja.pocoo.org/),
-as well as Jinja-derivatives like [Twig](http://twig.sensiolabs.org/) or
+as well as Jinja-derivatives like [Twig](https://twig.symfony.com/) or
 [Tera](https://github.com/Keats/tera).
 
 ```rust
