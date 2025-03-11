@@ -1,4 +1,4 @@
 [submodule "fuzzing/fuzz/corpus"]
 	path = fuzzing/fuzz/corpus
-	url = https://github.com/rinja-rs/fuzzing-corpus.git
+	url = https://github.com/askama-rs/fuzzing-corpus.git
 	branch = main
