@@ -373,7 +373,7 @@ static DEFAULT_ESCAPERS: &[(&[&str], &str)] = &[
         ],
         "Html",
     ),
-    (&["md", "none", "txt", "yml", ""], "Text"),
+    (&["md", "none", "txt", "typ", "yml", ""], "Text"),
 ];
 
 #[cfg(test)]
@@ -656,7 +656,7 @@ mod tests {
                     "askama::filters::Html".into()
                 ),
                 (
-                    str_set(&["md", "none", "txt", "yml", ""]),
+                    str_set(&["md", "none", "txt", "typ", "yml", ""]),
                     "askama::filters::Text".into()
                 ),
             ]
